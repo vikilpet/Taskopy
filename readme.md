@@ -1,4 +1,5 @@
 ﻿
+
 # Taskopy
 ### Python scheduler for Windows with hotkeys, tray menu, HTTP-server and many more.
 
@@ -9,7 +10,7 @@ Run your python code with hotkey or by HTTP-request just like that:
 def my_task(hotkey='ctrl+shift+t', http=True):
   print('This is my code!')
 ```
-Then press Ctrl+Shift+T or open in browser URL http://127.0.0.1/task?my_function and your task («my_function») will be executed.
+Then press Ctrl+Shift+T or open in browser URL http://127.0.0.1/task?my_task and your task will be executed.
 
 Another example: show message box every day at 10:30 and hide this task from menu:
 ```python
@@ -158,8 +159,9 @@ search in *source* with regular expression.
 - **email_send(recipient:str, subject:str, message:str, smtp_server:str, smtp_port:int, smtp_user:str, smtp_password:str)** --- send email.
 
 ### Filesystem
-*fullpath* means full name of file, for example 'c:\\\Windows\\\System32\\\calc.exe'
-**IMPORTANT! Always use double backslash in paths**
+***fullpath* means full name of file, for example 'c:\\\Windows\\\System32\\\calc.exe'**
+
+ **IMPORTANT! Always use double backslash in paths!**
 
  - **dir_delete(fullpath:str):** --- delete directory.
  - **dir_list(fullpath:str)->list:** --- get list of files in directory.
