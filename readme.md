@@ -2,7 +2,7 @@
 # Taskopy
 ### Python scheduler for Windows with hotkeys, tray menu, HTTP-server and many more.
 
-![Tray icon menu](https://i4.imageban.ru/out/2019/06/24/a639cfc74fafc76dabc60164973e6054.png)
+![Tray icon menu](https://i6.imageban.ru/out/2019/07/04/a6f6538a80bc7a62ab06ce5cea295a93.png)
 
 Run your python code with hotkey or by HTTP-request just like that:
 ```python
@@ -303,5 +303,5 @@ def calc_currency_alfa(submenu='Rare', single=True):
 ```
 
 <!---
-2019-07-03_13-48-13
+2019-07-04_22-29-52
  -->
