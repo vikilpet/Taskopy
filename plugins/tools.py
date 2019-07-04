@@ -176,10 +176,10 @@ def email_send(
 	):
 	''' Send email
 	'''
-	plugin_send_mail.send_email(
+	send_email(
 		receiver_email=recipient
-		, subject=subject, 
-		from_name=APP_NAME
+		, subject=subject
+		, from_name=APP_NAME
 		, message=message
 		, smtp_server=smtp_server
 		, smtp_port=smtp_port
