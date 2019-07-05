@@ -50,8 +50,7 @@ def demo_task_4(left_click=True):
 	# Запускаем калькулятор:
 	app_start(r'calc.exe')
 	# Скачиваем json по которому грузится список валют
-	# по ссылке https://alfabank.ru/currency/ и получаем
-	# из него курс продажи доллара:
+	# и получаем из него курс продажи доллара:
 	usd = json_element_get(
 		'https://www.sberbank.ru/portalserver/proxy/?pipe=shortCachePipe&url=http://localhost/rates-web/rateService/rate/current%3FregionId%3D77%26currencyCode%3D840%26currencyCode%3D978%26rateCategory%3Dbeznal'
 		, ['beznal', '840', '0', 'sellValue']

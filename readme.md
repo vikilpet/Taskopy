@@ -3,7 +3,12 @@
 # Taskopy
 ### Python scheduler for Windows with hotkeys, tray menu, HTTP-server and many more.
 
+<p align="center">
+  <img src="https://i6.imageban.ru/out/2019/07/04/a6f6538a80bc7a62ab06ce5cea295a93.png">
+</p>
+<!---
 ![Tray icon menu](https://i6.imageban.ru/out/2019/07/04/a6f6538a80bc7a62ab06ce5cea295a93.png)
+-->
 
 Run your python code with hotkey or by HTTP-request just like that:
 ```python
@@ -77,17 +82,17 @@ Format: **option name** (default value) — description.
 - **hotkey_suppress** (True) — if set to False hotkey will not supressed so active window ill still receive it.
 - **schedule** (None) — add to schedule. Functionality provided by [schedule project](https://github.com/dbader/schedule) so you better refer to their [documentation](https://schedule.readthedocs.io/en/stable/). Some examples:
 Run task every hour:
-```python
-schedule='every().hour'
-```
+    ```python
+    schedule='every().hour'
+    ```
 Run task every wednesday at 13:15:
-```python
-schedule='every().wednesday.at("13:15")'
-```
+    ```python
+    schedule='every().wednesday.at("13:15")'
+    ```
 You can set multiple schedule at once with list:
-```python
-schedule=['every().wednesday.at("18:00")', 'every().friday.at("17:00")']
-```
+    ```python
+    schedule=['every().wednesday.at("18:00")', 'every().friday.at("17:00")']
+    ```
 - **active** (True) — to enable-disable task.
 - **startup** (False) — run at taskopy startup.
 - **sys_startup** (False) — run at Windows startup (uptime is less than 3 min).
@@ -99,13 +104,13 @@ schedule=['every().wednesday.at("18:00")', 'every().friday.at("17:00")']
 - **http** (False) — run task by HTTP request. HTTP request syntax: http://127.0.0.1/task?your_task_name where «your_task_name» is the name of function from crontab.
 If option **result** also enabled then HTTP request will show what task will return or 'OK' if there is no value returned.
 Example:
-```python
-def demo_task_4(http=True, result=True):
-	# Get list of files and folders in Taskopy folder:
-	listing = dir_list(r'*')
-	# return this list as string divided by html <br> tag:
-	return '<br>'.join(listing)
-```
+    ```python
+    def demo_task_4(http=True, result=True):
+    	# Get list of files and folders in Taskopy folder:
+    	listing = dir_list('*')
+    	# return this list as string divided by html <br> tag:
+    	return '<br>'.join(listing)
+    ```
 Result in browser:
 ```
 backup
@@ -126,7 +131,7 @@ Description of global application settings that you can change in
 - **language** (en) — menu and msgbox language. Variants: en, ru.
 - **editor** (notepad) — text editor for «Edit crontab» menu command.
 - **server_ip** (127.0.0.1) — bind HTTP server to this local IP. For access from any address set to *0.0.0.0*.
-**IT IS DANDEROUS TO ALLOW ACCESS FROM ANY IP!** Do not use *0.0.0.0* in public networks or limit access with firewall.
+**IT IS DANGEROUS TO ALLOW ACCESS FROM ANY IP!** Do not use *0.0.0.0* in public networks or limit access with firewall.
 - **server_port** (80) — HTTP server port.
 
 
@@ -139,13 +144,13 @@ Description of global application settings that you can change in
 *wait* — if set to True — continue task execution without waiting for user responce.
 *timeout* (in seconds) — automatically close messagebox. If messagebox is closed by timeout (no button is pressed by user) and *ui* contains more than one button (*MB_YESNO* for example) then it will return 32000.
 Example:
-```python
-def test_msgbox():
-    if msgbox('I can have cheeseburger?') == IDYES:
-        print('Yes!')
-    else:
-        print('No :-(')
-```
+    ```python
+    def test_msgbox():
+        if msgbox('I can have cheeseburger?') == IDYES:
+            print('Yes!')
+        else:
+            print('No :-(')
+    ```
 - **sound_play (fullpath:str, wait:bool)->str** — play .wav file. *wait* — do not pause task execution.
 - **time_now(template:str='%Y-%m-%d_%H-%M-%S')->str** — string with current time.
 - **time_sleep(sec:float)** — pause in seconds.
@@ -159,14 +164,15 @@ search in *source* with regular expression.
 - **email_send(recipient:str, subject:str, message:str, smtp_server:str, smtp_port:int, smtp_user:str, smtp_password:str)** — send email.
 
 ### Filesystem
-***fullpath* means full name of file, for example 'c:\\\Windows\\\System32\\\calc.exe'**
 
- **IMPORTANT! Always use double backslash in paths!**
+**fullpath** means full name of file, for example 'c:\\\Windows\\\System32\\\calc.exe'
 
- - **dir_delete(fullpath:str):** — delete directory.
- - **dir_list(fullpath:str)->list:** — get list of files in directory.
+**IMPORTANT: always use double backslash in paths!**
+
+- **dir_delete(fullpath:str):** — delete directory.
+- **dir_list(fullpath:str)->list:** — get list of files in directory.
  Examples:
-    - Get list of all log files in 'c:\\\Windows\\\' **without** subfolders:
+    - Get list of all log files in 'c:\\\Windows' **without** subfolders:
     ```python
     dir_list('c:\\Windows\\*.log')
     ```
@@ -174,20 +180,20 @@ search in *source* with regular expression.
     ```python
     dir_list('c:\\Windows\\**\\*.log')
     ```
- - **file_backup(fullpath, folder:str=None):** — make copy of file with added timestamp.
+- **file_backup(fullpath, folder:str=None):** — make copy of file with added timestamp.
 *folder* — place copy to this folder. If omitted — place in original folder.
- - **file_copy(fullpath:str, destination:str):** — copy file to destination (fullpath or just folder)/
- - **file_delete(fullpath:str):** — delete file.
- - **file_dir(fullpath:str)->str:** — get parent directory name of file.
- - **file_move(fullpath:str, destination:str):** — move file to destination folder or file.
- - **file_name(fullpath:str)->str:** — get file name without directory.
- - **file_read(fullpath:str)->str:** — get content of file.
- - **file_size(fullpath:str, unit:str='b')->bool:** — get size of file in units (gb, mb, kb, b).
- - **file_write(fullpath:str, content=str):** — write content to file.
- - **free_space(letter:str, unit:str='GB')->int:** — get disk free space in units (gb, mb, kb, b).
- - **is_directory(fullpath:str)->bool:** — fullpath is directory?
- - **path_exists(fullpath:str)->bool:** — fullpath exists (no matter is it folder or file)?
- - **purge_old(fullpath:str, days:int=0, recursive=False, creation:bool=False, test:bool=False):** — delete files from folder *fullpath* older than n *days*.
+- **file_copy(fullpath:str, destination:str):** — copy file to destination (fullpath or just folder)/
+- **file_delete(fullpath:str):** — delete file.
+- **file_dir(fullpath:str)->str:** — get parent directory name of file.
+- **file_move(fullpath:str, destination:str):** — move file to destination folder or file.
+- **file_name(fullpath:str)->str:** — get file name without directory.
+- **file_read(fullpath:str)->str:** — get content of file.
+- **file_size(fullpath:str, unit:str='b')->bool:** — get size of file in units (gb, mb, kb, b).
+- **file_write(fullpath:str, content=str):** — write content to file.
+- **free_space(letter:str, unit:str='GB')->int:** — get disk free space in units (gb, mb, kb, b).
+- **is_directory(fullpath:str)->bool:** — fullpath is directory?
+- **path_exists(fullpath:str)->bool:** — fullpath exists (no matter is it folder or file)?
+- **purge_old(fullpath:str, days:int=0, recursive=False, creation:bool=False, test:bool=False):** — delete files from folder *fullpath* older than n *days*.
 If *days* == 0 then delete all files.
 *creation* — use date of creation, otherwise use last modification date.
 *recursive* — delete from subfolders too.
@@ -249,8 +255,8 @@ def iPython():
 	]
 	# also enable autoreload:
 	clip_set(
-		r'%load_ext autoreload' + '\n'
-		+ r'%autoreload 2' + '\n'
+		'%load_ext autoreload' + '\n'
+		+ '%autoreload 2' + '\n'
 		+ '\n'.join(plugs) + '\n'
 	)
 
@@ -288,22 +294,22 @@ def get_current_ip():
 	msgbox(f'Current IP: {ip}', timeout=10)
 
 # Запускаем калькулятор и меняем его заголовок на курс продажи
-# доллара в Альфа-Банке
-def calc_currency_alfa(submenu='Rare', single=True):
+# доллара в Сбербанке. Назначаем выполнение задачи на клик
+# левой клавишей мыши по иконке:
+def demo_task_4(left_click=True):
 	# Запускаем калькулятор:
 	app_start(r'calc.exe')
 	# Скачиваем json по которому грузится список валют
-	# по ссылке https://alfabank.ru/currency/ и получаем
-	# из него курс продажи доллара:
+	# и получаем из него курс продажи доллара:
 	usd = json_element_get(
-		'https://alfabank.ru/ext-json/0.2/exchange/cash?offset=0&limit=2&mode=rest'
-		, ['usd', 2, 'value']
+		'https://www.sberbank.ru/portalserver/proxy/?pipe=shortCachePipe&url=http://localhost/rates-web/rateService/rate/current%3FregionId%3D77%26currencyCode%3D840%26currencyCode%3D978%26rateCategory%3Dbeznal'
+		, ['beznal', '840', '0', 'sellValue']
 	)
-	# Теперь меняем заголовок калькулятора на USD=63.65
+	# Теперь меняем заголовок калькулятора на USD={найденное значение}
 	window_title_set('Калькулятор', f'USD={usd}')
 
 ```
 
 <!---
-2019-07-04_22-43-44
+2019-07-05_03-15-57
  -->

@@ -1,8 +1,8 @@
 pyperclip==1.6.4
-requests==2.22.0
-pywin32==224
 keyboard==0.13.3
-wxPython==4.0.4
+pywin32==224
 schedule==0.6.0
+wxPython==4.0.4
+requests==2.22.0
 beautifulsoup4==4.7.1
 win32gui==221.6
