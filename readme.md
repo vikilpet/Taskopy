@@ -35,6 +35,7 @@ def my_another_task(schedule='every().day.at("10:30")', menu=False):
   - [System](#system)
   - [Process](#process)
   - [Winamp](#winamp)
+  - [Mikrotik RouterOS](#mikrotik-routeros)
 - [Help Me](#help-me)
 - [Task Examples](#task-examples)
 
@@ -204,13 +205,13 @@ If *days* == 0 then delete all files.
 *destination* — it may be None, fullpath or folder. If None then download to temporary folder with random name.
 - **html_element_get(url:str, find_all_args)->str:** — download page and retrieve value of html element.
 *find_all_args* — dictionary that contain element information such as name or attributes. Example:
-```pyhon
-# Get "123" from html tag <span itemprop="softwareVersion">123</span>
-find_all_args={
-	'name': 'span'
-	, 'attrs': {'itemprop':'softwareVersion'}
-}
-```
+    ```pyhon
+    # Get "123" from html tag <span itemprop="softwareVersion">123</span>
+    find_all_args={
+    	'name': 'span'
+    	, 'attrs': {'itemprop':'softwareVersion'}
+    }
+    ```
 See *get_current_ip* in [task examples](#task-examples)
 - **json_element_get(url:str, element:list):** — same as **html_element_get** but for json.
 *element* — list with map to needed element. Example: element=['usd', 2, 'value']
@@ -235,7 +236,78 @@ See *get_current_ip* in [task examples](#task-examples)
 - **winamp_track_info(sep:str='   ')->str:** — return string with samplerate, bitrate and channels.
 - **winamp_track_length()->str:** — track length.
 - **winamp_track_title(clean:bool=True)->str:** — current track title.
- 
+
+### Mikrotik RouterOS
+- **def routeros_query(query:list, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — send query to router and get status and data. Please read wiki [wiki](https://wiki.mikrotik.com/wiki/Manual:API) about query syntax.
+Example: get information about interface:
+	```python
+	status, data = routeros_query(['/interface/print', '?name=bridge1'], '192.168.0.1', '8728', 'admin', 'pAsSworD')
+	```
+	*data*:
+	```
+	[{'=.id': '*2',
+	'=name': 'bridge1',
+	'=type': 'bridge',
+	'=mtu': 'auto',
+	'=actual-mtu': '1500',
+	'=l2mtu': '1596',
+	'=mac-address': '6b:34:1B:2F:AA:21',
+	'=last-link-up-time': 'jun/10/2019 10:33:35',
+	'=link-downs': '0',
+	'=rx-byte': '1325381950539',
+	'=tx-byte': '2786508773388',
+	'=rx-packet': '2216725736',
+	'=tx-packet': '2703349720',
+	'=rx-drop': '0',
+	'=tx-drop': '0',
+	'=tx-queue-drop': '0',
+	'=rx-error': '0',
+	'=tx-error': '0',
+	'=fp-rx-byte': '1325315798948',
+	'=fp-tx-byte': '0',
+	'=fp-rx-packet': '2216034870',
+	'=fp-tx-packet': '0',
+	'=running': 'true',
+	'=disabled': 'false',
+	'=comment': 'lan'}]
+	```
+- **def routeros_send(cmd:str, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — send command to router and get status and error.
+Example: get list of static items from specified address-list then delete them all:
+    ```python
+	status, data = routeros_query(
+		[
+			'/ip/firewall/address-list/print'
+			, '?list=my_list'
+			, '?dynamic=false'
+		]
+		, device_ip='192.168.0.1'
+		, device_user='admin'
+		, device_pwd='PaSsWorD'
+	)
+
+	# check status and exit if there is error:
+	if not status:
+		print(f'Error: {data}')
+		return
+
+	# get list items from data:
+	items = [i['=.id'] for i in data]
+
+	# Now send commands for removing items from list.
+	# Notice: cmd is list of lists
+	routeros_send(
+		[
+			[
+				'/ip/firewall/address-list/remove'
+				, f'=.id={i}'
+			] for i in items
+		]
+		, device_ip='192.168.0.1'
+		, device_user='admin'
+		, device_pwd='PaSsWorD'
+	)	
+    ```
+
 ## Help me
 - Please correct my spelling mistakes because I am not a native English speaker.
 - [My StackOverflow question about menu by hotkey in wxPython](https://stackoverflow.com/questions/56079269/wxpython-popupmenu-by-global-hotkey) You can add a bounty if you have a lot of reputation.
@@ -311,5 +383,5 @@ def demo_task_4(left_click=True):
 ```
 
 <!---
-2019-07-05_03-15-57
- -->
+2019-07-07_03-43-51
+-->

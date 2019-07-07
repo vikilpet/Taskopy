@@ -13,7 +13,7 @@ import win32gui
 from .plugin_send_mail import send_email
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2019-07-05'
+APP_VERSION = 'v2019-07-07'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 TASK_OPTIONS = [
@@ -64,8 +64,9 @@ def sound_play(fullpath, wait=False):
 	else:
 		winsound.PlaySound(fullpath, winsound.SND_FILENAME + winsound.SND_ASYNC)
 
-def cron_log(msg:str, log_file:bool=True):
-	'''Log to console and logfile'''
+def con_log(msg:str, log_file:bool=True):
+	''' Log to console and logfile
+	'''
 	msg = f"{time.strftime('%y.%m.%d %H:%M:%S')} {msg}"
 	print(msg)
 	if not log_file: return
@@ -162,6 +163,7 @@ def re_replace(source:str, re_pattern:str, repl:str=''
 		pattern=re_pattern
 		, repl=repl
 		, string=source
+		, flags=re_flags
 	)
 	return r
 
@@ -242,10 +244,10 @@ def msgbox(msg:str, title:str=APP_NAME
 	'''
 	def get_hwnd(title_tmp:str):
 		hwnd = 0
-		for i in range(100):
+		for i in range(1000):
 			hwnd = win32gui.FindWindow(None, title_tmp)
-			if hwnd: break
-			time.sleep(0.01)
+			if hwnd:
+				break
 		return hwnd
 	
 	def title_countdown(hwnd:int, timeout:int, title:str):
@@ -260,16 +262,19 @@ def msgbox(msg:str, title:str=APP_NAME
 			time.sleep(0.01)
 	
 	def dis_buttons(hwnd:int, dis_timeout:float):
-		def dis_butt(enable):
-			for but_id in [3, 2, 11, 5, 7, 1, 4, 10, 6]:
-				try:
-					hbut = win32gui.GetDlgItem(hwnd, but_id)
-					win32gui.EnableWindow(hbut, enable)
-				except:
-					pass
-		dis_butt(False)
-		time.sleep(dis_timeout)
-		dis_butt(True)
+		def dis_butt(hchild, state):
+			
+			if win32gui.GetWindowLong(hchild, -12) < 12:
+				win32gui.ShowWindow(hchild, state)
+			return True
+		
+		time.sleep(0.01)
+		try:
+			win32gui.EnumChildWindows(hwnd, dis_butt, False)
+			time.sleep(dis_timeout)
+			win32gui.EnumChildWindows(hwnd, dis_butt, True)
+		except:
+			pass
 		
 	if ui:
 		ui += MB_SYSTEMMODAL
@@ -356,4 +361,4 @@ def msgbox(msg:str, title:str=APP_NAME
 			).start()
 
 def msgbox_warning(msg:str):
-	msgbox(msg, APP_FULLNAME, MB_ICONWARNING)
+	msgbox(msg, APP_NAME, MB_ICONWARNING)

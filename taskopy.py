@@ -59,7 +59,7 @@ class Settings():
 def load_crontab(event=None)->bool:
 	global tasks
 	global crontab
-	cron_log(f'{lang.load_crontab} {os.getcwd()}')
+	con_log(f'{lang.load_crontab} {os.getcwd()}')
 	try:
 		if sys.modules.get('crontab') is None:
 			crontab = importlib.import_module('crontab')
@@ -74,7 +74,7 @@ def load_crontab(event=None)->bool:
 	except Exception as e:
 		trace_li = traceback.format_exc().splitlines()
 		trace_str = '\n'.join(trace_li[-3:])
-		cron_log(traceback.format_exc())
+		con_log(traceback.format_exc())
 		msgbox_warning(f'{lang.warn_crontab_reload}:\n\n{trace_str}')
 		return False
 
@@ -167,7 +167,7 @@ class Tasks():
 	
 	def add_hotkey(s, task):
 		def hk_error(error):
-			cron_log(error)
+			con_log(error)
 			msgbox_warning(
 				lang.warn_hotkey.format(
 					task['task_name_full']
@@ -209,7 +209,7 @@ class Tasks():
 				)
 				eval(sched_rule)
 			except Exception as e:
-				cron_log(repr(e))
+				con_log(repr(e))
 				msgbox_warning(
 					lang.warn_schedule.format(task['task_name_full'])
 					+ ':\n' + inter
@@ -245,9 +245,10 @@ class Tasks():
 				try:
 					s.task_opt_set(task['task_function_name'], 'running', True)
 					task_kwargs = {}
-					if 'caller' in task['task_function'].__code__.co_varnames:
+					func_args = inspect.signature(task['task_function']).parameters.keys()
+					if 'caller' in func_args:
 						task_kwargs['caller'] = caller
-					if 'data' in task['task_function'].__code__.co_varnames:
+					if 'data' in func_args:
 						task_kwargs['data'] = data
 					r = task['task_function'](**task_kwargs)
 					if r: result.append(r)
@@ -256,7 +257,7 @@ class Tasks():
 					s.task_opt_set(task['task_function_name'], 'running', False)
 					trace_li = traceback.format_exc().splitlines()
 					trace_str = '\n'.join(trace_li[-3:])
-					cron_log(
+					con_log(
 						f'Error in task: {task["task_name_full"]}\n'
 						+ traceback.format_exc()
 					)
@@ -269,7 +270,7 @@ class Tasks():
 				if task['running']: return
 			if task['log']:
 				cs = f' ({caller})' if caller else ''
-				cron_log(f'task{cs}: {task["task_name_full"]}')
+				con_log(f'task{cs}: {task["task_name_full"]}')
 			result = []
 			if task['result']:
 				t = threading.Thread(target=catcher, args=(result,)
@@ -384,7 +385,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		s.PopupMenu(menu)
 
 	def on_exit(s, event=None):
-		cron_log(lang.menu_exit)
+		con_log(lang.menu_exit)
 		tasks.close()
 		wx.CallAfter(s.Destroy)
 		s.frame.Close()
@@ -400,10 +401,10 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		app.enabled = tasks.enabled
 		if tasks.enabled:
 			set_title(APP_NAME)
-			cron_log('Enabled')
+			con_log('Enabled')
 		else:
 			set_title(f'Disabled {APP_NAME}')
-			cron_log('Disabled')
+			con_log('Disabled')
 		s.set_icon(not tasks.enabled)
 	
 	def on_restart(s, event=None):
@@ -460,9 +461,11 @@ def main():
 		
 		app.MainLoop()
 	except Exception as e:
-		msg = f'\nGeneral exception: {repr(e)}\n'
+		trace_li = traceback.format_exc().splitlines()
+		trace_str = '\n'.join(trace_li[-3:])
+		msg = f'\nGeneral exception:\n\n{repr(e)}\n\n{trace_str}'
 		print(msg)
-		msgbox_warning(msg + '\nCheck console!')
+		msgbox_warning(msg)
 		input('Press Enter to exit...')
 	except KeyboardInterrupt:
 		print('Interrupted by keyboard')

@@ -4,6 +4,7 @@ from plugins.plugin_filesystem import *
 from plugins.plugin_network import *
 from plugins.plugin_winamp import *
 from plugins.plugin_system import *
+from plugins.plugin_routeros import *
 
 # Task with only one option: run at taskopy startup.
 # You can disable it with option «active=False» like that:
@@ -72,3 +73,30 @@ def backup_and_purge(
 	purge_old('backup', days=10)
 	# Delete logs older than 10 days
 	purge_old('log', days=10)
+
+# Check github for new version
+def taskopy_update(schedule='every().sunday.at("15:30")', submenu='WIP'):
+	new_ver = html_element_get(
+		'https://github.com/vikilpet/Taskopy/releases'
+		, {'name':'div', 'class':'f1'}
+	)[1:-1]	# remove first and last \n
+	cur_ver = var_get('taskopy_version')
+	if cur_ver == '':
+		# It is a first time, don't bother user:
+		print('First check for updates')
+		# just save current version and exit:
+		var_set('taskopy_version', APP_VERSION)
+		return
+	if cur_ver != new_ver:
+		news = html_element_get(
+			'https://github.com/vikilpet/Taskopy/releases'
+			, {'name':'div', 'class':'markdown-body'}
+		)[1:-1]
+		print(f'New version of Taskopy: {new_ver}')
+		if msgbox(
+			f'New version of Taskopy: {new_ver}\n\n{news}'
+			, dis_timeout=1
+			, ui=MB_YESNO + MB_ICONINFORMATION
+		) == IDYES:
+			var_set('taskopy_version', new_ver)
+			file_open('https://github.com/vikilpet/Taskopy/releases')
