@@ -83,17 +83,17 @@ Format: **option name** (default value) — description.
 - **hotkey_suppress** (True) — if set to False hotkey will not supressed so active window ill still receive it.
 - **schedule** (None) — add to schedule. Functionality provided by [schedule project](https://github.com/dbader/schedule) so you better refer to their [documentation](https://schedule.readthedocs.io/en/stable/). Some examples:
 Run task every hour:
-    ```python
-    schedule='every().hour'
-    ```
+	```python
+	schedule='every().hour'
+	```
 Run task every wednesday at 13:15:
-    ```python
-    schedule='every().wednesday.at("13:15")'
-    ```
+	```python
+	schedule='every().wednesday.at("13:15")'
+	```
 You can set multiple schedule at once with list:
-    ```python
-    schedule=['every().wednesday.at("18:00")', 'every().friday.at("17:00")']
-    ```
+	```python
+	schedule=['every().wednesday.at("18:00")', 'every().friday.at("17:00")']
+	```
 - **active** (True) — to enable-disable task.
 - **startup** (False) — run at taskopy startup.
 - **sys_startup** (False) — run at Windows startup (uptime is less than 3 min).
@@ -105,13 +105,13 @@ You can set multiple schedule at once with list:
 - **http** (False) — run task by HTTP request. HTTP request syntax: http://127.0.0.1/task?your_task_name where «your_task_name» is the name of function from crontab.
 If option **result** also enabled then HTTP request will show what task will return or 'OK' if there is no value returned.
 Example:
-    ```python
-    def demo_task_4(http=True, result=True):
-    	# Get list of files and folders in Taskopy folder:
-    	listing = dir_list('*')
-    	# return this list as string divided by html <br> tag:
-    	return '<br>'.join(listing)
-    ```
+	```python
+	def demo_task_4(http=True, result=True):
+		# Get list of files and folders in Taskopy folder:
+		listing = dir_list('*')
+		# return this list as string divided by html <br> tag:
+		return '<br>'.join(listing)
+	```
 Result in browser:
 ```
 backup
@@ -145,13 +145,13 @@ Description of global application settings that you can change in
 *wait* — if set to True — continue task execution without waiting for user responce.
 *timeout* (in seconds) — automatically close messagebox. If messagebox is closed by timeout (no button is pressed by user) and *ui* contains more than one button (*MB_YESNO* for example) then it will return 32000.
 Example:
-    ```python
-    def test_msgbox():
-        if msgbox('I can have cheeseburger?') == IDYES:
-            print('Yes!')
-        else:
-            print('No :-(')
-    ```
+	```python
+	def test_msgbox():
+		if msgbox('I can have cheeseburger?') == IDYES:
+			print('Yes!')
+		else:
+			print('No :-(')
+	```
 - **sound_play (fullpath:str, wait:bool)->str** — play .wav file. *wait* — do not pause task execution.
 - **time_now(template:str='%Y-%m-%d_%H-%M-%S')->str** — string with current time.
 - **time_sleep(sec:float)** — pause in seconds.
@@ -173,14 +173,14 @@ search in *source* with regular expression.
 - **dir_delete(fullpath:str):** — delete directory.
 - **dir_list(fullpath:str)->list:** — get list of files in directory.
  Examples:
-    - Get list of all log files in 'c:\\\Windows' **without** subfolders:
-    ```python
-    dir_list('c:\\Windows\\*.log')
-    ```
-    - Get all log files in 'c:\\\Windows\\\' **with** subfolders:
-    ```python
-    dir_list('c:\\Windows\\**\\*.log')
-    ```
+	- Get list of all log files in 'c:\\\Windows' **without** subfolders:
+	```python
+	dir_list('c:\\Windows\\*.log')
+	```
+	- Get all log files in 'c:\\\Windows\\\' **with** subfolders:
+	```python
+	dir_list('c:\\Windows\\**\\*.log')
+	```
 - **file_backup(fullpath, folder:str=None):** — make copy of file with added timestamp.
 *folder* — place copy to this folder. If omitted — place in original folder.
 - **file_copy(fullpath:str, destination:str):** — copy file to destination (fullpath or just folder)/
@@ -205,13 +205,13 @@ If *days* == 0 then delete all files.
 *destination* — it may be None, fullpath or folder. If None then download to temporary folder with random name.
 - **html_element_get(url:str, find_all_args)->str:** — download page and retrieve value of html element.
 *find_all_args* — dictionary that contain element information such as name or attributes. Example:
-    ```pyhon
-    # Get "123" from html tag <span itemprop="softwareVersion">123</span>
-    find_all_args={
-    	'name': 'span'
-    	, 'attrs': {'itemprop':'softwareVersion'}
-    }
-    ```
+	```pyhon
+	# Get "123" from html tag <span itemprop="softwareVersion">123</span>
+	find_all_args={
+		'name': 'span'
+		, 'attrs': {'itemprop':'softwareVersion'}
+	}
+	```
 See *get_current_ip* in [task examples](#task-examples)
 - **json_element_get(url:str, element:list):** — same as **html_element_get** but for json.
 *element* — list with map to needed element. Example: element=['usd', 2, 'value']
@@ -238,7 +238,7 @@ See *get_current_ip* in [task examples](#task-examples)
 - **winamp_track_title(clean:bool=True)->str:** — current track title.
 
 ### Mikrotik RouterOS
-- **def routeros_query(query:list, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — send query to router and get status and data. Please read wiki [wiki](https://wiki.mikrotik.com/wiki/Manual:API) about query syntax.
+- **routeros_query(query:list, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — send query to router and get status and data. Please read wiki [wiki](https://wiki.mikrotik.com/wiki/Manual:API) about query syntax.
 Example: get information about interface:
 	```python
 	status, data = routeros_query(['/interface/print', '?name=bridge1'], '192.168.0.1', '8728', 'admin', 'pAsSworD')
@@ -271,9 +271,9 @@ Example: get information about interface:
 	'=disabled': 'false',
 	'=comment': 'lan'}]
 	```
-- **def routeros_send(cmd:str, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — send command to router and get status and error.
+- **routeros_send(cmd:str, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — send command to router and get status and error.
 Example: get list of static items from specified address-list then delete them all:
-    ```python
+	```python
 	status, data = routeros_query(
 		[
 			'/ip/firewall/address-list/print'
@@ -306,7 +306,7 @@ Example: get list of static items from specified address-list then delete them a
 		, device_user='admin'
 		, device_pwd='PaSsWorD'
 	)	
-    ```
+	```
 
 ## Help me
 - Please correct my spelling mistakes because I am not a native English speaker.
@@ -383,5 +383,5 @@ def demo_task_4(left_click=True):
 ```
 
 <!---
-2019-07-07_03-43-51
+2019-07-07_15-32-16
 -->
