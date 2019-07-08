@@ -1,6 +1,4 @@
-﻿
-
-# Taskopy
+﻿# Taskopy
 ### Python scheduler for Windows with hotkeys, tray menu, HTTP-server and many more.
 
 <p align="center">
@@ -82,15 +80,15 @@ Format: **option name** (default value) — description.
 - **hotkey** (None) — assign to global hotkey. Example: *hotkey='alt+ctrl+m'*
 - **hotkey_suppress** (True) — if set to False hotkey will not supressed so active window ill still receive it.
 - **schedule** (None) — add to schedule. Functionality provided by [schedule project](https://github.com/dbader/schedule) so you better refer to their [documentation](https://schedule.readthedocs.io/en/stable/). Some examples:
-Run task every hour:
+	Run task every hour:
 	```python
 	schedule='every().hour'
 	```
-Run task every wednesday at 13:15:
+	Run task every wednesday at 13:15:
 	```python
 	schedule='every().wednesday.at("13:15")'
 	```
-You can set multiple schedule at once with list:
+	You can set multiple schedule at once with list:
 	```python
 	schedule=['every().wednesday.at("18:00")', 'every().friday.at("17:00")']
 	```
@@ -103,25 +101,25 @@ You can set multiple schedule at once with list:
 - **submenu** (None) — place task in this sub menu.
 - **result** (False) — task should return some value. Use together with http option to get page with task results.
 - **http** (False) — run task by HTTP request. HTTP request syntax: http://127.0.0.1/task?your_task_name where «your_task_name» is the name of function from crontab.
-If option **result** also enabled then HTTP request will show what task will return or 'OK' if there is no value returned.
-Example:
+	If option **result** also enabled then HTTP request will show what task will return or 'OK' if there is no value returned.
+	Example:
 	```python
 	def demo_task_4(http=True, result=True):
 		# Get list of files and folders in Taskopy folder:
 		listing = dir_list('*')
-		# return this list as string divided by html <br> tag:
+		# return this list as string divided by html br tag:
 		return '<br>'.join(listing)
 	```
-Result in browser:
-```
-backup
-crontab.py
-log
-resources
-settings.ini
-taskopy.exe
-```
-Also see [settings](#settings) section for IP and port bindings.
+	Result in browser:
+	```
+	backup
+	crontab.py
+	log
+	resources
+	settings.ini
+	taskopy.exe
+	```
+	Also see [settings](#settings) section for IP and port bindings.
 
 
 ## Settings
@@ -138,13 +136,14 @@ Description of global application settings that you can change in
 
 ## Keywords
 ### Miscelanneous
-- **msgbox(msg:str, title:str=APP_NAME, ui:int=None, wait:bool=True, timeout:int=None)->int** — show messagebox and return user choice. Arguments:
+- **msgbox(msg:str, title:str=APP_NAME, ui:int=None, wait:bool=True, timeout:int=None)->int** — show messagebox and return user choice.
+Arguments:
 *msg* — text
 *title* — messagebox title
 *ui* — [interface flags](https://docs.microsoft.com/en-us/windows/desktop/api/winuser/nf-winuser-messagebox). Example: *ui = MB_ICONINFORMATION + MB_YESNO*
-*wait* — if set to True — continue task execution without waiting for user responce.
+*wait* — if set to False — continue task execution without waiting for user responce.
 *timeout* (in seconds) — automatically close messagebox. If messagebox is closed by timeout (no button is pressed by user) and *ui* contains more than one button (*MB_YESNO* for example) then it will return 32000.
-Example:
+	Example:
 	```python
 	def test_msgbox():
 		if msgbox('I can have cheeseburger?') == IDYES:
@@ -159,8 +158,7 @@ Example:
 - **var_get(var_name:str)->str** — retrieve variable value.
 - **clip_set(txt:str)->** — copy text to clipboard.
 - **clip_get()->str->** — get text from clipboard.
-- **re_find(source:str, re_pattern:str, sort:bool=True)->list** — 
-search in *source* with regular expression.
+- **re_find(source:str, re_pattern:str, sort:bool=True)->list** — search in *source* with regular expression.
 - **re_replace(source:str, re_pattern:str, repl:str='')** — replace in *source* all matches with *repl* string.
 - **email_send(recipient:str, subject:str, message:str, smtp_server:str, smtp_port:int, smtp_user:str, smtp_password:str)** — send email.
 
@@ -172,7 +170,7 @@ search in *source* with regular expression.
 
 - **dir_delete(fullpath:str):** — delete directory.
 - **dir_list(fullpath:str)->list:** — get list of files in directory.
- Examples:
+	Examples:
 	- Get list of all log files in 'c:\\\Windows' **without** subfolders:
 	```python
 	dir_list('c:\\Windows\\*.log')
@@ -183,7 +181,7 @@ search in *source* with regular expression.
 	```
 - **file_backup(fullpath, folder:str=None):** — make copy of file with added timestamp.
 *folder* — place copy to this folder. If omitted — place in original folder.
-- **file_copy(fullpath:str, destination:str):** — copy file to destination (fullpath or just folder)/
+- **file_copy(fullpath:str, destination:str):** — copy file to destination (fullpath or just folder).
 - **file_delete(fullpath:str):** — delete file.
 - **file_dir(fullpath:str)->str:** — get parent directory name of file.
 - **file_move(fullpath:str, destination:str):** — move file to destination folder or file.
@@ -206,19 +204,20 @@ If *days* == 0 then delete all files.
 - **html_element_get(url:str, find_all_args)->str:** — download page and retrieve value of html element.
 *find_all_args* — dictionary that contain element information such as name or attributes. Example:
 	```pyhon
-	# Get "123" from html tag <span itemprop="softwareVersion">123</span>
+	# Get "123" from html tag span itemprop="softwareVersion"123span
 	find_all_args={
 		'name': 'span'
 		, 'attrs': {'itemprop':'softwareVersion'}
 	}
 	```
-See *get_current_ip* in [task examples](#task-examples)
+	See *get_current_ip* in [task examples](#task-examples)
 - **json_element_get(url:str, element:list):** — same as **html_element_get** but for json.
 *element* — list with map to needed element. Example: element=['usd', 2, 'value']
 - **page_get(url:str, encoding:str='utf-8')->str:** — download page by url and return it's html as a string.
 
 ### System
-- **registry_get(fullpath:str)** — get value from Windows Registry. fullpath is string like 'HKEY_CURRENT_USER\\Software\\Microsoft\\Calc\\layout'
+- **registry_get(fullpath:str)** — get value from Windows Registry.
+	*fullpath* — string like 'HKEY_CURRENT_USER\\Software\\Microsoft\\Calc\\layout'
 - **window_title_set(cur_title:str, new_title:str):** — change window title from *cur_title* to *new_title*
 
 ### Process
@@ -228,7 +227,7 @@ See *get_current_ip* in [task examples](#task-examples)
 - **file_open(fullpath:str):** — open file or URL in default application.
 
 ### Winamp
-- **winamp_notification():** — show notification (modern skin).
+- **winamp_notification():** — show notification (only for «Modern» skin).
 - **winamp_pause():** — pause.
 - **winamp_play():** — play.
 - **winamp_status()->str:** — playback status ('playing', 'paused' or 'stopped').
@@ -239,9 +238,18 @@ See *get_current_ip* in [task examples](#task-examples)
 
 ### Mikrotik RouterOS
 - **routeros_query(query:list, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — send query to router and get status and data. Please read wiki [wiki](https://wiki.mikrotik.com/wiki/Manual:API) about query syntax.
-Example: get information about interface:
+	Example: get information about interface:
 	```python
-	status, data = routeros_query(['/interface/print', '?name=bridge1'], '192.168.0.1', '8728', 'admin', 'pAsSworD')
+	status, data = routeros_query(
+		[
+			'/interface/print'
+			, '?name=bridge1'
+		]
+		, '192.168.0.1'
+		, '8728'
+		, 'admin'
+		, 'pAsSworD'
+	)
 	```
 	*data*:
 	```
@@ -272,7 +280,7 @@ Example: get information about interface:
 	'=comment': 'lan'}]
 	```
 - **routeros_send(cmd:str, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — send command to router and get status and error.
-Example: get list of static items from specified address-list then delete them all:
+	Example: get list of static items from specified address-list then delete them all:
 	```python
 	status, data = routeros_query(
 		[
@@ -344,7 +352,7 @@ def check_free_space(caller, schedule='every(30).to(45).minutes'):
 			'Free space in GB:\n'
 			+ f'c: {free_space("c")}\n'
 			+ f'd: {free_space("d")}\n'
-			+ f'e: {free_space("g")}\n'
+			+ f'e: {free_space("e")}\n'
 		)
 		# messagebox will auto-closed after 3 seconds:
 		msgbox(msg, timeout=3)
@@ -383,5 +391,5 @@ def demo_task_4(left_click=True):
 ```
 
 <!---
-2019-07-07_15-32-16
+2019-07-07_19-14-37
 -->

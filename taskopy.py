@@ -23,7 +23,7 @@ from resources.languages import Language
 tasks = None
 app = None
 crontab = None
-settings = None
+sett = None
 lang = None
 
 if getattr(sys, 'frozen', False):
@@ -157,13 +157,13 @@ class Tasks():
 		if s.task_list_http:
 			threading.Thread(
 				target=http_server_start
-				, args=(settings, s)
+				, args=(sett, s)
 				, daemon=True
 			).start()
 		t = threading.Thread(target=s.run_scheduler, daemon=True)
 		t.start()
 		s.sched_thread_id = t.ident
-		if settings.developer: print(f'Total tasks: {len(s.task_list)}')
+		if sett.developer: print(f'Total tasks: {len(s.task_list)}')
 	
 	def add_hotkey(s, task):
 		def hk_error(error):
@@ -232,16 +232,21 @@ class Tasks():
 				task[option] = value
 				break
 
-	def run_task(s, task:dict, caller:str=None, data=None):
-		''' task - dict with task options
-			Logging and other staff
+	def run_task(s, task:dict, caller:str=None, data=None
+				, result:list=None):
+		''' Logging, threading, error catching and other staff.
+			task - dict with task options
 			caller - who actually launched the task.
 				It can be 'hotkey', 'menu', 'scheduler', 'http' etc.
 				So you can check inside task function who calls
 				function this time.
+			data - pass some data to task
+			result - list in which we will place result of task. It is
+				passed through all inner fuctions (run_task_inner,
+				catcher).
 		'''
-		def run_task_inner():
-			def catcher(result):
+		def run_task_inner(result:list=None):
+			def catcher(result:list=None):
 				try:
 					s.task_opt_set(task['task_function_name'], 'running', True)
 					task_kwargs = {}
@@ -251,7 +256,9 @@ class Tasks():
 					if 'data' in func_args:
 						task_kwargs['data'] = data
 					r = task['task_function'](**task_kwargs)
-					if r: result.append(r)
+					if r:
+						if not result is None:
+							result.append(r)
 					s.task_opt_set(task['task_function_name'], 'running', False)
 				except Exception as e:
 					s.task_opt_set(task['task_function_name'], 'running', False)
@@ -271,20 +278,17 @@ class Tasks():
 			if task['log']:
 				cs = f' ({caller})' if caller else ''
 				con_log(f'task{cs}: {task["task_name_full"]}')
-			result = []
 			if task['result']:
 				t = threading.Thread(target=catcher, args=(result,)
 									, daemon=True)
 				t.start()
 				t.join()
-				if result:
-					return result[0]
 			else:
-				threading.Thread(target=catcher, args=(result,)
-								, daemon=True).start()
-		if task['result']:
+				threading.Thread(target=catcher, daemon=True).start()
+		if task['result'] and not result is None:
 			threading.Thread(
 				target=run_task_inner
+				, args=(result,)
 				, daemon=True
 			).start()
 		else:
@@ -307,7 +311,7 @@ class Tasks():
 		try:
 			keyboard.unhook_all()
 		except:
-			if settings.developer: print('no hotkeys wih keyboard module')
+			if sett.developer: print('no hotkeys wih keyboard module')
 		if s.global_hk:
 			s.global_hk.unregister()
 			s.global_hk.stop_listener()
@@ -360,7 +364,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			, lang.menu_disable if tasks.enabled else lang.menu_enable
 			, s.on_disable
 		)
-		if settings.developer:
+		if sett.developer:
 			create_menu_item(menu, 'Show menu 3 sec', s.show_menu_wait)
 			create_menu_item(menu, lang.menu_restart, s.on_restart)
 			create_menu_item(menu, lang.menu_edit_settings, s.on_edit_settings)
@@ -391,10 +395,10 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		s.frame.Close()
 
 	def on_edit_crontab(s, event=None):
-		app_start(f'{settings.editor} crontab.py')
+		app_start(f'{sett.editor} crontab.py')
 
 	def on_edit_settings(s, event=None):
-		app_start(f'{settings.editor} settings.ini')
+		app_start(f'{sett.editor} sett.ini')
 
 	def on_disable(s, event=None):
 		tasks.enabled = not tasks.enabled
@@ -438,26 +442,26 @@ class App(wx.App):
 def main():
 	global app
 	global tasks
-	global settings
+	global sett
 	global lang
 	set_title(APP_NAME)
 	try:
-		settings = Settings()
+		sett = Settings()
 	except Exception as e:
 		print(f'{lang.load_sett_error}:\n{repr(e)}')
 		msgbox_warning(f'{lang.load_sett_error}:\n{repr(e)}')
 		return
-	lang = Language(settings.language)
+	lang = Language(sett.language)
 	print(f'{APP_NAME} version {APP_VERSION}')
 	print(lang.load_homepage)
 	print(lang.load_donate + '\n\n')
-	if settings.developer: print(f'APP_PATH: {APP_PATH}')
+	if sett.developer: print(f'APP_PATH: {APP_PATH}')
 	try:
 		app = App(False)
 		load_crontab()
 		tasks.run_at_startup()
 		tasks.run_at_sys_startup()
-		if settings.developer: app.taskbar_icon.popup_menu_hk()
+		if sett.developer: app.taskbar_icon.popup_menu_hk()
 		
 		app.MainLoop()
 	except Exception as e:

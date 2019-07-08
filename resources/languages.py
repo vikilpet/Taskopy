@@ -11,12 +11,15 @@ class Language():
 		for i in di_def.items():
 			di.setdefault(i[0], i[1])
 		s.__dict__.update(di)
+	
+	def __getattr__(s, name):
+		return 'unknown word'
 
 _dict_en='''\
 load_crontab=Load crontab from folder
 load_sett_error=Settings loading error
-load_homepage=Homepage: http://github.com/vikilpet
-load_donate=Donate: https://www.paypal.me/vikil
+load_homepage=Homepage: https://github.com/vikilpet/Taskopy
+load_donate=Donate if you like it: https://www.paypal.me/vikil
 menu_edit_crontab=Edit crontab
 menu_reload=Reload crontab
 menu_disable=Disable
@@ -33,8 +36,8 @@ warn_task_error=Error when executing a task «{}»
 _dict_ru='''\
 load_crontab=Загрузка кронтаба из папки
 load_sett_error=Ошибка загрузки настроек
-load_homepage=Домашняя страница: http://vikilpet.wordpress.com/
-load_donate=Пожертвования: https://www.paypal.me/vikil
+load_homepage=Домашняя страница: https://vikilpet.wordpress.com/taskopy/
+load_donate=Благодарю за использование.
 menu_edit_crontab=Редактировать кронтаб
 menu_reload=Перечитать кронтаб
 menu_disable=Выключить

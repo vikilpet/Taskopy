@@ -1,12 +1,28 @@
 ﻿import time
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import urllib
 from .tools import msgbox_warning
 
+class RequestData():
+	''' To keep HTTP request data in instance instead of dictionary
+	'''
+	def __init__(s, client_ip:str, path:str
+					, headers:dict={}, params:dict={}):
+		''' client_ip - str
+		'''
+		s.client_ip = client_ip
+		s.path = path
+		s.__dict__.update(headers)
+		s.__dict__.update(params)
+
+	def __getattr__(s, name):
+		return ''
+
 class HTTPHandlerTasks(BaseHTTPRequestHandler):
 	def __init__(s, request, client_address, server
-				, tasks, settings):
-		s.silent = settings.server_silent
+				, tasks, sett):
+		s.silent = sett.server_silent
 		s.tasks = tasks
 		super().__init__(request, client_address, server)
 
@@ -60,17 +76,38 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			task_name = s.path.split('?')[1].split('&')[0]
 			for task in s.tasks.task_list_http:
 				if task['task_function_name'] == task_name:
-					result = s.tasks.run_task(
-						task
-						, caller='http'
-						, data={
-							'headers':dict(s.headers)
-							, 'client_ip':s.client_address[0]
-							, 'path':s.path
-							, 'params':params
-						}
-					)
-					page = str(result) if result else 'OK'
+					try:
+						req_data = RequestData(
+							client_ip=s.client_address[0]
+							, path=s.path
+							, headers=dict(s.headers)
+							, params=params
+						)
+						if task['result']:
+							result = []
+							s.tasks.run_task(
+								task
+								, caller='http'
+								, data=req_data
+								, result=result
+							)
+							i = 0
+							timeout = 0.001
+							page = 'Timeout'
+							while (not result) and (i < (10 / timeout)):
+								i += 1
+								time.sleep(timeout)
+							page = str(result[0]) if result else page
+						else:
+							s.tasks.run_task(
+								task
+								, caller='http'
+								, data=req_data
+							)
+							page = 'OK'
+					except Exception as e:
+						print('HTTP task exception: {repr(e)}')
+						page = 'Error'
 					break
 			else:
 				page = 'task not found'
@@ -82,20 +119,20 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 		if not s.silent: super().log_message(format, *args)
 
 
-def http_server_start(settings, tasks):
+def http_server_start(sett, tasks):
 	''' Start HTTP server that will run tasks.
-		settings - instance of Settings class
+		sett - instance of Settings class
 		tasks - instance of Tasks class
 	'''
 	try:
 		httpd = ThreadingHTTPServer(
-			(settings.server_ip, int(settings.server_port))
-			, lambda *a, settings=settings, tasks=tasks:
-				HTTPHandlerTasks(*a, settings=settings, tasks=tasks)
+			(sett.server_ip, int(sett.server_port))
+			, lambda *a, sett=sett, tasks=tasks:
+				HTTPHandlerTasks(*a, sett=sett, tasks=tasks)
 		)
 		print(
 			'Start HTTP-server on'
-			+ f' {settings.server_ip}:{settings.server_port}'
+			+ f' {sett.server_ip}:{sett.server_port}'
 		)
 		tasks.http_server = httpd
 		httpd.serve_forever()

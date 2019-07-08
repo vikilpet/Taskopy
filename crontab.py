@@ -75,7 +75,7 @@ def backup_and_purge(
 	purge_old('log', days=10)
 
 # Check github for new version
-def taskopy_update(schedule='every().sunday.at("15:30")', submenu='WIP'):
+def taskopy_update(schedule='every().sunday.at("15:30")', submenu='Rare'):
 	new_ver = html_element_get(
 		'https://github.com/vikilpet/Taskopy/releases'
 		, {'name':'div', 'class':'f1'}
@@ -94,7 +94,7 @@ def taskopy_update(schedule='every().sunday.at("15:30")', submenu='WIP'):
 		)[1:-1]
 		print(f'New version of Taskopy: {new_ver}')
 		if msgbox(
-			f'New version of Taskopy: {new_ver}\n\n{news}'
+			f'New version of Taskopy: {new_ver}\n{news}'
 			, dis_timeout=1
 			, ui=MB_YESNO + MB_ICONINFORMATION
 		) == IDYES:

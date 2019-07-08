@@ -13,7 +13,7 @@ import win32gui
 from .plugin_send_mail import send_email
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2019-07-07'
+APP_VERSION = 'v2019-07-08'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 TASK_OPTIONS = [

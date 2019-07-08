@@ -129,14 +129,20 @@ def json_element_get(url:str, element:list, headers:dict=None
 	data = json.loads(j)
 	if type(element[0]) is list:
 		li = []
-		for elem in element:
-			da = data
-			for key in elem: da = da[key]
-			li.append(da)
-		r = li
+		try:
+			for elem in element:
+				da = data
+				for key in elem: da = da[key]
+				li.append(da)
+			r = li
+		except:
+			r = ['not found']
 	else:
-		for key in element: data = data[key]
-		r = data
+		try:
+			for key in element: data = data[key]
+			r = data
+		except:
+			r = 'not found'
 	return r
 
 def tracking_status_rp(track_number:str)->str:
