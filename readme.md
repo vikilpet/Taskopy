@@ -120,7 +120,24 @@ Format: **option name** (default value) — description.
 	taskopy.exe
 	```
 	Also see [settings](#settings) section for IP and port bindings.
-
+- **caller** — place this option before other options and in task body you will know who actually launched task this time. Possible values: http, menu, scheduler, hotkey. See *def check_free_space* in [Task Examples](#task-examples).
+- **data** — use together with **http** and place this option before other options and it will filled with HTTP request data and you will able to work with them in task body.
+	*data.client_ip* — IP-address of request.
+	*data.path* — full relative path of request including */task?*
+	*data* will contain all HTTP-request headers such as *User-Agent*, 	*Accept-Language* etc.
+	If you will construst request URL with common scheme *&param1=value1&param2=value2* they will be processed and added to data and you can access them in task body as data.param1, data.param2.
+	Example:
+	```Python
+	def alert(data, http=True, single=False, menu=False):
+		msgbox(
+			data.text
+			, title=data.title if data.title else 'Alert'
+			, dis_timeout=1
+		)
+	```
+	Type in address bar of browser something like this:
+	http://127.0.0.1/task?alert&text=MyMsg&title=MyTitle
+	and you will see messagebox with title and text from URL.
 
 ## Settings
 
@@ -373,23 +390,22 @@ def get_current_ip():
 	print(f'Current IP: {ip}')
 	msgbox(f'Current IP: {ip}', timeout=10)
 
-# Запускаем калькулятор и меняем его заголовок на курс продажи
-# доллара в Сбербанке. Назначаем выполнение задачи на клик
-# левой клавишей мыши по иконке:
-def demo_task_4(left_click=True):
-	# Запускаем калькулятор:
-	app_start(r'calc.exe')
-	# Скачиваем json по которому грузится список валют
-	# и получаем из него курс продажи доллара:
-	usd = json_element_get(
-		'https://www.sberbank.ru/portalserver/proxy/?pipe=shortCachePipe&url=http://localhost/rates-web/rateService/rate/current%3FregionId%3D77%26currencyCode%3D840%26currencyCode%3D978%26rateCategory%3Dbeznal'
-		, ['beznal', '840', '0', 'sellValue']
-	)
-	# Теперь меняем заголовок калькулятора на USD={найденное значение}
-	window_title_set('Калькулятор', f'USD={usd}')
-
+# Add IP-address from clipboard to Mikrotik router
+# address-list:
+def add_ip_to_list():
+    routeros_send(
+        [
+            '/ip/firewall/address-list/add'
+            , '=list=my_list'
+            , '=address=' + clip_get()
+        ]
+        , device_ip='192.168.88.1'
+        , device_user='admin'
+        , device_pwd='PaSsWoRd'
+    )
+    msgbox('Done!', timeout=5)
 ```
 
 <!---
-2019-07-07_19-14-37
+2019-07-09_13-38-15
 -->

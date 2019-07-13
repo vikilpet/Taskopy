@@ -35,10 +35,16 @@ def file_move(fullpath:str, destination:str):
 	shutil.move(fullpath, destination)
 
 def file_delete(fullpath:str):
-	os.remove(fullpath)
+	try:
+		os.remove(fullpath)
+	except FileNotFoundError:
+		pass
 
 def dir_delete(fullpath:str):
-	shutil.rmtree(fullpath)
+	try:
+		shutil.rmtree(fullpath)
+	except FileNotFoundError:
+		pass
 
 def path_exists(fullpath:str)->bool:
 	''' Check if directory or file exist '''
@@ -82,8 +88,10 @@ i		recursive - delete in subfolders too. Empty subfolders
 	current_time = time.time()
 	if test:
 		file_func = print
+		dir_func = print
 	else:
 		file_func = robust_remove
+		dir_func = shutil.rmtree
 	
 	for fi in files:
 		if os.path.isdir(fi):
@@ -91,7 +99,7 @@ i		recursive - delete in subfolders too. Empty subfolders
 			files_count = sum(
 				[1 for sub in folders if not os.path.isdir(sub)]
 			)
-			if files_count == 0: shutil.rmtree(fi)
+			if files_count == 0: dir_func(fi)
 		else:
 			if days:
 				if (current_time - date_func(fi)) > delta:

@@ -1,5 +1,4 @@
 ﻿import time
-import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import urllib
 from .tools import msgbox_warning

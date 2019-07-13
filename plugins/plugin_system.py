@@ -1,4 +1,5 @@
-﻿import win32api
+﻿import ctypes
+import win32api
 import win32gui
 import winreg
 
@@ -61,6 +62,34 @@ def window_title_set(cur_title:str, new_title:str):
 	hwnd = win32gui.FindWindow(None, cur_title)
 	if hwnd:
 		win32gui.SetWindowText(hwnd, new_title)
+
+def window_find(title:str)->list:
+	''' Find window handle by Title
+		Returns list of found window handles.
+	'''
+	def check_title(hwnd, title:str):
+		if win32gui.GetWindowText(hwnd) == title:
+			result.append(hwnd)
+	result = []
+	win32gui.EnumWindows(check_title, title)
+	return result
+
+def window_show(window):
+	''' Bring window to front
+		window - str with window title or int with window handle
+	'''
+	if type(window) is str:
+		hwnd = win32gui.FindWindow(None, window)
+	else:
+		hwnd = window
+	if hwnd:
+		win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+		win32gui.SetForegroundWindow(hwnd)
+	else:
+		print(f'Window {window} not found')
+
+
+
 
 def test():
 	reg_key = 'HKEY_CURRENT_USER\\Software\\Microsoft\\Calc\\layout'

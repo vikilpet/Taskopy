@@ -1,4 +1,6 @@
-﻿import sys
+﻿# source: https://wiki.mikrotik.com/wiki/Manual:API_Python3
+
+import sys
 import time
 import binascii
 import socket
@@ -7,15 +9,15 @@ import hashlib
 
 class _ApiRos:
 	"Routeros api"
-	def __init__(self, sk, pri:bool=True):
-		''' pri - print to console
+	def __init__(s, sk, info:bool=False):
+		''' info - print routeros replies to console
 		'''
-		self.sk = sk
-		self.currenttag = 0
-		self.pri = pri
+		s.sk = sk
+		s.currenttag = 0
+		s.info = info
 
-	def login(self, username, pwd):
-		for repl, attrs in self.talk([
+	def login(s, username, pwd):
+		for repl, attrs in s.talk([
 			"/login", "=name=" + username
 			, "=password=" + pwd
 		]):
@@ -27,7 +29,7 @@ class _ApiRos:
 				md.update(b'\x00')
 				md.update(pwd.encode(sys.stdout.encoding))
 				md.update(chal)
-				for repl2, attrs2 in self.talk([
+				for repl2, attrs2 in s.talk([
 					"/login"
 					, "=name=" + username
 					, "=response=00" + binascii.hexlify(md.digest()).decode(sys.stdout.encoding)
@@ -36,11 +38,11 @@ class _ApiRos:
 						return False
 		return True
 
-	def talk(self, words):
-		if self.writeSentence(words) == 0: return
+	def talk(s, words):
+		if s.writeSentence(words) == 0: return
 		r = []
 		while 1:
-			i = self.readSentence();
+			i = s.readSentence();
 			if len(i) == 0: continue
 			reply = i[0]
 			attrs = {}
@@ -53,111 +55,112 @@ class _ApiRos:
 			r.append((reply, attrs))
 			if reply == '!done': return r
 
-	def writeSentence(self, words):
+	def writeSentence(s, words):
 		ret = 0
 		for w in words:
-			self.writeWord(w)
+			s.writeWord(w)
 			ret += 1
-		self.writeWord('')
+		s.writeWord('')
 		return ret
 
-	def readSentence(self):
+	def readSentence(s):
 		r = []
 		while 1:
-			w = self.readWord()
+			w = s.readWord()
 			if w == '': return r
 			r.append(w)
 
-	def writeWord(self, w):
-		if self.pri: print(("<<< " + w))
-		self.writeLen(len(w))
-		self.writeStr(w)
+	def writeWord(s, w):
+		if s.info: print(("<<< " + w))
+		s.writeLen(len(w))
+		s.writeStr(w)
 
-	def readWord(self):
-		ret = self.readStr(self.readLen())
-		if self.pri: print((">>> " + ret))
+	def readWord(s):
+		ret = s.readStr(s.readLen())
+		if s.info: print((">>> " + ret))
 		return ret
 
-	def writeLen(self, l):
+	def writeLen(s, l):
 		if l < 0x80:
-			self.writeByte((l).to_bytes(1, sys.byteorder))
+			s.writeByte((l).to_bytes(1, sys.byteorder))
 		elif l < 0x4000:
 			l |= 0x8000
 			tmp = (l >> 8) & 0xFF
-			self.writeByte(((l >> 8) & 0xFF).to_bytes(1, sys.byteorder))
-			self.writeByte((l & 0xFF).to_bytes(1, sys.byteorder))
+			s.writeByte(((l >> 8) & 0xFF).to_bytes(1, sys.byteorder))
+			s.writeByte((l & 0xFF).to_bytes(1, sys.byteorder))
 		elif l < 0x200000:
 			l |= 0xC00000
-			self.writeByte(((l >> 16) & 0xFF).to_bytes(1, sys.byteorder))
-			self.writeByte(((l >> 8) & 0xFF).to_bytes(1, sys.byteorder))
-			self.writeByte((l & 0xFF).to_bytes(1, sys.byteorder))
+			s.writeByte(((l >> 16) & 0xFF).to_bytes(1, sys.byteorder))
+			s.writeByte(((l >> 8) & 0xFF).to_bytes(1, sys.byteorder))
+			s.writeByte((l & 0xFF).to_bytes(1, sys.byteorder))
 		elif l < 0x10000000:
 			l |= 0xE0000000
-			self.writeByte(((l >> 24) & 0xFF).to_bytes(1, sys.byteorder))
-			self.writeByte(((l >> 16) & 0xFF).to_bytes(1, sys.byteorder))
-			self.writeByte(((l >> 8) & 0xFF).to_bytes(1, sys.byteorder))
-			self.writeByte((l & 0xFF).to_bytes(1, sys.byteorder))
+			s.writeByte(((l >> 24) & 0xFF).to_bytes(1, sys.byteorder))
+			s.writeByte(((l >> 16) & 0xFF).to_bytes(1, sys.byteorder))
+			s.writeByte(((l >> 8) & 0xFF).to_bytes(1, sys.byteorder))
+			s.writeByte((l & 0xFF).to_bytes(1, sys.byteorder))
 		else:
-			self.writeByte((0xF0).to_bytes(1, sys.byteorder))
-			self.writeByte(((l >> 24) & 0xFF).to_bytes(1, sys.byteorder))
-			self.writeByte(((l >> 16) & 0xFF).to_bytes(1, sys.byteorder))
-			self.writeByte(((l >> 8) & 0xFF).to_bytes(1, sys.byteorder))
-			self.writeByte((l & 0xFF).to_bytes(1, sys.byteorder))
+			s.writeByte((0xF0).to_bytes(1, sys.byteorder))
+			s.writeByte(((l >> 24) & 0xFF).to_bytes(1, sys.byteorder))
+			s.writeByte(((l >> 16) & 0xFF).to_bytes(1, sys.byteorder))
+			s.writeByte(((l >> 8) & 0xFF).to_bytes(1, sys.byteorder))
+			s.writeByte((l & 0xFF).to_bytes(1, sys.byteorder))
 
-	def readLen(self):
-		c = ord(self.readStr(1))
+	def readLen(s):
+		c = ord(s.readStr(1))
 		if (c & 0x80) == 0x00:
 			pass
 		elif (c & 0xC0) == 0x80:
 			c &= ~0xC0
 			c <<= 8
-			c += ord(self.readStr(1))
+			c += ord(s.readStr(1))
 		elif (c & 0xE0) == 0xC0:
 			c &= ~0xE0
 			c <<= 8
-			c += ord(self.readStr(1))
+			c += ord(s.readStr(1))
 			c <<= 8
-			c += ord(self.readStr(1))
+			c += ord(s.readStr(1))
 		elif (c & 0xF0) == 0xE0:
 			c &= ~0xF0
 			c <<= 8
-			c += ord(self.readStr(1))
+			c += ord(s.readStr(1))
 			c <<= 8
-			c += ord(self.readStr(1))
+			c += ord(s.readStr(1))
 			c <<= 8
-			c += ord(self.readStr(1))
+			c += ord(s.readStr(1))
 		elif (c & 0xF8) == 0xF0:
-			c = ord(self.readStr(1))
+			c = ord(s.readStr(1))
 			c <<= 8
-			c += ord(self.readStr(1))
+			c += ord(s.readStr(1))
 			c <<= 8
-			c += ord(self.readStr(1))
+			c += ord(s.readStr(1))
 			c <<= 8
-			c += ord(self.readStr(1))
+			c += ord(s.readStr(1))
 		return c
 
-	def writeStr(self, str):
+	def writeStr(s, str):
 		n = 0;
 		while n < len(str):
-			r = self.sk.send(bytes(str[n:], 'UTF-8'))
+			r = s.sk.send(bytes(str[n:], 'UTF-8'))
 			if r == 0: raise RuntimeError("connection closed by remote end")
 			n += r
 
-	def writeByte(self, str):
+	def writeByte(s, str):
 		n = 0;
 		while n < len(str):
-			r = self.sk.send(str[n:])
+			r = s.sk.send(str[n:])
 			if r == 0: raise RuntimeError("connection closed by remote end")
 			n += r
 
-	def readStr(self, length):
+	def readStr(s, length):
 		ret = ''
 		while len(ret) < length:
-			s = self.sk.recv(length - len(ret))
-			if s == b'': raise RuntimeError("connection closed by remote end")
-			if s >= (128).to_bytes(1, "big") :
-				return s
-			ret += s.decode(sys.stdout.encoding, "replace")
+			com_s = s.sk.recv(length - len(ret))
+			if com_s == b'':
+				raise RuntimeError('connection closed by remote end')
+			if com_s >= (128).to_bytes(1, 'big') :
+				return com_s
+			ret += com_s.decode(sys.stdout.encoding, 'replace')
 		return ret
 
 def routeros_send(
@@ -166,7 +169,7 @@ def routeros_send(
 	, device_port:str='8728'
 	, device_user:str='admin'
 	, device_pwd:str=''
-	, pri:bool=False
+	, info:bool=False
 ):
 	''' Send command 'cmd' through api.
 		cmd - list of strings (single command) or list
@@ -195,16 +198,79 @@ def routeros_send(
 		break
 	
 	if soc is None:
-		print ('Could not open socket')
+		if info: print('routeros_send: Could not open socket')
 		return False, 'Could not open socket'
 	try:
-		apiros = _ApiRos(soc, pri=pri)
+		apiros = _ApiRos(soc)
 		apiros.login(device_user, device_pwd)
 		if type(cmd[0]) == list:
 			for c in cmd: apiros.talk(c)
 		else:
 			apiros.talk(cmd)
 	except Exception as e:
+		if info: print(f'routeros_send exception:\n{repr(e)}')
+		return False, repr(e)[:200]
+	return True, None
+
+def routeros_find_send(
+	cmd_find:list
+	, cmd_send:list
+	, device_ip:str=None
+	, device_port:str='8728'
+	, device_user:str='admin'
+	, device_pwd:str=''
+	, info:bool=False
+):
+	''' Find id and perform command against them.
+		cmd_find - list of str to get list of id's.
+			Example - find static id's in address-list:
+				cmd_send=[
+					'/ip/firewall/address-list/print'
+					, '?list=my_list'
+					, '?dynamic=false'
+				]
+		cmd_send - list of str with action that needs to be performed
+			over found items.
+			Example - remove from address-list:
+				cmd_send=['/ip/firewall/address-list/remove']
+		Return True, None on success or False, 'error'
+	'''
+	soc = None
+	for res in socket.getaddrinfo(
+		device_ip
+		, device_port
+		, socket.AF_UNSPEC
+		, socket.SOCK_STREAM
+	):
+		af, socktype, proto, canonname, sa = res
+		try:
+			 soc = socket.socket(af, socktype, proto)
+		except socket.error:
+			soc = None
+			continue
+		try:
+			soc.connect(sa)
+		except socket.error:
+			soc.close()
+			soc = None
+			continue
+		break
+	
+	if soc is None:
+		if info: print('routeros_find_send: Could not open socket')
+		return False, 'Could not open socket'
+	try:
+		apiros = _ApiRos(soc)
+		apiros.login(device_user, device_pwd)
+		api_data = apiros.talk(cmd_find)
+		if api_data[0][0] == '!trap':
+			if info: print(f'routeros_find_send bad query:\n{api_data}')
+			return False, 'bad query'
+		id_list = [tup[1]['=.id'] for tup in api_data[:-1]]
+		if info: print(f'routeros_find_send: len(id_list)={len(id_list)}')
+		apiros.talk(cmd_send + [f'=numbers=' + ','.join(id_list)])
+	except Exception as e:
+		if info: print(f'routeros_find_send exception:\n{repr(e)}')
 		return False, repr(e)[:200]
 	return True, None
 
@@ -214,7 +280,7 @@ def routeros_query(
 	, device_port:str='8728'
 	, device_user:str='admin'
 	, device_pwd:str=''
-	, pri:bool=False
+	, info:bool=False
 ):
 	''' Send query and return True, data = list of dictionaries
 		or False, 'error'
@@ -247,24 +313,25 @@ def routeros_query(
 		break
 
 	if soc is None:
-		print ('Could not open socket')
+		if info: print('routeros_query: Could not open socket')
 		return False, 'Could not open socket'
 
 	try:
-		apiros = _ApiRos(soc, pri=pri)
+		apiros = _ApiRos(soc)
 		apiros.login(device_user, device_pwd)
 		api_data = apiros.talk(query)
 
 		
-		#
 
 		if len(api_data) > 1:
 			if api_data[0][0] == '!trap':
+				if info: print(f'routeros_query: bad query')
 				return False, 'bad query'
 			else:
 				return True, [t[1] for t in api_data[:-1]]
 		else:
 			return True, []
 	except Exception as e:
+		if info: print(f'routeros_query exception:\n{repr(e)}')
 		return False, repr(e)[:200]
 	return False, 'something went wrong'

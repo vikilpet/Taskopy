@@ -10,10 +10,11 @@ import pyperclip
 import random
 import win32api
 import win32gui
+import win32con
 from .plugin_send_mail import send_email
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2019-07-08'
+APP_VERSION = 'v2019-07-13'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 TASK_OPTIONS = [
@@ -49,6 +50,13 @@ DB_FILE = (
 	os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 	+ r'\resources\db.sqlite3'
 )
+
+class DictToObj:
+	def __init__(s, di:dict):
+		s.__dict__.update(di)
+
+	def __getattr__(s, name):
+		return 'unknown key'
 
 def task(**kwargs):
 	def with_attrs(func):
@@ -114,16 +122,19 @@ def var_set(var_name:str, value:str):
 	conn.commit()
 	conn.close()
 
-def var_get(var_name:str)->str:
-	''' Retrieves variable from db.sqlite3 and returns '' if 
-		there is none
+def var_get(var_name:str, table:str=None)->str:
+	''' Retrieves value from db.sqlite3 and returns '' if 
+		there is none.
 	'''
+	if table is None: table = 'variables'
 	conn = sqlite3.connect(DB_FILE)
 	cur = conn.cursor()
-	cur.execute(f'''SELECT vvalue
-					FROM variables
-					WHERE vname = '{var_name}'
-				''')
+	cur.execute(
+		f'''SELECT vvalue
+			FROM {table}
+			WHERE vname = '{var_name}'
+		'''
+	)
 	r = cur.fetchone()
 	if r:
 		r = r[0]
@@ -188,7 +199,7 @@ def email_send(
 		, smtp_user=smtp_user
 		, smtp_password=smtp_password
 	)
-	
+
 _MessageBox = ctypes.windll.user32.MessageBoxW
 _MessageBoxTimeout = ctypes.windll.user32.MessageBoxTimeoutW
 MB_ABORTRETRYIGNORE = 0x00000002
@@ -275,7 +286,6 @@ def msgbox(msg:str, title:str=APP_NAME
 			win32gui.EnumChildWindows(hwnd, dis_butt, True)
 		except:
 			pass
-		
 	if ui:
 		ui += MB_SYSTEMMODAL
 	else:
@@ -339,26 +349,61 @@ def msgbox(msg:str, title:str=APP_NAME
 			else:
 				return mb_func(*mb_args)
 	else:
-		if dis_timeout:
-			threading.Thread(
-				target=mb_func
-				, args=mb_args
-				, daemon=True
-			).start()
-			hwnd = get_hwnd(title_tmp)
-			if hwnd:
-				win32gui.SetWindowText(hwnd, title)
+		if timeout:
+			if dis_timeout:
 				threading.Thread(
-					target=dis_buttons
-					, args=(hwnd, dis_timeout,)
+					target=mb_func
+					, args=mb_args
 					, daemon=True
 				).start()
+				hwnd = get_hwnd(title_tmp)
+				if hwnd:
+					win32gui.SetWindowText(hwnd, title)
+					threading.Thread(
+						target=dis_buttons
+						, args=(hwnd, dis_timeout,)
+						, daemon=True
+					).start()
+					threading.Thread(
+						target=title_countdown
+						, args=(hwnd, timeout, title)
+						, daemon=True
+					).start()
+			else:
+				threading.Thread(
+					target=mb_func
+					, args=mb_args
+					, daemon=True
+				).start()
+				hwnd = get_hwnd(title_tmp)
+				if hwnd:
+					win32gui.SetWindowText(hwnd, title)
+					threading.Thread(
+						target=title_countdown
+						, args=(hwnd, timeout, title,)
+						, daemon=True
+					).start()
 		else:
-			threading.Thread(
-				target=mb_func
-				, args=mb_args
-				, daemon=True
-			).start()
+			if dis_timeout:
+				threading.Thread(
+					target=mb_func
+					, args=mb_args
+					, daemon=True
+				).start()
+				hwnd = get_hwnd(title_tmp)
+				if hwnd:
+					win32gui.SetWindowText(hwnd, title)
+					threading.Thread(
+						target=dis_buttons
+						, args=(hwnd, dis_timeout,)
+						, daemon=True
+					).start()
+			else:
+				threading.Thread(
+					target=mb_func
+					, args=mb_args
+					, daemon=True
+				).start()
 
 def msgbox_warning(msg:str):
 	msgbox(msg, APP_NAME, MB_ICONWARNING)

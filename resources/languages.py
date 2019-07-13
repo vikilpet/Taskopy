@@ -13,7 +13,7 @@ class Language():
 		s.__dict__.update(di)
 	
 	def __getattr__(s, name):
-		return 'unknown word'
+		return 'unknown phrase'
 
 _dict_en='''\
 load_crontab=Load crontab from folder
@@ -31,6 +31,7 @@ warn_crontab_reload=Failed to reload crontab
 warn_hotkey=Wrong hotkey syntax in task «{}»
 warn_schedule=Wrong schedule syntax in task «{}»
 warn_task_error=Error when executing a task «{}»
+warn_left_click=Attempt to bind more than one task to left click: {}
 '''
 
 _dict_ru='''\
@@ -49,4 +50,5 @@ warn_crontab_reload=Ошибка при загрузке кронтаба
 warn_hotkey=Неправильный формат горячей клавиши в задаче «{}»
 warn_schedule=Неправильный формат планировщика в задаче «{}»
 warn_task_error=Ошибка при выполнении задачи «{}»
+warn_left_click=Попытка привязать левому клику больше одной задачи: {}
 '''

@@ -12,13 +12,20 @@ import ctypes
 import schedule
 import keyboard
 import win32api
+import win32gui
+import win32con
 from plugins.tools import *
 from plugins.plugin_filesystem import *
+from plugins.plugin_system import *
 from plugins.plugin_process import *
 from plugins.plugin_http_server import http_server_start
 from plugins.plugin_hotkey import GlobalHotKeys
 from resources.languages import Language
 
+# Docs:
+# https://docs.python.org/3/library/threading.html
+# https://github.com/boppreh/keyboard
+# https://schedule.readthedocs.io/en/stable/
 
 tasks = None
 app = None
@@ -37,7 +44,7 @@ APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
 
 set_title = ctypes.windll.kernel32.SetConsoleTitleW
-
+	
 class Settings():
 	''' Load global settings from settings.ini
 	'''
@@ -87,6 +94,7 @@ class Tasks():
 		s.task_list_menu = []
 		s.task_list_submenus = []
 		s.task_list_startup = []
+		s.task_list_left_click = []
 		s.task_list_sys_startup = []
 		s.task_list_http = []
 		s.http_server = None
@@ -119,6 +127,7 @@ class Tasks():
 				s.add_schedule(task_opts)
 			if task_opts['hotkey']: s.add_hotkey(task_opts)
 			if task_opts['left_click']:
+				s.task_list_left_click.append(task_opts)
 				app.taskbar_icon.Bind(
 					wx.adv.EVT_TASKBAR_LEFT_DOWN
 					, lambda evt, temp=task_opts:
@@ -143,12 +152,21 @@ class Tasks():
 					s.task_list_menu.append(task_opts)
 			if task_opts['http']:
 				s.task_list_http.append(task_opts)
-		s.task_list_menu[:] = sorted(s.task_list_menu
-			, key=lambda k: k['task_name'].lower()
-		)
+		s.task_list_menu.sort( key=lambda k: k['task_name'].lower() )
+		s.task_list_submenus.sort( key=lambda k: k[0].lower() )
 		for subm in s.task_list_submenus:
-			subm[1][:] = sorted(subm[1]
-				, key=lambda k: k['task_name'].lower()
+			subm[1].sort( key=lambda k: k['task_name'].lower() )
+		lc_count = len(s.task_list_left_click)
+		if lc_count > 1:
+			msgbox_warning(lang.warn_left_click.format(
+				', '.join(
+					[t['task_name'] for t in s.task_list_left_click]
+				)
+			))
+		elif lc_count == 0:
+			app.taskbar_icon.Bind(
+				wx.adv.EVT_TASKBAR_LEFT_DOWN
+				, app.taskbar_icon.on_left_down
 			)
 		if s.global_hk:
 			t = threading.Thread(target=s.global_hk.listen, daemon=True)
@@ -384,9 +402,11 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		menu.Destroy()
 
 	def on_left_down(s, event=None):
-		print ('Tray icon was left-clicked.')
-		menu = s.CreatePopupMenu()
-		s.PopupMenu(menu)
+		''' Default action ont left click to tray icon
+		'''
+		if app.app_hwnd:
+			win32gui.ShowWindow(app.app_hwnd, win32con.SW_RESTORE)
+			win32gui.SetForegroundWindow(app.app_hwnd)
 
 	def on_exit(s, event=None):
 		con_log(lang.menu_exit)
@@ -395,10 +415,10 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		s.frame.Close()
 
 	def on_edit_crontab(s, event=None):
-		app_start(f'{sett.editor} crontab.py')
+		app_start(sett.editor, 'crontab.py')
 
 	def on_edit_settings(s, event=None):
-		app_start(f'{sett.editor} sett.ini')
+		app_start(sett.editor, r'settings.ini')
 
 	def on_disable(s, event=None):
 		tasks.enabled = not tasks.enabled
@@ -416,7 +436,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		if getattr(sys, 'frozen', False):
 			os.startfile(os.getcwd() + '\\' + APP_NAME)
 		else:
-			app_start(os.getcwd() + f'\\{APP_NAME}.py', minimized=True)
+			file_open(f'{APP_PATH}\\{APP_NAME}.py')
 
 	def popup_menu_hk(s):
 		print('tb menu by hotkey')
@@ -429,6 +449,19 @@ class App(wx.App):
 		s.enabled = True
 		s.frame=wx.Frame(None)
 		s.taskbar_icon = TaskBarIcon(s.frame)
+		hwnd_list = window_find(APP_NAME)
+		if len(hwnd_list) == 1:
+			s.app_hwnd = hwnd_list[0]
+		elif len(hwnd_list) > 1:
+			s.app_hwnd = hwnd_list[0]
+			if sett.developer:
+				msgbox_warning(
+					f'Too many {APP_NAME} windows was found: {len(hwnd_list)}'
+				)
+		else:
+			s.app_hwnd = 0
+			if sett.developer:
+				msgbox_warning(f'None of {APP_NAME} windows was found')
 		return True
 
 	def popup_menu_hk(s):
