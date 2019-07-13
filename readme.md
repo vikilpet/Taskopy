@@ -350,6 +350,23 @@ If *days* == 0 then delete all files.
 		, device_pwd='PaSsWorD'
 	)	
 	```
+- **routeros_find_send(cmd_find:list, cmd_send:list, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — find all id's and perform some action on it.
+	*cmd_find* — list with API print command to find what we need.
+	*cmd_send* — list with action to perform.
+	Example — remove all static entries from address-list:
+	```python
+	routeros_find_send(
+		cmd_find=[
+			'/ip/firewall/address-list/print'
+			, '?list=my_list'
+			, '?dynamic=false'
+		]
+		, cmd_send=['/ip/firewall/address-list/remove']
+		, device_ip=ip
+		, device_user=USER
+		, device_pwd=PWD
+	)
+	```
 
 ## Help me
 - Please correct my spelling mistakes because I am not a native English speaker.
@@ -425,5 +442,5 @@ def add_ip_to_list():
 ```
 
 <!---
-2019-07-13_23-58-21
+2019-07-14_00-15-25
 -->
