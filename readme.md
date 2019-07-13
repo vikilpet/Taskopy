@@ -350,10 +350,10 @@ If *days* == 0 then delete all files.
 		, device_pwd='PaSsWorD'
 	)	
 	```
-- **routeros_find_send(cmd_find:list, cmd_send:list, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — find all id's and perform some action on it.
-	*cmd_find* — list with API print command to find what we need.
+- **routeros_find_send(cmd_find:list, cmd_send:list, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — find all id's and perform some action on them.
+	*cmd_find* — list with API *print* command to find what we need.
 	*cmd_send* — list with action to perform.
-	Example — remove all static entries from address-list:
+	Example — remove all static entries from address-list *my_list*:
 	```python
 	routeros_find_send(
 		cmd_find=[
@@ -362,9 +362,9 @@ If *days* == 0 then delete all files.
 			, '?dynamic=false'
 		]
 		, cmd_send=['/ip/firewall/address-list/remove']
-		, device_ip=ip
-		, device_user=USER
-		, device_pwd=PWD
+		, device_ip='192.168.88.1'
+		, device_user='admin'
+		, device_pwd='PaSsW0rd'
 	)
 	```
 
