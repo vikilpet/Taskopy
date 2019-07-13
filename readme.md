@@ -154,12 +154,12 @@ Description of global application settings that you can change in
 ## Keywords
 ### Miscelanneous
 - **msgbox(msg:str, title:str=APP_NAME, ui:int=None, wait:bool=True, timeout:int=None)->int** — show messagebox and return user choice.
-Arguments:
-*msg* — text
-*title* — messagebox title
-*ui* — [interface flags](https://docs.microsoft.com/en-us/windows/desktop/api/winuser/nf-winuser-messagebox). Example: *ui = MB_ICONINFORMATION + MB_YESNO*
-*wait* — if set to False — continue task execution without waiting for user responce.
-*timeout* (in seconds) — automatically close messagebox. If messagebox is closed by timeout (no button is pressed by user) and *ui* contains more than one button (*MB_YESNO* for example) then it will return 32000.
+	Arguments:
+	*msg* — text
+	*title* — messagebox title
+	*ui* — [interface flags](https://docs.microsoft.com/en-us/windows/desktop/api/winuser/nf-winuser-messagebox). Example: *ui = MB_ICONINFORMATION + MB_YESNO*
+	*wait* — if set to False — continue task execution without waiting for user responce.
+	*timeout* (in seconds) — automatically close messagebox. If messagebox is closed by timeout (no button is pressed by user) and *ui* contains more than one button (*MB_YESNO* for example) then it will return 32000.
 	Example:
 	```python
 	def test_msgbox():
@@ -168,6 +168,7 @@ Arguments:
 		else:
 			print('No :-(')
 	```
+	*dis_timeout* (in seconds) — disable buttons for some seconds.
 - **sound_play (fullpath:str, wait:bool)->str** — play .wav file. *wait* — do not pause task execution.
 - **time_now(template:str='%Y-%m-%d_%H-%M-%S')->str** — string with current time.
 - **time_sleep(sec:float)** — pause in seconds.
@@ -185,7 +186,7 @@ Arguments:
 
 **IMPORTANT: always use double backslash in paths!**
 
-- **dir_delete(fullpath:str):** — delete directory.
+- **dir_delete(fullpath:str)** — delete directory.
 - **dir_list(fullpath:str)->list:** — get list of files in directory.
 	Examples:
 	- Get list of all log files in 'c:\\\Windows' **without** subfolders:
@@ -196,20 +197,20 @@ Arguments:
 	```python
 	dir_list('c:\\Windows\\**\\*.log')
 	```
-- **file_backup(fullpath, folder:str=None):** — make copy of file with added timestamp.
+- **file_backup(fullpath, folder:str=None)** — make copy of file with added timestamp.
 *folder* — place copy to this folder. If omitted — place in original folder.
-- **file_copy(fullpath:str, destination:str):** — copy file to destination (fullpath or just folder).
-- **file_delete(fullpath:str):** — delete file.
+- **file_copy(fullpath:str, destination:str)** — copy file to destination (fullpath or just folder).
+- **file_delete(fullpath:str)** — delete file.
 - **file_dir(fullpath:str)->str:** — get parent directory name of file.
-- **file_move(fullpath:str, destination:str):** — move file to destination folder or file.
+- **file_move(fullpath:str, destination:str)** — move file to destination folder or file.
 - **file_name(fullpath:str)->str:** — get file name without directory.
 - **file_read(fullpath:str)->str:** — get content of file.
 - **file_size(fullpath:str, unit:str='b')->bool:** — get size of file in units (gb, mb, kb, b).
-- **file_write(fullpath:str, content=str):** — write content to file.
+- **file_write(fullpath:str, content=str)** — write content to file.
 - **free_space(letter:str, unit:str='GB')->int:** — get disk free space in units (gb, mb, kb, b).
 - **is_directory(fullpath:str)->bool:** — fullpath is directory?
 - **path_exists(fullpath:str)->bool:** — fullpath exists (no matter is it folder or file)?
-- **purge_old(fullpath:str, days:int=0, recursive=False, creation:bool=False, test:bool=False):** — delete files from folder *fullpath* older than n *days*.
+- **purge_old(fullpath:str, days:int=0, recursive=False, creation:bool=False, test:bool=False)** — delete files from folder *fullpath* older than n *days*.
 If *days* == 0 then delete all files.
 *creation* — use date of creation, otherwise use last modification date.
 *recursive* — delete from subfolders too.
@@ -228,27 +229,44 @@ If *days* == 0 then delete all files.
 	}
 	```
 	See *get_current_ip* in [task examples](#task-examples)
-- **json_element_get(url:str, element:list):** — same as **html_element_get** but for json.
+- **json_element_get(url:str, element:list)** — same as **html_element_get** but for json.
 *element* — list with map to needed element. Example: element=['usd', 2, 'value']
 - **page_get(url:str, encoding:str='utf-8')->str:** — download page by url and return it's html as a string.
 
 ### System
 - **registry_get(fullpath:str)** — get value from Windows Registry.
 	*fullpath* — string like 'HKEY_CURRENT_USER\\Software\\Microsoft\\Calc\\layout'
-- **window_title_set(cur_title:str, new_title:str):** — change window title from *cur_title* to *new_title*
+- **window_title_set(cur_title:str, new_title:str)** — change window title from *cur_title* to *new_title*
+- **window_find(title:str)->list** — find window by title. Returns list of all found windows.
+- **window_show(window)** — bring window to front. *window* may be a string with title or integer with window handle.
 
 ### Process
-- **app_start(app_path:str, wait=False):** — start application.
-*app_path* — fullpath to executable file.
-*wait* — wait until application will be closed.
-- **file_open(fullpath:str):** — open file or URL in default application.
+- **app_start(app_path:str, app_args:str='', wait=False)** — start application.
+	*app_path* — path to executable file.
+	*app_args* — command-line arguments.
+	*wait* — wait until application will be closed.
+- **file_open(fullpath:str)** — open file or URL in default application.
+- **process_list(name:str='')->list** — get list of processes with that name. Item in list have this attributes:
+	*pid* — PID of found process.
+	*name* — short name of executable.
+	*username* — username.
+	*exe* — full path to executable.
+	*cmdline* — command-line as list.
+	Example — распечатать PID всех процессов Firefox:
+	```python
+	for proc in process_list('firefox.exe'):
+		print(proc.pid)
+	```
+- **process_cpu(pid:int, interval:int=1)->float** — CPU usage of process with specified PID. *interval* in seconds - how long to measure.
+- **process_kill(process)** — kill process or processes. *process* may be an integer so only process with this PID will be terminated. If *process* is a string then kill every process with that name.
+
 
 ### Winamp
-- **winamp_notification():** — show notification (only for «Modern» skin).
-- **winamp_pause():** — pause.
-- **winamp_play():** — play.
+- **winamp_notification()** — show notification (only for «Modern» skin).
+- **winamp_pause()** — pause.
+- **winamp_play()** — play.
 - **winamp_status()->str:** — playback status ('playing', 'paused' or 'stopped').
-- **winamp_stop():** — stop.
+- **winamp_stop()** — stop.
 - **winamp_track_info(sep:str='   ')->str:** — return string with samplerate, bitrate and channels.
 - **winamp_track_length()->str:** — track length.
 - **winamp_track_title(clean:bool=True)->str:** — current track title.
@@ -407,5 +425,5 @@ def add_ip_to_list():
 ```
 
 <!---
-2019-07-09_13-38-15
+2019-07-13_23-58-21
 -->
