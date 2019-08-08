@@ -238,21 +238,31 @@ class Tasks():
 			s.run_task(task, caller='startup')
 			
 	def run_at_sys_startup(s):
-		if win32api.GetTickCount() < (3 * 60 * 1000):
+		if win32api.GetTickCount() < (6 * 60 * 1000):
 			for task in s.task_list_sys_startup:
 				s.run_task(task, caller='sys_startup')
 	
 	def task_opt_set(s, task_function_name:str, option:str, value):
-		''' Set tasks.task_list option
+		''' Set option from task dict in tasks.task_list
 		'''
 		for task in s.task_list:
 			if task['task_function_name'] == task_function_name:
 				task[option] = value
 				break
 
+	def task_opt_get(s, task_function_name:str, option:str):
+		''' Get option from task in tasks.task_list
+		'''
+		for task in s.task_list:
+			if task['task_function_name'] == task_function_name:
+				return task.get(option
+						, 'task_opt_get error: option not found')
+		else:
+			return 'task_opt_get error: task not found'
+
 	def run_task(s, task:dict, caller:str=None, data=None
 				, result:list=None):
-		''' Logging, threading, error catching and other staff.
+		''' Logging, threading, error catching and other stuff.
 			task - dict with task options
 			caller - who actually launched the task.
 				It can be 'hotkey', 'menu', 'scheduler', 'http' etc.
@@ -260,7 +270,7 @@ class Tasks():
 				function this time.
 			data - pass some data to task
 			result - list in which we will place result of task. It is
-				passed through all inner fuctions (run_task_inner,
+				passed through all inner fuctions (run_task_inner and
 				catcher).
 		'''
 		def run_task_inner(result:list=None):
@@ -277,19 +287,39 @@ class Tasks():
 					if r:
 						if not result is None:
 							result.append(r)
-					s.task_opt_set(task['task_function_name'], 'running', False)
+					s.task_opt_set(task['task_function_name']
+									, 'running', False)
+					s.task_opt_set(task['task_function_name']
+									, 'err_counter', 0)
 				except Exception as e:
-					s.task_opt_set(task['task_function_name'], 'running', False)
+					s.task_opt_set(task['task_function_name']
+									, 'running', False)
+					err_counter = s.task_opt_get(
+						task['task_function_name']
+						, 'err_counter'
+					) + 1
 					trace_li = traceback.format_exc().splitlines()
-					trace_str = '\n'.join(trace_li[-3:])
+					trace_str = '\n'.join(trace_li[-3:-1])
 					con_log(
 						f'Error in task: {task["task_name_full"]}\n'
 						+ traceback.format_exc()
 					)
-					msgbox_warning(
-						lang.warn_task_error.format(task['task_name_full'])
-						+ f':\n{trace_str}'
-					)
+					if err_counter > s.task_opt_get(
+						task['task_function_name']
+						, 'err_threshold'
+					):
+						if sett.developer:
+							print(f'err_counter={err_counter}')
+						s.task_opt_set(task['task_function_name']
+										, 'err_counter', 0)
+						msgbox_warning(
+							lang.warn_task_error.format(task['task_name_full'])
+							+ f':\n{trace_str}'
+						)
+					else:
+						s.task_opt_set(task['task_function_name']
+										, 'err_counter', err_counter)
+						
 			if not s.enabled: return
 			if task['single']:
 				if task['running']: return
@@ -407,6 +437,21 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		if app.app_hwnd:
 			win32gui.ShowWindow(app.app_hwnd, win32con.SW_RESTORE)
 			win32gui.SetForegroundWindow(app.app_hwnd)
+			'''
+			import wx.lib.agw.balloontip as BT
+			tipballoon = BT.BalloonTip(topicon=None, toptitle="textctrl",
+				message="this is a textctrl",
+				shape=BT.BT_ROUNDED,
+				tipstyle=BT.BT_CLICK)
+			tipballoon.SetTarget(app.taskbar_icon)
+			tipballoon.SetBalloonColour(wx.WHITE)
+			tipballoon.SetTitleFont(wx.Font(9, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False))
+			tipballoon.SetTitleColour(wx.BLACK)
+			tipballoon.SetMessageFont()
+			tipballoon.SetMessageColour(wx.LIGHT_GREY)
+			tipballoon.SetStartDelay(1000)
+			tipballoon.SetEndDelay(3000)
+			'''
 
 	def on_exit(s, event=None):
 		con_log(lang.menu_exit)
@@ -470,6 +515,7 @@ class App(wx.App):
 		time.sleep(0.1)
 		s.frame.PopupMenu(s.taskbar_icon.CreatePopupMenu())
 		
+
 
 
 def main():

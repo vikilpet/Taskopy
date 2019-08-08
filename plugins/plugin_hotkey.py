@@ -1,9 +1,9 @@
-﻿# Key codes https://docs.microsoft.com/en-us/windows/desktop/inputdev/virtual-key-codes
-
-import ctypes
+﻿import ctypes
 import ctypes.wintypes
 import win32con
 from .tools import msgbox_warning
+
+# Key codes https://docs.microsoft.com/en-us/windows/desktop/inputdev/virtual-key-codes
 
 user32 = ctypes.windll.user32
 kernel32 = ctypes.windll.kernel32
@@ -51,13 +51,18 @@ class GlobalHotKeys():
 					modifier |= s.modifiers[k]
 				elif k in s.keys.keys():
 					vk = s.keys[k]
+				elif k.isdigit():
+					vk = int(k)
 				else:
 					raise Exception(f'Unknown key: {k}')
 		else:
 			k = key_li[0]
 			vk = s.keys.get(k)
 			if not vk:
-				raise Exception(f'Unknown key: {k}')
+				if k.isdigit():
+					vk = int(k)
+				else:
+					raise Exception(f'Unknown key: {k}')
  
 		s.key_mapping.append(
 			(vk, modifier, lambda a=func_args: func(*a))
@@ -79,11 +84,14 @@ class GlobalHotKeys():
 		s.thread_id = kernel32.GetCurrentThreadId()
 		for index, (vk, modifiers, func) in enumerate(s.key_mapping):
 			if not user32.RegisterHotKey(None, index, modifiers, vk):
-				msgbox_warning(
+				error = (
 					'Unable to register hot key: '
 					+ str(vk) + ' error code is: '
 					+ str(kernel32.GetLastError())
 				)
+
+				print(error)
+				msgbox_warning(error)
  
 		try:
 			msg = ctypes.wintypes.MSG()
@@ -107,7 +115,7 @@ if __name__ == '__main__':
 	ghk = GlobalHotKeys()
 	ghk.register
 	ghk.register(
-		'multiply', func=test_func, func_args=['test passed']
+		'[', func=test_func, func_args=['test passed']
 	)
 	ghk.register('ctrl+multiply', func=ghk.stop_listener)
 	threading.Thread(target=ghk.listen).start()

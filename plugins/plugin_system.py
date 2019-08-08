@@ -1,7 +1,20 @@
 ﻿import ctypes
 import win32api
 import win32gui
+import win32con
 import winreg
+
+
+def _get_win(window)->int:
+	''' Returns hwnd
+	'''
+	if type(window) is str:
+		return win32gui.FindWindow(None, window)
+	elif type(window) is int:
+		return window
+	else:
+		return win32gui.GetForegroundWindow()
+	
 
 def registry_get(fullpath:str):
 	''' Get value by fullpath to registry key.
@@ -58,10 +71,13 @@ def registry_set(fullpath:str, value, value_type:str=None):
 		return f'error: {e}'
 
 
-def window_title_set(cur_title:str, new_title:str):
-	hwnd = win32gui.FindWindow(None, cur_title)
+def window_title_set(window=None, new_title:str='')->int:
+	''' Sets window title, returns hwnd.
+	'''
+	hwnd = _get_win(window)
 	if hwnd:
 		win32gui.SetWindowText(hwnd, new_title)
+		return hwnd
 
 def window_find(title:str)->list:
 	''' Find window handle by Title
@@ -74,20 +90,75 @@ def window_find(title:str)->list:
 	win32gui.EnumWindows(check_title, title)
 	return result
 
-def window_show(window):
-	''' Bring window to front
-		window - str with window title or int with window handle
+def window_activate(window=None)->int:
+	''' Bring window to front, returns hwnd.
 	'''
-	if type(window) is str:
-		hwnd = win32gui.FindWindow(None, window)
-	else:
-		hwnd = window
+	hwnd = _get_win(window)
 	if hwnd:
 		win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
 		win32gui.SetForegroundWindow(hwnd)
+		return hwnd
 	else:
 		print(f'Window {window} not found')
 
+def window_minimize(window=None)->int:
+	''' Minimize window. Returns hwnd.
+	'''
+	hwnd = _get_win(window)
+	if hwnd:
+		win32gui.ShowWindow(hwnd, win32con.SW_MINIMIZE)
+		return hwnd
+	
+def window_maximize(window=None)->int:
+	''' Maximize window. Returns hwnd.
+	'''
+	hwnd = _get_win(window)
+	if hwnd:
+		win32gui.ShowWindow(hwnd, win32con.SW_MAXIMIZE)
+		return hwnd
+
+def window_restore(window=None)->int:
+	''' Restore window. Returns hwnd.
+	'''
+	hwnd = _get_win(window)
+	if hwnd:
+		win32gui.ShowWindow(hwnd, win32con.SW_SHOWNORMAL)
+		return hwnd
+
+def window_show(window=None)->int:
+	''' Show window. Returns hwnd.
+	'''
+	hwnd = _get_win(window)
+	if hwnd:
+		win32gui.ShowWindow(hwnd, win32con.SW_SHOW)
+		return hwnd
+
+def window_hide(window=None)->int:
+	''' Hide window. Returns hwnd.
+	'''
+	hwnd = _get_win(window)
+	if hwnd:
+		win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
+		return hwnd
+
+_TIME_PREFIXES = {'msec':1, 'sec':1000, 'min':60000, 'hour':3600000}
+def idle_duration(unit:str='msec')->int:
+	''' Returns idle time in specified units.
+	'''
+	unit_den = _TIME_PREFIXES.get(unit.lower(), 1)
+	millis = (win32api.GetTickCount() - win32api.GetLastInputInfo())
+	return millis // unit_den
+
+def monitor_off():
+	''' Turn off the monitor
+	'''
+	win32gui.SendMessage(
+		win32con.HWND_BROADCAST
+		, win32con.WM_SYSCOMMAND
+		, win32con.SC_MONITORPOWER
+		, 2
+	)
+	
 
 
 

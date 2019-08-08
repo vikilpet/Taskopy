@@ -1,4 +1,5 @@
-﻿import os
+﻿import sys
+import os
 import time
 import datetime
 import threading
@@ -11,10 +12,13 @@ import random
 import win32api
 import win32gui
 import win32con
+import wx
 from .plugin_send_mail import send_email
 
+
+
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2019-07-13'
+APP_VERSION = 'v2019-08-08'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 TASK_OPTIONS = [
@@ -34,6 +38,8 @@ TASK_OPTIONS = [
 	, ['submenu', None]
 	, ['result', False]
 	, ['http', False]
+	, ['err_threshold', 0]
+	, ['err_counter', False]
 ]
 
 APP_SETTINGS=[
@@ -406,4 +412,28 @@ def msgbox(msg:str, title:str=APP_NAME
 				).start()
 
 def msgbox_warning(msg:str):
-	msgbox(msg, APP_NAME, MB_ICONWARNING)
+	msgbox(msg=msg, title=APP_NAME, ui=MB_ICONWARNING, wait=False)
+
+def inputbox(message:str, title:str=APP_NAME
+			, is_pwd:bool=False, default:str='')->str:
+	''' Request input from user.
+		is_pwd - use password dialog (hide input).
+		Problem: don't use default or you will get it value
+		whatever button user will press.
+	'''
+	if is_pwd:
+		box_func = wx.PasswordEntryDialog
+	else:
+		box_func = wx.TextEntryDialog
+	dlg = box_func(None, message, title)
+	dlg.SetValue(default)
+	try:
+		dlg.ShowModal()
+	except wx._core.wxAssertionError:
+		pass
+	value = dlg.GetValue()
+	dlg.Destroy()
+	return value
+
+
+

@@ -52,7 +52,7 @@ def demo_task_4(left_click=True):
 	app_start(r'calc.exe')
 	# Скачиваем json по которому грузится список валют
 	# и получаем из него курс продажи доллара:
-	usd = json_element_get(
+	usd = json_element(
 		'https://www.sberbank.ru/portalserver/proxy/?pipe=shortCachePipe&url=http://localhost/rates-web/rateService/rate/current%3FregionId%3D77%26currencyCode%3D840%26currencyCode%3D978%26rateCategory%3Dbeznal'
 		, ['beznal', '840', '0', 'sellValue']
 	)
@@ -76,7 +76,7 @@ def backup_and_purge(
 
 # Check github for new version
 def taskopy_update(schedule='every().sunday.at("15:30")', submenu='Rare'):
-	new_ver = html_element_get(
+	new_ver = html_element(
 		'https://github.com/vikilpet/Taskopy/releases'
 		, {'name':'div', 'class':'f1'}
 	)[1:-1]	# remove first and last \n
@@ -88,7 +88,7 @@ def taskopy_update(schedule='every().sunday.at("15:30")', submenu='Rare'):
 		var_set('taskopy_version', APP_VERSION)
 		return
 	if cur_ver != new_ver:
-		news = html_element_get(
+		news = html_element(
 			'https://github.com/vikilpet/Taskopy/releases'
 			, {'name':'div', 'class':'markdown-body'}
 		)[1:-1]

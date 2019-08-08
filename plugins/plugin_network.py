@@ -1,4 +1,5 @@
 ﻿import os
+import socket
 import requests
 import urllib
 import tempfile
@@ -36,7 +37,7 @@ def file_download(url:str, destination:str=None)->str:
 	urllib.request.urlretrieve (url, r)
 	return r
 
-def html_element_get(url:str, find_all_args
+def html_element(url:str, find_all_args
 					, clean:bool=True , encoding:str='utf-8'
 					, session:bool=False, headers:dict=None)->str:
 	''' Get text of specified page element (div).
@@ -90,7 +91,7 @@ def html_element_get(url:str, find_all_args
 		else:
 			return 'not found'
 
-def json_element_get(url:str, element:list, headers:dict=None
+def json_element(url:str, element:list, headers:dict=None
 					, session:bool=False, cookies:dict=None):
 	''' Download json by url and get its nested element by
 			map of keys like ['list', 0, 'someitem', 0]
@@ -149,7 +150,7 @@ def tracking_status_rp(track_number:str)->str:
 	''' Get last status of Russian post parcel 
 	'''
 	url = r'https://www.pochta.ru/tracking?p_p_id=trackingPortlet_WAR_portalportlet&p_p_lifecycle=2&p_p_state=normal&p_p_mode=view&p_p_resource_id=getList&p_p_cacheability=cacheLevelPage&p_p_col_id=column-1&p_p_col_pos=1&p_p_col_count=2&barcodeList={}&pos'
-	status_list = json_element_get(
+	status_list = json_element(
 		url.format(track_number)
 		, [
 			[
@@ -166,3 +167,9 @@ def tracking_status_rp(track_number:str)->str:
 		}
 	)
 	return ', '.join(status_list)
+
+def domain_ip(domain:str)->list:
+	''' Get IP adresses of domain
+	'''
+	data = socket.gethostbyname_ex(domain)
+	return data[2]

@@ -16,6 +16,11 @@ def file_write(fullpath:str, content:str):
 	with open(fullpath, 'wt+') as f:
 		f.write(content)
 
+def file_log(fullpath:str, message:str, encoding:str='utf-8'
+				, time_format:str='%Y.%m.%d %H:%M:%S'):
+	with open(fullpath, 'at+', encoding=encoding) as f:
+		f.write(time.strftime(time_format) + '\t' + message + '\n')
+
 def file_copy(fullpath:str, destination:str):
 	''' Copy file to destination.
 		Destination may be fullpath or folder name.
@@ -117,7 +122,7 @@ def file_dir(fullpath:str)->str:
 	'''
 	return os.path.dirname(fullpath)
 		
-def file_backup(fullpath, folder:str=None):
+def file_backup(fullpath:str, folder:str=None):
 	''' Copy somefile.txt to somefile_2019-05-19_21-23-02.txt
 		folder - destination. If not specified - current folder
 	'''
