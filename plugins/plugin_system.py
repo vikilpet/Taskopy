@@ -162,11 +162,11 @@ def monitor_off():
 
 
 
-def test():
+def _test():
 	reg_key = 'HKEY_CURRENT_USER\\Software\\Microsoft\\Calc\\layout'
 	input(
 		reg_key + ' = ' + str(registry_get(reg_key))
 		+ '\n\nPress enter to exit'
 	)
 
-if __name__ == '__main__': test()
+if __name__ == '__main__': _test()

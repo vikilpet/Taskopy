@@ -2,9 +2,11 @@
 ### Python scheduler for Windows with hotkeys, tray menu, HTTP-server and many more.
 
 <p align="center">
-  <img src="https://i6.imageban.ru/out/2019/07/04/a6f6538a80bc7a62ab06ce5cea295a93.png">
+	<img src="https://i6.imageban.ru/out/2019/07/04/a6f6538a80bc7a62ab06ce5cea295a93.png">
 </p>
-
+<!---
+2019-08-19_22-22-53
+-->
 Run your python code with hotkey or by HTTP-request just like that:
 ```python
 def my_task(hotkey='ctrl+shift+t', http=True):
@@ -25,6 +27,7 @@ def my_another_task(schedule='every().day.at("10:30")', menu=False):
 - [Settings](#settings)
 - [Keywords](#keywords)
 	- [Miscelanneous](#miscelanneous)
+	- [Keyboard](#keyboard)
 	- [Filesystem](#filesystem)
 	- [Network](#network)
 	- [System](#system)
@@ -35,23 +38,18 @@ def my_another_task(schedule='every().day.at("10:30")', menu=False):
 - [Task Examples](#task-examples)
 
 ## Installation
-### Option 1: binary
+### Option 1: binary file
 
 **Requirements:** Windows 7 and above.
 You can [download](https://github.com/vikilpet/Taskopy/releases) archive with binary release but many of lousy antiviruses don't like python inside EXE so VirusTotal shows about 7 detects.
 
 ### Option 2: Python
-**Requirements:** Python 3.7; Windows 7 and above.
+**Requirements:** Python 3.7.4; Windows 7 and above.
 
 Download project, install requirements:
 ```
 pip install -r requirements.txt
 ```
-[Download fresh sqlite-dll-win32-x86-...](https://www.sqlite.org/download.html) from *Precompiled Binaries for Windows* section and replace outdated sqlite3.dll (version < 3.24) in Python folder:
-```
-%userprofile%\AppData\Local\Programs\Python\Python37-32\DLLs\
-```
-
 Make shortcut to taskopy.py in Startup folder:
 ```
 %userprofile%\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\
@@ -178,7 +176,15 @@ Format: **setting** (default value) — description.
 - **re_replace(source:str, re_pattern:str, repl:str='')** — replace in *source* all matches with *repl* string.
 - **email_send(recipient:str, subject:str, message:str, smtp_server:str, smtp_port:int, smtp_user:str, smtp_password:str)** — send email.
 - **inputbox(message:str, title:str, is_pwd:bool=False)->str** — show a message with an input request. Returns the entered line or empty string if user pressed cancel.
-	*is_pwd* — to hide the text you are typing.
+	*is_pwd* — hide the typed text.
+- **random_num(a, b)->int** — return a random integer in the range from a to b, including a and b.
+- **random_str(string_len:int=10, string_source:str=None)->str** — generate a string of random characters with a given length.
+
+### Keyboard
+
+**keys_pressed(hotkey:str)->bool** — is the key pressed?
+**keys_send(hotkey:str)** — press the key combination.
+**keys_write(text:str)** — write a text.
 
 ### Filesystem
 
@@ -186,6 +192,7 @@ Format: **setting** (default value) — description.
 
 **IMPORTANT: always use double backslash "\\\" in paths!**
 
+- **csv_read(fullpath:str, encoding:str='utf-8', fieldnames=None, delimiter:str=';', quotechar:str='"')->list** — read a CSV file and return the contents as a list of dictionaries.
 - **dir_delete(fullpath:str)** — delete directory.
 - **dir_list(fullpath:str)->list:** — get list of files in directory.
 	Examples:
@@ -383,25 +390,33 @@ In the functions for working with windows, the *window* argument can be either a
 
 ## Task examples
 ```python
-# Launch iPython and copy all plugins to the clipboard so
-# you can quickly paste in iPython and access all
-# functions from all plugins:
-def iPython():
+# Launch iPython and copy all plugins to the clipboard
+# to quickly paste and access all keywords:
+def iPython(submenu='WIP'):
+	# kill existing process:
+	process_kill('ipython.exe')
+	# start new process:
 	app_start('ipython')
+	# get all plugins from 'plugins' folder:
 	plugs = dir_list('plugins\\*.py')
 	plugs[:] = [
 		'from ' + pl[:-3].replace('\\', '.')
 		+ ' import *' for pl in plugs
 	]
-	# add automatic plugin reload:
-	clip_set(
-		'%load_ext autoreload' + '\n'
-		+ '%autoreload 2' + '\n'
-		+ '\n'.join(plugs) + '\n'
+	# give the process time to boot up:
+	time_sleep(1.5)
+	# import from plug-ins:
+	keys_write(
+		r'%load_ext autoreload' + '\n'
+		+ r'%autoreload 2' + '\n'
+		+ '\n'.join(plugs)
 	)
+	time_sleep(0.2)
+	# send control + enter to complete the command:
+	keys_send('ctrl+enter')
 
 
-# Check free space on all disks.
+# Check the free space on all discs.
 # Add 'caller' to task arguments so inside task you can check
 # how task was called.
 # Scheduled to random interval between 30 and 45 minutes
@@ -449,7 +464,3 @@ def add_ip_to_list():
     )
     msgbox('Done!', timeout=5)
 ```
-
-<!---
-2019-08-08_21-42-46
--->

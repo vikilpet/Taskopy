@@ -120,8 +120,10 @@ class Tasks():
 			if task_opts['task_name']:
 				task_opts['task_name_full'] = f'{item} ({task_opts["task_name"]})'
 			else:
-				task_opts['task_name'] = item.replace('_'
-												, ' ').capitalize()
+				if item[0].isupper():
+					task_opts['task_name'] = item.replace('_', ' ')
+				else:
+					task_opts['task_name'] = item.replace('_', ' ').capitalize()
 				task_opts['task_name_full'] = task_opts['task_name']
 			if task_opts['schedule']:
 				s.add_schedule(task_opts)

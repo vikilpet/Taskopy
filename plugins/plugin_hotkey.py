@@ -1,9 +1,11 @@
 ﻿import ctypes
 import ctypes.wintypes
 import win32con
+import keyboard
 from .tools import msgbox_warning
 
 # Key codes https://docs.microsoft.com/en-us/windows/desktop/inputdev/virtual-key-codes
+# https://github.com/boppreh/keyboard
 
 user32 = ctypes.windll.user32
 kernel32 = ctypes.windll.kernel32
@@ -105,7 +107,13 @@ class GlobalHotKeys():
 				user32.DispatchMessageA(ctypes.byref(msg))
 		finally:
 			s.unregister()
- 
+
+keys_pressed = keyboard.is_pressed
+
+keys_send = keyboard.send
+
+keys_write = keyboard.write
+
 if __name__ == '__main__':
 	import threading
 

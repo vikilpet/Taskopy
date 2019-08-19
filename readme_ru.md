@@ -1,4 +1,5 @@
-﻿### Планировщик для Windows на основе Python с горячими клавишами, меню в трее, HTTP-сервером и многим другим.
+﻿
+### Планировщик для Windows на основе Python с горячими клавишами, меню в трее, HTTP-сервером и многим другим.
 
 <p align="center">
 	<img src="https://i6.imageban.ru/out/2019/07/04/a6f6538a80bc7a62ab06ce5cea295a93.png">
@@ -20,20 +21,21 @@ def my_another_task(schedule='every().day.at("10:30")', menu=False):
 ```
 
 ## Содержание
-- [Установка](#installation)
-- [Использование](#usage)
-- [Свойства задачи](#task-options)
-- [Настройки](#settings)
-- [Ключевые слова](#keywords)
-	- [Общие](#miscelanneous)
-	- [Файлы и папки](#filesystem)
-	- [Сеть](#network)
-	- [Система](#system)
-	- [Процессы](#process)
+- [Установка](#установка)
+- [Использование](#использование)
+- [Свойства задачи](#свойства-задачи)
+- [Настройки](#настройки)
+- [Ключевые слова](#ключевые-слова)
+	- [Общие](#общие)
+	- [Клавиатура](#клавиатура)
+	- [Файлы и папки](#файлы-и-папки)
+	- [Сеть](#сеть)
+	- [Система](#система)
+	- [Процессы](#процессы)
 	- [Winamp](#winamp)
 	- [Mikrotik RouterOS](#mikrotik-routeros)
-- [Помочь проекту](#help-me)
-- [Примеры задач](#task-examples)
+- [Помочь проекту](#помощь-проекту)
+- [Примеры задач](#примеры-задач)
 
 ## Установка
 ### Вариант 1: архив с исполняемым файлом.
@@ -43,16 +45,11 @@ def my_another_task(schedule='every().day.at("10:30")', menu=False):
 
 ### Вариант 2: Python
 **Требования:** Python 3.7+; Windows 7 и выше.
+
 Скачайте проект, установите зависимости:
 ```
 pip install -r requirements.txt
 ```	
-
-[Скачайте новую версию библиотеки sqlite-dll-win32-x86-...](https://www.sqlite.org/download.html) из секции _Precompiled Binaries for Windows_ и замените устаревшую sqlite3.dll (версия меньше < 3.24) в папке Питона:
-```
-%userprofile%\AppData\Local\Programs\Python\Python37-32\DLLs\
-```
-
 Сделайте ярлык для taskopy.py и поместите в автозагрузку:
 ```
 %userprofile%\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\
@@ -65,7 +62,6 @@ pip install -r requirements.txt
 def demo_task_3('left_click'=True, log=False):
 	app_start('calc.exe')
 ```	
-
 Затем кликните на иконке в трее и выберите _Reload crontab (перечитать кронтаб)_ и ваша задача готова.
 
 ## Свойства задачи
@@ -108,9 +104,8 @@ def demo_task_3('left_click'=True, log=False):
 		# вернуть этот список как строку, разделённую br-тэгом.
 		# wordpress съедает угловые скобки, поэтому здесь 'br' без них:
 		return 'br'.join(listing)
-		
-	Результат в браузере:
 	```
+	Результат в браузере:
 	backup
 	crontab.py
 	log
@@ -182,6 +177,14 @@ def demo_task_3('left_click'=True, log=False):
 - **email_send(recipient:str, subject:str, message:str, smtp_server:str, smtp_port:int, smtp_user:str, smtp_password:str)** — отправить письмо. Поддерживает отправку с русским заголовком и русским текстом.
 - **inputbox(message:str, title:str, is_pwd:bool=False)->str** — показать сообщение с вводом текста. Возвращает введённую строку или пустую строку, если пользователь нажал отмену.
 	*is_pwd* — скрыть вводимый текст.
+- **random_num(a, b)->int** — вернуть случайное целое число в диапазоне от a до b, включая a и b.
+- **random_str(string_len:int=10, string_source:str=None)->str** — сгенерировать строку из случайных символов заданной длины.
+
+### Клавиатура
+
+**keys_pressed(hotkey:str)->bool** — нажата ли клавиша.
+**keys_send(hotkey:str)** — нажать сочетание клавиш.
+**keys_write(text:str)** — написать текст.
 
 ### Файлы и папки
 
@@ -189,7 +192,8 @@ def demo_task_3('left_click'=True, log=False):
 
 **ВАЖНО: всегда используйте двойной обратный слеш "\\\" в путях!**
 
-- **dir_delete(fullpath:str):** —удалить папку.
+- **csv_read(fullpath:str, encoding:str='utf-8', fieldnames=None, delimiter:str=';', quotechar:str='"')->list** — прочитать CSV файл и вернуть содержимое в виде списка со словарями.
+- **dir_delete(fullpath:str):** — удалить папку.
 - **dir_list(fullpath:str)->list:** — получить список файлов в папке.
 	Примеры:
 	- Получить список всех .log файлов в 'c:\\\Windows' **не учитывая** подпапки:
@@ -386,21 +390,30 @@ def demo_task_3('left_click'=True, log=False):
 
 ## Примеры задач
 ```python
-# Запуск iPython и копирование всех плагинов в буфер обмена,
-# чтобы быстро вставить и получить доступ ко всем ключевым словам:
-def iPython():
+# Запуск iPython и копирование всех плагинов в буфер обмена
+# , чтобы быстро вставить и получить доступ ко всем ключевым словам:
+def iPython(submenu='WIP'):
+	# Убиваем существующий процесс, если есть:
+	process_kill('ipython.exe')
+	# запускаем новый процесс:
 	app_start('ipython')
+	# получаем список всех .py файлов в папке 'plugins':
 	plugs = dir_list('plugins\\*.py')
 	plugs[:] = [
 		'from ' + pl[:-3].replace('\\', '.')
 		+ ' import *' for pl in plugs
 	]
-	# и добавляем автоматическую перезагрузку плагинов:
-	clip_set(
-		'%load_ext autoreload' + '\n'
-		+ '%autoreload 2' + '\n'
-		+ '\n'.join(plugs) + '\n'
+	# даём процессу время загрузиться:
+	time_sleep(1.5)
+	# вводим импорты из плагинов:
+	keys_write(
+		r'%load_ext autoreload' + '\n'
+		+ r'%autoreload 2' + '\n'
+		+ '\n'.join(plugs)
 	)
+	time_sleep(0.2)
+	# отправляем control + enter, чтобы завершить ввод:
+	keys_send('ctrl+enter')
 
 
 # Проверяем свободное место на всех дисках (c, d, e).

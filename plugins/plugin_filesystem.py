@@ -1,6 +1,8 @@
 ﻿import os
 import time
 import glob
+import csv
+import pyodbc
 from pathlib import Path
 import shutil
 
@@ -153,3 +155,12 @@ def dir_list(fullpath:str)->list:
 	'''
 	recursive = ('**' in fullpath)
 	return glob.glob(fullpath, recursive=recursive)
+
+def csv_read(fullpath:str, encoding:str='utf-8', fieldnames=None, delimiter:str=';', quotechar:str='"')->list:
+	''' Read whole CSV file and return content as list of dictionaries
+	'''
+	with open(fullpath, 'r', encoding=encoding) as f:
+		reader = csv.DictReader(f, skipinitialspace=True, fieldnames=fieldnames
+		, delimiter=delimiter, quotechar=quotechar)
+		li = [dict(row) for row in reader]
+	return li

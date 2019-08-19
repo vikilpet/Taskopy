@@ -9,6 +9,7 @@ import ctypes
 import sqlite3
 import pyperclip
 import random
+import string
 import win32api
 import win32gui
 import win32con
@@ -18,7 +19,7 @@ from .plugin_send_mail import send_email
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2019-08-08'
+APP_VERSION = 'v2019-08-19'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 TASK_OPTIONS = [
@@ -52,10 +53,12 @@ APP_SETTINGS=[
 	, ['server_silent', True]
 ]
 
-DB_FILE = (
-	os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-	+ r'\resources\db.sqlite3'
-)
+if getattr(sys, 'frozen', False):
+	_APP_PATH = os.path.dirname(sys.executable)
+else:
+	_APP_PATH = os.getcwd()
+
+_DB_FILE = _APP_PATH + r'\resources\db.sqlite3'
 
 class DictToObj:
 	def __init__(s, di:dict):
@@ -103,8 +106,9 @@ def time_sleep(sec:float):
 	time.sleep(sec)
 
 def db_execute(sql:str):
-	''' Execute sql in DB_FILE '''
-	conn = sqlite3.connect(DB_FILE)
+	''' Execute sql in _DB_FILE
+	'''
+	conn = sqlite3.connect(_DB_FILE)
 	cur = conn.cursor()
 	cur.execute(sql)
 	conn.commit()
@@ -118,7 +122,7 @@ def var_set(var_name:str, value:str):
 	''' Store variable value in db.sqlite3 in table "variables"
 		It needs sqlite version 3.24+ (just replace dll)
 	'''
-	conn = sqlite3.connect(DB_FILE)
+	conn = sqlite3.connect(_DB_FILE)
 	cur = conn.cursor()
 	cur.execute(f'''INSERT INTO variables (vname, vvalue)
 					VALUES('{var_name}', '{value}')
@@ -133,7 +137,7 @@ def var_get(var_name:str, table:str=None)->str:
 		there is none.
 	'''
 	if table is None: table = 'variables'
-	conn = sqlite3.connect(DB_FILE)
+	conn = sqlite3.connect(_DB_FILE)
 	cur = conn.cursor()
 	cur.execute(
 		f'''SELECT vvalue
@@ -435,5 +439,11 @@ def inputbox(message:str, title:str=APP_NAME
 	dlg.Destroy()
 	return value
 
+random_num = random.randint
 
+def random_str(string_len:int=10, string_source:str=None)->str:
+	''' Generate a random string of fixed length
+	'''
+	if not string_source: string_source = string.ascii_letters + string.digits
+	return ''.join(random.choice(string_source) for i in range(string_len))
 

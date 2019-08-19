@@ -73,8 +73,7 @@ def html_element(url:str, find_all_args
 			r += soup.find_all(**d)
 		if r:
 			if clean:
-				print(r)
-				r = [i.get_text() for i in r]
+				r = [i.get_text().replace('\n', '') for i in r]
 				r = ' '.join(r)
 				return r
 			else:
@@ -85,27 +84,29 @@ def html_element(url:str, find_all_args
 		r = soup.find_all(**find_all_args)
 		if r:
 			if clean:
-				return r[0].get_text()
+				r = r[0].get_text()
+				return r.replace('\n', '')
 			else:
 				return r[0]
 		else:
 			return 'not found'
 
 def json_element(url:str, element:list, headers:dict=None
-					, session:bool=False, cookies:dict=None):
+					, session:bool=False, cookies:dict=None
+					, method:str='get', json_data:str=None):
 	''' Download json by url and get its nested element by
 			map of keys like ['list', 0, 'someitem', 0]
 		element - can be a list or list of lists so it will
 			get every element specified in nested list and return
 			list of values.
 			examples:
-				element=['banks',0,'usd','sale']
+				element=['banks', 0, 'usd', 'sale']
 					result: 63.69
 				
 				element=[
-					['banks',0,'eur','sale']
-					,['banks',0,'usd','sale']
-					,['banks',0,'gbp','sale']
+					['banks', 0, 'eur', 'sale']
+					, ['banks', 0, 'usd', 'sale']
+					, ['banks', 0, 'gbp', 'sale']
 				]
 					result = [71.99, 63.69, 83.0]
 		If nothing found then return 'not found'
@@ -115,11 +116,17 @@ def json_element(url:str, element:list, headers:dict=None
 	'''
 	if session:
 		ses = requests.Session()
-		ses.headers.update(headers)
-		ses.cookies.update(cookies)
-		req = ses.get(url)
+		if headers: ses.headers.update(headers)
+		if cookies: ses.cookies.update(cookies)
+		if method == 'get':
+			req = ses.get(url)
+		else:
+			req = ses.post(url, json=json_data)
 	else:
-		req = requests.get(url, headers=headers)
+		if method == 'get':
+			req = requests.get(url, headers=headers)
+		else:
+			req = requests.post(url, headers=headers, json=json_data)
 	if req.status_code == 200:
 		j = req.content
 	else:
@@ -145,6 +152,8 @@ def json_element(url:str, element:list, headers:dict=None
 		except:
 			r = 'not found'
 	return r
+
+
 
 def tracking_status_rp(track_number:str)->str:
 	''' Get last status of Russian post parcel 
@@ -173,3 +182,4 @@ def domain_ip(domain:str)->list:
 	'''
 	data = socket.gethostbyname_ex(domain)
 	return data[2]
+
