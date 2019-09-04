@@ -1,7 +1,10 @@
 ﻿import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import urllib
-from .tools import msgbox_warning
+if __name__ == '__main__':
+	from tools import msgbox_warning
+else:
+	from .tools import msgbox_warning
 
 class RequestData():
 	''' To keep HTTP request data in instance instead of dictionary
@@ -9,6 +12,9 @@ class RequestData():
 	def __init__(s, client_ip:str, path:str
 					, headers:dict={}, params:dict={}):
 		''' client_ip - str
+			path - '/task_name'
+			headers - HTTP request headers
+			params - 'par1':'123'
 		'''
 		s.client_ip = client_ip
 		s.path = path
@@ -21,7 +27,8 @@ class RequestData():
 class HTTPHandlerTasks(BaseHTTPRequestHandler):
 	def __init__(s, request, client_address, server
 				, tasks, sett):
-		s.silent = sett.server_silent
+		s.sett=sett
+		s.silent = not sett.developer
 		s.tasks = tasks
 		super().__init__(request, client_address, server)
 
@@ -52,15 +59,19 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 				)
 	
 	def do_GET(s):
-		if (
-			s.path.endswith('favicon')
-			or s.path.endswith('favicon.ico')
-			or s.path.endswith('favicon.png')
-		): return
-
+		if 'favicon.' in s.path:
+			if s.sett.developer: print(f'favicon request: {s.path}')
+			s.wfile.write(b'<link rel="icon" href="data:,">')
+			return
+		if s.sett.white_list:
+			if not s.address_string() in s.sett.white_list.split(','):
+				if s.sett.developer: print(time.asctime()
+					, f'Request from unknown IP ({s.address_string()}): {s.path}')
+				s.send_header('Content-type', 'text/plain; charset=utf-8')
+				s.wfile.write(b'403')
+				return
 		s.send_response(200)
-		
-		s.send_header('Content-type','text/html; charset=utf-8')
+		s.send_header('Content-type', 'text/plain; charset=utf-8')
 		s.end_headers()
 		if s.path.startswith('/task?'):
 			try:
@@ -120,23 +131,23 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 
 def http_server_start(sett, tasks):
 	''' Start HTTP server that will run tasks.
-		sett - instance of Settings class
+		sett - instance of Settings class from Taskopy
 		tasks - instance of Tasks class
 	'''
 	try:
 		httpd = ThreadingHTTPServer(
-			(sett.server_ip, int(sett.server_port))
+			(sett.server_ip, sett.server_port)
 			, lambda *a, sett=sett, tasks=tasks:
 				HTTPHandlerTasks(*a, sett=sett, tasks=tasks)
 		)
 		print(
-			'Start HTTP-server on'
+			'The HTTP server is running at'
 			+ f' {sett.server_ip}:{sett.server_port}'
 		)
 		tasks.http_server = httpd
 		httpd.serve_forever()
 	except Exception as e:
-		print(f'HTTP Server error:\n{repr(e)[:100]}')
+		print(f'HTTP Server error:\n{repr(e)[:200]}')
 		msgbox_warning(f'HTTP Server error:\n{repr(e)[:100]}')
 	
 
@@ -150,8 +161,7 @@ def main():
 		server_address = (serv_ip, serv_port)
 		httpd = ThreadingHTTPServer(server_address, HTTPHandlerTasks)
 		print(
-			'Starting server on '
-			+ f'{serv_ip}:{serv_port}'
+			f'The server is running at {serv_ip}:{serv_port}'
 		)
 		httpd.serve_forever()
 	except KeyboardInterrupt:

@@ -3,7 +3,6 @@ import os
 import psutil
 from .tools import DictToObj
 
-
 # https://psutil.readthedocs.io/en/latest/
 
 DETACHED_PROCESS = 0x00000008
@@ -15,6 +14,7 @@ SW_SHOWMINNOACTIVE = 7
 SW_HIDE = 0
 SW_FORCEMINIMIZE = 11
 
+_SIZE_PREFIXES = {'gb':1073741824, 'mb':1048576, 'kb':1024, 'b':1, 'percent':1}
 
 def file_open(fullpath:str):
 	''' Open file or URL in default program
@@ -40,7 +40,13 @@ def app_start(
 	'''
 
 	app_path = [app_path]
-	if app_args: app_path += app_args.split()
+	if app_args:
+		if type(app_args) is str:
+			app_path += app_args.split()
+		elif type(app_args) is list:
+			app_path += app_args
+		else:
+			raise 'Unknown type of app_args'
 	
 	info = subprocess.STARTUPINFO()
 	info.dwFlags = subprocess.STARTF_USESHOWWINDOW
@@ -64,10 +70,28 @@ def app_start(
 
 
 
+def process_exist(name:str, cmd:str=None)->bool:
+	''' Returns True if the process with the specified name exists.
+		name - image name.
+		cmd - optional string to search in the command line of the process.
+	'''
+	name = name.lower()
+	if cmd: cmd=cmd.lower()
+	for proc in psutil.process_iter():
+		if proc.name().lower() == name:
+			if cmd:
+				if cmd in ' '.join(proc.cmdline()):	return True
+			else:
+				return True
+	return False
+
 def process_list(name:str='')->list:
 	''' Returns list of dicts with process information.
 		name - image name. If not specified then list all
 			processes.
+		Process information includes: pid:int, name:str
+		, username:str, exe:str, cmdline:list
+
 	'''
 	ATTRS=['pid', 'name', 'username', 'exe', 'cmdline']
 
@@ -76,32 +100,50 @@ def process_list(name:str='')->list:
 	for proc in psutil.process_iter():
 		if name:
 			if proc.name().lower() == name:
-				proc_list.append( DictToObj(proc.as_dict(attrs=ATTRS) ) )
+				di = proc.as_dict(attrs=ATTRS)
+				di['cmdline'] = list(di['cmdline'])
+				proc_list.append( DictToObj(di) )
 		else:
-			proc_list.append( DictToObj(proc.as_dict(attrs=ATTRS) ) )
+			di = proc.as_dict(attrs=ATTRS)
+			di['cmdline'] = list(di['cmdline'])
+			proc_list.append( DictToObj(di) )
 	return proc_list
 
 def process_cpu(pid:int, interval:int=1)->float:
 	''' Returns CPU usage of specified PID for specified interval
 		of time in seconds.
 	'''
-	proc = psutil.Process(pid)
-	return proc.cpu_percent(interval)
+	try:
+		proc = psutil.Process(pid)
+		return proc.cpu_percent(interval)
+	except psutil.NoSuchProcess:
+		return 0
 
 def process_kill(process):
 	''' Kill specified prosess.
-		If process is int: kill by pid
-		If process is str: kill all processes with that name.
+		If 'process' is int: kill by pid.
+		If 'process' is str: kill all processes with that name.
 	'''
 	if type(process) == int:
-		psutil.Process(process).kill()
+		try:
+			psutil.Process(process).kill()
+		except ProcessLookupError:
+			print(f'PID {process}  not found')
 	elif type(process) == str:
 		name = process.lower()
 		for proc in psutil.process_iter(attrs=['name']):
-			if proc.name().lower() == name:
-				proc.kill()
+			if proc.name().lower() == name: proc.kill()
 	else:
 		raise ValueError(
-			f'Unknown type of process parameter: {type(process)}'
+			f'Unknown type of "process" argument: {type(process)}'
 		)
-	
+
+def free_ram(unit:str='percent'):
+	'''	Returns free RAM size.
+		unit - gb, mb... or 'percent'
+	'''
+	e = _SIZE_PREFIXES.get(unit.lower(), 1)
+	if unit == 'percent':
+		return round(100 - psutil.virtual_memory()[2], 1)
+	else:
+		return psutil.virtual_memory()[4] // e

@@ -19,7 +19,7 @@ from .plugin_send_mail import send_email
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2019-08-19'
+APP_VERSION = 'v2019-09-04'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 TASK_OPTIONS = [
@@ -41,6 +41,7 @@ TASK_OPTIONS = [
 	, ['http', False]
 	, ['err_threshold', 0]
 	, ['err_counter', False]
+	, ['no_print', False]
 ]
 
 APP_SETTINGS=[
@@ -254,7 +255,7 @@ IDRETRY = 4
 IDTRYAGAIN = 10
 IDYES = 6
 
-def msgbox(msg:str, title:str=APP_NAME
+def msgbox(msg:str, title:str=None
 	, ui:int=None, wait:bool=True, timeout:int=None
 	, dis_timeout:float=None)->int:
 	''' wait - msgbox should be closed to continue task
@@ -296,8 +297,10 @@ def msgbox(msg:str, title:str=APP_NAME
 			win32gui.EnumChildWindows(hwnd, dis_butt, True)
 		except:
 			pass
-	if ui:
-		ui += MB_SYSTEMMODAL
+	if not title:
+		title = sys._getframe(1).f_code.co_name.replace('_', ' ')
+		if title == '<module>': title = APP_NAME
+	if ui: ui += MB_SYSTEMMODAL
 	else:
 		ui = MB_ICONINFORMATION + MB_SYSTEMMODAL
 	if timeout:

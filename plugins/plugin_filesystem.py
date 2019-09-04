@@ -2,21 +2,29 @@
 import time
 import glob
 import csv
-import pyodbc
+import zipfile
 from pathlib import Path
+import pyodbc
 import shutil
 
 _SIZE_PREFIXES = {'gb':1073741824, 'mb':1048576, 'kb':1024, 'b':1}
 
-def file_read(fullpath:str)->str:
+def file_read(fullpath:str, encoding:str='utf-8')->str:
 	''' Returns content of file '''
-	with open(fullpath, 'tr') as f: return f.read()
+	with open(fullpath, 'tr', encoding=encoding) as f: return f.read()
 
-def file_write(fullpath:str, content:str):
+def file_write(fullpath:str, content:str, encoding:str='utf-8'):
 	''' Save content in file. Create file if fullpath doesn't exist.
 	'''
-	with open(fullpath, 'wt+') as f:
+	with open(fullpath, 'wt+', encoding=encoding, errors='ignore') as f:
 		f.write(content)
+
+def file_rename(fullpath:str, dest:str):
+	''' Rename file.
+		dest - fullpath or just new file name without parent directory.
+	'''
+	if not ':' in dest: dest = os.path.dirname(fullpath) + '\\' + dest
+	os.rename(fullpath, dest)
 
 def file_log(fullpath:str, message:str, encoding:str='utf-8'
 				, time_format:str='%Y.%m.%d %H:%M:%S'):
@@ -61,6 +69,11 @@ def path_exists(fullpath:str)->bool:
 def file_size(fullpath:str, unit:str='b')->int:
 	e = _SIZE_PREFIXES.get(unit.lower(), 1)
 	return os.stat(fullpath).st_size // e
+	retudir.exists()
+
+def file_size(fullpath:str, unit:str='b')->int:
+	e = _SIZE_PREFIXES.get(unit.lower(), 1)
+	return os.stat(fullpath).st_size // e
 
 def is_directory(fullpath:str)->bool:
 	''' Check if fullpath is a directory '''
@@ -73,13 +86,18 @@ def purge_old(fullpath:str, days:int=0, recursive=False
 		days=0 - delete everything
 		creation - use date of creation, otherwise use last
 			modification date.
-i		recursive - delete in subfolders too. Empty subfolders 
+		recursive - delete in subfolders too. Empty subfolders 
 			will be deleted.
 		test - only print files and folders that should be removed
 	'''
-	def robust_remove(fullpath):
+	def robust_remove_file(fullpath):
 		try:
 			os.remove(fullpath)
+		except:
+			pass
+	def robust_remove_dir(fullpath):
+		try:
+			shutil.rmtree(fullpath)
 		except:
 			pass
 	if days: delta = 24 * 3600 * days
@@ -97,8 +115,8 @@ i		recursive - delete in subfolders too. Empty subfolders
 		file_func = print
 		dir_func = print
 	else:
-		file_func = robust_remove
-		dir_func = shutil.rmtree
+		file_func = robust_remove_file
+		dir_func = robust_remove_dir
 	
 	for fi in files:
 		if os.path.isdir(fi):
@@ -164,3 +182,37 @@ def csv_read(fullpath:str, encoding:str='utf-8', fieldnames=None, delimiter:str=
 		, delimiter=delimiter, quotechar=quotechar)
 		li = [dict(row) for row in reader]
 	return li
+
+def dir_zip(fullpath:str, destination:str)->str:
+	''' Compresses folder and returns the full path to archive.
+	'''
+	filename = os.path.basename(destination)
+	name, suffix = filename.split('.')
+	archive_from = os.path.dirname(fullpath)
+	archive_to = os.path.basename(fullpath.strip(os.sep))
+	shutil.make_archive(name, format=suffix, root_dir=archive_from
+						, base_dir=archive_to)
+	shutil.move(f'{name}.{suffix}', destination)
+	return destination
+
+def file_zip(fullpath, destination:str)->str:
+	''' Compresses a file or files to archive.
+		fullpath - string with fullpath or list with fullpaths.
+	'''
+	if type(fullpath) is str:
+		with zipfile.ZipFile(
+			destination, 'w'
+		) as zipf:
+			zipf.write(fullpath, arcname=os.path.basename(fullpath)
+						, compress_type=zipfile.ZIP_DEFLATED)
+		return destination
+	elif type(fullpath) is list:
+		with zipfile.ZipFile(
+			destination, 'w'
+		) as zipf:
+			for fi in fullpath:
+				zipf.write(fi, arcname=os.path.basename(fi)
+						, compress_type=zipfile.ZIP_DEFLATED)
+		return destination
+	else:
+		return 'error: unknown type of fullpath'

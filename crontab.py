@@ -92,7 +92,7 @@ def taskopy_update(schedule='every().sunday.at("15:30")', submenu='Rare'):
 		)
 		print(f'New version of the Taskopy: {new_ver}')
 		if msgbox(
-			f'New version of the Taskopy: {new_ver}\n\n' + news[:100]
+			f'New version of the Taskopy: {new_ver}\n\n' + news[:200]
 			+ '\n\nOpen GitHub page?'
 			, dis_timeout=1
 			, ui=MB_YESNO + MB_ICONINFORMATION

@@ -45,8 +45,9 @@ APP_ICON_DIS = r'resources\icon_dis.png'
 
 set_title = ctypes.windll.kernel32.SetConsoleTitleW
 	
-class Settings():
+class Settings:
 	''' Load global settings from settings.ini
+		Settings from all sections are collected.
 	'''
 	def __init__(s):
 		config = configparser.ConfigParser()
@@ -58,6 +59,13 @@ class Settings():
 					s.__dict__[setting[0]] = True
 				elif setting[1].lower() in ('false', 'no'):
 					s.__dict__[setting[0]] = False
+				elif setting[1].isdigit():
+					s.__dict__[setting[0]] = int(setting[1])
+				elif setting[1].replace('.', '', 1).isdigit():
+					try:
+						s.__dict__[setting[0]] = float(setting[1])
+					except:
+						s.__dict__[setting[0]] = setting[1]
 				else:
 					s.__dict__[setting[0]] = setting[1]
 		for setting in APP_SETTINGS:
@@ -85,8 +93,16 @@ def load_crontab(event=None)->bool:
 		msgbox_warning(f'{lang.warn_crontab_reload}:\n\n{trace_str}')
 		return False
 
+class SuppressPrint:
+	def __enter__(self):
+		self._original_stdout = sys.stdout
+		sys.stdout = open(os.devnull, 'w')
 
-class Tasks():
+	def __exit__(self, exc_type, exc_val, exc_tb):
+		sys.stdout.close()
+		sys.stdout = self._original_stdout
+
+class Tasks:
 	''' Tasks from crontab and they properties '''
 	def __init__(s):
 		s.enabled = True
@@ -267,9 +283,8 @@ class Tasks():
 		''' Logging, threading, error catching and other stuff.
 			task - dict with task options
 			caller - who actually launched the task.
-				It can be 'hotkey', 'menu', 'scheduler', 'http' etc.
-				So you can check inside task function who calls
-				function this time.
+				It can be 'hotkey', 'menu', 'scheduler', 'http' etc.,
+				so you can find out inside the task function who started function this time.
 			data - pass some data to task
 			result - list in which we will place result of task. It is
 				passed through all inner fuctions (run_task_inner and
@@ -285,15 +300,17 @@ class Tasks():
 						task_kwargs['caller'] = caller
 					if 'data' in func_args:
 						task_kwargs['data'] = data
-					r = task['task_function'](**task_kwargs)
+					if task['no_print']:
+						with SuppressPrint():
+							r = task['task_function'](**task_kwargs)
+					else:
+						r = task['task_function'](**task_kwargs)
 					if r:
 						if not result is None:
 							result.append(r)
-					s.task_opt_set(task['task_function_name']
-									, 'running', False)
-					s.task_opt_set(task['task_function_name']
-									, 'err_counter', 0)
-				except Exception as e:
+					s.task_opt_set(task['task_function_name'], 'running', False)
+					s.task_opt_set(task['task_function_name'], 'err_counter', 0)
+				except Exception:
 					s.task_opt_set(task['task_function_name']
 									, 'running', False)
 					err_counter = s.task_opt_get(
@@ -399,9 +416,12 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 
 	def CreatePopupMenu(s):
 		menu = wx.Menu()
-		if sys.modules.get('crontab') is not None:
-			for task in tasks.task_list_menu:
-				create_menu_item(menu, task)
+		if not sys.modules.get('crontab') is None:
+			if keyboard.is_pressed('shift'):
+				for task in tasks.task_list:
+					if not task['submenu']: create_menu_item(menu, task)
+			else:
+				for task in tasks.task_list_menu: create_menu_item(menu, task)
 			for subm in tasks.task_list_submenus:
 				submenu = wx.Menu()
 				for task in subm[1]:
@@ -422,7 +442,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		return menu
 
 	def set_icon(s, dis:bool=False):
-		s.SetIcon(s.icon_dis if dis else s.icon, APP_NAME)
+		s.SetIcon(s.icon_dis if dis else s.icon, APP_FULLNAME)
 
 	def show_menu_wait(s, event=None):
 		print('show_menu 3 sec')
@@ -447,7 +467,8 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 				tipstyle=BT.BT_CLICK)
 			tipballoon.SetTarget(app.taskbar_icon)
 			tipballoon.SetBalloonColour(wx.WHITE)
-			tipballoon.SetTitleFont(wx.Font(9, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False))
+			tipballoon.SetTitleFont(wx.Font(9, wx.FONTFAMILY_SWISS
+							, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False))
 			tipballoon.SetTitleColour(wx.BLACK)
 			tipballoon.SetMessageFont()
 			tipballoon.SetMessageColour(wx.LIGHT_GREY)

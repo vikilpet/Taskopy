@@ -6,22 +6,33 @@ import tempfile
 from bs4 import BeautifulSoup
 import json
 
-def page_get(url:str, encoding:str='utf-8')->str:
+def page_get(url:str, encoding:str='utf-8', session:bool=False
+			, cookies:dict=None, headers:dict=None
+			, http_method:str='get', json_data:str=None)->str:
 	''' Get content of the specified url
 	'''
+	if http_method: http_method = http_method.lower()
 	try:
-		req = requests.get(url)
+		if session:
+			ses = requests.Session()
+			if headers: ses.headers.update(headers)
+			if cookies: ses.cookies.update(cookies)
+			req = getattr(ses, http_method)(url=url, json=json_data)
+		else:
+			req = getattr(requests, http_method)(
+				url=url, headers=headers, json=json_data, cookies=cookies
+			)
 	except Exception as e:
-		return 'error: download failed'
+		return f'error {http_method}: {repr(e)}'
 	if req.status_code == 200:
 		return str(req.content, encoding=encoding, errors='ignore')
 	else:
-		return f'error: status {req.status_code}'
+		return f'error status: {req.status_code}'
 
 def file_download(url:str, destination:str=None)->str:
 	''' Download file from url to destination and return fullpath.
-		If destination is a folder, then get filename from url
-		If destination is None then download to temporary file
+		If destination is a folder, then get filename from url.
+		If destination is None then download to temporary file.
 	'''
 	if destination is None:
 		dest = tempfile.TemporaryFile()
@@ -32,14 +43,15 @@ def file_download(url:str, destination:str=None)->str:
 		)
 	else:
 		dest = open(destination, 'bw+')
-	r = dest.name
+	dest_file = dest.name
 	dest.close()
-	urllib.request.urlretrieve (url, r)
-	return r
+	urllib.request.urlretrieve (url, dest_file)
+	return dest_file
 
 def html_element(url:str, find_all_args
-					, clean:bool=True , encoding:str='utf-8'
-					, session:bool=False, headers:dict=None)->str:
+				, clean:bool=True , encoding:str='utf-8'
+				, session:bool=False, headers:dict=None
+				, cookies:dict=None)->str:
 	''' Get text of specified page element (div).
 		find_all_args - dict that will passed to find_all method
 			https://www.crummy.com/software/BeautifulSoup/bs4/doc/
@@ -55,17 +67,9 @@ def html_element(url:str, find_all_args
 		session - use requests.Session instead of get
 		cookies - dictionary with cookies like {'GUEST_LANGUAGE_ID': 'ru_RU'}
 	'''
-	if session:
-		ses = requests.Session()
-		ses.headers.update(headers)
-		ses.cookies.update(cookies)
-		req = ses.get(url)
-	else:
-		req = requests.get(url, headers=headers)
-	if req.status_code != 200:
-		return f'error {req.status_code}'
-	html = str(req.content, encoding=encoding
-				, errors='ignore')
+	html = page_get(url=url, encoding=encoding, session=session
+				, cookies=cookies, headers=headers)
+	if html.startswith('error'): return html
 	soup = BeautifulSoup(html, 'html.parser')
 	if type(find_all_args) is list:
 		r = []
@@ -93,7 +97,7 @@ def html_element(url:str, find_all_args
 
 def json_element(url:str, element:list, headers:dict=None
 					, session:bool=False, cookies:dict=None
-					, method:str='get', json_data:str=None):
+					, http_method:str='get', json_data:str=None):
 	''' Download json by url and get its nested element by
 			map of keys like ['list', 0, 'someitem', 0]
 		element - can be a list or list of lists so it will
@@ -114,26 +118,19 @@ def json_element(url:str, element:list, headers:dict=None
 		session - use requests.Session instead of get
 		cookies - dictionary with cookies like {'GUEST_LANGUAGE_ID': 'ru_RU'}
 	'''
-	if session:
-		ses = requests.Session()
-		if headers: ses.headers.update(headers)
-		if cookies: ses.cookies.update(cookies)
-		if method == 'get':
-			req = ses.get(url)
-		else:
-			req = ses.post(url, json=json_data)
-	else:
-		if method == 'get':
-			req = requests.get(url, headers=headers)
-		else:
-			req = requests.post(url, headers=headers, json=json_data)
-	if req.status_code == 200:
-		j = req.content
-	else:
+	j = page_get(
+		url=url
+		, session=session
+		, headers=headers
+		, cookies=cookies
+		, http_method=http_method
+		, json_data=json_data
+	)
+	if j.startswith('error'):
 		if type(element[0]) is list:
-			return [f'error {req.status_code}']
+			return [j]
 		else:
-			return f'error {req.status_code}'
+			return j
 	data = json.loads(j)
 	if type(element[0]) is list:
 		li = []
@@ -171,9 +168,7 @@ def tracking_status_rp(track_number:str)->str:
 				, 0, 'humanStatus'
 			]
 		]
-		, headers={
-			'Accept-Language':'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3'
-		}
+		, headers={'Accept-Language':'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3'}
 	)
 	return ', '.join(status_list)
 
@@ -182,4 +177,12 @@ def domain_ip(domain:str)->list:
 	'''
 	data = socket.gethostbyname_ex(domain)
 	return data[2]
+
+
+
+def url_hostname(url:str)->str:
+ 	''' Get hostname from url
+ 	'''
+ 	return urllib.parse.urlparse(url).netloc
+
 
