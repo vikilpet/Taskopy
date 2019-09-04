@@ -52,6 +52,7 @@ APP_SETTINGS=[
 	, ['server_ip', '127.0.0.1']
 	, ['server_port', 80]
 	, ['server_silent', True]
+	, ['hide_console', False]
 ]
 
 if getattr(sys, 'frozen', False):

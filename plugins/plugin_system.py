@@ -5,6 +5,8 @@ import win32con
 import winreg
 
 
+_TIME_PREFIXES = {'msec':1, 'sec':1000, 'min':60000, 'hour':3600000}
+
 def _get_win(window)->int:
 	''' Returns hwnd
 	'''
@@ -15,7 +17,6 @@ def _get_win(window)->int:
 	else:
 		return win32gui.GetForegroundWindow()
 	
-
 def registry_get(fullpath:str):
 	''' Get value by fullpath to registry key.
 		fullpath  - string like
@@ -141,7 +142,6 @@ def window_hide(window=None)->int:
 		win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
 		return hwnd
 
-_TIME_PREFIXES = {'msec':1, 'sec':1000, 'min':60000, 'hour':3600000}
 def idle_duration(unit:str='msec')->int:
 	''' Returns idle time in specified units.
 	'''
@@ -158,6 +158,16 @@ def monitor_off():
 		, win32con.SC_MONITORPOWER
 		, 2
 	)
+
+
+def window_is_visible(window=None):
+	''' A visible window?
+	''' 
+	hwnd = _get_win(window)
+	if hwnd:
+		return win32gui.IsWindowVisible(hwnd) == 1
+	else:
+		return False
 	
 
 

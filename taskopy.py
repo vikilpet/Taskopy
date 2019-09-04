@@ -252,6 +252,9 @@ class Tasks:
 				)
 
 	def run_at_startup(s):
+		if sett.hide_console:
+			if sett.developer: print(f'hide {app.app_hwnd}')
+			window_hide(app.app_hwnd)
 		for task in s.task_list_startup:
 			s.run_task(task, caller='startup')
 			
@@ -454,27 +457,19 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		menu.Destroy()
 
 	def on_left_down(s, event=None):
-		''' Default action ont left click to tray icon
+		''' Default action on left click to tray icon
 		'''
 		if app.app_hwnd:
-			win32gui.ShowWindow(app.app_hwnd, win32con.SW_RESTORE)
-			win32gui.SetForegroundWindow(app.app_hwnd)
-			'''
-			import wx.lib.agw.balloontip as BT
-			tipballoon = BT.BalloonTip(topicon=None, toptitle="textctrl",
-				message="this is a textctrl",
-				shape=BT.BT_ROUNDED,
-				tipstyle=BT.BT_CLICK)
-			tipballoon.SetTarget(app.taskbar_icon)
-			tipballoon.SetBalloonColour(wx.WHITE)
-			tipballoon.SetTitleFont(wx.Font(9, wx.FONTFAMILY_SWISS
-							, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False))
-			tipballoon.SetTitleColour(wx.BLACK)
-			tipballoon.SetMessageFont()
-			tipballoon.SetMessageColour(wx.LIGHT_GREY)
-			tipballoon.SetStartDelay(1000)
-			tipballoon.SetEndDelay(3000)
-			'''
+			if sett.hide_console:
+				if window_is_visible(app.app_hwnd):
+					window_hide(app.app_hwnd)
+				else:
+					window_show(app.app_hwnd)
+			else:
+				win32gui.ShowWindow(app.app_hwnd, win32con.SW_RESTORE)
+				win32gui.SetForegroundWindow(app.app_hwnd)
+			
+			
 
 	def on_exit(s, event=None):
 		con_log(lang.menu_exit)

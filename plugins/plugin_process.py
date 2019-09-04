@@ -23,7 +23,7 @@ def file_open(fullpath:str):
 
 def app_start(
 	app_path:str
-	, app_args:str=''
+	, app_args=None
 	, cwd:str=None
 	, wait:bool=False
 	, shell:bool=True
@@ -31,10 +31,10 @@ def app_start(
 	, minimized:bool=False
 	, maximized:bool=False
 ):
-	''' app_path - path to file or path to executable
-		app_args - command-line parameters
-		cwd - working directory
-		wait - wait for execution and return process exit code
+	''' app_path - path to file or path to executable.
+		app_args (list or str) - command-line parameters.
+		cwd - working directory.
+		wait - wait for execution and return process exit code.
 
 		https://docs.python.org/3/library/subprocess.html
 	'''
