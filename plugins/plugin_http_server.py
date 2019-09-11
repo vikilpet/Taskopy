@@ -28,7 +28,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 	def __init__(s, request, client_address, server
 				, tasks, sett):
 		s.sett=sett
-		s.silent = not sett.developer
+		s.silent = not sett.dev
 		s.tasks = tasks
 		super().__init__(request, client_address, server)
 
@@ -60,12 +60,12 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 	
 	def do_GET(s):
 		if 'favicon.' in s.path:
-			if s.sett.developer: print(f'favicon request: {s.path}')
+			if s.sett.dev: print(f'favicon request: {s.path}')
 			s.wfile.write(b'<link rel="icon" href="data:,">')
 			return
 		if s.sett.white_list:
 			if not s.address_string() in s.sett.white_list.split(','):
-				if s.sett.developer: print(time.asctime()
+				if s.sett.dev: print(time.asctime()
 					, f'Request from unknown IP ({s.address_string()}): {s.path}')
 				s.send_header('Content-type', 'text/plain; charset=utf-8')
 				s.wfile.write(b'403')
