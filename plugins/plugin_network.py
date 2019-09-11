@@ -29,6 +29,18 @@ def page_get(url:str, encoding:str='utf-8', session:bool=False
 	else:
 		return f'error status: {req.status_code}'
 
+def _clean_text(text:str, leave:str=None)->str:
+	''' Removes \n \r \t, multiple spaces, leading and trailing
+		spaces from text.
+	'''
+	unw_chars = '\r\n\t'
+	if leave: unw_chars = unw_chars.replace(leave, '')
+	r = text.strip()
+	for c in '\r\n\t':
+		r = c.join(r.split(c))
+	r = ' '.join(r.split(' '))
+	return r
+
 def file_download(url:str, destination:str=None)->str:
 	''' Download file from url to destination and return fullpath.
 		If destination is a folder, then get filename from url.
@@ -77,23 +89,21 @@ def html_element(url:str, find_all_args
 			r += soup.find_all(**d)
 		if r:
 			if clean:
-				r = [i.get_text().replace('\n', '') for i in r]
-				r = ' '.join(r)
-				return r
+				return _clean_text(r)
 			else:
 				return r
 		else:
-			return 'not found'
+			return 'error: not found'
 	else:
 		r = soup.find_all(**find_all_args)
 		if r:
 			if clean:
 				r = r[0].get_text()
-				return r.replace('\n', '')
+				return _clean_text(r)
 			else:
 				return r[0]
 		else:
-			return 'not found'
+			return 'error: not found'
 
 def json_element(url:str, element:list, headers:dict=None
 					, session:bool=False, cookies:dict=None
@@ -141,13 +151,13 @@ def json_element(url:str, element:list, headers:dict=None
 				li.append(da)
 			r = li
 		except:
-			r = ['not found']
+			r = ['error: not found']
 	else:
 		try:
 			for key in element: data = data[key]
 			r = data
 		except:
-			r = 'not found'
+			r = 'error: not found'
 	return r
 
 

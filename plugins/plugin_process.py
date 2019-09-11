@@ -21,17 +21,21 @@ def file_open(fullpath:str):
 	'''
 	os.startfile(fullpath)
 
+
+
 def app_start(
 	app_path:str
 	, app_args=None
 	, cwd:str=None
 	, wait:bool=False
+	, encoding:str='cp866'
 	, shell:bool=True
 	, hidden:bool=False
 	, minimized:bool=False
 	, maximized:bool=False
 ):
-	''' app_path - path to file or path to executable.
+	''' app_path - path to file or path to executable. Do not add
+		double quotes.
 		app_args (list or str) - command-line parameters.
 		cwd - working directory.
 		wait - wait for execution and return process exit code.
@@ -51,18 +55,25 @@ def app_start(
 	info = subprocess.STARTUPINFO()
 	info.dwFlags = subprocess.STARTF_USESHOWWINDOW
 	if minimized: info.wShowWindow = SW_SHOWMINNOACTIVE
-
-	proc = subprocess.Popen(
-		app_path
-		, shell=shell
-		, close_fds=True
-		, cwd=cwd
-		, creationflags=DETACHED_PROCESS
-		, startupinfo=info
-	)
+	proc_args = {
+		'args': app_path
+		, 'shell': shell
+		, 'close_fds': True
+		, 'cwd': cwd
+		, 'creationflags': DETACHED_PROCESS
+		, 'startupinfo': info
+	}
 	if wait:
-		proc.wait()
-		return proc.returncode
+		proc_func = subprocess.run
+		proc_args['shell'] = False
+		proc_args['capture_output'] = True
+		proc_args['text'] = True
+		proc_args['encoding']: encoding
+	else:
+		proc_func = subprocess.Popen
+	r = proc_func(**proc_args)
+	if wait:
+		return r.returncode, r.stdout, r.stderr
 	else:
 		return True
 

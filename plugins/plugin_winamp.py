@@ -1,6 +1,7 @@
 ﻿import win32api
 import win32gui
-from .tools import msgbox
+from .tools import *
+from .plugin_process import app_start
 
 WM_COMMAND = 0x0111
 WM_USER = 0x400
@@ -10,17 +11,23 @@ def winamp_command(par1:int, par2:int, par3:int):
 	if h:
 		return win32api.SendMessage(h, par1, par2, par3)
 	else:
-		msgbox('Winamp not found')
+		if msgbox('Winamp not found. Open?'
+				, title='Winamp command'
+				, ui=MB_YESNO + MB_ICONQUESTION) == IDYES:
+			app_start(sett.winamp_path)
 		return 0
 
-def winamp_pause():
-	winamp_command(WM_COMMAND, 40046, 0)
-
-def winamp_play():
-	winamp_command(WM_COMMAND, 40045, 0)
-
-def winamp_stop():
-	winamp_command(WM_COMMAND, 40047, 0)
+def winamp_pause(): winamp_command(WM_COMMAND, 40046, 0)
+def winamp_play(): winamp_command(WM_COMMAND, 40045, 0)
+def winamp_stop(): winamp_command(WM_COMMAND, 40047, 0)
+def winamp_previous(): winamp_command(WM_COMMAND, 40044, 0)
+def winamp_next(): winamp_command(WM_COMMAND, 40048, 0)
+def winamp_fast_forward(): winamp_command(WM_COMMAND, 40148, 0)
+def winamp_fast_rewind(): winamp_command(WM_COMMAND, 40144, 0)
+def winamp_toggle_main_window(): winamp_command(WM_COMMAND, 40258, 0)
+def winamp_toggle_media_library(): winamp_command(WM_COMMAND, 40379, 0)
+def winamp_toggle_always_on_top(): winamp_command(WM_COMMAND, 40019, 0)
+def winamp_close(): winamp_command(WM_COMMAND, 40001, 0)
 
 def winamp_status()->str:
 	''' Playing, paused, stopped

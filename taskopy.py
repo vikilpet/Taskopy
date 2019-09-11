@@ -146,7 +146,7 @@ class Tasks:
 			if task_opts['hotkey']: s.add_hotkey(task_opts)
 			if task_opts['left_click']:
 				s.task_list_left_click.append(task_opts)
-				app.taskbar_icon.Bind(
+				app.taskbaricon.Bind(
 					wx.adv.EVT_TASKBAR_LEFT_DOWN
 					, lambda evt, temp=task_opts:
 						s.run_task(task=temp, caller='left_click')
@@ -182,9 +182,9 @@ class Tasks:
 				)
 			))
 		elif lc_count == 0:
-			app.taskbar_icon.Bind(
+			app.taskbaricon.Bind(
 				wx.adv.EVT_TASKBAR_LEFT_DOWN
-				, app.taskbar_icon.on_left_down
+				, app.taskbaricon.on_left_down
 			)
 		if s.global_hk:
 			t = threading.Thread(target=s.global_hk.listen, daemon=True)
@@ -199,7 +199,7 @@ class Tasks:
 		t = threading.Thread(target=s.run_scheduler, daemon=True)
 		t.start()
 		s.sched_thread_id = t.ident
-		if sett.developer: print(f'Total tasks: {len(s.task_list)}')
+		if sett.dev: print(f'Total tasks: {len(s.task_list)}')
 	
 	def add_hotkey(s, task):
 		def hk_error(error):
@@ -253,7 +253,6 @@ class Tasks:
 
 	def run_at_startup(s):
 		if sett.hide_console:
-			if sett.developer: print(f'hide {app.app_hwnd}')
 			window_hide(app.app_hwnd)
 		for task in s.task_list_startup:
 			s.run_task(task, caller='startup')
@@ -330,7 +329,7 @@ class Tasks:
 						task['task_function_name']
 						, 'err_threshold'
 					):
-						if sett.developer:
+						if sett.dev:
 							print(f'err_counter={err_counter}')
 						s.task_opt_set(task['task_function_name']
 										, 'err_counter', 0)
@@ -381,7 +380,7 @@ class Tasks:
 		try:
 			keyboard.unhook_all()
 		except:
-			if sett.developer: print('no hotkeys wih keyboard module')
+			if sett.dev: print('no hotkeys wih keyboard module')
 		if s.global_hk:
 			s.global_hk.unregister()
 			s.global_hk.stop_listener()
@@ -390,8 +389,8 @@ class Tasks:
 
 def create_menu_item(menu, task, func=None, parent_menu=None):
 	''' Task - task dict or menu item label
-		If task is dict then func = tasks.run_task...
-		parent_menu - only for submenu items
+		If task is dict then func = tasks.run_task
+		parent_menu - only for submenu items.
 	'''
 	if type(task) is dict:
 		tn = task['task_name']
@@ -430,6 +429,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 				for task in subm[1]:
 					create_menu_item(submenu, task, parent_menu=menu)
 				menu.AppendSubMenu(submenu, subm[0])
+		if sett.kiosk and not keyboard.is_pressed(sett.kiosk_key): return menu
 		menu.AppendSeparator()
 		create_menu_item(menu, lang.menu_edit_crontab, s.on_edit_crontab)
 		create_menu_item(menu, lang.menu_reload, load_crontab)
@@ -437,15 +437,15 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			, lang.menu_disable if tasks.enabled else lang.menu_enable
 			, s.on_disable
 		)
-		if sett.developer:
+		if sett.dev:
 			create_menu_item(menu, 'Show menu 3 sec', s.show_menu_wait)
 			create_menu_item(menu, lang.menu_restart, s.on_restart)
 			create_menu_item(menu, lang.menu_edit_settings, s.on_edit_settings)
 		create_menu_item(menu, lang.menu_exit, s.on_exit)
 		return menu
 
-	def set_icon(s, dis:bool=False):
-		s.SetIcon(s.icon_dis if dis else s.icon, APP_FULLNAME)
+	def set_icon(s, dis:bool=False, text:str=APP_FULLNAME):
+		s.SetIcon(s.icon_dis if dis else s.icon, text)
 
 	def show_menu_wait(s, event=None):
 		print('show_menu 3 sec')
@@ -459,16 +459,17 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 	def on_left_down(s, event=None):
 		''' Default action on left click to tray icon
 		'''
+		if sett.kiosk and not keyboard.is_pressed(sett.kiosk_key): return
 		if app.app_hwnd:
 			if sett.hide_console:
 				if window_is_visible(app.app_hwnd):
 					window_hide(app.app_hwnd)
 				else:
-					window_show(app.app_hwnd)
+					win32gui.ShowWindow(app.app_hwnd, win32con.SW_RESTORE)
+					win32gui.SetForegroundWindow(app.app_hwnd)
 			else:
 				win32gui.ShowWindow(app.app_hwnd, win32con.SW_RESTORE)
 				win32gui.SetForegroundWindow(app.app_hwnd)
-			
 			
 
 	def on_exit(s, event=None):
@@ -511,19 +512,19 @@ class App(wx.App):
 	def OnInit(s):
 		s.enabled = True
 		s.frame=wx.Frame(None)
-		s.taskbar_icon = TaskBarIcon(s.frame)
+		s.taskbaricon = TaskBarIcon(s.frame)
 		hwnd_list = window_find(APP_NAME)
 		if len(hwnd_list) == 1:
 			s.app_hwnd = hwnd_list[0]
 		elif len(hwnd_list) > 1:
 			s.app_hwnd = hwnd_list[0]
-			if sett.developer:
+			if sett.dev:
 				msgbox_warning(
 					f'Too many {APP_NAME} windows was found: {len(hwnd_list)}'
 				)
 		else:
 			s.app_hwnd = 0
-			if sett.developer:
+			if sett.dev:
 				msgbox_warning(f'None of {APP_NAME} windows was found')
 		return True
 
@@ -531,7 +532,7 @@ class App(wx.App):
 		print('app menu by hotkey')
 		s.frame.SetFocus()
 		time.sleep(0.1)
-		s.frame.PopupMenu(s.taskbar_icon.CreatePopupMenu())
+		s.frame.PopupMenu(s.taskbaricon.CreatePopupMenu())
 		
 
 
@@ -548,17 +549,23 @@ def main():
 		print(f'{lang.load_sett_error}:\n{repr(e)}')
 		msgbox_warning(f'{lang.load_sett_error}:\n{repr(e)}')
 		return
+	__builtins__.sett = sett
+	if sett.kiosk:
+		sett.dev = False
+		sett.hide_console = True
 	lang = Language(sett.language)
+	__builtins__.lang = lang
 	print(f'{APP_NAME} version {APP_VERSION}')
 	print(lang.load_homepage)
 	print(lang.load_donate + '\n\n')
-	if sett.developer: print(f'APP_PATH: {APP_PATH}')
+	if sett.dev: print(f'APP_PATH: {APP_PATH}')
 	try:
 		app = App(False)
+		__builtins__.app = app
 		load_crontab()
 		tasks.run_at_startup()
 		tasks.run_at_sys_startup()
-		if sett.developer: app.taskbar_icon.popup_menu_hk()
+		if sett.dev: app.taskbaricon.popup_menu_hk()
 		
 		app.MainLoop()
 	except Exception as e:

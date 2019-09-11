@@ -17,9 +17,8 @@ import wx
 from .plugin_send_mail import send_email
 
 
-
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2019-09-04'
+APP_VERSION = 'v2019-09-11'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 TASK_OPTIONS = [
@@ -45,7 +44,7 @@ TASK_OPTIONS = [
 ]
 
 APP_SETTINGS=[
-	['developer', False]
+	['dev', False]
 	, ['language', 'en']
 	, ['menu_hotkey', None]
 	, ['editor', 'notepad.exe']
@@ -53,6 +52,8 @@ APP_SETTINGS=[
 	, ['server_port', 80]
 	, ['server_silent', True]
 	, ['hide_console', False]
+	, ['kiosk', False]
+	, ['kiosk_key', 'shift']
 ]
 
 if getattr(sys, 'frozen', False):
@@ -433,7 +434,7 @@ def inputbox(message:str, title:str=APP_NAME
 		box_func = wx.PasswordEntryDialog
 	else:
 		box_func = wx.TextEntryDialog
-	dlg = box_func(None, message, title)
+	dlg = box_func(app.frame, message, title)
 	dlg.SetValue(default)
 	try:
 		dlg.ShowModal()
@@ -450,4 +451,9 @@ def random_str(string_len:int=10, string_source:str=None)->str:
 	'''
 	if not string_source: string_source = string.ascii_letters + string.digits
 	return ''.join(random.choice(string_source) for i in range(string_len))
+
+def app_icon_text_set(text:str=APP_FULLNAME):
+	''' Set hint text for taskbar icon
+	'''
+	app.taskbaricon.set_icon(text=text)
 
