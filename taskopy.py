@@ -42,6 +42,8 @@ else:
 
 APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
+_TIME_UNITS = {'msec':1, 'ms':1, 'sec':1000, 's':1000, 'min':60000
+				,'m':60000, 'hour':3600000, 'h':3600000}
 
 set_title = ctypes.windll.kernel32.SetConsoleTitleW
 	
@@ -52,7 +54,13 @@ class Settings:
 	def __init__(s):
 		config = configparser.ConfigParser()
 		config.optionxform = str
-		config.read(r'settings.ini', encoding='utf-8-sig')
+		try:
+			with open(r'settings.ini', 'tr', encoding='utf-8-sig') as f:
+				config.readfp(f)
+		except FileNotFoundError:
+			create_default_ini_file()
+			with open(r'settings.ini', 'tr', encoding='utf-8-sig') as f:
+				config.readfp(f)
 		for section in config._sections.values():
 			for setting in section.items():
 				if setting[1].lower() in ('true', 'yes'):
@@ -113,6 +121,8 @@ class Tasks:
 		s.task_list_left_click = []
 		s.task_list_sys_startup = []
 		s.task_list_http = []
+		s.task_list_idle = []
+		s.idle_min = 0
 		s.http_server = None
 		s.global_hk = None
 		s.global_hk_thread_id = None
@@ -168,8 +178,8 @@ class Tasks:
 						)
 				else:
 					s.task_list_menu.append(task_opts)
-			if task_opts['http']:
-				s.task_list_http.append(task_opts)
+			if task_opts['http']: s.task_list_http.append(task_opts)
+			if task_opts['idle']: s.add_idle_task(task_opts)
 		s.task_list_menu.sort( key=lambda k: k['task_name'].lower() )
 		s.task_list_submenus.sort( key=lambda k: k[0].lower() )
 		for subm in s.task_list_submenus:
@@ -199,7 +209,7 @@ class Tasks:
 		t = threading.Thread(target=s.run_scheduler, daemon=True)
 		t.start()
 		s.sched_thread_id = t.ident
-		if sett.dev: print(f'Total tasks: {len(s.task_list)}')
+		dev_print(f'Total tasks: {len(s.task_list)}')
 	
 	def add_hotkey(s, task):
 		def hk_error(error):
@@ -329,8 +339,7 @@ class Tasks:
 						task['task_function_name']
 						, 'err_threshold'
 					):
-						if sett.dev:
-							print(f'err_counter={err_counter}')
+						dev_print(f'err_counter={err_counter}')
 						s.task_opt_set(task['task_function_name']
 										, 'err_counter', 0)
 						msgbox_warning(
@@ -362,12 +371,35 @@ class Tasks:
 			).start()
 		else:
 			run_task_inner()
+
+	def add_idle_task(s, task):
+		value, coef = value_unit(task['idle'], _TIME_UNITS, 1000)
+		task['idle_dur'] = value * coef
+		task['idle_done'] = False
+		s.task_list_idle.append(task)
 		
 	def run_scheduler(s):
 		time.sleep(0.01)
 		local_id = tasks.sched_thread_id
+		if s.task_list_idle:
+			afk = False
+			s.idle_min = min([t['idle_dur'] for t in s.task_list_idle])
 		while (tasks.sched_thread_id == local_id):
 			schedule.run_pending()
+			if s.task_list_idle:
+				ms = win32api.GetTickCount() - win32api.GetLastInputInfo()
+				if ms < s.idle_min:
+					if afk:
+						dev_print(f'user is back') 
+						afk = False
+						for task in s.task_list_idle: task['idle_done'] = False
+				else:
+					afk = True
+					for task in s.task_list_idle:
+						if task['idle_done']: continue
+						if ms >= task['idle_dur']:
+							s.run_task(task, caller='idle')
+							task['idle_done'] = True
 			time.sleep(1)
 
 	def close(s):
@@ -380,7 +412,7 @@ class Tasks:
 		try:
 			keyboard.unhook_all()
 		except:
-			if sett.dev: print('no hotkeys wih keyboard module')
+			dev_print('no hotkeys with keyboard module')
 		if s.global_hk:
 			s.global_hk.unregister()
 			s.global_hk.stop_listener()
@@ -441,8 +473,16 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			create_menu_item(menu, 'Show menu 3 sec', s.show_menu_wait)
 			create_menu_item(menu, lang.menu_restart, s.on_restart)
 			create_menu_item(menu, lang.menu_edit_settings, s.on_edit_settings)
+		if sett.dev or keyboard.is_pressed('shift'):
+			create_menu_item(menu, lang.menu_command, s.run_command)
 		create_menu_item(menu, lang.menu_exit, s.on_exit)
 		return menu
+
+	def run_command(s, event=None):
+		win32gui.ShowWindow(app.app_hwnd, win32con.SW_RESTORE)
+		win32gui.SetForegroundWindow(app.app_hwnd)
+		cmd = input(f'{lang.menu_command_con}: ')
+		if cmd:	print(eval(cmd))
 
 	def set_icon(s, dis:bool=False, text:str=APP_FULLNAME):
 		s.SetIcon(s.icon_dis if dis else s.icon, text)
@@ -546,19 +586,19 @@ def main():
 	try:
 		sett = Settings()
 	except Exception as e:
-		print(f'{lang.load_sett_error}:\n{repr(e)}')
-		msgbox_warning(f'{lang.load_sett_error}:\n{repr(e)}')
+		print(f'Cannot load settings:\n{repr(e)}')
+		msgbox_warning(f'Cannot load settings:\n{repr(e)}')
 		return
 	__builtins__.sett = sett
+	lang = Language('en')
+	__builtins__.lang = lang
 	if sett.kiosk:
 		sett.dev = False
 		sett.hide_console = True
-	lang = Language(sett.language)
-	__builtins__.lang = lang
 	print(f'{APP_NAME} version {APP_VERSION}')
 	print(lang.load_homepage)
 	print(lang.load_donate + '\n\n')
-	if sett.dev: print(f'APP_PATH: {APP_PATH}')
+	dev_print(f'APP_PATH: {APP_PATH}')
 	try:
 		app = App(False)
 		__builtins__.app = app

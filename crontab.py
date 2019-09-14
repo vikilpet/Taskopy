@@ -19,7 +19,7 @@ def demo_task_1(startup=True):
 	# «\n» is for a new line.
 	msgbox(
 		'Welkome to Taskopy!'
-		+ '\nI am a demo_task_1.'
+		+ '\nI am demo_task_1.'
 		+ '\nWhen you press OK I will open the crontab in notepad'
 		+ ' so you can disable or even delete me.'
 	)

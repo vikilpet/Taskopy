@@ -18,7 +18,7 @@ from .plugin_send_mail import send_email
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2019-09-11'
+APP_VERSION = 'v2019-09-14'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 TASK_OPTIONS = [
@@ -41,6 +41,7 @@ TASK_OPTIONS = [
 	, ['err_threshold', 0]
 	, ['err_counter', False]
 	, ['no_print', False]
+	, ['idle', None]
 ]
 
 APP_SETTINGS=[
@@ -50,11 +51,23 @@ APP_SETTINGS=[
 	, ['editor', 'notepad.exe']
 	, ['server_ip', '127.0.0.1']
 	, ['server_port', 80]
+	, ['white_list', '127.0.0.1']
 	, ['server_silent', True]
 	, ['hide_console', False]
 	, ['kiosk', False]
 	, ['kiosk_key', 'shift']
 ]
+
+_DEFAULT_INI = '''[General]
+language=en
+editor=notepad.exe
+hide_console=False
+
+[HTTP]
+server_ip=127.0.0.1
+server_port=80
+white_list=127.0.0.1
+'''
 
 if getattr(sys, 'frozen', False):
 	_APP_PATH = os.path.dirname(sys.executable)
@@ -62,6 +75,8 @@ else:
 	_APP_PATH = os.getcwd()
 
 _DB_FILE = _APP_PATH + r'\resources\db.sqlite3'
+_TIME_UNITS = {'msec':1, 'ms':1, 'sec':1000, 's':1000, 'min':60000
+				,'m':60000, 'hour':3600000, 'h':3600000}
 
 class DictToObj:
 	def __init__(s, di:dict):
@@ -69,6 +84,26 @@ class DictToObj:
 
 	def __getattr__(s, name):
 		return 'unknown key'
+
+def value_unit(value, unit_dict:dict, default:int)->tuple:
+	''' Returns (int, int) - value and coefficient found in unit_dict.
+		If the unit not found then returns default.
+	'''
+
+
+	if type(value) is int:
+		return value, default
+	elif value.isdigit():
+		return int(value), default
+	elif ' ' in value:
+		v, u = value.split()
+		return int(v), unit_dict.get(u, default)
+	elif any(i.isdigit() for i in value):
+		v = ''.join(filter(str.isdigit, value))
+		return int(v), unit_dict.get(value.replace(v, ''), default)
+	else:
+		dev_print(f'value_unit wrong value: {value}')
+		return value, default
 
 def task(**kwargs):
 	def with_attrs(func):
@@ -83,6 +118,14 @@ def sound_play(fullpath, wait=False):
 		winsound.PlaySound(fullpath, winsound.SND_FILENAME)
 	else:
 		winsound.PlaySound(fullpath, winsound.SND_FILENAME + winsound.SND_ASYNC)
+
+def dev_print(msg:str):
+	d = False
+	if getattr(__builtins__, 'sett', None):
+		d = sett.dev
+	else:
+		d = True
+	if d: print(f'{time.strftime("%H:%M:%S")} {msg}')
 
 def con_log(msg:str, log_file:bool=True):
 	''' Log to console and logfile
@@ -105,8 +148,14 @@ def time_weekday(tdate=None, template:str='%A')->str:
 	if not tdate: tdate = datetime.date.today()
 	return tdate.strftime(template)
 
-def time_sleep(sec:float):
-	time.sleep(sec)
+def time_sleep(interval):
+	''' Pauses for specified amount of time.
+		interval - int of seconds or str with unit like '5 min'
+	'''
+	val, coef = value_unit(interval, _TIME_UNITS, 1000)
+	time.sleep(val * coef / 1000)
+time_pause = time_sleep
+time_wait = time_sleep
 
 def db_execute(sql:str):
 	''' Execute sql in _DB_FILE
@@ -117,7 +166,7 @@ def db_execute(sql:str):
 	conn.commit()
 	conn.close()
 
-def _create_new_db():
+def _create_table_var():
 	db_execute('''CREATE TABLE variables
 				(vname TEXT PRIMARY KEY, vvalue TEXT)''')
 
@@ -125,33 +174,45 @@ def var_set(var_name:str, value:str):
 	''' Store variable value in db.sqlite3 in table "variables"
 		It needs sqlite version 3.24+ (just replace dll)
 	'''
-	conn = sqlite3.connect(_DB_FILE)
-	cur = conn.cursor()
-	cur.execute(f'''INSERT INTO variables (vname, vvalue)
-					VALUES('{var_name}', '{value}')
-					ON CONFLICT(vname)
-					DO UPDATE SET vvalue=excluded.vvalue;
-				''')
-	conn.commit()
+	try:
+		conn = sqlite3.connect(_DB_FILE)
+		cur = conn.cursor()
+		cur.execute(f'''INSERT INTO variables (vname, vvalue)
+						VALUES('{var_name}', '{value}')
+						ON CONFLICT(vname)
+						DO UPDATE SET vvalue=excluded.vvalue;
+					''')
+		conn.commit()
+	except sqlite3.OperationalError:
+		_create_table_var()
+		cur.execute(f'''INSERT INTO variables (vname, vvalue)
+						VALUES('{var_name}', '{value}')
+						ON CONFLICT(vname)
+						DO UPDATE SET vvalue=excluded.vvalue;
+					''')
+		conn.commit()
 	conn.close()
 
-def var_get(var_name:str, table:str=None)->str:
+def var_get(var_name:str, table:str='variables')->str:
 	''' Retrieves value from db.sqlite3 and returns '' if 
 		there is none.
 	'''
-	if table is None: table = 'variables'
-	conn = sqlite3.connect(_DB_FILE)
-	cur = conn.cursor()
-	cur.execute(
-		f'''SELECT vvalue
-			FROM {table}
-			WHERE vname = '{var_name}'
-		'''
-	)
-	r = cur.fetchone()
-	if r:
-		r = r[0]
-	else:
+	try:
+		conn = sqlite3.connect(_DB_FILE)
+		cur = conn.cursor()
+		cur.execute(
+			f'''SELECT vvalue
+				FROM {table}
+				WHERE vname = '{var_name}'
+			'''
+		)
+		r = cur.fetchone()
+		if r:
+			r = r[0]
+		else:
+			r = ''
+	except sqlite3.OperationalError:
+		_create_table_var()
 		r = ''
 	conn.close()
 	return r
@@ -164,7 +225,7 @@ def clip_get()->str:
 
 def re_find(source:str, re_pattern:str, sort:bool=True
 	, re_flags:int=re.IGNORECASE)->list:
-	''' Return list with matches.
+	r''' Return list with matches.
 		re_flags:
 			re.IGNORECASE	ignore case
 			re.MULTILINE	make begin/end {^, $} consider each line.
@@ -268,7 +329,7 @@ def msgbox(msg:str, title:str=None
 	'''
 	def get_hwnd(title_tmp:str):
 		hwnd = 0
-		for i in range(1000):
+		for _ in range(1000):
 			hwnd = win32gui.FindWindow(None, title_tmp)
 			if hwnd:
 				break
@@ -453,7 +514,13 @@ def random_str(string_len:int=10, string_source:str=None)->str:
 	return ''.join(random.choice(string_source) for i in range(string_len))
 
 def app_icon_text_set(text:str=APP_FULLNAME):
-	''' Set hint text for taskbar icon
+	''' Set hint text for taskbar icon.
 	'''
 	app.taskbaricon.set_icon(text=text)
+
+def create_default_ini_file():
+	''' Creates default settings.ini file.
+	'''
+	with open('settings.ini', 'xt', encoding='utf-8-sig') as ini:
+		ini.write(_DEFAULT_INI)
 

@@ -7,7 +7,7 @@ from pathlib import Path
 import pyodbc
 import shutil
 
-_SIZE_PREFIXES = {'gb':1073741824, 'mb':1048576, 'kb':1024, 'b':1}
+_SIZE_UNITS = {'gb':1073741824, 'mb':1048576, 'kb':1024, 'b':1}
 
 def file_read(fullpath:str, encoding:str='utf-8')->str:
 	''' Returns content of file '''
@@ -67,12 +67,12 @@ def path_exists(fullpath:str)->bool:
 	return p.exists()
 
 def file_size(fullpath:str, unit:str='b')->int:
-	e = _SIZE_PREFIXES.get(unit.lower(), 1)
+	e = _SIZE_UNITS.get(unit.lower(), 1)
 	return os.stat(fullpath).st_size // e
 	retudir.exists()
 
 def file_size(fullpath:str, unit:str='b')->int:
-	e = _SIZE_PREFIXES.get(unit.lower(), 1)
+	e = _SIZE_UNITS.get(unit.lower(), 1)
 	return os.stat(fullpath).st_size // e
 
 def is_directory(fullpath:str)->bool:
@@ -164,7 +164,7 @@ def file_backup(fullpath:str, folder:str=None):
 def free_space(letter:str, unit:str='GB')->int:
 	''' Returns disk free space in GB, MB, KB or B
 	'''
-	e = _SIZE_PREFIXES.get(unit.lower(), 1073741824)
+	e = _SIZE_UNITS.get(unit.lower(), 1073741824)
 	return shutil.disk_usage(f'{letter}:\\')[2] // e
 
 def dir_list(fullpath:str)->list:

@@ -1,6 +1,6 @@
 ﻿import sys
 
-class Language():
+class Language:
 	def __init__(s, language:str='en'):
 		di_str = getattr(
 			sys.modules[__name__]
@@ -17,7 +17,6 @@ class Language():
 
 _dict_en='''\
 load_crontab=Load crontab from folder
-load_sett_error=Settings loading error
 load_homepage=Homepage: https://github.com/vikilpet/Taskopy
 load_donate=Donate if you like it: https://www.paypal.me/vikil
 menu_edit_crontab=Edit crontab
@@ -26,6 +25,8 @@ menu_disable=Disable
 menu_enable=Enable
 menu_restart=Restart
 menu_edit_settings=Edit settings
+menu_command=Enter a command
+menu_command_con=Enter a command
 menu_exit=Exit
 warn_crontab_reload=Failed to reload crontab
 warn_hotkey=Wrong hotkey syntax in task «{}»
@@ -36,7 +37,6 @@ warn_left_click=Attempt to bind more than one task to left click: {}
 
 _dict_ru='''\
 load_crontab=Загрузка кронтаба из папки
-load_sett_error=Ошибка загрузки настроек
 load_homepage=Домашняя страница: https://vikilpet.wordpress.com/taskopy/
 load_donate=Благодарю за использование.
 menu_edit_crontab=Редактировать кронтаб
@@ -46,6 +46,8 @@ menu_enable=Включить
 menu_restart=Перезапустить
 menu_edit_settings=Редактировать настройки
 menu_exit=Выход
+menu_command=Ввести команду
+menu_command_con=Введите команду
 warn_crontab_reload=Ошибка при загрузке кронтаба
 warn_hotkey=Неправильный формат горячей клавиши в задаче «{}»
 warn_schedule=Неправильный формат планировщика в задаче «{}»

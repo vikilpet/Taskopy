@@ -196,3 +196,16 @@ def url_hostname(url:str)->str:
  	return urllib.parse.urlparse(url).netloc
 
 
+
+def is_online(*sites, timeout:int=2)->int:
+	''' Checks if there is an internet connection using HEAD
+		requests to the specified web sites.
+	'''
+	if not sites: sites = ['https://www.google.com/', 'https://yandex.ru/']
+	r = 0
+	for site in sites:
+		try:
+			requests.head(site, timeout=timeout)
+			r += 1
+		except: pass
+	return r

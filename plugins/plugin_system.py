@@ -5,10 +5,12 @@ import win32con
 import winreg
 
 
-_TIME_PREFIXES = {'msec':1, 'sec':1000, 'min':60000, 'hour':3600000}
+_TIME_UNITS = {'msec':1, 'ms':1, 'sec':1000, 's':1000, 'min':60000
+				,'m':60000, 'hour':3600000, 'h':3600000}
 
-def _get_win(window)->int:
-	''' Returns hwnd
+def window_get(window=None)->int:
+	''' Returns hwnd. If window is not specified then
+		finds foreground window.
 	'''
 	if type(window) is str:
 		return win32gui.FindWindow(None, window)
@@ -71,22 +73,29 @@ def registry_set(fullpath:str, value, value_type:str=None):
 	except WindowsError as e:
 		return f'error: {e}'
 
+def window_title_get(window=None)->str:
+	''' Gets the title of the window.
+	'''
+	hwnd = window_get(window)
+	if hwnd:
+		return win32gui.GetWindowText(hwnd)
+	else:
+		return 'error: not found'
 
 def window_title_set(window=None, new_title:str='')->int:
 	''' Sets window title, returns hwnd.
 	'''
-	hwnd = _get_win(window)
+	hwnd = window_get(window)
 	if hwnd:
 		win32gui.SetWindowText(hwnd, new_title)
 		return hwnd
 
 def window_find(title:str)->list:
-	''' Find window handle by Title
+	''' Find window handle by Title.
 		Returns list of found window handles.
 	'''
 	def check_title(hwnd, title:str):
-		if win32gui.GetWindowText(hwnd) == title:
-			result.append(hwnd)
+		if win32gui.GetWindowText(hwnd) == title: result.append(hwnd)
 	result = []
 	win32gui.EnumWindows(check_title, title)
 	return result
@@ -94,7 +103,7 @@ def window_find(title:str)->list:
 def window_activate(window=None)->int:
 	''' Bring window to front, returns hwnd.
 	'''
-	hwnd = _get_win(window)
+	hwnd = window_get(window)
 	if hwnd:
 		win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
 		win32gui.SetForegroundWindow(hwnd)
@@ -105,7 +114,7 @@ def window_activate(window=None)->int:
 def window_minimize(window=None)->int:
 	''' Minimize window. Returns hwnd.
 	'''
-	hwnd = _get_win(window)
+	hwnd = window_get(window)
 	if hwnd:
 		win32gui.ShowWindow(hwnd, win32con.SW_MINIMIZE)
 		return hwnd
@@ -113,7 +122,7 @@ def window_minimize(window=None)->int:
 def window_maximize(window=None)->int:
 	''' Maximize window. Returns hwnd.
 	'''
-	hwnd = _get_win(window)
+	hwnd = window_get(window)
 	if hwnd:
 		win32gui.ShowWindow(hwnd, win32con.SW_MAXIMIZE)
 		return hwnd
@@ -121,7 +130,7 @@ def window_maximize(window=None)->int:
 def window_restore(window=None)->int:
 	''' Restore window. Returns hwnd.
 	'''
-	hwnd = _get_win(window)
+	hwnd = window_get(window)
 	if hwnd:
 		win32gui.ShowWindow(hwnd, win32con.SW_SHOWNORMAL)
 		return hwnd
@@ -129,7 +138,7 @@ def window_restore(window=None)->int:
 def window_show(window=None)->int:
 	''' Show window. Returns hwnd.
 	'''
-	hwnd = _get_win(window)
+	hwnd = window_get(window)
 	if hwnd:
 		win32gui.ShowWindow(hwnd, win32con.SW_SHOW)
 		return hwnd
@@ -137,15 +146,30 @@ def window_show(window=None)->int:
 def window_hide(window=None)->int:
 	''' Hide window. Returns hwnd.
 	'''
-	hwnd = _get_win(window)
+	hwnd = window_get(window)
 	if hwnd:
 		win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
 		return hwnd
 
-def idle_duration(unit:str='msec')->int:
-	''' Returns idle time in specified units.
+def window_on_top(window=None, on_top:bool=True):
+	''' Sets the window to stay always on top.
 	'''
-	unit_den = _TIME_PREFIXES.get(unit.lower(), 1)
+	hwnd = window_get(window)
+	if hwnd:
+		try:
+			win32gui.SetWindowPos(
+				hwnd
+				, win32con.HWND_TOPMOST if on_top else win32con.HWND_NOTOPMOST
+				, 0, 0, 0, 0
+				, win32con.SWP_NOSIZE | win32con.SWP_NOMOVE
+			)
+		except: pass
+		return hwnd
+
+def idle_duration(unit:str='sec')->int:
+	''' Returns idle time in specified units ('msec', 'sec', 'min', 'hour').
+	'''
+	unit_den = _TIME_UNITS.get(unit.lower(), 1000)
 	millis = (win32api.GetTickCount() - win32api.GetLastInputInfo())
 	return millis // unit_den
 
@@ -160,16 +184,15 @@ def monitor_off():
 	)
 
 
-def window_is_visible(window=None):
-	''' A visible window?
+def window_is_visible(window=None)->bool:
+	''' Is window visible?
 	''' 
-	hwnd = _get_win(window)
+	hwnd = window_get(window)
 	if hwnd:
 		return win32gui.IsWindowVisible(hwnd) == 1
 	else:
 		return False
 	
-
 
 
 def _test():
