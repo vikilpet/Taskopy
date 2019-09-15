@@ -56,11 +56,10 @@ class Settings:
 		config.optionxform = str
 		try:
 			with open(r'settings.ini', 'tr', encoding='utf-8-sig') as f:
-				config.readfp(f)
+				config.read_file(f)
 		except FileNotFoundError:
 			create_default_ini_file()
-			with open(r'settings.ini', 'tr', encoding='utf-8-sig') as f:
-				config.readfp(f)
+			config.read(r'settings.ini', encoding='utf-8-sig')
 		for section in config._sections.values():
 			for setting in section.items():
 				if setting[1].lower() in ('true', 'yes'):

@@ -19,12 +19,13 @@ def file_write(fullpath:str, content:str, encoding:str='utf-8'):
 	with open(fullpath, 'wt+', encoding=encoding, errors='ignore') as f:
 		f.write(content)
 
-def file_rename(fullpath:str, dest:str):
+def file_rename(fullpath:str, dest:str)->str:
 	''' Rename file.
 		dest - fullpath or just new file name without parent directory.
 	'''
 	if not ':' in dest: dest = os.path.dirname(fullpath) + '\\' + dest
 	os.rename(fullpath, dest)
+	return dest
 
 def file_log(fullpath:str, message:str, encoding:str='utf-8'
 				, time_format:str='%Y.%m.%d %H:%M:%S'):
@@ -198,6 +199,7 @@ def dir_zip(fullpath:str, destination:str)->str:
 def file_zip(fullpath, destination:str)->str:
 	''' Compresses a file or files to archive.
 		fullpath - string with fullpath or list with fullpaths.
+		destination - fullpath to the archive.
 	'''
 	if type(fullpath) is str:
 		with zipfile.ZipFile(

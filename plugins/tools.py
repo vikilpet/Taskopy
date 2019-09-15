@@ -18,7 +18,7 @@ from .plugin_send_mail import send_email
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2019-09-14'
+APP_VERSION = 'v2019-09-15'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 TASK_OPTIONS = [
@@ -133,11 +133,20 @@ def con_log(msg:str, log_file:bool=True):
 	msg = f"{time.strftime('%y.%m.%d %H:%M:%S')} {msg}"
 	print(msg)
 	if not log_file: return
-	with open(
-		f"log\\{time.strftime('%y.%m.%d')}.txt"
-		, 'ta+', encoding='utf-8'
-	) as f:
-		f.write(msg + '\n')
+	try:
+		with open(
+			f"log\\{time.strftime('%y.%m.%d')}.txt"
+			, 'ta+', encoding='utf-8'
+		) as f:
+			f.write(msg + '\n')
+	except FileNotFoundError:
+		os.makedirs('log')
+		with open(
+			f"log\\{time.strftime('%y.%m.%d')}.txt"
+			, 'ta+', encoding='utf-8'
+		) as f:
+			f.write(msg + '\n')
+
 
 def time_now(template:str='%Y-%m-%d_%H-%M-%S'):
 	return time.strftime(template)
@@ -154,8 +163,8 @@ def time_sleep(interval):
 	'''
 	val, coef = value_unit(interval, _TIME_UNITS, 1000)
 	time.sleep(val * coef / 1000)
-time_pause = time_sleep
-time_wait = time_sleep
+pause = time_sleep
+wait = time_sleep
 
 def db_execute(sql:str):
 	''' Execute sql in _DB_FILE
@@ -362,7 +371,7 @@ def msgbox(msg:str, title:str=None
 			pass
 	if not title:
 		title = sys._getframe(1).f_code.co_name.replace('_', ' ')
-		if title == '<module>': title = APP_NAME
+		if title.startswith('<'): title = APP_NAME
 	if ui: ui += MB_SYSTEMMODAL
 	else:
 		ui = MB_ICONINFORMATION + MB_SYSTEMMODAL
@@ -523,4 +532,5 @@ def create_default_ini_file():
 	'''
 	with open('settings.ini', 'xt', encoding='utf-8-sig') as ini:
 		ini.write(_DEFAULT_INI)
+
 

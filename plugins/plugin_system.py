@@ -151,7 +151,7 @@ def window_hide(window=None)->int:
 		win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
 		return hwnd
 
-def window_on_top(window=None, on_top:bool=True):
+def window_on_top(window=None, on_top:bool=True)->int:
 	''' Sets the window to stay always on top.
 	'''
 	hwnd = window_get(window)

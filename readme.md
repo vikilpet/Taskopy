@@ -133,6 +133,7 @@ Format: **option name** (default value) — description.
 	Type in address bar of browser something like this:
 	http://127.0.0.1/task?alert&text=MyMsg&title=MyTitle
 	and you will see messagebox with title and text from URL.
+- **idle** — Perform the task when the user is idle for the specified time. For example, *idle='5 min'* - run when the user is idle for 5 minutes. The task is executed only once during the inactivity.
 - **err_threshold** — do not report any errors in the task until this threshold is exceeded.
 
 ## Settings
@@ -142,8 +143,10 @@ Format: **setting** (default value) — description.
 
 - **language** (en) — menu and msgbox language. Variants: en, ru.
 - **editor** (notepad) — text editor for «Edit crontab» menu command.
+- **hide_console** — hide the console window.
 - **server_ip** (127.0.0.1) — bind HTTP server to this local IP. For access from any address set to *0.0.0.0*.
 	**IT IS DANGEROUS TO ALLOW ACCESS FROM ANY IP!** Do not use *0.0.0.0* in public networks or limit access with firewall.
+- **white_list** (127.0.0.1) — a list of IP addresses separated by commas from which requests are received.
 - **server_port** (80) — HTTP server port.
 
 ## Keywords
@@ -156,7 +159,7 @@ Format: **setting** (default value) — description.
 		Example: *ui = MB_ICONINFORMATION + MB_YESNO*
 	*wait* — if set to False — continue task execution without waiting for user responce.
 	*timeout* (in seconds) — automatically close messagebox. If messagebox is closed by timeout (no button is pressed by user) and *ui* contains more than one button (*MB_YESNO* for example) then it will return 32000.
-	*dis_timeout* (в секундах) — hide the buttons for a specified number of seconds.
+	*dis_timeout* (in seconds) — hide the buttons for a specified number of seconds.
 	Example:
 	```python
 	def test_msgbox():
@@ -167,7 +170,7 @@ Format: **setting** (default value) — description.
 	```
 - **sound_play (fullpath:str, wait:bool)->str** — play .wav file. *wait* — do not pause task execution.
 - **time_now(template:str='%Y-%m-%d_%H-%M-%S')->str** — string with current time.
-- **time_sleep(sec:float)** — pause in seconds.
+- **pause(sec:float)** — pause the execution of the task for the specified number of seconds. *interval* - time in seconds or a string specifying a unit like '5 ms' or '6 sec' or '7 min'.
 - **var_set(var_name:str, value:str)** — save *value* of variable *var_name* to disk so it will persist between program starts.
 - **var_get(var_name:str)->str** — retrieve variable value.
 - **clip_set(txt:str)->** — copy text to clipboard.
@@ -204,6 +207,7 @@ Format: **setting** (default value) — description.
 	```python
 	dir_list('c:\\Windows\\**\\*.log')
 	```
+- **dir_zip(source:str, destination:str)->str** — zip the folder return the path to the archive.
 - **file_backup(fullpath, folder:str=None)** — make copy of file with added timestamp.
 	*folder* — place copy to this folder. If omitted — place in original folder.
 - **file_copy(fullpath:str, destination:str)** — copy file to destination (fullpath or just folder).
@@ -213,8 +217,12 @@ Format: **setting** (default value) — description.
 - **file_move(fullpath:str, destination:str)** — move file to destination folder or file.
 - **file_name(fullpath:str)->str:** — get file name without directory.
 - **file_read(fullpath:str)->str:** — get content of file.
+- **file_rename(fullpath:str, dest:str)->str** — rename the file. *dest* is the full path or just a new file name without a folder.
 - **file_size(fullpath:str, unit:str='b')->bool:** — get size of file in units (gb, mb, kb, b).
 - **file_write(fullpath:str, content=str)** — write content to file.
+- **file_zip(fullpath, destination:str)->str** — compress a file or files into an archive.
+	*fullpath* — a string with a full file name or a list of files.
+	*destiniation* — full path to the archive.
 - **free_space(letter:str, unit:str='GB')->int:** — get disk free space in units (gb, mb, kb, b).
 - **is_directory(fullpath:str)->bool:** — fullpath is directory?
 - **path_exists(fullpath:str)->bool:** — fullpath exists (no matter is it folder or file)?
@@ -239,14 +247,17 @@ Format: **setting** (default value) — description.
 	}
 	```
 	See *get_current_ip* in [task examples](#task-examples)
+- **is_online(*sites, timeout:int=2)->int:** — checks if you have access to the Internet using HEAD queries to specified sites. If sites are not specified, then use google and yandex.
 - **json_element(url:str, element:list)** — same as **html_element** but for json.
 	*element* — a list with a map to desired item.
 	Example: *element=['usd', 2, 'value']*
 - **page_get(url:str, encoding:str='utf-8')->str:** — download page by url and return it's html as a string.
+- **url_hostname(url:str)->str** — extract the domain name from the URL.
 
 ### System
 In the functions for working with windows, the *window* argument can be either a string with the window title or a number representing the window handle.
 
+- **free_ram(unit:str='percent')** — amount of free memory. *unit* — 'kb', 'mb'... or 'percent'.
 - **idle_duration(unit:str='msec')->int** — how much time has passed since user's last activity.
 - **monitor_off()** — turn off the monitor.
 - **registry_get(fullpath:str)** — get value from Windows Registry.
@@ -254,15 +265,18 @@ In the functions for working with windows, the *window* argument can be either a
 - **window_activate(window=None)->int** — bring window to front. *window* may be a string with title or integer with window handle.
 - **window_find(title:str)->list** — find window by title. Returns list of all found windows.
 - **window_hide(window=None)->int** — hide window.
+**- window_on_top(window=None, on_top:bool=True)->int** — makes the window to stay always on top.
 - **window_show(window=None)->int** — show window.
 - **window_title_set(window=None, new_title:str='')->int** — change window title from *cur_title* to *new_title*
 
 ### Process
-- **app_start(app_path:str, app_args:str='', wait=False)** — start application.
+- **app_start(app_path:str, app_args:str='', wait:bool=False)** — start application. If *wait=True* — returns process return code, if *False* — returns PID of created process.
 	*app_path* — path to executable file.
 	*app_args* — command-line arguments.
 	*wait* — wait until application will be closed.
 - **file_open(fullpath:str)** — open file or URL in default application.
+- **process_close(process, timeout:int=10)** — soft completion of the process: first all windows belonging to the specified process are closed, and after the timeout (in seconds) the process itself is killed, if still exists.
+- **process_exist(process, cmd:str=None)->bool** — checks whether the process exists and returns a PID or False. *cmd* is an optional command line search. This way you can distinguish between processes with the same executable but different command lines.
 - **process_list(name:str='')->list** — get list of processes with that name. Item in list have this attributes:
 	*pid* — PID of found process.
 	*name* — short name of executable.
@@ -278,11 +292,17 @@ In the functions for working with windows, the *window* argument can be either a
 - **process_kill(process)** — kill process or processes. *process* may be an integer so only process with this PID will be terminated. If *process* is a string then kill every process with that name.
 
 ### Winamp
-- **winamp_notification()** — show notification (only for «Modern» skin).
+- **winamp_close** — close Winamp.
+- **winamp_fast_forward** — fast forward 5 sec.
+- **winamp_fast_rewind** — rewind 5 sec.
+- **winamp_notification()** — show notification (for «Modern» skin only).
 - **winamp_pause()** — pause.
 - **winamp_play()** — play.
 - **winamp_status()->str:** — playback status ('playing', 'paused' or 'stopped').
 - **winamp_stop()** — stop.
+- **winamp_toggle_always_on_top** — toggle always on top.
+- **winamp_toggle_main_window** — show/hide Winamp window.
+- **winamp_toggle_media_library** — show/hide media library.
 - **winamp_track_info(sep:str='   ')->str:** — return string with samplerate, bitrate and channels. *sep* — separator.
 - **winamp_track_length()->str:** — track length.
 - **winamp_track_title(clean:bool=True)->str:** — current track title.

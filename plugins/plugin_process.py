@@ -28,11 +28,11 @@ def process_get(process)->int:
 def app_start(
 	app_path:str
 	, app_args=None
-	, cwd:str=None
 	, wait:bool=False
 	, capture_output:bool=False
 	, encoding:str='cp866'
 	, shell:bool=False
+	, cwd:str=None
 	, env:dict=None
 	, hidden:bool=False
 	, minimized:bool=False
@@ -69,6 +69,8 @@ def app_start(
 	info.dwFlags = subprocess.STARTF_USESHOWWINDOW
 	if minimized:
 		info.wShowWindow = win32con.SW_SHOWMINNOACTIVE
+	elif maximized:
+		info.wShowWindow = win32con.SW_SHOWMAXIMIZED
 	elif hidden:
 		info.wShowWindow = win32con.SW_HIDE
 	else:
