@@ -18,7 +18,7 @@ from .plugin_send_mail import send_email
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2019-09-15'
+APP_VERSION = 'v2019-09-16'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 TASK_OPTIONS = [
@@ -533,4 +533,33 @@ def create_default_ini_file():
 	with open('settings.ini', 'xt', encoding='utf-8-sig') as ini:
 		ini.write(_DEFAULT_INI)
 
+def function_queue(func_list:list, timeout:int
+					, sleep_timeout:float=0.001)->list:
+	''' Runs functions in threads and waits when all of them return result
+		or timeout is expired.
+		func_list = list of sublist, where sublist should consist of 3
+		items: function, (args), {kwargs}
+		Example:
+		func_list = [
+			[function1, (1, 3, 4), {'par1': 2, 'par2':3}]
+			, [function2, (), {'par1': 'foo', 'par2': 'bar'}]
+			...
+		]
+	'''
+	for li in func_list:
+		li.append([])
+		job = {}
+		job['func'] = li[0]
+		job['args'] = li[1]
+		job['kwargs'] = li[2]
+		job['result'] = li[3]
+		threading.Thread(
+			target=lambda *a, **kw: job['result'].append(job['func'](*a, **kw))
+			, args=job['args']
+			, kwargs=job['kwargs']
+			, daemon=True
+		).start()
+	for i in range(int(timeout / sleep_timeout)):
+		if all([len(li[3]) for li in func_list]): return
+		time.sleep(sleep_timeout)
 

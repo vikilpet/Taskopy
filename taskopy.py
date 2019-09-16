@@ -58,6 +58,7 @@ class Settings:
 			with open(r'settings.ini', 'tr', encoding='utf-8-sig') as f:
 				config.read_file(f)
 		except FileNotFoundError:
+			dev_print('create new settings.ini')
 			create_default_ini_file()
 			config.read(r'settings.ini', encoding='utf-8-sig')
 		for section in config._sections.values():
@@ -589,7 +590,7 @@ def main():
 		msgbox_warning(f'Cannot load settings:\n{repr(e)}')
 		return
 	__builtins__.sett = sett
-	lang = Language('en')
+	lang = Language(sett.language)
 	__builtins__.lang = lang
 	if sett.kiosk:
 		sett.dev = False
