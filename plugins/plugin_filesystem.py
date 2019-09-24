@@ -3,9 +3,11 @@ import time
 import glob
 import csv
 import zipfile
+import tempfile
 from pathlib import Path
 import pyodbc
 import shutil
+from .tools import random_str
 
 _SIZE_UNITS = {'gb':1073741824, 'mb':1048576, 'kb':1024, 'b':1}
 
@@ -218,3 +220,14 @@ def file_zip(fullpath, destination:str)->str:
 		return destination
 	else:
 		return 'error: unknown type of fullpath'
+
+def temp_folder()->str:
+	''' Returns full path of temp folder (without trailing slash).
+	'''
+	return tempfile.gettempdir()
+
+def temp_file(suffix:str='')->str:
+	''' Returns temporary file name.
+	'''
+	return (f'{tempfile.gettempdir()}\\'
+			+ f'{time.strftime("%m%d%H%M%S") + random_str(5) + suffix}')

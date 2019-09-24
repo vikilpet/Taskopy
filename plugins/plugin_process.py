@@ -4,6 +4,7 @@ import ctypes
 import psutil
 import time
 import win32gui
+import win32api
 import win32con
 from .tools import DictToObj, dev_print
 
@@ -11,10 +12,10 @@ from .tools import DictToObj, dev_print
 
 _SIZE_UNITS = {'gb':1073741824, 'mb':1048576, 'kb':1024, 'b':1, 'percent':1}
 
-def file_open(fullpath:str):
+def file_open(fullpath:str, showcmd:int=win32con.SW_SHOWNORMAL):
 	''' Open file or URL in default program
 	'''
-	os.startfile(fullpath)
+	win32api.ShellExecute(None, 'open', fullpath, None, None, showcmd)
 
 def process_get(process)->int:
 	''' Returns PID of process.

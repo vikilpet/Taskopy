@@ -18,7 +18,7 @@ from .plugin_send_mail import send_email
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2019-09-16'
+APP_VERSION = 'v2019-09-24'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 TASK_OPTIONS = [
@@ -538,14 +538,24 @@ def function_queue(func_list:list, timeout:int
 	''' Runs functions in threads and waits when all of them return result
 		or timeout is expired.
 		func_list = list of sublist, where sublist should consist of 3
-		items: function, (args), {kwargs}
+		items: function, (args), {kwargs}.
+		Adds to the list the result of execution and time spent
 		Example:
 		func_list = [
 			[function1, (1, 3, 4), {'par1': 2, 'par2':3}]
 			, [function2, (), {'par1': 'foo', 'par2': 'bar'}]
 			...
 		]
+		Result:
+		[
+			[function1, (1, 3, 4), {'par1': 2, 'par2':3}
+				, ['result 1', '0:00:00.441000']]
+			, [function2, (), {'par1': 'foo', 'par2': 'bar'}
+				, ['result 2', '0:00:00.138000']]
+			...
+		]
 	'''
+	time_start = time.time()
 	for li in func_list:
 		li.append([])
 		job = {}
@@ -554,12 +564,25 @@ def function_queue(func_list:list, timeout:int
 		job['kwargs'] = li[2]
 		job['result'] = li[3]
 		threading.Thread(
-			target=lambda *a, **kw: job['result'].append(job['func'](*a, **kw))
+			target=lambda *a, **kw: job['result'].extend(
+				[
+					job['func'](*a, **kw)
+					, datetime.timedelta(seconds=(time.time() - time_start))
+				]
+			)
 			, args=job['args']
 			, kwargs=job['kwargs']
 			, daemon=True
 		).start()
-	for i in range(int(timeout / sleep_timeout)):
+	for _ in range(int(timeout / sleep_timeout)):
 		if all([len(li[3]) for li in func_list]): return
 		time.sleep(sleep_timeout)
+	else:
+		for li in func_list:
+			if len(li[3]) != 2: li[3].extend(['timeout', 'timeout'])
+
+def tprint(msg, **kwargs):
+	task_name = sys._getframe(1).f_code.co_name
+	print(task_name, end=': ')
+	print(msg, **kwargs)
 

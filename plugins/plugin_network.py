@@ -29,17 +29,11 @@ def page_get(url:str, encoding:str='utf-8', session:bool=False
 	else:
 		return f'error status: {req.status_code}'
 
-def _clean_text(text:str, leave:str=None)->str:
-	''' Removes \n \r \t, multiple spaces, leading and trailing
-		spaces from text.
+def _clean_text(text:str)->str:
+	''' Removes whitespace characters from string.
 	'''
-	unw_chars = '\r\n\t'
-	if leave: unw_chars = unw_chars.replace(leave, '')
-	r = text.strip()
-	for c in '\r\n\t':
-		r = c.join(r.split(c))
-	r = ' '.join(r.split(' '))
-	return r
+
+	return ' '.join(text.split())
 
 def file_download(url:str, destination:str=None)->str:
 	''' Download file from url to destination and return fullpath.
@@ -60,7 +54,7 @@ def file_download(url:str, destination:str=None)->str:
 	urllib.request.urlretrieve (url, dest_file)
 	return dest_file
 
-def html_element(url:str, find_all_args
+def html_element(url:str, find_all_args, number:int=0
 				, clean:bool=True , encoding:str='utf-8'
 				, session:bool=False, headers:dict=None
 				, cookies:dict=None)->str:
@@ -73,10 +67,10 @@ def html_element(url:str, find_all_args
 					'name': 'span'
 					, 'attrs': {'itemprop':'softwareVersion'}
 				}
-		Returns only the first occurrence.
-		clean - remove html tags and spaces
-		headers - optional dictionary with request headers
-		session - use requests.Session instead of get
+		number - number of element in list.
+		clean - remove html tags and spaces.
+		headers - optional dictionary with request headers.
+		session - use requests.Session instead of get.
 		cookies - dictionary with cookies like {'GUEST_LANGUAGE_ID': 'ru_RU'}
 	'''
 	html = page_get(url=url, encoding=encoding, session=session
@@ -89,7 +83,7 @@ def html_element(url:str, find_all_args
 			r += soup.find_all(**d)
 		if r:
 			if clean:
-				return _clean_text(r)
+				return [_clean_text(i.get_text()) for i in r]
 			else:
 				return r
 		else:
@@ -98,10 +92,10 @@ def html_element(url:str, find_all_args
 		r = soup.find_all(**find_all_args)
 		if r:
 			if clean:
-				r = r[0].get_text()
+				r = r[number].get_text()
 				return _clean_text(r)
 			else:
-				return r[0]
+				return r[number]
 		else:
 			return 'error: not found'
 
