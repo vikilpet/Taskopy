@@ -184,10 +184,17 @@ def domain_ip(domain:str)->list:
 
 
 
-def url_hostname(url:str)->str:
- 	''' Get hostname from url
- 	'''
- 	return urllib.parse.urlparse(url).netloc
+def url_hostname(url:str, second_lvl:bool=True)->str:
+	''' Get hostname (second level domain) from URL.
+	'''
+	domain = urllib.parse.urlparse(url).netloc
+	if not second_lvl: return domain
+	if '.'.join(domain.split('.')[-2:]) in ['co.uk']:
+		suf_len = -3
+	else:
+		suf_len = -2
+	domain = '.'.join(domain.split('.')[suf_len:])
+	return domain
 
 
 

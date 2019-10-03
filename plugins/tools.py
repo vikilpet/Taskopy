@@ -5,6 +5,7 @@ import datetime
 import threading
 import re
 import winsound
+import glob
 import ctypes
 import sqlite3
 import pyperclip
@@ -14,11 +15,10 @@ import win32api
 import win32gui
 import win32con
 import wx
-from .plugin_send_mail import send_email
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2019-09-24'
+APP_VERSION = 'v2019-10-03'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 TASK_OPTIONS = [
@@ -114,10 +114,16 @@ def task(**kwargs):
 	return with_attrs
 
 def sound_play(fullpath, wait=False):
-	if wait:
-		winsound.PlaySound(fullpath, winsound.SND_FILENAME)
+	''' Play .wav sound. If fullpath is a folder, then pick random file.
+	'''
+	if os.path.isdir(fullpath):
+		fi = random.choice(glob.glob(fullpath + '\\*'))
 	else:
-		winsound.PlaySound(fullpath, winsound.SND_FILENAME + winsound.SND_ASYNC)
+		fi = fullpath
+	if wait:
+		winsound.PlaySound(fi, winsound.SND_FILENAME)
+	else:
+		winsound.PlaySound(fi, winsound.SND_FILENAME + winsound.SND_ASYNC)
 
 def dev_print(msg:str):
 	d = False
@@ -260,28 +266,6 @@ def re_replace(source:str, re_pattern:str, repl:str=''
 		, flags=re_flags
 	)
 	return r
-
-def email_send(
-		recipient:str
-		, subject:str
-		, message:str
-		, smtp_server:str
-		, smtp_port:int
-		, smtp_user:str
-		, smtp_password:str
-	):
-	''' Send email
-	'''
-	send_email(
-		receiver_email=recipient
-		, subject=subject
-		, from_name=APP_NAME
-		, message=message
-		, smtp_server=smtp_server
-		, smtp_port=smtp_port
-		, smtp_user=smtp_user
-		, smtp_password=smtp_password
-	)
 
 _MessageBox = ctypes.windll.user32.MessageBoxW
 _MessageBoxTimeout = ctypes.windll.user32.MessageBoxTimeoutW
@@ -493,13 +477,16 @@ def msgbox(msg:str, title:str=None
 def msgbox_warning(msg:str):
 	msgbox(msg=msg, title=APP_NAME, ui=MB_ICONWARNING, wait=False)
 
-def inputbox(message:str, title:str=APP_NAME
+def inputbox(message:str, title:str=None
 			, is_pwd:bool=False, default:str='')->str:
 	''' Request input from user.
 		is_pwd - use password dialog (hide input).
 		Problem: don't use default or you will get it value
 		whatever button user will press.
 	'''
+	if not title:
+		title = sys._getframe(1).f_code.co_name.replace('_', ' ')
+		if title.startswith('<'): title = APP_NAME
 	if is_pwd:
 		box_func = wx.PasswordEntryDialog
 	else:
@@ -539,50 +526,61 @@ def function_queue(func_list:list, timeout:int
 		or timeout is expired.
 		func_list = list of sublist, where sublist should consist of 3
 		items: function, (args), {kwargs}.
-		Adds to the list the result of execution and time spent
+		Returns list of job objects, where job have these attributes:
+		func, args, kwargs, result, time
 		Example:
 		func_list = [
 			[function1, (1, 3, 4), {'par1': 2, 'par2':3}]
-			, [function2, (), {'par1': 'foo', 'par2': 'bar'}]
+			, [function2, (), {'par1':'foo', 'par2':'bar'}]
 			...
 		]
-		Result:
+		jobs:
 		[
-			[function1, (1, 3, 4), {'par1': 2, 'par2':3}
-				, ['result 1', '0:00:00.441000']]
-			, [function2, (), {'par1': 'foo', 'par2': 'bar'}
-				, ['result 2', '0:00:00.138000']]
+			<job.func=function1, job.args = (1, 3, 4), job.kwargs={'par1': 2, 'par2':3}
+				, job.result=True, job.time='0:00:00.0181'>
+			, <job.func=function2, job.args = (), job.kwargs={'par1':'foo', 'par2':'bar'}
+				, job.result=[True, data], job.time='0:00:05.827'>
+
 			...
 		]
 	'''
+	jobs = []
 	time_start = time.time()
 	for li in func_list:
-		li.append([])
 		job = {}
 		job['func'] = li[0]
 		job['args'] = li[1]
 		job['kwargs'] = li[2]
-		job['result'] = li[3]
+		job['result'] = []
+		job['time'] = None
+		jobs.append(job)
 		threading.Thread(
-			target=lambda *a, **kw: job['result'].extend(
-				[
-					job['func'](*a, **kw)
-					, datetime.timedelta(seconds=(time.time() - time_start))
-				]
-			)
+			target=lambda *a, **kw: job['result'].extend([
+				job['func'](*a, **kw)
+				, datetime.timedelta(seconds=(time.time() - time_start))
+			])
 			, args=job['args']
 			, kwargs=job['kwargs']
 			, daemon=True
 		).start()
 	for _ in range(int(timeout / sleep_timeout)):
-		if all([len(li[3]) for li in func_list]): return
+		if all([len(j['result'])==2 for j in jobs]):
+			for job in jobs:
+				job['result'], job['time'] = job['result']
+			return [DictToObj(j) for j in jobs]
 		time.sleep(sleep_timeout)
 	else:
-		for li in func_list:
-			if len(li[3]) != 2: li[3].extend(['timeout', 'timeout'])
+		for job in jobs:
+			if len(job['result']):
+				job['result'], job['time'] = job['result']
+			else:
+				job['result'] = 'timeout'
+				job['time'] = 'timeout'
+		return [DictToObj(j) for j in jobs]
 
 def tprint(msg, **kwargs):
 	task_name = sys._getframe(1).f_code.co_name
 	print(task_name, end=': ')
 	print(msg, **kwargs)
+
 

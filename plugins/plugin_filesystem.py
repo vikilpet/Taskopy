@@ -22,12 +22,14 @@ def file_write(fullpath:str, content:str, encoding:str='utf-8'):
 		f.write(content)
 
 def file_rename(fullpath:str, dest:str)->str:
-	''' Rename file.
+	''' Rename path.
 		dest - fullpath or just new file name without parent directory.
 	'''
 	if not ':' in dest: dest = os.path.dirname(fullpath) + '\\' + dest
 	os.rename(fullpath, dest)
 	return dest
+
+dir_rename = file_rename
 
 def file_log(fullpath:str, message:str, encoding:str='utf-8'
 				, time_format:str='%Y.%m.%d %H:%M:%S'):

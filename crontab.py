@@ -6,6 +6,8 @@ from plugins.plugin_winamp import *
 from plugins.plugin_system import *
 from plugins.plugin_routeros import *
 from plugins.plugin_hotkey import *
+from plugins.plugin_mail import *
+from plugins.plugin_crypt import *
 
 # Task with only one parameter - run at application start
 # You can deactivate it with the parameter «active=False» like that:
