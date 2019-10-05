@@ -186,9 +186,9 @@ Format: **setting** (default value) — description.
 
 ### Keyboard
 
-**keys_pressed(hotkey:str)->bool** — is the key pressed?
-**keys_send(hotkey:str)** — press the key combination.
-**keys_write(text:str)** — write a text.
+- **keys_pressed(hotkey:str)->bool** — is the key pressed?
+- **keys_send(hotkey:str)** — press the key combination.
+- **keys_write(text:str)** — write a text.
 
 ### Filesystem
 

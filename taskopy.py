@@ -576,7 +576,6 @@ class App(wx.App):
 		
 
 
-
 def main():
 	global app
 	global tasks

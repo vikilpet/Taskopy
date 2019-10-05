@@ -8,6 +8,7 @@
 Исходный код: [https://github.com/vikilpet/Taskopy](https://github.com/vikilpet/Taskopy)
 
 Привязать ваш код к горячей клавише или HTTP-запросу:
+
 ```python
 def my_task(hotkey='ctrl+shift+t', http=True):
 	print('Это моя задача!')
@@ -185,9 +186,9 @@ def demo_task_3('left_click'=True, log=False):
 
 ### Клавиатура
 
-**keys_pressed(hotkey:str)->bool** — нажата ли клавиша.
-**keys_send(hotkey:str)** — нажать сочетание клавиш.
-**keys_write(text:str)** — написать текст.
+- **keys_pressed(hotkey:str)->bool** — нажата ли клавиша.
+- **keys_send(hotkey:str)** — нажать сочетание клавиш.
+- **keys_write(text:str)** — написать текст.
 
 ### Файлы и папки
 

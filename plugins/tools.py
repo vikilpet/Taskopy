@@ -18,7 +18,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2019-10-03'
+APP_VERSION = 'v2019-10-05'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 TASK_OPTIONS = [
@@ -478,7 +478,7 @@ def msgbox_warning(msg:str):
 	msgbox(msg=msg, title=APP_NAME, ui=MB_ICONWARNING, wait=False)
 
 def inputbox(message:str, title:str=None
-			, is_pwd:bool=False, default:str='')->str:
+			, is_pwd:bool=False, default:str='', multiline:bool=False)->str:
 	''' Request input from user.
 		is_pwd - use password dialog (hide input).
 		Problem: don't use default or you will get it value
@@ -491,7 +491,9 @@ def inputbox(message:str, title:str=None
 		box_func = wx.PasswordEntryDialog
 	else:
 		box_func = wx.TextEntryDialog
-	dlg = box_func(app.frame, message, title)
+	style=(wx.OK + wx.CANCEL + wx.STAY_ON_TOP + wx.CENTRE)
+	if multiline: style += wx.TE_MULTILINE
+	dlg = box_func(app.frame, message, title, style=style)
 	dlg.SetValue(default)
 	try:
 		dlg.ShowModal()
@@ -579,8 +581,23 @@ def function_queue(func_list:list, timeout:int
 		return [DictToObj(j) for j in jobs]
 
 def tprint(msg, **kwargs):
+	''' Print with task name. '''
 	task_name = sys._getframe(1).f_code.co_name
 	print(task_name, end=': ')
 	print(msg, **kwargs)
+
+def balloon(msg:str, title:str=APP_NAME, timeout:int=None, icon:str=None):
+	''' Show balloon. title - 63 symbols max, msg - 255.
+		icon - 'info', 'warning' or 'error'.
+	'''
+	kwargs = {'title': title, 'text': msg}
+	if timeout: kwargs['msec'] = timeout * 1000
+	if icon:
+		kwargs['flags'] = {
+			'info': wx.ICON_INFORMATION
+			, 'error': wx.ICON_ERROR
+			, 'warning': wx.ICON_WARNING
+		}.get(icon.lower(), wx.ICON_INFORMATION)
+	app.taskbaricon.ShowBalloon(**kwargs)
 
 

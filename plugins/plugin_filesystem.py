@@ -1,4 +1,5 @@
 ﻿import os
+import stat
 import time
 import glob
 import csv
@@ -85,44 +86,64 @@ def is_directory(fullpath:str)->bool:
 	p = Path(fullpath)
 	return p.is_dir()
 
-def purge_old(fullpath:str, days:int=0, recursive=False
+def purge_old(fullpath:str, days:int=0, recursive:bool=False
 			, creation:bool=False, test:bool=False):
-	''' Delete files older than x days.
+	''' Deletes files older than x days.
+		Returns number of deleted files and folders. 
 		days=0 - delete everything
 		creation - use date of creation, otherwise use last
 			modification date.
 		recursive - delete in subfolders too. Empty subfolders 
 			will be deleted.
-		test - only print files and folders that should be removed
+		test - only print files and folders that should be removed.
 	'''
+	counter = 0
 	def robust_remove_file(fullpath):
+		nonlocal counter
 		try:
 			os.remove(fullpath)
+			counter += 1
+		except PermissionError:
+			try:
+				os.chmod(fullpath, stat.S_IWRITE)
+				os.remove(fullpath)
+				counter += 1
+			except:
+				pass
 		except:
 			pass
 	def robust_remove_dir(fullpath):
+		nonlocal counter
 		try:
 			shutil.rmtree(fullpath)
+			counter += 1
 		except:
 			pass
+	def file_print(fullpath):
+		nonlocal counter
+		counter += 1
+		print(os.path.basename(fullpath))
 	if days: delta = 24 * 3600 * days
 	if creation:
 		date_func = os.path.getctime
 	else:
 		date_func = os.path.getmtime
-	if fullpath[-1] != '\\': fullpath += '\\'
-	if recursive:
-		files = glob.glob(f'{fullpath}**\*', recursive=True)
+	if '*' in fullpath:
+		pass
+	elif fullpath.endswith('\\'):
+		fullpath += '*'
 	else:
-		files = glob.glob(f'{fullpath}*')
+		fullpath += '\\*'
+	if recursive:
+		fullpath = fullpath.replace('*', r'**\*')
+	files = glob.glob(fullpath, recursive=recursive)
 	current_time = time.time()
 	if test:
-		file_func = print
-		dir_func = print
+		file_func = file_print
+		dir_func = file_print
 	else:
 		file_func = robust_remove_file
 		dir_func = robust_remove_dir
-	
 	for fi in files:
 		if os.path.isdir(fi):
 			folders = glob.glob(f'{fi}\\*')
@@ -132,10 +153,14 @@ def purge_old(fullpath:str, days:int=0, recursive=False
 			if files_count == 0: dir_func(fi)
 		else:
 			if days:
-				if (current_time - date_func(fi)) > delta:
-					file_func(fi)
+				try:
+					if (current_time - date_func(fi)) > delta:
+						file_func(fi)
+				except FileNotFoundError:
+					pass
 			else:
 				file_func(fi)
+	return counter
 
 def file_name(fullpath:str)->str:
 	''' Returns only name from fullpath
