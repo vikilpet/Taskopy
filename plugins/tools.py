@@ -18,7 +18,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2019-10-05'
+APP_VERSION = 'v2019-10-12'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 TASK_OPTIONS = [
@@ -79,6 +79,9 @@ _TIME_UNITS = {'msec':1, 'ms':1, 'sec':1000, 's':1000, 'min':60000
 				,'m':60000, 'hour':3600000, 'h':3600000}
 
 class DictToObj:
+	''' Converts dictionary to object.
+		Convert back: use vars() built-in function.
+	'''
 	def __init__(s, di:dict):
 		s.__dict__.update(di)
 

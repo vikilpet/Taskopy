@@ -6,6 +6,7 @@ import time
 import win32gui
 import win32api
 import win32con
+import win32ts
 from .tools import DictToObj, dev_print
 
 # https://psutil.readthedocs.io/en/latest/
@@ -22,6 +23,7 @@ def process_get(process)->int:
 	'''
 	if type(process) is int: return process
 	name = process.lower()
+	if not name.endswith('.exe'): name = name + '.exe'
 	for proc in psutil.process_iter():
 		if proc.name().lower() == name: return proc.pid
 	return False
@@ -111,37 +113,45 @@ def process_exist(process, cmd:str=None)->bool:
 		process - image name or PID.
 		cmd - optional string to search in the command line of the process.
 	'''
-	pid = process_get(process)
 	if cmd: cmd=cmd.lower()
 	for proc in psutil.process_iter():
-		if proc.pid == pid:
-			if cmd:
-				if cmd in ' '.join(proc.cmdline()):	return proc.pid
-			else:
-				return pid
+		if type(process) == str:
+			if proc.name().lower() == process:
+				if cmd:
+					if cmd in ' '.join(proc.cmdline()).lower(): return proc.pid
+				else:
+					return proc.pid
+		else:
+			if proc.pid == process:
+				if cmd:
+					if cmd in ' '.join(proc.cmdline()).lower(): return proc.pid
+				else:
+					return proc.pid
 	return False
 
 def process_list(name:str='')->list:
-	''' Returns list of dicts with process information.
+	''' Returns list of DictToObj with process information.
 		name - image name. If not specified then list all
 			processes.
 		Process information includes: pid:int, name:str
 		, username:str, exe:str, cmdline:list
-
 	'''
 	ATTRS=['pid', 'name', 'username', 'exe', 'cmdline']
-
 	name = name.lower()
 	proc_list = []
 	for proc in psutil.process_iter():
 		if name:
 			if proc.name().lower() == name:
 				di = proc.as_dict(attrs=ATTRS)
-				di['cmdline'] = list(di['cmdline'])
+				if di['cmdline']: di['cmdline'] = list(di['cmdline'])
+				if di['username']:
+					di['username'] = di['username'].split('\\')[1]
 				proc_list.append( DictToObj(di) )
 		else:
 			di = proc.as_dict(attrs=ATTRS)
-			di['cmdline'] = list(di['cmdline'])
+			if di['cmdline']: di['cmdline'] = list(di['cmdline'])
+			if di['username']:
+				di['username'] = di['username'].split('\\')[1]
 			proc_list.append( DictToObj(di) )
 	return proc_list
 
@@ -207,3 +217,45 @@ def process_close(process, timeout:int=10):
 		dev_print(f'PID {process} not found')
 	return False
 
+def wts_message(sessionid:int, msg:str, title:str, style:int=0
+, timeout:int=0, wait:bool=False):
+	''' Sends message to WTS session.
+		style - styles like in MessageBox (0 - MB_OK).
+		timeout - timeout in seconds (0 - no timeout).
+		Returns same values like MessageBox.
+	'''
+	return win32ts.WTSSendMessage(0, sessionid
+	, msg, title, style, timeout, wait)
+	
+def wts_cur_sessionid()->int:
+	''' Returns SessionID of current process.
+	'''
+	return win32ts.ProcessIdToSessionId(win32api.GetCurrentProcessId())
+
+def wts_logoff(sessionid:int, wait:bool=False)->int:
+	''' Logoffs session. wait - wait for completion.
+		If the function fails, the return value is zero.
+	'''
+	return win32ts.WTSLogoffSession(0, sessionid, wait)
+	
+def wts_proc_list(process:str=None)->list:
+	''' Returns list of DictToObj objects with properties:
+		.sessionid:int, .pid:int, .process:str
+		, .pysid:obj, .username:str, .cmdline:list
+		process - filter by process name.
+	'''
+	if process: process = process.lower()
+	proc_tup = win32ts.WTSEnumerateProcesses()
+	proc_li = []
+	for tup in proc_tup:
+		if process:
+			if tup[2].lower() != process: continue
+		di = {}
+		di['sessionid'], di['pid'], di['process'], _ = tup
+		proc = psutil.Process(di['pid'])
+		di['username'] = proc.username()
+		if di['username']:
+			di['username'] = di['username'].split('\\')[1]
+		di['cmdline'] = proc.cmdline()
+		proc_li.append(DictToObj(di))
+	return proc_li

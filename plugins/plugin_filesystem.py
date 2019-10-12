@@ -3,10 +3,10 @@ import stat
 import time
 import glob
 import csv
+import pyodbc
 import zipfile
 import tempfile
 from pathlib import Path
-import pyodbc
 import shutil
 from .tools import random_str
 
@@ -204,14 +204,48 @@ def dir_list(fullpath:str)->list:
 	recursive = ('**' in fullpath)
 	return glob.glob(fullpath, recursive=recursive)
 
-def csv_read(fullpath:str, encoding:str='utf-8', fieldnames=None, delimiter:str=';', quotechar:str='"')->list:
-	''' Read whole CSV file and return content as list of dictionaries
+def csv_read(fullpath:str, encoding:str='utf-8', fieldnames:tuple=None
+, delimiter:str=';', quotechar:str='"')->list:
+	''' Read whole CSV file and return content as list of dictionaries.
+		If no fieldnames is provided uses first row as fieldnames.
+		All cell values is strings.
 	'''
 	with open(fullpath, 'r', encoding=encoding) as f:
 		reader = csv.DictReader(f, skipinitialspace=True, fieldnames=fieldnames
 		, delimiter=delimiter, quotechar=quotechar)
 		li = [dict(row) for row in reader]
 	return li
+
+def csv_write(fullpath:str, content:list, fieldnames:tuple=None
+, encoding:str='utf-8', delimiter:str=';', quotechar:str='"'
+, quoting:int=csv.QUOTE_MINIMAL)->str:
+	''' Writes list of dictionaries as CSV file.
+		If fieldnames is None then takes keys() from
+		first list item as field names.
+		Returns fullpath.
+		content example:
+		[
+			{'name': 'some name',
+			'number': 1}
+			, {'name': 'another name',
+			'number': 2}
+			...	
+		]
+	'''
+	if not fieldnames:
+		fieldnames = content[0].keys()
+	with open(fullpath, 'w', encoding=encoding
+	, errors='ignore', newline='') as f:
+		writer = csv.DictWriter(
+			f
+			, fieldnames=fieldnames
+			, delimiter=delimiter
+			, quotechar=quotechar
+			, quoting=quoting
+		)
+		writer.writeheader()
+		writer.writerows([di for di in content])
+	return fullpath
 
 def dir_zip(fullpath:str, destination:str)->str:
 	''' Compresses folder and returns the full path to archive.

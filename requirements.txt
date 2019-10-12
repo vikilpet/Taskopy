@@ -1,9 +1,11 @@
-pyperclip==1.6.4
-keyboard==0.13.3
-psutil==5.6.3
-wxPython==4.0.4
-schedule==0.6.0
+pyodbc==4.0.24
+cryptography==2.7
 pywin32==224
+psutil==5.6.3
+keyboard==0.13.3
+pyperclip==1.6.4
 requests==2.22.0
-beautifulsoup4==4.7.1
+schedule==0.6.0
+wxPython==4.0.4
+beautifulsoup4==4.8.1
 win32gui==221.6

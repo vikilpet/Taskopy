@@ -1,4 +1,4 @@
-import os
+﻿import os
 import base64
 from cryptography.hazmat.backends import default_backend
 from cryptography.fernet import Fernet
