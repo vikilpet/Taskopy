@@ -5,7 +5,10 @@ import glob
 import csv
 import pyodbc
 import zipfile
+from distutils import dir_util
+from zlib import crc32
 import tempfile
+import hashlib
 from pathlib import Path
 import shutil
 from .tools import random_str
@@ -14,13 +17,22 @@ _SIZE_UNITS = {'gb':1073741824, 'mb':1048576, 'kb':1024, 'b':1}
 
 def file_read(fullpath:str, encoding:str='utf-8')->str:
 	''' Returns content of file '''
-	with open(fullpath, 'tr', encoding=encoding) as f: return f.read()
+	if encoding == 'binary':
+		with open(fullpath, 'rb') as f:
+			return f.read()
+	else:
+		with open(fullpath, 'tr', encoding=encoding) as f:
+			return f.read()
 
 def file_write(fullpath:str, content:str, encoding:str='utf-8'):
 	''' Save content in file. Create file if fullpath doesn't exist.
 	'''
-	with open(fullpath, 'wt+', encoding=encoding, errors='ignore') as f:
-		f.write(content)
+	if encoding == 'binary':
+		with open(fullpath, 'wb+') as f:
+			f.write(content)
+	else:
+		with open(fullpath, 'wt+', encoding=encoding, errors='ignore') as f:
+			f.write(content)
 
 def file_rename(fullpath:str, dest:str)->str:
 	''' Rename path.
@@ -38,12 +50,21 @@ def file_log(fullpath:str, message:str, encoding:str='utf-8'
 		f.write(time.strftime(time_format) + '\t' + message + '\n')
 
 def file_copy(fullpath:str, destination:str):
-	''' Copy file to destination.
+	''' Copies file to destination.
 		Destination may be fullpath or folder name.
-		If destination path exist it will be overwritten.
-		If destination is a folder, it should exist.
+		If destination file exists it will be overwritten.
+		If destination is a folder, subfolders will
+		be created if they don't exist.
 	'''
-	shutil.copy(fullpath, destination)
+	try:
+		shutil.copy(fullpath, destination)
+	except FileNotFoundError:
+		try:
+			os.makedirs(
+				os.path.dirname(fullpath)
+			)
+			shutil.copy(fullpath, destination)
+		except FileExistsError: pass
 
 def file_move(fullpath:str, destination:str):
 	''' Move file to destination.
@@ -60,6 +81,28 @@ def file_delete(fullpath:str):
 		os.remove(fullpath)
 	except FileNotFoundError:
 		pass
+
+def dir_copy(fullpath:str, destination:str, update:bool=True):
+	''' Copy a folder with all content to a new location.
+		Returns number of errors.
+	'''
+    	err = 0
+	try:
+		dir_util.copy_tree(fullpath, destination, update=update)
+	except dir_util.DistutilsFileError as e:
+		err += 1
+		print(f'dir_copy error: {repr(e)}')
+	return err
+
+def dir_create(fullpath:str=None)->str:
+	''' Creates new dir and returns full path.
+		If fullpath=None then creates temporary directory.
+	'''
+	if not fullpath: return temp_dir('temp')
+	try:
+		os.makedirs(fullpath)
+	except FileExistsError: pass
+	return fullpath
 
 def dir_delete(fullpath:str):
 	try:
@@ -282,13 +325,43 @@ def file_zip(fullpath, destination:str)->str:
 	else:
 		return 'error: unknown type of fullpath'
 
-def temp_folder()->str:
-	''' Returns full path of temp folder (without trailing slash).
+def temp_dir(new_dir:str=None)->str:
+	''' Returns full path of temp dir (without trailing slash).
+		If new_dir - creates folder in temp dir and returns its full path.
 	'''
-	return tempfile.gettempdir()
+	if not new_dir:
+		return tempfile.gettempdir()
+	if new_dir == 'temp':
+		new_dir = (tempfile.gettempdir()
+			+ '\\' + time.strftime("%m%d%H%M%S") + random_str(5))
+	else:
+		new_dir = tempfile.gettempdir() + '\\' + new_dir
+	try:
+		os.mkdir(new_dir)
+	except FileExistsError: pass
+	return new_dir
 
 def temp_file(suffix:str='')->str:
 	''' Returns temporary file name.
 	'''
-	return (f'{tempfile.gettempdir()}\\'
-			+ f'{time.strftime("%m%d%H%M%S") + random_str(5) + suffix}')
+	return (tempfile.gettempdir() + '\\'
+			+ time.strftime('%m%d%H%M%S') + random_str(5) + suffix)
+
+def file_hash(fullpath:str, algorithm:str='crc32')->str:
+	''' Returns hash of file.
+		algorithm - 'crc32' or 'md5'.
+	'''
+	algorithm = algorithm.lower()
+	if algorithm == 'md5':
+		hash_md5 = hashlib.md5()
+		with open(fullpath, 'rb') as fi:
+			for chunk in iter(lambda: fi.read(4096), b''):
+				hash_md5.update(chunk)
+		return hash_md5.hexdigest()
+	elif algorithm == 'crc32':
+		prev = 0
+		for eachLine in open(fullpath,"rb"):
+			prev = crc32(eachLine, prev)
+		return '%X' % (prev & 0xFFFFFFFF)		
+	else:
+		return 'error: unknown algorithm'

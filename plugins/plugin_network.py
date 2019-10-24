@@ -3,25 +3,50 @@ import socket
 import requests
 import urllib
 import tempfile
+from hashlib import md5
 from bs4 import BeautifulSoup
 import json
 
 def page_get(url:str, encoding:str='utf-8', session:bool=False
 			, cookies:dict=None, headers:dict=None
-			, http_method:str='get', json_data:str=None)->str:
+			, http_method:str='get', json_data:str=None
+			, post_file:str=None, post_hash:bool=False)->str:
 	''' Get content of the specified url
 	'''
+	if post_file: http_method = 'POST'
 	if http_method: http_method = http_method.lower()
 	try:
 		if session:
 			ses = requests.Session()
 			if headers: ses.headers.update(headers)
 			if cookies: ses.cookies.update(cookies)
-			req = getattr(ses, http_method)(url=url, json=json_data)
+			if post_file:
+				if post_hash:
+					ses.headers.update({'': _file_hash(post_file)})
+				with open(post_file, 'rb') as fi:
+					files = {'file': fi}
+					req = getattr(ses, http_method)(url=url
+						, json=json_data, files=files)
+			else:
+				req = getattr(ses, http_method)(url=url, json=json_data)
 		else:
-			req = getattr(requests, http_method)(
-				url=url, headers=headers, json=json_data, cookies=cookies
-			)
+			if post_file:
+				if post_hash:
+					if headers:
+						headers['Content-MD5'] = _file_hash(post_file)
+					else:
+						headers = {'Content-MD5': _file_hash(post_file)}
+				with open(post_file, 'rb') as fi:
+					files = {'file': fi}
+					req = getattr(requests, http_method)(
+						url=url, headers=headers, json=json_data
+						, cookies=cookies, files=files
+					)
+			else:
+				req = getattr(requests, http_method)(
+					url=url, headers=headers, json=json_data
+					, cookies=cookies
+				)
 	except Exception as e:
 		return f'error {http_method}: {repr(e)}'
 	if req.status_code == 200:
@@ -210,3 +235,10 @@ def is_online(*sites, timeout:int=2)->int:
 			r += 1
 		except: pass
 	return r
+
+def _file_hash(fullpath:str)->str:
+	hash_md5 = md5()
+	with open(fullpath, 'rb') as fi:
+		for chunk in iter(lambda: fi.read(4096), b''):
+			hash_md5.update(chunk)
+	return hash_md5.hexdigest()

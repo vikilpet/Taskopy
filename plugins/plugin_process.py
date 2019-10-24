@@ -7,14 +7,17 @@ import win32gui
 import win32api
 import win32con
 import win32ts
-from .tools import DictToObj, dev_print
+import win32serviceutil
+from .tools import DictToObj, dev_print, msgbox, tprint
+from .plugin_filesystem import path_exists
 
 # https://psutil.readthedocs.io/en/latest/
 
 _SIZE_UNITS = {'gb':1073741824, 'mb':1048576, 'kb':1024, 'b':1, 'percent':1}
 
 def file_open(fullpath:str, showcmd:int=win32con.SW_SHOWNORMAL):
-	''' Open file or URL in default program
+	''' Open file or URL in default program.
+		showcmd=7 - start minimized.
 	'''
 	win32api.ShellExecute(None, 'open', fullpath, None, None, showcmd)
 
@@ -259,3 +262,22 @@ def wts_proc_list(process:str=None)->list:
 		di['cmdline'] = proc.cmdline()
 		proc_li.append(DictToObj(di))
 	return proc_li
+
+def service_running(service:str)->bool:
+	'''Returns True if servise is running.'''
+	return win32serviceutil.QueryServiceStatus(service)[1] == 4
+
+def service_start(service:str, args:tuple=None):
+	''' Starts windows service.'''
+	win32serviceutil.StartService(service, args)
+
+def service_stop(service:str)->tuple:
+	''' Stops windows service.'''
+	return win32serviceutil.StopService(service)
+
+
+
+
+
+
+

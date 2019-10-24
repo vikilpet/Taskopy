@@ -13,10 +13,10 @@ class Crypt:
 		description']
 	'''
 	def __init__(s, password:str, pwd_encoding:str='utf-8'
-	, scrypt_args:dict=None):
+	, scrypt_args:dict=None, file_encoding:str=None):
 		s.enc_file = None
 		s.password = password
-		s.file_encoding = None
+		s.file_encoding = file_encoding
 		s.pwd_encoding = pwd_encoding
 		if scrypt_args:
 			s.scrypt_args = scrypt_args
@@ -47,11 +47,11 @@ class Crypt:
 		except Exception as e:
 			return False, [repr(e)]
 
-	def file_encrypt(s, fullpath:str, content:str, encoding:str='utf-8'):
+	def write_enc_file(s, fullpath:str, content:str):
 		''' Returns filename of encrypted file (fullpath + base64(salt)
 			as extension). Deletes old files with same name (without
 			salt extension).
-			If encoding == 'binary' writes content as is.
+			If encoding='binary' writes content as is.
 		'''
 		try:
 			li = glob(fullpath + '.*')
@@ -64,10 +64,10 @@ class Crypt:
 		salt = data[1]
 		key = base64.urlsafe_b64encode(data[0])
 		fer = Fernet(key)
-		if encoding == 'binary':
+		if s.file_encoding == 'binary':
 			token = fer.encrypt(content)
 		else:
-			token = fer.encrypt(bytes(content, encoding))
+			token = fer.encrypt(bytes(content, s.file_encoding))
 		try:
 			newpath = fullpath + '.' + salt
 			with open(newpath, 'bw+') as f:
@@ -76,7 +76,7 @@ class Crypt:
 			return False, ['file write error: ' + repr(e)]
 		return True, [newpath]
 
-	def file_decrypt(s, fullpath:str, encoding:str='utf-8')->list:
+	def read_enc_file(s, fullpath:str)->list:
 		''' Returns content of encrypted file.
 			fullpath - encrypted file with salt in extension.
 		'''
@@ -102,7 +102,7 @@ class Crypt:
 		except Exception as e:
 			return False, ['fer.decrypt error: ' + repr(e)]
 		if s.file_encoding != 'binary':
-			content = content.decode(encoding=encoding)
+			content = content.decode(encoding=s.file_encoding)
 		return True, [content]
 	
 	def _find_enc_file(s, fullpath:str):
@@ -121,50 +121,54 @@ class Crypt:
 
 
 
-	def get_pass_from_list(s, pw_list:list, secret:str)->list:
-		''' Returns True and [login, password] from list
-		'''
-		if len(pw_list)==0:
-			return False, ['Empty list']
-		for li in pw_list:
-			if len(li):
-				if li[0]==secret:
-					return True, li[1:3]
-		return False, ['Not found: ' + secret]
-
-	def get_secret(s, secret:str)->list:
-		''' Returns [login, password] '''
-		if not os.path.isfile(s.plain_file):
-			status, data = s._find_enc_file()
-			if not status:
-				return False, ['_find_enc_file error: ' + data[0]]
-			status, data = s.decrypt_file_save(data[0], s.plain_file)
-			if not status:
-				return False, ['decrypt_file_save error: ' + data[0]]				
-		status, data  = s.get_secret_from_file(secret)
-		if status:
-			return True, data
-		else:
-			return False, ['get_secret_from_file error: ' + data[0]]
+	
 
 def file_enc_write(fullpath:str, content:str, password:str
 , encoding:str='utf-8'):
 	''' Encrypts content with password and writes to a file.
 		Adds salt as file extension.
+		encoding='binary' - binary mode.
 		Returns fullpath.
 	'''
-	crypt = Crypt(password=password)
-	status, data = crypt.file_encrypt(fullpath=fullpath, content=content
-									, encoding=encoding)
-	if not status: return False, f'file_encrypt error: {data}'
+	crypt = Crypt(password=password, file_encoding=encoding)
+	status, data = crypt.write_enc_file(fullpath=fullpath, content=content)
+	if not status: return False, f'write_enc_file error: {data}'
 	return True, data[0]
 
-def file_enc_read(fullpath:str, password:str, encoding:str='utf-8'):
-	''' Decrypts file and returns content.
+def file_enc_read(fullpath:str, password:str, encoding:str='utf-8')->tuple:
+	''' Decrypts file and returns status, content.
+		encoding='binary' - binary mode.
 	'''
-	crypt = Crypt(password=password)
-	status, data = crypt.file_decrypt(fullpath=fullpath, encoding=encoding)
-	if not status: return False, f'file_decrypt error: {data}'
+	crypt = Crypt(password=password, file_encoding=encoding)
+	status, data = crypt.read_enc_file(fullpath=fullpath)
+	if not status: return False, f'read_enc_file error: {data}'
 	return True, data[0]
+
+def file_encrypt(fullpath:str, password:str)->tuple:
+	''' Encrypts file with password.
+		Returns status, fullpath (or error).
+		Adds salt as file extension.
+	'''
+	crypt = Crypt(password=password, file_encoding='binary')
+	with open(fullpath, 'rb') as fi:
+		status, data = crypt.write_enc_file(
+			fullpath=fullpath, content=fi.read()
+		)
+	if not status: return False, f'write_enc_file error: {data}'
+	return True, data[0]
+
+def file_decrypt(fullpath:str, password:str)->tuple:
+	''' Decrypts file with password.
+		Returns status, fullpath (or error).
+		Removes salt from file name.
+	'''
+	crypt = Crypt(password=password, file_encoding='binary')
+	status, data = crypt.read_enc_file(fullpath=fullpath)
+	if not status: return False, f'read_enc_file error: {data}'
+	fullpath = '.'.join(fullpath.split('.')[:-1])
+	with open(fullpath, 'wb+') as fi:
+		fi.write(data[0])
+	return True, fullpath
+
 
 

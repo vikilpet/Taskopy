@@ -203,7 +203,7 @@ class Tasks:
 		if s.task_list_http:
 			threading.Thread(
 				target=http_server_start
-				, args=(sett, s)
+				, args=(s, )
 				, daemon=True
 			).start()
 		t = threading.Thread(target=s.run_scheduler, daemon=True)

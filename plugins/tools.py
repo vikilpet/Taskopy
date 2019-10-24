@@ -18,7 +18,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2019-10-12'
+APP_VERSION = 'v2019-10-25'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 TASK_OPTIONS = [
@@ -38,6 +38,7 @@ TASK_OPTIONS = [
 	, ['submenu', None]
 	, ['result', False]
 	, ['http', False]
+	, ['http_dir', None]
 	, ['err_threshold', 0]
 	, ['err_counter', False]
 	, ['no_print', False]

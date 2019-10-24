@@ -19,6 +19,7 @@ _errors = []
 _FORBIDDEN_CHARS = '<>:"/\\|?*\n\r\x1a'
 _MAX_FILE_LEN = 250
 _MAX_ERR_STR_LEN = 200
+_MAX_TITLE_LEN = 80
 
 def _parse_args():
 	parser = argparse.ArgumentParser()
@@ -109,7 +110,7 @@ def mail_send_batch(recipients:str='', **mail_send_args):
 		)
 def mail_check(server:str, login:str, password:str
 	, folders:list=['inbox'], msg_status:str='UNSEEN', silent:bool=True)->tuple:
-	''' Checks server and return number of messages
+	''' Checks server and return number of 'msg_status' messages
 		and list of errors.
 	'''
 	msg_num = 0
@@ -179,8 +180,6 @@ def mail_download(server:str, login:str, password:str
 		for char in _FORBIDDEN_CHARS:
 			name = name.replace(char, ' ')
 		return name
-
-
 	try:
 		pr('connect to server')
 		imap = imaplib.IMAP4_SSL(server)
@@ -193,74 +192,76 @@ def mail_download(server:str, login:str, password:str
 		for folder in folders:
 			pr(f'select folder {folder}')
 			status, mail_count = imap.select(folder, readonly=False)
-			if status == 'OK':
-				pr('select is "OK"')
-				number = int(mail_count[0].decode('utf-8'))
-				pr(f'found {number} messages in "{folder}" folder')
-				msg_number += number
-				status, search_data = imap.search(None, 'ALL')
-				if status == 'OK':
-					for msg_id in search_data[0].split():
-						status, msg_data = imap.fetch(msg_id, '(RFC822)')
-						if status == 'OK':
-							msg_raw = msg_data[0][1]
-							msg = message_from_bytes(msg_raw)
-							try:
-								msg_subj = str(
-									make_header(decode_header(msg['Subject']))
-								)
-							except LookupError:
-								pr('BAD SUBJECT')
-								msg_subj = 'bad_subject'
-							except TypeError:
-								msg_subj = 'no_subject'
-							except Exception as e:
-								pr(f'error subject: {repr(e)}')
-								msg_subj = 'error_subject'
-							msg_subj = fix_name(msg_subj)
-							msg_subj = ''.join(msg_subj.strip())
-							if last_index == 0:
-								last_index = _get_last_index(output_dir) + 1
-							else:
-								last_index += 1
-							filename = '{}\\{} - {}.eml'.format(
-								output_dir
-								, last_index
-								, msg_subj
-							)
-							if len(filename) > _MAX_FILE_LEN:
-								pr(f'name too long (len={len(filename)}):\n{msg_subj}\n')
-								new_len = (
-									_MAX_FILE_LEN
-									- len(str(last_index))
-									- len(output_dir)
-									- 11								)
-								filename = '{}\\{} - {}....eml'.format(
-									output_dir,
-									last_index,
-									msg_subj[:new_len]
-								)
-							try:
-								with open(filename, 'bw') as f:
-									f.write(msg_raw)
-									file_ok = True
-							except Exception as e:
-								file_ok = False
-								pr(f'error file write: {repr(e)}')
-							subjects.append(msg_subj[:77] + '...' if
-								len(msg_subj) > 80 else msg_subj)
-							if file_ok:
-								status, data = imap.copy(msg_id, trash_folder)
-								if status == 'OK':
-									imap.store(msg_id, '+FLAGS', '\\Deleted')
-								else:
-									pr(f'error message move: {status} {data}')
-						else:
-							pr(f'error imap fetch: {status} {msg_data}')
+			if status != 'OK':
+				pr(f'error imap select folder ({folder}): {status} {mail_count}')
+				continue
+			pr('select is "OK"')
+			number = int(mail_count[0].decode('utf-8'))
+			pr(f'found {number} messages in "{folder}" folder')
+			msg_number += number
+			status, search_data = imap.search(None, 'ALL')
+			if status != 'OK':
+				pr(f'error imap search: {status} {search_data}')
+				continue
+			for msg_id in search_data[0].split():
+				status, msg_data = imap.fetch(msg_id, '(RFC822)')
+				if status != 'OK':
+					pr(f'error imap fetch: {status} {msg_data}')
+					continue
+				msg_raw = msg_data[0][1]
+				msg = message_from_bytes(msg_raw)
+				try:
+					msg_subj = str(
+						make_header(decode_header(msg['Subject']))
+					)
+				except LookupError:
+					pr('bad subject')
+					msg_subj = 'bad_subject'
+				except TypeError:
+					msg_subj = 'no_subject'
+				except Exception as e:
+					pr(f'error subject: {repr(e)}')
+					msg_subj = 'error_subject'
+				msg_subj = fix_name(msg_subj)
+				msg_subj = ''.join(msg_subj.strip())
+				if last_index == 0:
+					last_index = _get_last_index(output_dir) + 1
 				else:
-					pr(f'error imap search: {status} {search_data}')
-			else:
-				pr(f'error imap select folder: {status} {mail_count}')
+					last_index += 1
+				filename = '{}\\{} - {}.eml'.format(
+					output_dir
+					, last_index
+					, msg_subj
+				)
+				if len(filename) > _MAX_FILE_LEN:
+					pr(f'name too long (len={len(filename)}):\n{msg_subj}\n')
+					new_len = (
+						_MAX_FILE_LEN
+						- len(str(last_index))
+						- len(output_dir)
+						- 11					)
+					filename = '{}\\{} - {}....eml'.format(
+						output_dir,
+						last_index,
+						msg_subj[:new_len]
+					)
+				try:
+					with open(filename, 'bw') as f:
+						f.write(msg_raw)
+					file_ok = True
+				except Exception as e:
+					file_ok = False
+					pr(f'error file write: {repr(e)}')
+				subjects.append(
+					msg_subj[:_MAX_TITLE_LEN - 3] + '...' if
+					len(msg_subj) > _MAX_TITLE_LEN else msg_subj
+				)
+				if file_ok:
+					status, data = imap.copy(msg_id, trash_folder)
+					if status == 'OK':
+						imap.store(msg_id, '+FLAGS', '\\Deleted')
+					else:
+						pr(f'error message move: {status} {data}')
 			pr('expunge')
 			imap.expunge()
 			pr('close')
