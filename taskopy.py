@@ -1,4 +1,5 @@
 ﻿import time
+import uptime
 import sys
 import os
 import importlib
@@ -268,7 +269,7 @@ class Tasks:
 			s.run_task(task, caller='startup')
 			
 	def run_at_sys_startup(s):
-		if win32api.GetTickCount() < (6 * 60 * 1000):
+		if uptime.uptime() < 120:
 			for task in s.task_list_sys_startup:
 				s.run_task(task, caller='sys_startup')
 	
@@ -335,6 +336,8 @@ class Tasks:
 						f'Error in task: {task["task_name_full"]}\n'
 						+ traceback.format_exc()
 					)
+					if not result is None:
+						result.append('task error')
 					if err_counter > s.task_opt_get(
 						task['task_function_name']
 						, 'err_threshold'

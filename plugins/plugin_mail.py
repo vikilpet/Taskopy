@@ -11,7 +11,7 @@ import imaplib
 from email import message_from_bytes
 from email.header import Header, decode_header, make_header
 import mimetypes
-from .tools import function_queue
+from .tools import jobs_batch
 
 CC_LIMIT = 35
 _errors = []
@@ -73,10 +73,6 @@ def mail_send(
 					, filename=attachment[attachment.rfind('\\') + 1:]
 				)
 	
-	'''
-	with open('outgoing.msg', 'wb') as f:
-		f.write(bytes(msg))
-	'''
 	try:
 		with smtplib.SMTP_SSL(smtp_server, smtp_port
 								, context=context) as server:
@@ -273,7 +269,7 @@ def mail_download(server:str, login:str, password:str
 		return [], [f'error general: {repr(e)}']
 	return subjects, errors
 
-def mail_download_batch(mailboxes:list, output_dir:str, timeout:int=20
+def mail_download_batch(mailboxes:list, output_dir:str, timeout:int=60
 , log_file:str=r'mail_errors.log', err_thr:int=8, silent:bool=True)->tuple:
 	''' Downloads (or checks) all mailboxes in list of dictionaries
 		with parameters for mail_download or mail_check.
@@ -334,7 +330,7 @@ def mail_download_batch(mailboxes:list, output_dir:str, timeout:int=20
 					, ()
 					, {k:box[k] for k in box if k!='check_only'}
 				])
-		jobs = function_queue(queue, timeout=timeout)
+		jobs = jobs_batch(queue, timeout=timeout)
 		errors = []
 		msg = ''
 		for job in jobs:

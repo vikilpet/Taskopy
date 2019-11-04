@@ -3,6 +3,7 @@ import os
 import time
 import datetime
 import threading
+from multiprocessing.dummy import Pool as ThreadPool
 import re
 import winsound
 import glob
@@ -18,7 +19,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2019-10-25'
+APP_VERSION = 'v2019-11-04'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 TASK_OPTIONS = [
@@ -118,7 +119,7 @@ def task(**kwargs):
 	return with_attrs
 
 def sound_play(fullpath, wait=False):
-	''' Play .wav sound. If fullpath is a folder, then pick random file.
+	''' Play .wav sound. If fullpath is a folder then pick random file.
 	'''
 	if os.path.isdir(fullpath):
 		fi = random.choice(glob.glob(fullpath + '\\*'))
@@ -161,7 +162,31 @@ def con_log(msg:str, log_file:bool=True):
 def time_now(template:str='%Y-%m-%d_%H-%M-%S'):
 	return time.strftime(template)
 
-def time_weekday(tdate=None, template:str='%A')->str:
+def time_hour()->int:
+	'''Returns current hour'''
+	return datetime.datetime.now().hour
+
+def time_minute()->int:
+	'''Returns current minute'''
+	return datetime.datetime.now().minute
+
+def time_second()->int:
+	'''Returns current second'''
+	return datetime.datetime.now().second
+
+def date_year()->int:
+	'''Returns current year'''
+	return datetime.datetime.now().year
+
+def date_month()->int:
+	'''Returns current month'''
+	return datetime.datetime.now().month
+
+def date_day()->int:
+	'''Returns current day'''
+	return datetime.datetime.now().day
+
+def date_weekday(tdate=None, template:str='%A')->str:
 	''' tdate may be datetime.date(2019, 6, 12)
 	'''
 	if not tdate: tdate = datetime.date.today()
@@ -526,11 +551,38 @@ def create_default_ini_file():
 	with open('settings.ini', 'xt', encoding='utf-8-sig') as ini:
 		ini.write(_DEFAULT_INI)
 
-def function_queue(func_list:list, timeout:int
-					, sleep_timeout:float=0.001)->list:
-	''' Runs functions in threads and waits when all of them return result
-		or timeout is expired.
-		func_list = list of sublist, where sublist should consist of 3
+def jobs_pool(function:str, args:tuple, pool_size:int=None)->list:
+	''' Launches 'pool_size' functions at a time for
+		all the 'args'.
+		'args' may be a tuple of tuples or tuple of values.
+		If 'pool_size' not specified, pool_size = number of CPU.
+		Example:
+			jobs_pool(
+				msgbox
+				, (
+					'one'
+					, 'two'
+					, 'three'
+					, 'four'
+				)
+				, 4
+			)
+	'''
+	pool = ThreadPool(pool_size)
+	if type(args[0]) in [tuple, list, dict]:
+		map_func = pool.starmap
+	else:
+		map_func = pool.map
+	results = map_func(function, args)
+	pool.close()
+	pool.join()
+	return results
+
+def jobs_batch(func_list:list, timeout:int
+, sleep_timeout:float=0.001)->list:
+	''' Runs functions (they may not be same) in threads and waits
+		when all of them return result or timeout is expired.
+		func_list - list of sublist, where sublist should consist of 3
 		items: function, (args), {kwargs}.
 		Returns list of job objects, where job have these attributes:
 		func, args, kwargs, result, time

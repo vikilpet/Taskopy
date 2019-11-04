@@ -138,24 +138,22 @@ def process_list(name:str='')->list:
 			processes.
 		Process information includes: pid:int, name:str
 		, username:str, exe:str, cmdline:list
+		All strings in lower case.
 	'''
 	ATTRS=['pid', 'name', 'username', 'exe', 'cmdline']
 	name = name.lower()
 	proc_list = []
 	for proc in psutil.process_iter():
 		if name:
-			if proc.name().lower() == name:
-				di = proc.as_dict(attrs=ATTRS)
-				if di['cmdline']: di['cmdline'] = list(di['cmdline'])
-				if di['username']:
-					di['username'] = di['username'].split('\\')[1]
-				proc_list.append( DictToObj(di) )
-		else:
-			di = proc.as_dict(attrs=ATTRS)
-			if di['cmdline']: di['cmdline'] = list(di['cmdline'])
-			if di['username']:
-				di['username'] = di['username'].split('\\')[1]
-			proc_list.append( DictToObj(di) )
+			if proc.name().lower() != name: continue
+		di = proc.as_dict(attrs=ATTRS)
+		for k in di:
+			if type(di[k]) is str:
+				di[k] = di[k].lower()
+		if di['cmdline']: di['cmdline'] = list(di['cmdline'])
+		if di['username']:
+			di['username'] = di['username'].split('\\')[1].lower()
+		proc_list.append( DictToObj(di) )
 	return proc_list
 
 def process_cpu(pid:int, interval:int=1)->float:
@@ -221,11 +219,11 @@ def process_close(process, timeout:int=10):
 	return False
 
 def wts_message(sessionid:int, msg:str, title:str, style:int=0
-, timeout:int=0, wait:bool=False):
+, timeout:int=0, wait:bool=False)->int:
 	''' Sends message to WTS session.
 		style - styles like in MessageBox (0 - MB_OK).
 		timeout - timeout in seconds (0 - no timeout).
-		Returns same values like MessageBox.
+		Returns same values as MessageBox.
 	'''
 	return win32ts.WTSSendMessage(0, sessionid
 	, msg, title, style, timeout, wait)
@@ -243,7 +241,7 @@ def wts_logoff(sessionid:int, wait:bool=False)->int:
 	
 def wts_proc_list(process:str=None)->list:
 	''' Returns list of DictToObj objects with properties:
-		.sessionid:int, .pid:int, .process:str
+		.sessionid:int, .pid:int, .process:str (name of exe file)
 		, .pysid:obj, .username:str, .cmdline:list
 		process - filter by process name.
 	'''
@@ -255,10 +253,11 @@ def wts_proc_list(process:str=None)->list:
 			if tup[2].lower() != process: continue
 		di = {}
 		di['sessionid'], di['pid'], di['process'], _ = tup
+		di['process'] = di['process'].lower()
 		proc = psutil.Process(di['pid'])
 		di['username'] = proc.username()
 		if di['username']:
-			di['username'] = di['username'].split('\\')[1]
+			di['username'] = di['username'].split('\\')[1].lower()
 		di['cmdline'] = proc.cmdline()
 		proc_li.append(DictToObj(di))
 	return proc_li

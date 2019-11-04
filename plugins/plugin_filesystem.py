@@ -15,6 +15,13 @@ from .tools import random_str
 
 _SIZE_UNITS = {'gb':1073741824, 'mb':1048576, 'kb':1024, 'b':1}
 
+def _dir_slash(dirpath:str)->str:
+	''' Adds trailing slash if there is's not there. '''
+	if dirpath.endswith('\\'):
+		return dirpath
+	else:
+		return dirpath + '\\'
+
 def file_read(fullpath:str, encoding:str='utf-8')->str:
 	''' Returns content of file '''
 	if encoding == 'binary':
@@ -71,10 +78,15 @@ def file_move(fullpath:str, destination:str):
 		Destination may be fullpath or folder name.
 		If destination path exist it will be overwritten.
 	'''
-	if os.path.exists(destination):
-		if not os.path.isdir(destination):
-			os.remove(destination)
-	shutil.move(fullpath, destination)
+	if os.path.isdir(destination):
+		new_fullpath = _dir_slash(destination) + os.path.basename(fullpath)
+	else:
+		new_fullpath = destination
+	try:
+		os.remove(new_fullpath)
+	except FileNotFoundError:
+		pass
+	shutil.move(fullpath, new_fullpath)
 
 def file_delete(fullpath:str):
 	try:
@@ -86,7 +98,7 @@ def dir_copy(fullpath:str, destination:str, update:bool=True):
 	''' Copy a folder with all content to a new location.
 		Returns number of errors.
 	'''
-    	err = 0
+	err = 0
 	try:
 		dir_util.copy_tree(fullpath, destination, update=update)
 	except dir_util.DistutilsFileError as e:
@@ -342,8 +354,7 @@ def temp_dir(new_dir:str=None)->str:
 	return new_dir
 
 def temp_file(suffix:str='')->str:
-	''' Returns temporary file name.
-	'''
+	''' Returns temporary file name. '''
 	return (tempfile.gettempdir() + '\\'
 			+ time.strftime('%m%d%H%M%S') + random_str(5) + suffix)
 

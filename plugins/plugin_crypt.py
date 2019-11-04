@@ -124,7 +124,7 @@ class Crypt:
 	
 
 def file_enc_write(fullpath:str, content:str, password:str
-, encoding:str='utf-8'):
+, encoding:str='utf-8')->tuple:
 	''' Encrypts content with password and writes to a file.
 		Adds salt as file extension.
 		encoding='binary' - binary mode.
@@ -135,7 +135,8 @@ def file_enc_write(fullpath:str, content:str, password:str
 	if not status: return False, f'write_enc_file error: {data}'
 	return True, data[0]
 
-def file_enc_read(fullpath:str, password:str, encoding:str='utf-8')->tuple:
+def file_enc_read(fullpath:str, password:str
+, encoding:str='utf-8')->tuple:
 	''' Decrypts file and returns status, content.
 		encoding='binary' - binary mode.
 	'''

@@ -8,9 +8,9 @@ from bs4 import BeautifulSoup
 import json
 
 def page_get(url:str, encoding:str='utf-8', session:bool=False
-			, cookies:dict=None, headers:dict=None
-			, http_method:str='get', json_data:str=None
-			, post_file:str=None, post_hash:bool=False)->str:
+, cookies:dict=None, headers:dict=None
+, http_method:str='get', json_data:str=None
+, post_file:str=None, post_hash:bool=False)->str:
 	''' Get content of the specified url
 	'''
 	if post_file: http_method = 'POST'
@@ -60,8 +60,10 @@ def _clean_text(text:str)->str:
 
 	return ' '.join(text.split())
 
-def file_download(url:str, destination:str=None)->str:
+def file_download(url:str, destination:str=None, attempts:int=3)->str:
 	''' Download file from url to destination and return fullpath.
+		Returns the full path to the downloaded file.
+		attempts - how many times to retry download if failed.
 		If destination is a folder, then get filename from url.
 		If destination is None then download to temporary file.
 	'''
@@ -76,13 +78,23 @@ def file_download(url:str, destination:str=None)->str:
 		dest = open(destination, 'bw+')
 	dest_file = dest.name
 	dest.close()
-	urllib.request.urlretrieve (url, dest_file)
+	for attempt in range(attempts):
+		try:
+			urllib.request.urlretrieve (url, dest_file)
+		except Exception as e:
+			if sett.dev:
+				print(f'{attempt} dl failed, err="{repr(e)[:20]}", url={url}')
+		else:
+			break
+		finally:
+			if (attempt + 1) == attempts:
+				return f'error'
 	return dest_file
 
 def html_element(url:str, find_all_args, number:int=0
-				, clean:bool=True , encoding:str='utf-8'
-				, session:bool=False, headers:dict=None
-				, cookies:dict=None)->str:
+, clean:bool=True , encoding:str='utf-8'
+, session:bool=False, headers:dict=None
+, cookies:dict=None)->str:
 	''' Get text of specified page element (div).
 		find_all_args - dict that will passed to find_all method
 			https://www.crummy.com/software/BeautifulSoup/bs4/doc/

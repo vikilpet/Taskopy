@@ -9,17 +9,15 @@
 -->
 Run your python code with hotkey or by HTTP-request just like that:
 
-```python
-def my_task(hotkey='ctrl+shift+t', http=True):
-	print('This is my code!')
-```
+	def my_task(hotkey='ctrl+shift+t', http=True):
+		print('This is my code!')
+
 Then press Ctrl+Shift+T or open in browser URL http://127.0.0.1/task?my_task and your task will be executed.
 
 Another example: show message box every day at 10:30 and hide this task from menu:
-```python
-def my_another_task(schedule='every().day.at("10:30")', menu=False):
-	msgbox('Take the pills', ui=MB_ICONEXCLAMATION)
-```
+
+	def my_another_task(schedule='every().day.at("10:30")', menu=False):
+		msgbox('Take the pills', ui=MB_ICONEXCLAMATION)
 
 ## Contents
 - [Installation](#installation)
@@ -32,9 +30,11 @@ def my_another_task(schedule='every().day.at("10:30")', menu=False):
 	- [Filesystem](#filesystem)
 	- [Network](#network)
 	- [System](#system)
+	- [Mail](#mail)
 	- [Process](#process)
-	- [Winamp](#winamp)
+	- [Cryptography](#cryptography)
 	- [Mikrotik RouterOS](#mikrotik-routeros)
+	- [Winamp](#winamp)
 - [Help Me](#help-me)
 - [Task Examples](#task-examples)
 
@@ -48,21 +48,21 @@ You can [download](https://github.com/vikilpet/Taskopy/releases) archive with bi
 **Requirements:** Python 3.7.4; Windows 7 and above.
 
 Download project, install requirements:
-```
-pip install -r requirements.txt
-```
+
+	pip install -r requirements.txt
+
 Make shortcut to taskopy.py in Startup folder:
-```
-%userprofile%\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\
-```
+
+	%userprofile%\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\
+
 In shortcut options choose *Run: minimized* option and change shortcut icon to resources\logo.ico
 
 ## Usage
 Open crontab.py in your favorite text editor and create your task as function with arguments:
-```python
-def demo_task_3('left_click'=True, log=False):
-	app_start('calc.exe')
-```
+
+	def demo_task_3('left_click'=True, log=False):
+		app_start('calc.exe')
+
 Then right click on tray icon and choose "Reload crontab" and your task is ready.
 
 ## Task options
@@ -76,17 +76,17 @@ Format: **option name** (default value) — description.
 - **hotkey_suppress** (True) — if set to False hotkey will not supressed so active window ill still receive it.
 - **schedule** (None) — add to schedule. Functionality provided by [schedule project](https://github.com/dbader/schedule) so you better refer to their [documentation](https://schedule.readthedocs.io/en/stable/).
 	Run task every hour:
-	```python
-	schedule='every().hour'
-	```
+
+		schedule='every().hour'
+
 	Run task every wednesday at 13:15:
-	```python
-	schedule='every().wednesday.at("13:15")'
-	```
+
+		schedule='every().wednesday.at("13:15")'
+
 	You can set multiple schedule at once with list:
-	```python
-	schedule=['every().wednesday.at("18:00")', 'every().friday.at("17:00")']
-	```
+
+		schedule=['every().wednesday.at("18:00")', 'every().friday.at("17:00")']
+
 - **active** (True) — to enable-disable task.
 - **startup** (False) — run at taskopy startup.
 - **sys_startup** (False) — run at Windows startup (uptime is less than 3 min).
@@ -98,39 +98,40 @@ Format: **option name** (default value) — description.
 - **http** (False) — run task by HTTP request. HTTP request syntax: http://127.0.0.1/task?your_task_name where «your_task_name» is the name of function from crontab.
 	If option **result** also enabled then HTTP request will show what task will return or 'OK' if there is no value returned.
 	Example:
-	```python
-	def demo_task_4(http=True, result=True):
-		# Get list of files and folders in Taskopy folder:
-		listing = dir_list('*')
-		# return this list as string divided by html br tag:
-		return '<br>'.join(listing)
-	```
+
+		def demo_task_4(http=True, result=True):
+			# Get list of files and folders in Taskopy folder:
+			listing = dir_list('*')
+			# return this list as string divided by html br tag:
+			return '<br>'.join(listing)
+
 	Result in browser:
-	```
-	backup
-	crontab.py
-	log
-	resources
-	settings.ini
-	taskopy.exe
-	```
-	Also see [settings](#settings) section for IP and port bindings.
+
+		backup
+		crontab.py
+		log
+		resources
+		settings.ini
+		taskopy.exe
+
+	See also [settings](#settings) section for IP and port bindings.
+- **http_dir** — folder where to save files sent via HTTP POST request. If not set then use system temporary folder.
 - **caller** — place this option before other options and in task body you will know who actually launched task this time. Possible values: http, menu, scheduler, hotkey. See *def check_free_space* in [Task Examples](#task-examples).
 - **data** — use together with **http** and place this option before other options and it will filled with HTTP request data and you will able to work with them in task body.
 	*data.client_ip* — IP-address of request.
 	*data.path* — full relative path of request including */task?*
+	*data.post_file* - full path to the received file, which was sent to the task via POST request (see **page_get**).
 	*data* will contain all HTTP-request headers such as *User-Agent*, 	*Accept-Language* etc.
-	If you will construst request URL with common scheme *&param1=value1&param2=value2* they will be processed and added to data and you can access them in task body as data.param1, data.param2.
-	Example:
-	```Python
-	def alert(data, http=True, single=False, menu=False):
-		msgbox(
-			data.text
-			# Use data.title if possible otherwise just use 'Alert' as message title.
-			, title=data.title if data.title else 'Alert'
-			, dis_timeout=1
-		)
-	```
+	If you will construst request URL with common scheme *&param1=value1&param2=value2* they will be processed and added to data and you can access them in task body as data.param1, data.param2. Example:
+
+		def alert(data, http=True, single=False, menu=False):
+			msgbox(
+				data.text
+				# Use data.title if possible otherwise just use 'Alert' as message title.
+				, title=data.title if data.title else 'Alert'
+				, dis_timeout=1
+			)
+
 	Type in address bar of browser something like this:
 	http://127.0.0.1/task?alert&text=MyMsg&title=MyTitle
 	and you will see messagebox with title and text from URL.
@@ -152,6 +153,39 @@ Format: **setting** (default value) — description.
 
 ## Keywords
 ### Miscelanneous
+- **balloon(msg:str, title:str=APP_NAME,timeout:int=None, icon:str=None)** — shows *baloon* message from tray icon. `title` - 63 symbols max, `msg` - 255 symbols. `icon` - 'info', 'warning' or 'error'.
+- **jobs_batch(func_list:list, timeout:int)->list**: — Runs functions (they may not be same) in threads and waits when all of them return result or timeout is expired. *func_list* - list of sublist, where sublist should consist of 3 items: function, (args), {kwargs}. Returns list of *job* objects, where *job* have these attributes: function, args, kwargs, result, time. Example:
+
+		func_list = [
+			[function1, (1, 3, 4), {'par1': 2, 'par2':3}]
+			, [function2, (), {'par1':'foo', 'par2':'bar'}]
+			...
+		]
+		jobs:
+		[
+			<job.func=function1, job.args = (1, 3, 4), job.kwargs={'par1': 2, 'par2':3}
+				, job.result=True, job.time='0:00:00.0181'>
+			, <job.func=function2, job.args = (), job.kwargs={'par1':'foo', 'par2':'bar'}
+				, job.result=[True, data], job.time='0:00:05.827'>
+
+			...
+		]
+- **jobs_pool(function:str, pool_size:int, args:tuple)->list** - Launches 'pool_size' functions at a time for all the 'args'. 'args' may be a tuple of tuples or tuple of values. If 'pool_size' not specified, then pool_size = number of CPU. Example:
+
+		jobs_pool(
+			msgbox
+			, (
+				'one'
+				, 'two'
+				, 'three'
+				, 'four'
+			)
+			, 4
+		)
+	
+	Difference between `jobs_batch` and `job_pool`:
+	- `jobs_batch` - different functions with different arguments, waiting for the function is interrupted after the specified timeout and the results are returned as is, and where the function has not been executed yet, it returns *timeout*. All functions runs in parallel.
+	- `jobs_pool` - same function for different arguments. Only the specified number of instances of the function is executed at the same time.
 - **msgbox(msg:str, title:str=APP_NAME, ui:int=None, wait:bool=True, timeout:int=None)->int** — show messagebox and return user choice.
 	Arguments:
 	*msg* — text
@@ -162,14 +196,14 @@ Format: **setting** (default value) — description.
 	*timeout* (in seconds) — automatically close messagebox. If messagebox is closed by timeout (no button is pressed by user) and *ui* contains more than one button (*MB_YESNO* for example) then it will return 32000.
 	*dis_timeout* (in seconds) — hide the buttons for a specified number of seconds.
 	Example:
-	```python
-	def test_msgbox():
-		if msgbox('I can have cheeseburger?') == IDYES:
-			print('Yes!')
-		else:
-			print('No :-(')
-	```
-- **sound_play (fullpath:str, wait:bool)->str** — play .wav file. *wait* — do not pause task execution.
+
+		def test_msgbox():
+			if msgbox('Can I have a cheeseburger?') == IDYES:
+				print('Yes!')
+			else:
+				print('No :-(')
+
+- **sound_play (fullpath:str, wait:bool)->str** — play .wav file. *wait* — do not pause task execution. If fullpath is a folder then pick random file.
 - **time_now(template:str='%Y-%m-%d_%H-%M-%S')->str** — string with current time.
 - **pause(sec:float)** — pause the execution of the task for the specified number of seconds. *interval* - time in seconds or a string specifying a unit like '5 ms' or '6 sec' or '7 min'.
 - **var_set(var_name:str, value:str)** — save *value* of variable *var_name* to disk so it will persist between program starts.
@@ -178,7 +212,6 @@ Format: **setting** (default value) — description.
 - **clip_get()->str->** — get text from clipboard.
 - **re_find(source:str, re_pattern:str, sort:bool=True)->list** — search in *source* with regular expression.
 - **re_replace(source:str, re_pattern:str, repl:str='')** — replace in *source* all matches with *repl* string.
-- **email_send(recipient:str, subject:str, message:str, smtp_server:str, smtp_port:int, smtp_user:str, smtp_password:str)** — send email.
 - **inputbox(message:str, title:str, is_pwd:bool=False)->str** — show a message with an input request. Returns the entered line or empty string if user pressed cancel.
 	*is_pwd* — hide the typed text.
 - **random_num(a, b)->int** — return a random integer in the range from a to b, including a and b.
@@ -197,23 +230,33 @@ Format: **setting** (default value) — description.
 **IMPORTANT: always use double backslash "\\\" in paths!**
 
 - **csv_read(fullpath:str, encoding:str='utf-8', fieldnames=None, delimiter:str=';', quotechar:str='"')->list** — read a CSV file and return the contents as a list of dictionaries.
+- **csv_write(fullpath:str, content:list, fieldnames:tuple=None, encoding:str='utf-8', delimiter:str=';', quotechar:str='"', quoting:int=csv.QUOTE_MINIMAL)->str** — writes the list of dictionaries as a CSV file. If *fieldnames* is not specified - it takes the keys of the first dictionary as headers. Returns the full path to the file. *content* example:
+
+		[
+			{'name': 'some name',
+			'number': 1}
+			, {'name': 'another name',
+			'number': 2}
+			...	
+		]
 - **dir_delete(fullpath:str)** — delete directory.
 - **dir_list(fullpath:str)->list:** — get list of files in directory.
 	Examples:
 	- Get a list of all log files in 'c:\\\Windows' **without** subfolders:
-	```python
-	dir_list('c:\\Windows\\*.log')
-	```
+
+		dir_list('c:\\Windows\\*.log')
+
 	- Get all log files in 'c:\\\Windows\\\' **with** subfolders:
-	```python
-	dir_list('c:\\Windows\\**\\*.log')
-	```
+
+		dir_list('c:\\Windows\\**\\*.log')
+
 - **dir_zip(source:str, destination:str)->str** — zip the folder return the path to the archive.
 - **file_backup(fullpath, folder:str=None)** — make copy of file with added timestamp.
 	*folder* — place copy to this folder. If omitted — place in original folder.
 - **file_copy(fullpath:str, destination:str)** — copy file to destination (fullpath or just folder).
 - **file_delete(fullpath:str)** — delete file.
 - **file_dir(fullpath:str)->str:** — get parent directory name of file.
+- **file_hash(fullpath:str, algorithm:str='crc32')->str** - returns hash of file. *algorithm* - 'crc32' or 'md5'.
 - **file_log(fullpath:str, message:str, encoding:str='utf-8', time_format:str='%Y.%m.%d %H:%M:%S')** — log *message* to *fullpath* file.
 - **file_move(fullpath:str, destination:str)** — move file to destination folder or file.
 - **file_name(fullpath:str)->str:** — get file name without directory.
@@ -232,27 +275,31 @@ Format: **setting** (default value) — description.
 	*creation* — use date of creation, otherwise use last modification date.
 	*recursive* — delete from subfolders too.
 	*test* — do not actually delete files, only print them.
+- **temp_dir(new_dir:str=None)->str** — returns the path to the temporary folder. If *new_dir* is specified, it creates a subfolder in the temporary folder and returns its path.
+- **temp_file(suffix:str='')->str** — returns the name for the temporary file.
 
 ### Network
 - **domain_ip(domain:str)->list** — get a list of IP-addresses by domain name.
 - **file_download(url:str, destination:str=None)->str:** — download file and return fullpath.
 	*destination* — it may be None, fullpath or folder. If None then download to temporary folder with random name.
 - **html_element(url:str, find_all_args)->str:** — download page and retrieve value of html element.
-	*find_all_args* — dictionary that contain element information such as name or attributes. Example:
-	```python
-	# Get the internal text of span element which has
-	# the attribute itemprop="softwareVersion"
-	find_all_args={
-		'name': 'span'
-		, 'attrs': {'itemprop':'softwareVersion'}
-	}
-	```
+	*find_all_args* — dictionary that contain element information such as name or attributes.
+	*number* - item number, if there are several of them found.
+	Example:
+
+		# Get the internal text of span element which has
+		# the attribute itemprop="softwareVersion"
+		find_all_args={
+			'name': 'span'
+			, 'attrs': {'itemprop':'softwareVersion'}
+		}
+
 	See *get_current_ip* in [task examples](#task-examples)
 - **is_online(*sites, timeout:int=2)->int:** — checks if you have access to the Internet using HEAD queries to specified sites. If sites are not specified, then use google and yandex.
 - **json_element(url:str, element:list)** — same as **html_element** but for json.
 	*element* — a list with a map to desired item.
 	Example: *element=['usd', 2, 'value']*
-- **page_get(url:str, encoding:str='utf-8')->str:** — download page by url and return it's html as a string.
+- **page_get(url:str, encoding:str='utf-8', post_file:str=None, post_hash:bool=False)->str:** — download page by url and return it's html as a string. *post_file* - send this file with POST request. *post_hash* - add the checksum of the file to request headers to check the integrity (see [Task Options](#task-options)).
 - **url_hostname(url:str)->str** — extract the domain name from the URL.
 
 ### System
@@ -270,6 +317,11 @@ In the functions for working with windows, the *window* argument can be either a
 - **window_show(window=None)->int** — show window.
 - **window_title_set(window=None, new_title:str='')->int** — change window title from *cur_title* to *new_title*
 
+### Mail
+- **mail_check(server:str, login:str, password:str, folders:list=['inbox'], msg_status:str='UNSEEN')->tuple** — returns the number of new emails and a list of errors.
+- **mail_download(server:str, login:str, password:str, output_dir:str, folders:list=['inbox'], trash_folder:str='Trash')->tuple** — downloads all messages to the specified folder. Successfully downloaded messages are moved to the IMAP *trash_folder* folder on the server. Returns the list with decoded message subjects and the list of errors.
+- **mail_send(recipient:str, subject:str, message:str, smtp_server:str, smtp_port:int, smtp_user:str, smtp_password:str)** — send email.
+
 ### Process
 - **app_start(app_path:str, app_args:str='', wait:bool=False)** — start application. If *wait=True* — returns process return code, if *False* — returns PID of created process.
 	*app_path* — path to executable file.
@@ -285,12 +337,121 @@ In the functions for working with windows, the *window* argument can be either a
 	*exe* — full path to executable.
 	*cmdline* — command-line as list.
 	Example — print PID of all Firefox processes:
-	```python
-	for proc in process_list('firefox.exe'):
-		print(proc.pid)
-	```
+
+		for proc in process_list('firefox.exe'):
+			print(proc.pid)
+
 - **process_cpu(pid:int, interval:int=1)->float** — CPU usage of process with specified PID. *interval* in seconds - how long to measure.
 - **process_kill(process)** — kill process or processes. *process* may be an integer so only process with this PID will be terminated. If *process* is a string then kill every process with that name.
+- **service_start(service:str, args:tuple=None)** — starts the service.
+- **service_stop(service:str)->tuple** — stops the service.
+- **service_running(service:str)->bool** — the service is up and running?
+- **wts_message(sessionid:int, msg:str, title:str, style:int=0, timeout:int=0, wait:bool=False)** - sends message to WTS session. *style* - styles like in msgbox (0 - MB_OK). *timeout* - timeout in seconds (0 - no timeout). Returns same values as msgbox.
+- **wts_cur_sessionid()->int** - returns SessionID of current process
+- **wts_logoff(sessionid:int, wait:bool=False)->int** - logoffs session. *wait* - wait for completion.
+- **wts_proc_list(process:str=None)->list** - returns list of DictToObj objects with properties: *.sessionid:int*, *.pid:int*, *.process:str* (name of exe file), *.pysid:obj*, *.username:str*, *.cmdline:list*. *process* - filter by process name.
+
+### Cryptography
+- **file_enc_write(fullpath:str, content:str, password:str, encoding:str='utf-8')->tuple**: — encrypts content with password and writes to a file. Adds salt as file extension. Returns status, fullpath/error.
+- **file_enc_read(fullpath:str, password:str, encoding:str='utf-8')->tuple** — decrypts the contents of the file and returns status, content/error
+- **file_encrypt(fullpath:str, password:str)->tuple** — encrypts file with password. Returns status, fullpath/error. Adds salt as file extension.
+- **file_decrypt(fullpath:str, password:str)->tuple** — decrypts file with password. Returns status, fullpath/or error.
+
+### Mikrotik RouterOS
+- **routeros_query(query:list, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — send query to router and get status and data. Please read wiki [wiki](https://wiki.mikrotik.com/wiki/Manual:API) about query syntax.
+	Example — get information about interface 'bridge1':
+
+		status, data = routeros_query(
+			[
+				'/interface/print'
+				, '?name=bridge1'
+			]
+			, '192.168.0.1'
+			, '8728'
+			, 'admin'
+			, 'pAsSworD'
+		)
+
+	Contents of *data*:
+
+		[{'=.id': '*2',
+		'=name': 'bridge1',
+		'=type': 'bridge',
+		'=mtu': 'auto',
+		'=actual-mtu': '1500',
+		'=l2mtu': '1596',
+		'=mac-address': '6b:34:1B:2F:AA:21',
+		'=last-link-up-time': 'jun/10/2019 10:33:35',
+		'=link-downs': '0',
+		'=rx-byte': '1325381950539',
+		'=tx-byte': '2786508773388',
+		'=rx-packet': '2216725736',
+		'=tx-packet': '2703349720',
+		'=rx-drop': '0',
+		'=tx-drop': '0',
+		'=tx-queue-drop': '0',
+		'=rx-error': '0',
+		'=tx-error': '0',
+		'=fp-rx-byte': '1325315798948',
+		'=fp-tx-byte': '0',
+		'=fp-rx-packet': '2216034870',
+		'=fp-tx-packet': '0',
+		'=running': 'true',
+		'=disabled': 'false',
+		'=comment': 'lan'}]
+
+- **routeros_send(cmd:str, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — send command to router and get status and error.
+	Example: get list of static items from specified address-list then delete them all:
+
+		status, data = routeros_query(
+			[
+				'/ip/firewall/address-list/print'
+				, '?list=my_list'
+				, '?dynamic=false'
+			]
+			, device_ip='192.168.0.1'
+			, device_user='admin'
+			, device_pwd='PaSsWorD'
+		)
+
+		# check status and exit if there is error:
+		if not status:
+			print(f'Error: {data}')
+			return
+
+		# get list items from data:
+		items = [i['=.id'] for i in data]
+
+		# Now send commands for removing items from list.
+		# Notice: cmd is list of lists
+		routeros_send(
+			[
+				[
+					'/ip/firewall/address-list/remove'
+					, f'=.id={i}'
+				] for i in items
+			]
+			, device_ip='192.168.0.1'
+			, device_user='admin'
+			, device_pwd='PaSsWorD'
+		)	
+
+- **routeros_find_send(cmd_find:list, cmd_send:list, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — find all id's and perform some action on them.
+	*cmd_find* — list with API *print* command to find what we need.
+	*cmd_send* — list with action to perform.
+	Example — remove all static entries from address-list *my_list*:
+
+		routeros_find_send(
+			cmd_find=[
+				'/ip/firewall/address-list/print'
+				, '?list=my_list'
+				, '?dynamic=false'
+			]
+			, cmd_send=['/ip/firewall/address-list/remove']
+			, device_ip='192.168.88.1'
+			, device_user='admin'
+			, device_pwd='PaSsW0rd'
+		)
 
 ### Winamp
 - **winamp_close** — close Winamp.
@@ -308,180 +469,84 @@ In the functions for working with windows, the *window* argument can be either a
 - **winamp_track_length()->str:** — track length.
 - **winamp_track_title(clean:bool=True)->str:** — current track title.
 
-### Mikrotik RouterOS
-- **routeros_query(query:list, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — send query to router and get status and data. Please read wiki [wiki](https://wiki.mikrotik.com/wiki/Manual:API) about query syntax.
-	Example — get information about interface 'bridge1':
-	```python
-	status, data = routeros_query(
-		[
-			'/interface/print'
-			, '?name=bridge1'
-		]
-		, '192.168.0.1'
-		, '8728'
-		, 'admin'
-		, 'pAsSworD'
-	)
-	```
-	Contents of *data*:
-	```
-	[{'=.id': '*2',
-	'=name': 'bridge1',
-	'=type': 'bridge',
-	'=mtu': 'auto',
-	'=actual-mtu': '1500',
-	'=l2mtu': '1596',
-	'=mac-address': '6b:34:1B:2F:AA:21',
-	'=last-link-up-time': 'jun/10/2019 10:33:35',
-	'=link-downs': '0',
-	'=rx-byte': '1325381950539',
-	'=tx-byte': '2786508773388',
-	'=rx-packet': '2216725736',
-	'=tx-packet': '2703349720',
-	'=rx-drop': '0',
-	'=tx-drop': '0',
-	'=tx-queue-drop': '0',
-	'=rx-error': '0',
-	'=tx-error': '0',
-	'=fp-rx-byte': '1325315798948',
-	'=fp-tx-byte': '0',
-	'=fp-rx-packet': '2216034870',
-	'=fp-tx-packet': '0',
-	'=running': 'true',
-	'=disabled': 'false',
-	'=comment': 'lan'}]
-	```
-- **routeros_send(cmd:str, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — send command to router and get status and error.
-	Example: get list of static items from specified address-list then delete them all:
-	```python
-	status, data = routeros_query(
-		[
-			'/ip/firewall/address-list/print'
-			, '?list=my_list'
-			, '?dynamic=false'
-		]
-		, device_ip='192.168.0.1'
-		, device_user='admin'
-		, device_pwd='PaSsWorD'
-	)
-
-	# check status and exit if there is error:
-	if not status:
-		print(f'Error: {data}')
-		return
-
-	# get list items from data:
-	items = [i['=.id'] for i in data]
-
-	# Now send commands for removing items from list.
-	# Notice: cmd is list of lists
-	routeros_send(
-		[
-			[
-				'/ip/firewall/address-list/remove'
-				, f'=.id={i}'
-			] for i in items
-		]
-		, device_ip='192.168.0.1'
-		, device_user='admin'
-		, device_pwd='PaSsWorD'
-	)	
-	```
-- **routeros_find_send(cmd_find:list, cmd_send:list, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — find all id's and perform some action on them.
-	*cmd_find* — list with API *print* command to find what we need.
-	*cmd_send* — list with action to perform.
-	Example — remove all static entries from address-list *my_list*:
-	```python
-	routeros_find_send(
-		cmd_find=[
-			'/ip/firewall/address-list/print'
-			, '?list=my_list'
-			, '?dynamic=false'
-		]
-		, cmd_send=['/ip/firewall/address-list/remove']
-		, device_ip='192.168.88.1'
-		, device_user='admin'
-		, device_pwd='PaSsW0rd'
-	)
-	```
-
 ## Help me
 - [My StackOverflow question about menu by hotkey in wxPython](https://stackoverflow.com/questions/56079269/wxpython-popupmenu-by-global-hotkey) You can add a bounty if you have a lot of reputation.
 - [Donate via PayPal](https://www.paypal.me/vikil)
 
 ## Task examples
-```python
-# Launch iPython and copy all plugins to the clipboard
-# to quickly paste and access all keywords:
-def iPython(submenu='WIP'):
-	# kill existing process:
-	process_kill('ipython.exe')
-	# start new process:
-	app_start('ipython')
-	# get all plugins from 'plugins' folder:
-	plugs = dir_list('plugins\\*.py')
-	plugs[:] = [
-		'from ' + pl[:-3].replace('\\', '.')
-		+ ' import *' for pl in plugs
-	]
-	# give the process time to boot up:
-	time_sleep(1.5)
-	# import from plug-ins:
-	keys_write(
-		r'%load_ext autoreload' + '\n'
-		+ r'%autoreload 2' + '\n'
-		+ '\n'.join(plugs)
-	)
-	time_sleep(0.2)
-	# send control + enter to complete the command:
-	keys_send('ctrl+enter')
 
-
-# Check the free space on all discs.
-# Add 'caller' to task arguments so inside task you can check
-# how task was called.
-# Scheduled to random interval between 30 and 45 minutes
-def check_free_space(caller, schedule='every(30).to(45).minutes'):
-	# If task was runned from menu then show messagebox
-	if caller == 'menu':
-		msg = (
-			'Free space in GB:\n'
-			+ f'c: {free_space("c")}\n'
-			+ f'd: {free_space("d")}\n'
-			+ f'e: {free_space("e")}\n'
+	# Launch iPython and copy all plugins to the clipboard
+	# to quickly paste and access all keywords:
+	def iPython(submenu='Rare', task_name='iPython + plugins'):
+		# softly close existing application:
+		process_close('ipython.exe')
+		# start new process in new console:
+		app_start('ipython', shell=True)
+		# get all plugins from 'plugins' folder:
+		plugs = dir_list('plugins\\*.py')
+		# Add 'from ... import *':
+		plugs[:] = [
+			'from ' + pl[:-3].replace('\\', '.')
+			+ ' import *' for pl in plugs
+		]
+		# give the process time to boot up:
+		while not 'IPython' in window_title_get(): pause('100 ms')
+		pause(1)
+		# import from plug-ins:
+		keys_write(
+			r'%load_ext autoreload' + '\n'
+			+ r'%autoreload 2' + '\n'
+			+ '\n'.join(plugs)
 		)
-		# messagebox will auto-closed after 3 seconds:
-		msgbox(msg, timeout=3)
-	else:
-		# Task is launched by scheduler
-		# check free space in C, D, E and show alert only if
-		# there is less than 3 GB left:
-		for l in 'cde':
-			if free_space(l) < 3:
-				msgbox(f'Low disk space: {l.upper()}')
+		pause('200 ms')
+		# send control + enter to complete the command:
+		keys_send('ctrl+enter')
 
-def get_current_ip():
-	# Get the text of the HTML-tag 'body' from the checkip.dyndns.org page
-	# html_element should return a string like 'Current IP Address: 11.22.33.44'
-	ip = html_element(
-		'http://checkip.dyndns.org/'
-		, {'name':'body'}
-	).split(': ')[1]
-	print(f'Current IP: {ip}')
-	msgbox(f'Current IP: {ip}', timeout=10)
 
-# Add the IP-address from the clipboard to the address-list
-# of Mikrotik router
-def add_ip_to_list():
-    routeros_send(
-        [
-            '/ip/firewall/address-list/add'
-            , '=list=my_list'
-            , '=address=' + clip_get()
-        ]
-        , device_ip='192.168.88.1'
-        , device_user='admin'
-        , device_pwd='PaSsWoRd'
-    )
-    msgbox('Done!', timeout=5)
-```
+	# Check the free space on all discs.
+	# Add 'caller' to task arguments so inside task you can check
+	# how task was called.
+	# Scheduled to random interval between 30 and 45 minutes
+	def check_free_space(caller, schedule='every(30).to(45).minutes'):
+		# If task was runned from menu then show messagebox
+		if caller == 'menu':
+			msg = (
+				'Free space in GB:\n'
+				+ f'c: {free_space("c")}\n'
+				+ f'd: {free_space("d")}\n'
+				+ f'e: {free_space("e")}\n'
+			)
+			# messagebox will auto-closed after 3 seconds:
+			msgbox(msg, timeout=3)
+		else:
+			# Task is launched by scheduler
+			# check free space in C, D, E and show alert only if
+			# there is less than 3 GB left:
+			for l in 'cde':
+				if free_space(l) < 3:
+					msgbox(f'Low disk space: {l.upper()}')
+
+	def get_current_ip():
+		# Get the text of the HTML-tag 'body' from the checkip.dyndns.org page
+		# html_element should return a string like 'Current IP Address: 11.22.33.44'
+		ip = html_element(
+			'http://checkip.dyndns.org/'
+			, {'name':'body'}
+		).split(': ')[1]
+		print(f'Current IP: {ip}')
+		msgbox(f'Current IP: {ip}', timeout=10)
+
+	# Add the IP-address from the clipboard to the address-list
+	# of Mikrotik router
+	def add_ip_to_list():
+		routeros_send(
+			[
+				'/ip/firewall/address-list/add'
+				, '=list=my_list'
+				, '=address=' + clip_get()
+			]
+			, device_ip='192.168.88.1'
+			, device_user='admin'
+			, device_pwd='PaSsWoRd'
+		)
+		msgbox('Done!', timeout=3)
