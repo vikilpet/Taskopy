@@ -114,6 +114,9 @@ keys_send = keyboard.send
 
 keys_write = keyboard.write
 
+keys_press = keyboard.press
+keys_release = keyboard.release
+
 if __name__ == '__main__':
 	import threading
 

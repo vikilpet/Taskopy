@@ -48,6 +48,7 @@ def page_get(url:str, encoding:str='utf-8', session:bool=False
 					, cookies=cookies
 				)
 	except Exception as e:
+		if sett.dev: raise
 		return f'error {http_method}: {repr(e)}'
 	if req.status_code == 200:
 		return str(req.content, encoding=encoding, errors='ignore')

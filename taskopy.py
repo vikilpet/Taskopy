@@ -1,5 +1,4 @@
 ﻿import time
-import uptime
 import sys
 import os
 import importlib
@@ -15,6 +14,7 @@ import keyboard
 import win32api
 import win32gui
 import win32con
+import uptime
 from plugins.tools import *
 from plugins.plugin_filesystem import *
 from plugins.plugin_system import *
@@ -384,16 +384,17 @@ class Tasks:
 	def run_scheduler(s):
 		time.sleep(0.01)
 		local_id = tasks.sched_thread_id
+		afk = True
 		if s.task_list_idle:
 			afk = False
 			s.idle_min = min([t['idle_dur'] for t in s.task_list_idle])
 		while (tasks.sched_thread_id == local_id):
 			schedule.run_pending()
 			if s.task_list_idle:
-				ms = win32api.GetTickCount() - win32api.GetLastInputInfo()
+				ms = int(uptime.uptime() * 1000) - win32api.GetLastInputInfo()
 				if ms < s.idle_min:
 					if afk:
-						dev_print(f'user is back') 
+						dev_print('user is back')
 						afk = False
 						for task in s.task_list_idle: task['idle_done'] = False
 				else:

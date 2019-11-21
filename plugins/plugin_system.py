@@ -3,6 +3,7 @@ import win32api
 import win32gui
 import win32con
 import winreg
+import uptime
 
 
 _TIME_UNITS = {'msec':1, 'ms':1, 'sec':1000, 's':1000, 'min':60000
@@ -170,7 +171,7 @@ def idle_duration(unit:str='sec')->int:
 	''' Returns idle time in specified units ('msec', 'sec', 'min', 'hour').
 	'''
 	unit_den = _TIME_UNITS.get(unit.lower(), 1000)
-	millis = (win32api.GetTickCount() - win32api.GetLastInputInfo())
+	millis = (int(uptime.uptime() * 1000) - win32api.GetLastInputInfo())
 	return millis // unit_den
 
 def monitor_off():

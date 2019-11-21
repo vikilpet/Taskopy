@@ -36,7 +36,7 @@ def app_start(
 	, app_args=None
 	, wait:bool=False
 	, capture_output:bool=False
-	, encoding:str='cp866'
+	, encoding:str=None
 	, shell:bool=False
 	, cwd:str=None
 	, env:dict=None
@@ -71,6 +71,9 @@ def app_start(
 			app_path += app_args
 		else:
 			raise 'Unknown type of app_args'
+	if not cwd:
+		if ':\\' in app_path[0]:
+			cwd = os.path.dirname(app_path[0])
 	info = subprocess.STARTUPINFO()
 	info.dwFlags = subprocess.STARTF_USESHOWWINDOW
 	if minimized:
@@ -88,6 +91,7 @@ def app_start(
 		, 'cwd': cwd
 		, 'creationflags': win32con.DETACHED_PROCESS
 		, 'startupinfo': info
+		, 'encoding': encoding
 	}
 	if env:
 		env = {**os.environ, **env}
@@ -99,7 +103,6 @@ def app_start(
 			proc_args['shell'] = False
 			proc_args['capture_output'] = True
 			proc_args['text'] = True
-			proc_args['encoding']: encoding
 	else:
 		proc_func = subprocess.Popen
 	r = proc_func(**proc_args)
@@ -118,18 +121,21 @@ def process_exist(process, cmd:str=None)->bool:
 	'''
 	if cmd: cmd=cmd.lower()
 	for proc in psutil.process_iter():
-		if type(process) == str:
-			if proc.name().lower() == process:
-				if cmd:
-					if cmd in ' '.join(proc.cmdline()).lower(): return proc.pid
-				else:
-					return proc.pid
-		else:
-			if proc.pid == process:
-				if cmd:
-					if cmd in ' '.join(proc.cmdline()).lower(): return proc.pid
-				else:
-					return proc.pid
+		try:
+			if type(process) == str:
+				if proc.name().lower() == process:
+					if cmd:
+						if cmd in ' '.join(proc.cmdline()).lower(): return proc.pid
+					else:
+						return proc.pid
+			else:
+				if proc.pid == process:
+					if cmd:
+						if cmd in ' '.join(proc.cmdline()).lower(): return proc.pid
+					else:
+						return proc.pid
+		except psutil.AccessDenied:
+			dev_print('proc_exist access denied')
 	return False
 
 def process_list(name:str='')->list:
