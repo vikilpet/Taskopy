@@ -55,7 +55,7 @@ def page_get(url:str, encoding:str='utf-8', session:bool=False
 	else:
 		return f'error status: {req.status_code}'
 
-def _clean_text(text:str)->str:
+def html_whitespace(text:str)->str:
 	''' Removes whitespace characters from string.
 	'''
 
@@ -121,7 +121,7 @@ def html_element(url:str, find_all_args, number:int=0
 			r += soup.find_all(**d)
 		if r:
 			if clean:
-				return [_clean_text(i.get_text()) for i in r]
+				return [html_whitespace(i.get_text()) for i in r]
 			else:
 				return r
 		else:
@@ -131,7 +131,7 @@ def html_element(url:str, find_all_args, number:int=0
 		if r:
 			if clean:
 				r = r[number].get_text()
-				return _clean_text(r)
+				return html_whitespace(r)
 			else:
 				return r[number]
 		else:

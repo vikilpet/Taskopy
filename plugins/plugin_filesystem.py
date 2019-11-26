@@ -32,7 +32,7 @@ def file_read(fullpath:str, encoding:str='utf-8')->str:
 			return f.read()
 
 def file_write(fullpath:str, content:str, encoding:str='utf-8'):
-	''' Save content in file. Create file if fullpath doesn't exist.
+	''' Save content to file. Create file if the fullpath doesn't exist.
 	'''
 	if encoding == 'binary':
 		with open(fullpath, 'wb+') as f:
@@ -122,6 +122,12 @@ def dir_delete(fullpath:str):
 	except FileNotFoundError:
 		pass
 
+def dir_exists(fullpath:str)->bool:
+	return os.path.isdir(fullpath)
+
+def file_exists(fullpath:str)->bool:
+	return os.path.isfile(fullpath)
+
 def path_exists(fullpath:str)->bool:
 	''' Check if directory or file exist '''
 	p = Path(fullpath)
@@ -130,16 +136,12 @@ def path_exists(fullpath:str)->bool:
 def file_size(fullpath:str, unit:str='b')->int:
 	e = _SIZE_UNITS.get(unit.lower(), 1)
 	return os.stat(fullpath).st_size // e
-	retudir.exists()
 
-def file_size(fullpath:str, unit:str='b')->int:
-	e = _SIZE_UNITS.get(unit.lower(), 1)
-	return os.stat(fullpath).st_size // e
-
-def is_directory(fullpath:str)->bool:
-	''' Check if fullpath is a directory '''
-	p = Path(fullpath)
-	return p.is_dir()
+def file_ext(fullpath:str)->str:
+	''' Returns file extension. '''
+	ext = os.path.splitext(fullpath)[1]
+	if ext == '': return ext
+	return ext[1:]
 
 def purge_old(fullpath:str, days:int=0, recursive:bool=False
 			, creation:bool=False, test:bool=False):
@@ -301,6 +303,16 @@ def csv_write(fullpath:str, content:list, fieldnames:tuple=None
 		writer.writeheader()
 		writer.writerows([di for di in content])
 	return fullpath
+
+def dir_size(fullpath:str, unit:str='b')->int:
+	e = _SIZE_UNITS.get(unit.lower(), 1)
+	total_size = 0
+	for dirpath, _, filenames in os.walk(fullpath):
+		for fi in filenames:
+			fp = os.path.join(dirpath, fi)
+			if not os.path.islink(fp):
+				total_size += os.path.getsize(fp)
+	return total_size // e
 
 def dir_zip(fullpath:str, destination:str)->str:
 	''' Compresses folder and returns the full path to archive.

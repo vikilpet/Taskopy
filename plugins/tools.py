@@ -19,7 +19,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2019-11-18'
+APP_VERSION = 'v2019-11-26'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 TASK_OPTIONS = [
@@ -553,7 +553,7 @@ def create_default_ini_file():
 
 def jobs_pool(function:str, args:tuple, pool_size:int=None)->list:
 	''' Launches 'pool_size' functions at a time for
-		all the 'args'.
+		all the 'args'. Returns list of results.
 		'args' may be a tuple of tuples or tuple of values.
 		If 'pool_size' not specified, pool_size = number of CPU.
 		Example:
@@ -636,11 +636,11 @@ def jobs_batch(func_list:list, timeout:int
 				job['time'] = 'timeout'
 		return [DictToObj(j) for j in jobs]
 
-def tprint(msg, **kwargs):
-	''' Print with task name. '''
+def tprint(*msgs, **kwargs):
+	''' Print with task name and time '''
 	task_name = sys._getframe(1).f_code.co_name
-	print(task_name, end=': ')
-	print(msg, **kwargs)
+	print(time.strftime('%y.%m.%d %H:%M:%S ') + task_name, end=': ')
+	print(*msgs, **kwargs)
 
 def balloon(msg:str, title:str=APP_NAME, timeout:int=None, icon:str=None):
 	''' Show balloon. title - 63 symbols max, msg - 255.
