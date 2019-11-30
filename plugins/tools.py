@@ -19,7 +19,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2019-11-26'
+APP_VERSION = 'v2019-11-30'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 TASK_OPTIONS = [
@@ -130,34 +130,32 @@ def sound_play(fullpath, wait=False):
 	else:
 		winsound.PlaySound(fi, winsound.SND_FILENAME + winsound.SND_ASYNC)
 
-def dev_print(msg:str):
+def dev_print(*msg):
 	d = False
 	if getattr(__builtins__, 'sett', None):
 		d = sett.dev
 	else:
 		d = True
-	if d: print(f'{time.strftime("%H:%M:%S")} {msg}')
+	if d: tprint(*msg)
 
-def con_log(msg:str, log_file:bool=True):
+def con_log(*msg, log_file:bool=True):
 	''' Log to console and logfile
 	'''
-	msg = f"{time.strftime('%y.%m.%d %H:%M:%S')} {msg}"
-	print(msg)
+	tprint(*msg)
 	if not log_file: return
 	try:
 		with open(
-			f"log\\{time.strftime('%y.%m.%d')}.txt"
+			f"log\\{time.strftime('%y.%m.%d')}.log"
 			, 'ta+', encoding='utf-8'
 		) as f:
-			f.write(msg + '\n')
+			f.write('\n'.join(msg))
 	except FileNotFoundError:
 		os.makedirs('log')
 		with open(
-			f"log\\{time.strftime('%y.%m.%d')}.txt"
+			f"log\\{time.strftime('%y.%m.%d')}.log"
 			, 'ta+', encoding='utf-8'
 		) as f:
-			f.write(msg + '\n')
-
+			f.write('\n'.join(msg))
 
 def time_now(template:str='%Y-%m-%d_%H-%M-%S'):
 	return time.strftime(template)
@@ -638,9 +636,11 @@ def jobs_batch(func_list:list, timeout:int
 
 def tprint(*msgs, **kwargs):
 	''' Print with task name and time '''
-	task_name = sys._getframe(1).f_code.co_name
-	print(time.strftime('%y.%m.%d %H:%M:%S ') + task_name, end=': ')
-	print(*msgs, **kwargs)
+	parent = sys._getframe(1).f_code.co_name
+	msgs = list(msgs)
+	if not parent in ['dev_print', 'con_log']:
+		msgs.insert(0, parent)
+	print(time.strftime('%y.%m.%d %H:%M:%S'), *msgs)
 
 def balloon(msg:str, title:str=APP_NAME, timeout:int=None, icon:str=None):
 	''' Show balloon. title - 63 symbols max, msg - 255.

@@ -92,6 +92,13 @@ def file_download(url:str, destination:str=None, attempts:int=3)->str:
 				return f'error'
 	return dest_file
 
+def html_clean(html_str:str, separator=' ')->str:
+	''' Removes HTML tags from string '''
+	return BeautifulSoup(
+		html_str
+		, 'html.parser'
+	).get_text(separator=separator)
+
 def html_element(url:str, find_all_args, number:int=0
 , clean:bool=True , encoding:str='utf-8'
 , session:bool=False, headers:dict=None

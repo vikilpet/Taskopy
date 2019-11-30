@@ -199,29 +199,33 @@ def free_ram(unit:str='percent'):
 	else:
 		return psutil.virtual_memory()[4] // e
 
-GetWindowThreadProcessId = ctypes.windll.user32.GetWindowThreadProcessId
+
 def process_close(process, timeout:int=10):
-	''' Kill process 'softly'. Returns 'True' if process was closed 'softly'
-		and False if process was killed after timeout.
+	''' Kills the process 'softly'. Returns 'True' if process
+		was closed 'softly' and False if process was killed
+		after timeout.
 	'''
-	def find_proc(hwnd, pid):
-		cur_pid = ctypes.c_int()
-		GetWindowThreadProcessId(hwnd, ctypes.byref(cur_pid))
-		if cur_pid.value == pid: windows.append(hwnd)
+	def collect_windows(hwnd, param=None):
+		nonlocal windows
+		windows.append(hwnd)
+		return True
 	pid = process_get(process)
 	if not pid: return False
 	windows = []
-	win32gui.EnumWindows(find_proc, pid)
-	if not windows: return False
+	for thread in psutil.Process(pid).threads():
+		win32gui.EnumThreadWindows(thread.id, collect_windows, None)
 	for hwnd in windows:
-		win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
+		try:
+			win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
+		except Exception as e:
+			dev_print(f'postmessage error: {repr(e)}')
 	for _ in range(timeout):
 		time.sleep(1)
 		if not psutil.pid_exists(pid): return True
 	try:
 		psutil.Process(pid).kill()
 	except ProcessLookupError:
-		dev_print(f'PID {process} not found')
+		dev_print(f'PID {pid} was not found')
 	return False
 
 def wts_message(sessionid:int, msg:str, title:str, style:int=0

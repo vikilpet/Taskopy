@@ -68,7 +68,7 @@ def file_copy(fullpath:str, destination:str):
 	except FileNotFoundError:
 		try:
 			os.makedirs(
-				os.path.dirname(fullpath)
+				os.path.dirname(destination)
 			)
 			shutil.copy(fullpath, destination)
 		except FileExistsError: pass
