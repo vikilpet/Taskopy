@@ -138,12 +138,12 @@ def file_size(fullpath:str, unit:str='b')->int:
 	return os.stat(fullpath).st_size // e
 
 def file_ext(fullpath:str)->str:
-	''' Returns file extension. '''
+	''' Returns file extension without dot. '''
 	ext = os.path.splitext(fullpath)[1]
 	if ext == '': return ext
 	return ext[1:]
 
-def purge_old(fullpath:str, days:int=0, recursive:bool=False
+def dir_purge(fullpath:str, days:int=0, recursive:bool=False
 			, creation:bool=False, test:bool=False):
 	''' Deletes files older than x days.
 		Returns number of deleted files and folders. 

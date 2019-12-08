@@ -407,8 +407,8 @@ class Tasks:
 			time.sleep(1)
 
 	def close(s):
-		''' Destructor
-			Remove scheduler jobs, hotkey bindings, stop http server
+		''' Destructor.
+			Remove scheduler jobs, hotkey bindings, stop http server.
 		'''
 		if s.http_server:
 			s.http_server.shutdown()
@@ -517,6 +517,26 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			
 
 	def on_exit(s, event=None):
+		TASKS_MSG_MAX = 2
+		running_tasks = []
+		for task in tasks.task_list:
+			if task['running']:
+				running_tasks.append(task)
+		if running_tasks:
+			print(lang.warn_runn_tasks_con + ':')
+			print(*[
+				t['task_function_name'] for t in running_tasks
+			])
+			tasks_str = '\r\n'.join(
+				[t['task_name'] for t in running_tasks][:TASKS_MSG_MAX]
+			)
+			if len(running_tasks) > TASKS_MSG_MAX: tasks_str += '\r\n...'
+			if msgbox(
+				lang.warn_runn_tasks_msg.format(len(running_tasks))
+				+ '\r\n\r\n' + tasks_str
+				, ui=MB_ICONEXCLAMATION + MB_YESNO
+			) != IDYES:
+				return
 		con_log(lang.menu_exit)
 		tasks.close()
 		wx.CallAfter(s.Destroy)
@@ -555,7 +575,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 class App(wx.App):
 	def OnInit(s):
 		s.enabled = True
-		s.frame=wx.Frame(None)
+		s.frame=wx.Frame(None, style=wx.DEFAULT_FRAME_STYLE | wx.STAY_ON_TOP)
 		s.taskbaricon = TaskBarIcon(s.frame)
 		hwnd_list = window_find(APP_NAME)
 		if len(hwnd_list) == 1:

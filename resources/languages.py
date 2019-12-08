@@ -33,6 +33,8 @@ warn_hotkey=Wrong hotkey syntax in task «{}»
 warn_schedule=Wrong schedule syntax in task «{}»
 warn_task_error=Error when executing a task «{}»
 warn_left_click=Attempt to bind more than one task to left click: {}
+warn_runn_tasks_con=Running tasks
+warn_runn_tasks_msg=Some tasks ({}) are being performed now. Close anyway?
 '''
 
 _dict_ru='''\
@@ -53,4 +55,6 @@ warn_hotkey=Неправильный формат горячей клавиши 
 warn_schedule=Неправильный формат планировщика в задаче «{}»
 warn_task_error=Ошибка при выполнении задачи «{}»
 warn_left_click=Попытка привязать левому клику больше одной задачи: {}
+warn_runn_tasks_con=Работающие задачи
+warn_runn_tasks_msg=Некоторые задачи ({} шт.) выполняются в текущий момент. Всё равно закрыть?
 '''

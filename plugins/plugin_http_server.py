@@ -37,7 +37,7 @@ class RequestData:
 class HTTPHandlerTasks(BaseHTTPRequestHandler):
 	def __init__(s, request, client_address, server
 				, tasks):
-		s.silent = not sett.dev
+		s.silent = True
 		s.tasks = tasks
 		super().__init__(request, client_address, server)
 

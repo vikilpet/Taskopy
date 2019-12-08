@@ -270,7 +270,7 @@
 - **free_space(letter:str, unit:str='GB')->int:** — размер свободного места на диске (gb, mb, kb, b).
 - **is_directory(fullpath:str)->bool:** — указанный путь является папкой?
 - **path_exists(fullpath:str)->bool:** — указанный путь существует (не важно файл это или папка)?
-- **purge_old(fullpath:str, days:int=0, recursive=False, creation:bool=False, test:bool=False):** — удалить файлы из папки старше указанного числа дней.
+- **dir_purge(fullpath:str, days:int=0, recursive=False, creation:bool=False, test:bool=False):** — удалить файлы из папки старше указанного числа дней.
 	Если *days* == 0 значит удалить вообще все файлы в папке.
 	*creation* — использовать дату создания, иначе использовать дату последнего изменения.
 	*recursive* — включая подпапки.

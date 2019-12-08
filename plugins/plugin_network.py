@@ -10,9 +10,9 @@ import json
 def page_get(url:str, encoding:str='utf-8', session:bool=False
 , cookies:dict=None, headers:dict=None
 , http_method:str='get', json_data:str=None
-, post_file:str=None, post_hash:bool=False)->str:
-	''' Get content of the specified url
-	'''
+, post_file:str=None, post_hash:bool=False
+, timeout:tuple=(10, 600))->str:
+	''' Gets content of the specified URL '''
 	if post_file: http_method = 'POST'
 	if http_method: http_method = http_method.lower()
 	try:
@@ -26,29 +26,29 @@ def page_get(url:str, encoding:str='utf-8', session:bool=False
 				with open(post_file, 'rb') as fi:
 					files = {'file': fi}
 					req = getattr(ses, http_method)(url=url
-						, json=json_data, files=files)
+						, json=json_data, files=files, timeout=timeout)
 			else:
-				req = getattr(ses, http_method)(url=url, json=json_data)
+				req = getattr(ses, http_method)(url=url, json=json_data
+				, timeout=timeout)
 		else:
 			if post_file:
 				if post_hash:
-					if headers:
-						headers['Content-MD5'] = _file_hash(post_file)
-					else:
-						headers = {'Content-MD5': _file_hash(post_file)}
+					if not headers: headers = {}
+					headers['Content-MD5'] = _file_hash(post_file)
 				with open(post_file, 'rb') as fi:
 					files = {'file': fi}
 					req = getattr(requests, http_method)(
 						url=url, headers=headers, json=json_data
-						, cookies=cookies, files=files
+						, cookies=cookies, files=files, timeout=timeout
 					)
 			else:
 				req = getattr(requests, http_method)(
 					url=url, headers=headers, json=json_data
-					, cookies=cookies
+					, cookies=cookies, timeout=timeout
 				)
 	except Exception as e:
-		if sett.dev: raise
+		if sett.dev:
+			print(f'page_get error {http_method}: {repr(e)}')
 		return f'error {http_method}: {repr(e)}'
 	if req.status_code == 200:
 		return str(req.content, encoding=encoding, errors='ignore')
@@ -130,7 +130,7 @@ def html_element(url:str, find_all_args, number:int=0
 			if clean:
 				return [html_whitespace(i.get_text()) for i in r]
 			else:
-				return r
+				return [str(i) for i in r]
 		else:
 			return 'error: not found'
 	else:
@@ -140,7 +140,7 @@ def html_element(url:str, find_all_args, number:int=0
 				r = r[number].get_text()
 				return html_whitespace(r)
 			else:
-				return r[number]
+				return str(r[number])
 		else:
 			return 'error: not found'
 

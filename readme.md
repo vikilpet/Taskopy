@@ -270,7 +270,7 @@ Format: **setting** (default value) — description.
 - **free_space(letter:str, unit:str='GB')->int:** — get disk free space in units (gb, mb, kb, b).
 - **is_directory(fullpath:str)->bool:** — fullpath is directory?
 - **path_exists(fullpath:str)->bool:** — fullpath exists (no matter is it folder or file)?
-- **purge_old(fullpath:str, days:int=0, recursive=False, creation:bool=False, test:bool=False)** — delete files from folder *fullpath* older than n *days*.
+- **dir_purge(fullpath:str, days:int=0, recursive=False, creation:bool=False, test:bool=False)** — delete files from folder *fullpath* older than n *days*.
 	If *days* == 0 then delete all files.
 	*creation* — use date of creation, otherwise use last modification date.
 	*recursive* — delete from subfolders too.

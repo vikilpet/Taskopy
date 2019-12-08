@@ -212,8 +212,12 @@ def process_close(process, timeout:int=10):
 	pid = process_get(process)
 	if not pid: return False
 	windows = []
-	for thread in psutil.Process(pid).threads():
-		win32gui.EnumThreadWindows(thread.id, collect_windows, None)
+	try:
+		for thread in psutil.Process(pid).threads():
+			win32gui.EnumThreadWindows(thread.id, collect_windows, None)
+	except psutil.NoSuchProcess:
+		dev_print('process is gone')
+		pass
 	for hwnd in windows:
 		try:
 			win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)

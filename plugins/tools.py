@@ -19,7 +19,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2019-11-30'
+APP_VERSION = 'v2019-12-08'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 TASK_OPTIONS = [
@@ -92,7 +92,7 @@ class DictToObj:
 
 def value_unit(value, unit_dict:dict, default:int)->tuple:
 	''' Returns (int, int) - value and coefficient found in unit_dict.
-		If the unit not found then returns default.
+		If no unit is found, it returns the default value.
 	'''
 
 
@@ -138,24 +138,29 @@ def dev_print(*msg):
 		d = True
 	if d: tprint(*msg)
 
-def con_log(*msg, log_file:bool=True):
+def con_log(*msgs):
 	''' Log to console and logfile
 	'''
-	tprint(*msg)
-	if not log_file: return
+	log_str = ''
+	for m in msgs:
+		tprint(m)
+		log_str += (
+			time.strftime('%Y.%m.%d %H:%M:%S')
+			+ ' ' + str(m) + '\n'
+		)
 	try:
 		with open(
-			f"log\\{time.strftime('%y.%m.%d')}.log"
+			f"log\\{time.strftime('%Y.%m.%d')}.log"
 			, 'ta+', encoding='utf-8'
 		) as f:
-			f.write('\n'.join(msg))
+			f.write(log_str)
 	except FileNotFoundError:
 		os.makedirs('log')
 		with open(
-			f"log\\{time.strftime('%y.%m.%d')}.log"
+			f"log\\{time.strftime('%Y.%m.%d')}.log"
 			, 'ta+', encoding='utf-8'
 		) as f:
-			f.write('\n'.join(msg))
+			f.write(log_str)
 
 def time_now(template:str='%Y-%m-%d_%H-%M-%S'):
 	return time.strftime(template)
@@ -285,7 +290,8 @@ def re_find(source:str, re_pattern:str, sort:bool=True
 	return matches
 
 def re_replace(source:str, re_pattern:str, repl:str=''
-				, re_flags:int=re.IGNORECASE)->str:
+, re_flags:int=re.IGNORECASE)->str:
+	''' Regexp replace substring'''
 	r = re.sub(
 		pattern=re_pattern
 		, repl=repl
@@ -293,6 +299,11 @@ def re_replace(source:str, re_pattern:str, repl:str=''
 		, flags=re_flags
 	)
 	return r
+
+def re_match(source:str, re_pattern:str
+, re_flags:int=re.IGNORECASE)->bool:
+	''' Regexp match '''
+	return bool(re.match(re_pattern, source, flags=re_flags))
 
 _MessageBox = ctypes.windll.user32.MessageBoxW
 _MessageBoxTimeout = ctypes.windll.user32.MessageBoxTimeoutW
@@ -339,11 +350,12 @@ IDTRYAGAIN = 10
 IDYES = 6
 
 def msgbox(msg:str, title:str=None
-	, ui:int=None, wait:bool=True, timeout:int=None
+, ui:int=None, wait:bool=True, timeout:int=None
 	, dis_timeout:float=None)->int:
 	''' wait - msgbox should be closed to continue task
 		ui - combination of buttons and icons
-		timeout - timeout in seconds
+		timeout - timeout in seconds (int) or str with
+			unit: '5 sec', '5 min', '2 hour' etc
 		dis_timeout (seconds) - disable buttons for x seconds.
 			Should be smaller than timeout.
 	'''
@@ -389,7 +401,9 @@ def msgbox(msg:str, title:str=None
 	if timeout:
 		mb_func = _MessageBoxTimeout
 		title_tmp = title + '          rand' + str(random.randint(100000, 1000000))
-		mb_args = (None, msg, title_tmp, ui, 0, timeout*1000)
+		value, coef = value_unit(timeout, _TIME_UNITS, 1000)
+		timeout = int(value * coef / 1000)
+		mb_args = (None, msg, title_tmp, ui, 0, timeout * 1000)
 	else:
 		if dis_timeout:
 			mb_func = _MessageBox
@@ -505,7 +519,7 @@ def msgbox_warning(msg:str):
 	msgbox(msg=msg, title=APP_NAME, ui=MB_ICONWARNING, wait=False)
 
 def inputbox(message:str, title:str=None
-			, is_pwd:bool=False, default:str='', multiline:bool=False)->str:
+, is_pwd:bool=False, default:str='', multiline:bool=False)->str:
 	''' Request input from user.
 		is_pwd - use password dialog (hide input).
 		Problem: don't use default or you will get it value
@@ -518,17 +532,47 @@ def inputbox(message:str, title:str=None
 		box_func = wx.PasswordEntryDialog
 	else:
 		box_func = wx.TextEntryDialog
-	style=(wx.OK + wx.CANCEL + wx.STAY_ON_TOP + wx.CENTRE)
+	style=(wx.OK | wx.CANCEL | wx.CENTRE | wx.STAY_ON_TOP)
 	if multiline: style += wx.TE_MULTILINE
 	dlg = box_func(app.frame, message, title, style=style)
+	win32gui.SetWindowPos(
+		dlg.Handle
+		, win32con.HWND_TOPMOST
+		, 0, 0, 0, 0
+		, win32con.SWP_NOSIZE | win32con.SWP_NOMOVE
+	)
 	dlg.SetValue(default)
 	try:
 		dlg.ShowModal()
-	except wx._core.wxAssertionError:
+	except wx._core.wxAssertionError: 	
 		pass
 	value = dlg.GetValue()
 	dlg.Destroy()
 	return value
+
+def dialog_open(title:str=None, multiple:bool=False
+, default_dir:str='', default_file:str='', wildcard:str='')->str:
+	''' Shows standard file open dialog
+		and returns fullpath (or list of fullpaths
+		if multiple is True).
+		Will not work in console.
+	'''
+	if not title:
+		title = sys._getframe(1).f_code.co_name.replace('_', ' ')
+		if title.startswith('<'): title = APP_NAME
+	style = wx.FD_OPEN | wx.FD_FILE_MUST_EXIST
+	if multiple: style = style | wx.FD_MULTIPLE
+	dialog = wx.FileDialog(None, title, wildcard=wildcard
+		, defaultDir=default_dir, defaultFile=default_file, style=style)
+	if dialog.ShowModal() == wx.ID_OK:
+		if multiple:
+			fullpath = dialog.GetPaths()
+		else:
+			fullpath = dialog.GetPath()
+	else:
+		fullpath = None
+	dialog.Destroy()
+	return fullpath
 
 random_num = random.randint
 

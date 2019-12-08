@@ -69,9 +69,9 @@ def backup_and_purge(
 	# Backup crontab file to backup folder:
 	file_backup('crontab.py', 'backup')
 	# Delete backups older than 10 days:
-	purge_old('backup', days=10)
+	dir_purge('backup', days=10)
 	# Delete logs older than 10 days
-	purge_old('log', days=10)
+	dir_purge('log', days=10)
 
 # Check to see if there's a new version available
 def taskopy_update(schedule='every().sunday.at("15:30")', submenu='Rare'):
