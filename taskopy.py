@@ -179,20 +179,25 @@ class Tasks:
 						)
 				else:
 					s.task_list_menu.append(task_opts)
-			if task_opts['http']: s.task_list_http.append(task_opts)
+			if task_opts['http']:
+				if not task_opts['http_dir']:
+					task_opts['http_dir'] = temp_dir()
+				s.task_list_http.append(task_opts)
 			if task_opts['idle']: s.add_idle_task(task_opts)
 		s.task_list_menu.sort( key=lambda k: k['task_name'].lower() )
 		s.task_list_submenus.sort( key=lambda k: k[0].lower() )
 		for subm in s.task_list_submenus:
 			subm[1].sort( key=lambda k: k['task_name'].lower() )
-		lc_count = len(s.task_list_left_click)
-		if lc_count > 1:
-			msgbox_warning(lang.warn_left_click.format(
-				', '.join(
-					[t['task_name'] for t in s.task_list_left_click]
+		left_click_tasks_count = len(s.task_list_left_click)
+		if left_click_tasks_count > 1:
+			msgbox_warning(
+				lang.warn_left_click.format(
+					', '.join(
+						[t['task_name'] for t in s.task_list_left_click]
+					)
 				)
-			))
-		elif lc_count == 0:
+			)
+		elif left_click_tasks_count == 0:
 			app.taskbaricon.Bind(
 				wx.adv.EVT_TASKBAR_LEFT_DOWN
 				, app.taskbaricon.on_left_down
@@ -297,7 +302,8 @@ class Tasks:
 			task - dict with task options
 			caller - who actually launched the task.
 				It can be 'hotkey', 'menu', 'scheduler', 'http' etc.,
-				so you can find out inside the task function who started function this time.
+				so you can find out inside the task function who
+				started function this time.
 			data - pass some data to task
 			result - list in which we will place result of task. It is
 				passed through all inner fuctions (run_task_inner and
@@ -474,9 +480,9 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			, s.on_disable
 		)
 		if sett.dev:
-			create_menu_item(menu, 'Show menu 3 sec', s.show_menu_wait)
 			create_menu_item(menu, lang.menu_restart, s.on_restart)
 			create_menu_item(menu, lang.menu_edit_settings, s.on_edit_settings)
+			create_menu_item(menu, 'List of running tasks', s.running_tasks)
 		if sett.dev or keyboard.is_pressed('shift'):
 			create_menu_item(menu, lang.menu_command, s.run_command)
 		create_menu_item(menu, lang.menu_exit, s.on_exit)
@@ -490,7 +496,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 
 	def set_icon(s, dis:bool=False, text:str=APP_FULLNAME):
 		s.SetIcon(s.icon_dis if dis else s.icon, text)
-
+	
 	def show_menu_wait(s, event=None):
 		print('show_menu 3 sec')
 		s.frame.Raise()
@@ -516,7 +522,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 				win32gui.SetForegroundWindow(app.app_hwnd)
 			
 
-	def on_exit(s, event=None):
+	def on_exit(s, event=None)->bool:
 		TASKS_MSG_MAX = 2
 		running_tasks = []
 		for task in tasks.task_list:
@@ -536,11 +542,37 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 				+ '\r\n\r\n' + tasks_str
 				, ui=MB_ICONEXCLAMATION + MB_YESNO
 			) != IDYES:
-				return
+				return False
 		con_log(lang.menu_exit)
 		tasks.close()
 		wx.CallAfter(s.Destroy)
 		s.frame.Close()
+		return True
+	
+	def running_tasks(s, event=None):
+		''' Print running tasks and show msgbox '''
+		TASKS_MSG_MAX = 5
+		running_tasks = [
+			t for t in tasks.task_list if t['running']
+		]
+		if not running_tasks:
+			msgbox('No tasks', ui=MB_ICONINFORMATION, timeout=3
+				, wait=False)
+			return
+		print(lang.warn_runn_tasks_con + ':')
+		print(*[
+			t['task_function_name'] for t in running_tasks
+		])
+		tasks_str = '\r\n'.join(
+			[t['task_name'] for t in running_tasks][:TASKS_MSG_MAX]
+		)
+		if len(running_tasks) > TASKS_MSG_MAX: tasks_str += '\r\n...'
+		msgbox(
+			tasks_str
+			, ui=MB_ICONINFORMATION
+			, wait=False
+		)
+		
 
 	def on_edit_crontab(s, event=None):
 		app_start(sett.editor, 'crontab.py')
@@ -560,7 +592,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		s.set_icon(not tasks.enabled)
 	
 	def on_restart(s, event=None):
-		s.on_exit()
+		if not s.on_exit(): return
 		if getattr(sys, 'frozen', False):
 			os.startfile(os.getcwd() + '\\' + APP_NAME)
 		else:

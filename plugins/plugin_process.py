@@ -6,6 +6,9 @@ import time
 import win32gui
 import win32api
 import win32con
+import win32com
+import win32process
+import win32security
 import win32ts
 import win32serviceutil
 from .tools import DictToObj, dev_print, msgbox, tprint
@@ -15,16 +18,28 @@ from .plugin_filesystem import path_exists
 
 _SIZE_UNITS = {'gb':1073741824, 'mb':1048576, 'kb':1024, 'b':1, 'percent':1}
 
-def file_open(fullpath:str, showcmd:int=win32con.SW_SHOWNORMAL):
-	''' Open file or URL in default program.
-		showcmd=7 - start minimized.
+def file_open(fullpath:str, operation:str='open', parameters:str=None
+, cwd:str=None, showcmd:int=win32con.SW_SHOWNORMAL):
+	''' Open file or URL in an associated application.
+		If 'file' is executable:
+			parameters - commandline parameters
+				to be passed to the application.
+		operation - operation to perform. With executable
+			use 'runas' for elevation.
+		cwd - working directory.
+		showcmd - how application should be
+			displayed. For example:
+			3 - maximized (win32con.SW_SHOWMAXIMIZED)
+			7 - minimized (win32con.SW_SHOWMINNOACTIVE)
+			0 - hidden (win32con.SW_HIDE)
 	'''
-	win32api.ShellExecute(None, 'open', fullpath, None, None, showcmd)
+	win32api.ShellExecute(None, operation.lower(), fullpath
+	, parameters, cwd, showcmd)
 
 def process_get(process)->int:
 	''' Returns PID of process.
 	'''
-	if type(process) is int: return process
+	if isinstance(process, int): return process
 	name = process.lower()
 	if not name.endswith('.exe'): name = name + '.exe'
 	for proc in psutil.process_iter():
@@ -40,9 +55,7 @@ def app_start(
 	, shell:bool=False
 	, cwd:str=None
 	, env:dict=None
-	, hidden:bool=False
-	, minimized:bool=False
-	, maximized:bool=False
+	, window:str=None
 ):
 	''' Starts application.
 		Returns:
@@ -56,41 +69,48 @@ def app_start(
 		wait - wait for execution.
 		capture_output - capture stdout and stderr.
 		env - add this environments to the process
+		window - maximized, minimized or hidden.
 
 		https://docs.python.org/3/library/subprocess.html
 	'''
 
-	if type(app_path) is str:
+	if isinstance(app_path, str):
 		app_path = [app_path]
-	elif not type(app_path) is list:
+	elif not isinstance(app_path, list):
 		raise 'Unknown type of app_path'
 	if app_args:
-		if type(app_args) is str:
+		if isinstance(app_args, str):
 			app_path += app_args.split()
-		elif type(app_args) is list:
+		elif isinstance(app_args, list):
 			app_path += app_args
 		else:
 			raise 'Unknown type of app_args'
 	if not cwd:
 		if ':\\' in app_path[0]:
 			cwd = os.path.dirname(app_path[0])
-	info = subprocess.STARTUPINFO()
-	info.dwFlags = subprocess.STARTF_USESHOWWINDOW
-	if minimized:
-		info.wShowWindow = win32con.SW_SHOWMINNOACTIVE
-	elif maximized:
-		info.wShowWindow = win32con.SW_SHOWMAXIMIZED
-	elif hidden:
-		info.wShowWindow = win32con.SW_HIDE
+	startupinfo = subprocess.STARTUPINFO()
+	creationflags = win32con.DETACHED_PROCESS
+	startupinfo.dwFlags = subprocess.STARTF_USESHOWWINDOW
+	if window:
+		window = window.lower()
 	else:
-		info.wShowWindow = win32con.SW_SHOWNORMAL
+		window = 'normal'
+	if window == 'minimized':
+		startupinfo.wShowWindow = win32con.SW_SHOWMINNOACTIVE
+	elif window == 'maximized':
+		startupinfo.wShowWindow = win32con.SW_SHOWMAXIMIZED
+	elif window == 'hidden':
+		creationflags |= win32process.CREATE_NO_WINDOW
+		startupinfo.wShowWindow = win32con.SW_HIDE
+	else:
+		startupinfo.wShowWindow = win32con.SW_SHOWNORMAL
 	proc_args = {
 		'args': app_path
 		, 'shell': shell
 		, 'close_fds': True
 		, 'cwd': cwd
-		, 'creationflags': win32con.DETACHED_PROCESS
-		, 'startupinfo': info
+		, 'creationflags': creationflags
+		, 'startupinfo': startupinfo
 		, 'encoding': encoding
 	}
 	if env:
@@ -117,15 +137,18 @@ def app_start(
 def process_exist(process, cmd:str=None)->bool:
 	''' Returns PID if the process with the specified name exists.
 		process - image name or PID.
-		cmd - optional string to search in the command line of the process.
+		cmd - optional string to search in the
+			command line of the process.
 	'''
 	if cmd: cmd=cmd.lower()
+	if isinstance(process, str): process = process.lower()
 	for proc in psutil.process_iter():
 		try:
-			if type(process) == str:
+			if isinstance(process, str):
 				if proc.name().lower() == process:
 					if cmd:
-						if cmd in ' '.join(proc.cmdline()).lower(): return proc.pid
+						if cmd in ' '.join(proc.cmdline()).lower():
+							return proc.pid
 					else:
 						return proc.pid
 			else:
@@ -135,30 +158,42 @@ def process_exist(process, cmd:str=None)->bool:
 					else:
 						return proc.pid
 		except psutil.AccessDenied:
-			dev_print('proc_exist access denied')
+			dev_print(f'proc_exist access denied: {process}')
 	return False
 
-def process_list(name:str='')->list:
+def process_list(name:str='', cmd_filter:str=None)->list:
 	''' Returns list of DictToObj with process information.
 		name - image name. If not specified then list all
 			processes.
+		cmd_filter - a substring to look for in command line.
 		Process information includes: pid:int, name:str
-		, username:str, exe:str, cmdline:list
-		All strings in lower case.
+		, username:str, fullpath:str, cmdline:list
+		, cmdline_str:str.
+		You may need admin rights to read info for every
+		process.
+		All strings in lowercase.
 	'''
 	ATTRS=['pid', 'name', 'username', 'exe', 'cmdline']
 	name = name.lower()
+	if cmd_filter: cmd_filter = cmd_filter.lower()
 	proc_list = []
 	for proc in psutil.process_iter():
 		if name:
 			if proc.name().lower() != name: continue
 		di = proc.as_dict(attrs=ATTRS)
-		for k in di:
-			if type(di[k]) is str:
-				di[k] = di[k].lower()
-		if di['cmdline']: di['cmdline'] = list(di['cmdline'])
+		for key in di:
+			if isinstance(di[key], str):
+				di[key] = di[key].lower()
+		if di['cmdline']:
+			li = [i.lower() for i in di['cmdline']]
+			di['cmdline'] = li
+			di['cmdline_str'] = ' '.join(li)
+			if cmd_filter:
+				if not cmd_filter in di['cmdline_str']:
+					continue
 		if di['username']:
-			di['username'] = di['username'].split('\\')[1].lower()
+			di['username'] = di['username'].split('\\')[1]
+		di['fullpath'] = di.get('exe', None)
 		proc_list.append( DictToObj(di) )
 	return proc_list
 
@@ -175,12 +210,12 @@ def process_cpu(pid:int, interval:int=1)->float:
 def process_kill(process):
 	''' Kills the prosess.
 	'''
-	if type(process) == int:
+	if isinstance(process, int):
 		try:
 			psutil.Process(process).kill()
 		except ProcessLookupError:
 			if sett.dev: print(f'PID {process} not found')
-	elif type(process) == str:
+	elif isinstance(process, str):
 		name = process.lower()
 		for proc in psutil.process_iter(attrs=['name']):
 			if proc.name().lower() == name: proc.kill()
@@ -287,6 +322,7 @@ def service_start(service:str, args:tuple=None):
 def service_stop(service:str)->tuple:
 	''' Stops windows service.'''
 	return win32serviceutil.StopService(service)
+
 
 
 

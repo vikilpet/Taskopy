@@ -22,8 +22,18 @@ def _dir_slash(dirpath:str)->str:
 	else:
 		return dirpath + '\\'
 
+def _long_path(fullpath:str):
+	''' Fix for path longer than 256 '''
+	if (len(fullpath) > 255
+	and not '\\\\?\\' in fullpath
+	and fullpath[1:3] == ':\\'):
+		return '\\\\?\\' + fullpath
+	else:
+		return fullpath
+
 def file_read(fullpath:str, encoding:str='utf-8')->str:
 	''' Returns content of file '''
+	fullpath = _long_path(fullpath)
 	if encoding == 'binary':
 		with open(fullpath, 'rb') as f:
 			return f.read()
@@ -44,6 +54,7 @@ def file_write(fullpath:str, content:str, encoding:str='utf-8'):
 def file_rename(fullpath:str, dest:str)->str:
 	''' Rename path.
 		dest - fullpath or just new file name without parent directory.
+		Returns destination.
 	'''
 	if not ':' in dest: dest = os.path.dirname(fullpath) + '\\' + dest
 	os.rename(fullpath, dest)
@@ -52,7 +63,9 @@ def file_rename(fullpath:str, dest:str)->str:
 dir_rename = file_rename
 
 def file_log(fullpath:str, message:str, encoding:str='utf-8'
-				, time_format:str='%Y.%m.%d %H:%M:%S'):
+, time_format:str='%Y.%m.%d %H:%M:%S'):
+	''' Write message to log '''
+	fullpath = _long_path(fullpath)
 	with open(fullpath, 'at+', encoding=encoding) as f:
 		f.write(time.strftime(time_format) + '\t' + message + '\n')
 
@@ -64,13 +77,13 @@ def file_copy(fullpath:str, destination:str):
 		be created if they don't exist.
 	'''
 	try:
-		shutil.copy(fullpath, destination)
+		return shutil.copy(fullpath, destination)
 	except FileNotFoundError:
 		try:
 			os.makedirs(
 				os.path.dirname(destination)
 			)
-			shutil.copy(fullpath, destination)
+			return shutil.copy(fullpath, destination)
 		except FileExistsError: pass
 
 def file_move(fullpath:str, destination:str):
@@ -83,25 +96,35 @@ def file_move(fullpath:str, destination:str):
 	else:
 		new_fullpath = destination
 	try:
-		os.remove(new_fullpath)
+		file_delete(new_fullpath)
 	except FileNotFoundError:
 		pass
 	shutil.move(fullpath, new_fullpath)
 
 def file_delete(fullpath:str):
+	''' Deletes the file. '''
 	try:
 		os.remove(fullpath)
+	except PermissionError:
+		try:
+			os.chmod(fullpath, stat.S_IWRITE)
+			os.remove(fullpath)
+		except Exception as e:
+			print(f'file_delete error: ' + str(e))
 	except FileNotFoundError:
 		pass
 
-def dir_copy(fullpath:str, destination:str, update:bool=True):
+def dir_copy(fullpath:str, destination:str, symlinks:bool=False):
 	''' Copy a folder with all content to a new location.
 		Returns number of errors.
 	'''
 	err = 0
 	try:
-		dir_util.copy_tree(fullpath, destination, update=update)
-	except dir_util.DistutilsFileError as e:
+		shutil.copytree(fullpath, destination, symlinks=symlinks)
+		
+	except FileExistsError:
+		pass
+	except Exception as e:
 		err += 1
 		print(f'dir_copy error: {repr(e)}')
 	return err
@@ -118,7 +141,8 @@ def dir_create(fullpath:str=None)->str:
 
 def dir_delete(fullpath:str):
 	try:
-		shutil.rmtree(fullpath)
+		shutil.rmtree(fullpath
+		, onerror=lambda func, path, exc: file_delete(path))
 	except FileNotFoundError:
 		pass
 
@@ -138,10 +162,36 @@ def file_size(fullpath:str, unit:str='b')->int:
 	return os.stat(fullpath).st_size // e
 
 def file_ext(fullpath:str)->str:
-	''' Returns file extension without dot. '''
-	ext = os.path.splitext(fullpath)[1]
+	''' Returns file extension in lower case
+		without dot. '''
+	ext = os.path.splitext(fullpath)[1].lower()
 	if ext == '': return ext
 	return ext[1:]
+
+def file_basename(fullpath:str)->str:
+	''' Returns basename: file name without 
+		parent folder and suffix.
+	'''
+	fname = os.path.basename(fullpath)
+	return os.path.splitext(fname)[0]
+
+def file_name_fix(fullpath:str, repl_char:str='_')->str:
+	''' Replaces forbidden characters with repl_char.
+		Removes leading and trailing spaces.
+		Adds '\\\\?\\' for long paths.
+	'''
+
+	parent = os.path.dirname(fullpath)
+	fn = os.path.basename(fullpath)
+	new_fn = ''
+	if parent: new_fn = parent + '\\'
+	for char in fn.strip():
+		if (char in '<>:"/|?*'
+		or ord(char) < 32):
+			new_fn += repl_char
+		else:
+			new_fn += char
+	return _long_path(new_fn)
 
 def dir_purge(fullpath:str, days:int=0, recursive:bool=False
 			, creation:bool=False, test:bool=False):
@@ -158,15 +208,8 @@ def dir_purge(fullpath:str, days:int=0, recursive:bool=False
 	def robust_remove_file(fullpath):
 		nonlocal counter
 		try:
-			os.remove(fullpath)
+			file_delete(fullpath)
 			counter += 1
-		except PermissionError:
-			try:
-				os.chmod(fullpath, stat.S_IWRITE)
-				os.remove(fullpath)
-				counter += 1
-			except:
-				pass
 		except:
 			pass
 	def robust_remove_dir(fullpath):
@@ -267,6 +310,7 @@ def csv_read(fullpath:str, encoding:str='utf-8', fieldnames:tuple=None
 		If no fieldnames is provided uses first row as fieldnames.
 		All cell values is strings.
 	'''
+	fullpath = _long_path(fullpath)
 	with open(fullpath, 'r', encoding=encoding) as f:
 		reader = csv.DictReader(f, skipinitialspace=True, fieldnames=fieldnames
 		, delimiter=delimiter, quotechar=quotechar)
@@ -331,6 +375,7 @@ def file_zip(fullpath, destination:str)->str:
 		fullpath - string with fullpath or list with fullpaths.
 		destination - fullpath to the archive.
 	'''
+	fullpath = _long_path(fullpath)
 	if type(fullpath) is str:
 		with zipfile.ZipFile(
 			destination, 'w'
@@ -374,6 +419,7 @@ def file_hash(fullpath:str, algorithm:str='crc32')->str:
 	''' Returns hash of file.
 		algorithm - 'crc32' or 'md5'.
 	'''
+	fullpath = _long_path(fullpath)
 	algorithm = algorithm.lower()
 	if algorithm == 'md5':
 		hash_md5 = hashlib.md5()

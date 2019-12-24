@@ -6,46 +6,45 @@ import tempfile
 from hashlib import md5
 from bs4 import BeautifulSoup
 import json
+import warnings
+from .tools import dev_print
+
 
 def page_get(url:str, encoding:str='utf-8', session:bool=False
-, cookies:dict=None, headers:dict=None
+, cookies:dict=None, headers:dict={}
 , http_method:str='get', json_data:str=None
 , post_file:str=None, post_hash:bool=False
-, timeout:tuple=(10, 600))->str:
+, post_form_data:dict=None, timeout:tuple=(10, 600))->str:
 	''' Gets content of the specified URL '''
-	if post_file: http_method = 'POST'
+	if (post_file or post_form_data): http_method = 'POST'
 	if http_method: http_method = http_method.lower()
 	try:
-		if session:
-			ses = requests.Session()
-			if headers: ses.headers.update(headers)
-			if cookies: ses.cookies.update(cookies)
-			if post_file:
-				if post_hash:
-					ses.headers.update({'': _file_hash(post_file)})
-				with open(post_file, 'rb') as fi:
-					files = {'file': fi}
-					req = getattr(ses, http_method)(url=url
-						, json=json_data, files=files, timeout=timeout)
-			else:
-				req = getattr(ses, http_method)(url=url, json=json_data
-				, timeout=timeout)
+		args = {'url': url, 'json': json_data, 'timeout': timeout
+			, 'data': post_form_data}
+		file_obj = None
+		post_file_hash = None
+		if post_file:
+			if post_hash: post_file_hash = _file_hash(post_file)
+			file_obj = open(post_file, 'rb')
+			args['files'] = {'file': file_obj}
 		else:
-			if post_file:
-				if post_hash:
-					if not headers: headers = {}
-					headers['Content-MD5'] = _file_hash(post_file)
-				with open(post_file, 'rb') as fi:
-					files = {'file': fi}
-					req = getattr(requests, http_method)(
-						url=url, headers=headers, json=json_data
-						, cookies=cookies, files=files, timeout=timeout
-					)
-			else:
-				req = getattr(requests, http_method)(
-					url=url, headers=headers, json=json_data
-					, cookies=cookies, timeout=timeout
-				)
+			post_file_hash = False
+		if session:
+			req_obj = requests.Session()
+			if headers: req_obj.headers.update(headers)
+			if cookies: req_obj.cookies.update(cookies)
+			if post_file_hash: req_obj.headers.update(
+				{'Content-MD5': post_file_hash})
+		else:
+			req_obj = requests
+			args['cookies'] = cookies
+			if post_file_hash:
+				headers['Content-MD5'] = post_file_hash
+			args['headers'] = headers
+		req = getattr(req_obj, http_method)(**args)
+		if file_obj: file_obj.close()
+
+
 	except Exception as e:
 		if sett.dev:
 			print(f'page_get error {http_method}: {repr(e)}')
@@ -53,7 +52,7 @@ def page_get(url:str, encoding:str='utf-8', session:bool=False
 	if req.status_code == 200:
 		return str(req.content, encoding=encoding, errors='ignore')
 	else:
-		return f'error status: {req.status_code}'
+		return f'reqest error: {req.status_code}'
 
 def html_whitespace(text:str)->str:
 	''' Removes whitespace characters from string.
@@ -83,8 +82,7 @@ def file_download(url:str, destination:str=None, attempts:int=3)->str:
 		try:
 			urllib.request.urlretrieve (url, dest_file)
 		except Exception as e:
-			if sett.dev:
-				print(f'{attempt} dl failed, err="{repr(e)[:20]}", url={url}')
+			dev_print(f'{attempt} dl failed, err="{repr(e)[:20]}", url={url}')
 		else:
 			break
 		finally:
@@ -94,10 +92,10 @@ def file_download(url:str, destination:str=None, attempts:int=3)->str:
 
 def html_clean(html_str:str, separator=' ')->str:
 	''' Removes HTML tags from string '''
-	return BeautifulSoup(
-		html_str
-		, 'html.parser'
-	).get_text(separator=separator)
+	warnings.filterwarnings("ignore", category=UserWarning, module='bs4')
+	text = BeautifulSoup(html_str, 'html.parser'
+		).get_text(separator=separator)
+	return text
 
 def html_element(url:str, find_all_args, number:int=0
 , clean:bool=True , encoding:str='utf-8'
@@ -144,14 +142,16 @@ def html_element(url:str, find_all_args, number:int=0
 		else:
 			return 'error: not found'
 
-def json_element(url:str, element:list, headers:dict=None
-					, session:bool=False, cookies:dict=None
-					, http_method:str='get', json_data:str=None):
-	''' Download json by url and get its nested element by
-			map of keys like ['list', 0, 'someitem', 0]
-		element - can be a list or list of lists so it will
+def json_element(source:str, element:list=None, headers:dict=None
+, session:bool=False, cookies:dict=None
+, http_method:str='get', json_data:str=None):
+	''' Download JSON by url and get its nested element by
+			map of keys like ['list', 0, 'someitem', 1]
+		source - URL to download or string with JSON.
+		element - can be a None, list or list of lists so it will
 			get every element specified in nested list and return
 			list of values.
+			If None - just return serialized JSON.
 			examples:
 				element=['banks', 0, 'usd', 'sale']
 					result: 63.69
@@ -167,20 +167,25 @@ def json_element(url:str, element:list, headers:dict=None
 		session - use requests.Session instead of get
 		cookies - dictionary with cookies like {'GUEST_LANGUAGE_ID': 'ru_RU'}
 	'''
-	j = page_get(
-		url=url
-		, session=session
-		, headers=headers
-		, cookies=cookies
-		, http_method=http_method
-		, json_data=json_data
-	)
-	if j.startswith('error'):
-		if type(element[0]) is list:
-			return [j]
-		else:
-			return j
+	if source.startswith('http'):
+		j = page_get(
+			url=source
+			, session=session
+			, headers=headers
+			, cookies=cookies
+			, http_method=http_method
+			, json_data=json_data
+		)
+		if j.startswith('error'):
+			if isinstance(element[0], list):
+				return [j]
+			else:
+				return j
+	else:
+		j = source
 	data = json.loads(j)
+	if element is None:
+		return data
 	if type(element[0]) is list:
 		li = []
 		try:
@@ -262,3 +267,7 @@ def _file_hash(fullpath:str)->str:
 		for chunk in iter(lambda: fi.read(4096), b''):
 			hash_md5.update(chunk)
 	return hash_md5.hexdigest()
+
+def pc_name()->str:
+	''' Returns hostname of current computer '''
+	return socket.gethostname()

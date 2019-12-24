@@ -19,7 +19,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2019-12-08'
+APP_VERSION = 'v2019-12-24'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 TASK_OPTIONS = [
@@ -88,7 +88,7 @@ class DictToObj:
 		s.__dict__.update(di)
 
 	def __getattr__(s, name):
-		return 'unknown key'
+		return 'DictToObj - unknown key'
 
 def value_unit(value, unit_dict:dict, default:int)->tuple:
 	''' Returns (int, int) - value and coefficient found in unit_dict.
@@ -270,8 +270,8 @@ def clip_set(txt:str):
 def clip_get()->str:
 	return pyperclip.paste()
 
-def re_find(source:str, re_pattern:str, sort:bool=True
-	, re_flags:int=re.IGNORECASE)->list:
+def re_find(source:str, re_pattern:str, sort:bool=False
+, re_flags:int=re.IGNORECASE)->list:
 	r''' Return list with matches.
 		re_flags:
 			re.IGNORECASE	ignore case
@@ -280,6 +280,7 @@ def re_find(source:str, re_pattern:str, sort:bool=True
 			re.UNICODE	make {\w, \W, \b, \B} follow Unicode rules.
 			re.LOCALE	make {\w, \W, \b, \B} follow locale.
 			re.VERBOSE	allow comment in regex.
+		Non-capturing group: (?:aaa)
 	'''
 	matches = list(
 		set(
@@ -392,7 +393,9 @@ def msgbox(msg:str, title:str=None
 			win32gui.EnumChildWindows(hwnd, dis_butt, True)
 		except:
 			pass
-	if not title:
+	if title:
+		title = str(title)
+	else:
 		title = sys._getframe(1).f_code.co_name.replace('_', ' ')
 		if title.startswith('<'): title = APP_NAME
 	if ui: ui += MB_SYSTEMMODAL
@@ -550,11 +553,12 @@ def inputbox(message:str, title:str=None
 	dlg.Destroy()
 	return value
 
-def dialog_open(title:str=None, multiple:bool=False
-, default_dir:str='', default_file:str='', wildcard:str='')->str:
-	''' Shows standard file open dialog
-		and returns fullpath (or list of fullpaths
-		if multiple is True).
+def file_dialog(title:str=None, multiple:bool=False
+, default_dir:str='', default_file:str=''
+, wildcard:str='', on_top:bool=True):
+	''' Shows standard file dialog
+		and returns fullpath or list of fullpaths
+		if multiple=True.
 		Will not work in console.
 	'''
 	if not title:
@@ -562,6 +566,7 @@ def dialog_open(title:str=None, multiple:bool=False
 		if title.startswith('<'): title = APP_NAME
 	style = wx.FD_OPEN | wx.FD_FILE_MUST_EXIST
 	if multiple: style = style | wx.FD_MULTIPLE
+	if on_top: style = style | wx.STAY_ON_TOP
 	dialog = wx.FileDialog(None, title, wildcard=wildcard
 		, defaultDir=default_dir, defaultFile=default_file, style=style)
 	if dialog.ShowModal() == wx.ID_OK:
@@ -683,7 +688,7 @@ def tprint(*msgs, **kwargs):
 	parent = sys._getframe(1).f_code.co_name
 	msgs = list(msgs)
 	if not parent in ['dev_print', 'con_log']:
-		msgs.insert(0, parent)
+		msgs.insert(0, parent + ':')
 	print(time.strftime('%y.%m.%d %H:%M:%S'), *msgs)
 
 def balloon(msg:str, title:str=APP_NAME, timeout:int=None, icon:str=None):

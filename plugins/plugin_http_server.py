@@ -3,8 +3,10 @@ import os
 import re
 from hashlib import md5
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import cgi
 import urllib
 import tempfile
+from .tools import dev_print
 
 
 _TASK_TIMEOUT = 60
@@ -19,7 +21,7 @@ class RequestData:
 	'''
 	def __init__(s, client_ip:str, path:str
 					, headers:dict={}, params:dict={}
-					, post_file:str=None):
+					, form_data:dict={}, post_file:str=None):
 		''' client_ip - str
 			path - '/task_name'
 			headers - HTTP request headers
@@ -30,9 +32,10 @@ class RequestData:
 		s.post_file = post_file
 		s.__dict__.update(headers)
 		s.__dict__.update(params)
+		s.__dict__.update(form_data)
 
 	def __getattr__(s, name):
-		return 'unknown property'
+		return f'RequestData - unknown property: {name}'
 
 class HTTPHandlerTasks(BaseHTTPRequestHandler):
 	def __init__(s, request, client_address, server
@@ -42,13 +45,12 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 		super().__init__(request, client_address, server)
 
 	def s_print(s, text:str, data:str=''):
-		now = time.time()
-		year, month, day, hh, mm, ss, x, y, z = time.localtime(now)
-		time_str = f'{day:02}-{month:02}-{year} {hh:02}:{mm:02}:{ss:02}'
 		if s.silent:
-			print(f'{time_str} {text}')
+			print('{} {}'.format(
+				time.strftime('%y.%m.%d %H:%M:%S'), text))
 		else:
-			print(f'{time_str} {text} {data}')
+			print('{} {} {}'.format(
+				time.strftime('%y.%m.%d %H:%M:%S'), text, data))
 	
 	def handle_one_request(s):
 		try:
@@ -86,20 +88,23 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 		s.wfile.write(bytes(page, 'utf-8'))
 
 	def launch_task(s, request_type:str):
-		def start_data_processing(http_dir:str=None):
-			''' Launch data_processing and calculate hash. '''
-			status, data, file_hash_header = s.data_processing(http_dir)
+		def start_data_processing(http_dir:str=None)->tuple:
+			''' Launch data_processing and calculate hash.
+				Returns (status:bool, data:dict, fullpath:str) or
+				(status, error:str, None)
+			'''
+			status, data, fullpath, file_hash_header = \
+				s.data_processing(http_dir)
 			if status:
-				fullpath = data
 				if not file_hash_header:
-					return True, fullpath
+					return True, data, fullpath
 				file_hash_local = _file_hash(fullpath)
 				if file_hash_local == file_hash_header:
-					return True, fullpath
+					return True, data, fullpath
 				else:
-					return False, 'hashes do not match'
+					return False, 'hashes do not match', None
 			else:
-				return False, data
+				return False, data, None
 		if not s.white_list_check():
 			s.headers_and_page('403')
 			return
@@ -120,20 +125,20 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 		for task in s.tasks.task_list_http:
 			if task['task_function_name'] != task_name: continue
 			post_file = None
+			form_data = {}
 			if request_type == 'POST':
-				status, post_file = start_data_processing(
-					http_dir=task['http_dir']
-				)
+				status, data, post_file = start_data_processing(
+					http_dir=task['http_dir'])
 				if not status:
-					s.s_print(f'data_processing error: {post_file}')
+					s.s_print(f'data_processing error: {data}')
 					s.headers_and_page('error')
 					return
+				form_data = data
 			try:
 				req_data = RequestData(
 					client_ip=s.client_address[0]
-					, path=s.path
-					, headers=dict(s.headers)
-					, params=params
+					, path=s.path, headers=dict(s.headers)
+					, params=params, form_data=form_data
 					, post_file=post_file
 				)
 				if task['result']:
@@ -169,59 +174,46 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 
 	def do_GET(s):
 		if 'favicon.' in s.path:
-			if sett.dev: s.s_print(f'favicon request: {s.path}')
+			dev_print(f'favicon request: {s.path}')
 			s.wfile.write(b'<link rel="icon" href="data:,">')
 			return
 		s.launch_task('GET')
 		
 	def data_processing(s, http_dir:str=None)->tuple:
-		''' Writes file on disk, calculates MD5 if 'Content-MD5'
-			header exist.
-			Returns: status, fullpath, md5 or status, error, None
+		''' Reads form data and file from POST request.
+			Writes file on disk, calculates MD5 if 'Content-MD5'
+			header exists.
+			Returns (status, data:dict, fullpath:str, MD5:str)
+			or (status, error:str, None, None)
 		'''
 		try:
-			content_type = s.headers.get('Content-Type', None)
-			if not content_type:
-				return False, "Content-Type does not exist", None
-			boundary = content_type.split('=')[1].encode()
-			remainbytes = int(s.headers['Content-Length'])
-			line = s.rfile.readline()
-			remainbytes -= len(line)
-			if not boundary in line:
-				return False, 'Content not begin with boundary', None
-			line = s.rfile.readline()
-			remainbytes -= len(line)
-			file_name = re.findall(r'Content-Disposition.*name="file";'
-								+' filename="(.*)"', line.decode())
-			if not http_dir: http_dir = tempfile.gettempdir()
-			if file_name:
-				fullpath = http_dir + '\\' + file_name[0]
-			else:
-				fullpath = (http_dir + '\\'
-					+ time.strftime('%m%d%H%M%S') + random_str(5))
-			line = s.rfile.readline()
-			remainbytes -= len(line)
-			with open(fullpath, 'bw+') as file_desc:
-				preline = s.rfile.readline()
-				remainbytes -= len(preline)
-				while remainbytes > 0:
-					line = s.rfile.readline()
-					remainbytes -= len(line)
-					if boundary in line:
-						preline = preline[0:-1]
-						if preline.endswith(b'\r'):
-							preline = preline[0:-1]
-						file_desc.write(preline)
-						break
-					else:
-						file_desc.write(preline)
-						preline = line
-			return True, fullpath, s.headers.get('Content-MD5', None)
+			form = cgi.FieldStorage(
+				fp=s.rfile,
+				headers=s.headers,
+				environ={
+					'REQUEST_METHOD': 'POST'
+					, 'CONTENT_TYPE': s.headers['Content-Type']
+			 	}
+			)
+			data = {}
+			for key in form.keys():
+				if key == 'file': continue
+				data[key] = form.getfirst(key)
+			filename = None
+			if form.getvalue('file', None):
+				if form['file'].file is None:
+					return False, 'File is None', None, None
+				filename = form['file'].filename
+				if not filename:
+					filename = time.strftime('%m%d%H%M%S') + random_str(5)
+				filename = os.path.join(http_dir, filename)
+				with open(filename, "wb") as fd:
+					fd.write(form['file'].file.read())
+			return True, data, filename, s.headers.get('Content-MD5', None)
 		except Exception as e:
-			return False, f'upload error: {repr(e)}', None
+			return False, f'upload error: {repr(e)}', None, None
 
 	def do_POST(s):
-		if sett.dev: s.s_print(s.headers)
 		s.launch_task('POST')
 
 	def log_message(s, format, *args):
@@ -229,8 +221,8 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 
 
 def http_server_start(tasks):
-	''' Start HTTP server that will run tasks.
-		tasks - instance of Tasks class
+	''' Starts HTTP server that will run 'tasks'.
+		tasks - instance of Tasks class.
 	'''
 	try:
 		httpd = ThreadingHTTPServer(
