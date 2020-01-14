@@ -9,6 +9,7 @@ from distutils import dir_util
 from zlib import crc32
 import tempfile
 import hashlib
+import win32api
 from pathlib import Path
 import shutil
 from .tools import random_str
@@ -140,6 +141,7 @@ def dir_create(fullpath:str=None)->str:
 	return fullpath
 
 def dir_delete(fullpath:str):
+	''' Deletes folder with it's contents '''
 	try:
 		shutil.rmtree(fullpath
 		, onerror=lambda func, path, exc: file_delete(path))
@@ -170,7 +172,7 @@ def file_ext(fullpath:str)->str:
 
 def file_basename(fullpath:str)->str:
 	''' Returns basename: file name without 
-		parent folder and suffix.
+		parent folder and extension.
 	'''
 	fname = os.path.basename(fullpath)
 	return os.path.splitext(fname)[0]
@@ -291,8 +293,8 @@ def file_backup(fullpath:str, folder:str=None):
 	)
 	shutil.copy(fullpath, destination)
 
-def free_space(letter:str, unit:str='GB')->int:
-	''' Returns disk free space in GB, MB, KB or B
+def drive_free(letter:str, unit:str='GB')->int:
+	''' Returns drive free space in GB, MB, KB or B
 	'''
 	e = _SIZE_UNITS.get(unit.lower(), 1073741824)
 	return shutil.disk_usage(f'{letter}:\\')[2] // e
@@ -300,6 +302,10 @@ def free_space(letter:str, unit:str='GB')->int:
 def dir_list(fullpath:str)->list:
 	''' Returns list of files in specified folder.
 		Fullpath passed to glob.glob
+		Example (current folder):
+			dir_list('d:\\folder\\*.jpg')
+		with subfolders:
+			dir_list('d:\\folder\\**\\*.jpg')
 	'''
 	recursive = ('**' in fullpath)
 	return glob.glob(fullpath, recursive=recursive)
@@ -349,6 +355,7 @@ def csv_write(fullpath:str, content:list, fieldnames:tuple=None
 	return fullpath
 
 def dir_size(fullpath:str, unit:str='b')->int:
+	''' Returns directory size without symlinks '''
 	e = _SIZE_UNITS.get(unit.lower(), 1)
 	total_size = 0
 	for dirpath, _, filenames in os.walk(fullpath):
@@ -434,3 +441,8 @@ def file_hash(fullpath:str, algorithm:str='crc32')->str:
 		return '%X' % (prev & 0xFFFFFFFF)		
 	else:
 		return 'error: unknown algorithm'
+
+def drive_list()->list:
+	''' Returns a list of local drive letters '''
+	drives = win32api.GetLogicalDriveStrings().split('\000')[:-1]
+	return [d[0].lower() for d in drives]

@@ -1,4 +1,4 @@
-$URL = "http://127.0.0.1/task?send_to&fullpath="
+$URL = "http://127.0.0.1:8275/task?send_to&fullpath="
 foreach ($file in $args) {
     # echo ($URL + [uri]::EscapeUriString($file))
     Invoke-WebRequest -Uri ($URL + [uri]::EscapeUriString($file))

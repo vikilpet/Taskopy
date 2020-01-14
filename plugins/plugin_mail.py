@@ -11,7 +11,7 @@ import imaplib
 from email import message_from_bytes
 from email.header import Header, decode_header, make_header
 import mimetypes
-from .tools import jobs_batch
+from .tools import jobs_batch, var_get, var_set
 
 CC_LIMIT = 35
 _errors = []
@@ -20,6 +20,7 @@ _FORBIDDEN_CHARS = '<>:"/\\|?*\n\r\x1a'
 _MAX_FILE_LEN = 250
 _MAX_ERR_STR_LEN = 200
 _MAX_TITLE_LEN = 80
+_LAST_NUM_VAR = 'last_mail_msg_num_in_'
 
 def _parse_args():
 	parser = argparse.ArgumentParser()
@@ -141,13 +142,16 @@ def mail_check(server:str, login:str, password:str
 	return msg_num, errors
 
 def _get_last_index(folder:str)->int:
-	''' Find last eml file in folder and return his
-		index (number before space).
-	'''
+	''' Get the last used message number '''
+	
+	num = var_get(_LAST_NUM_VAR + folder)
+	if num: return int(num)
 	try:
 		fi_list = glob.glob(folder + r'\*.eml')
 		if fi_list:
-			num = max([int(os.path.basename(x).split()[0]) for x in fi_list])
+			num = max(
+				[int(os.path.basename(x).split()[0]) for x in fi_list]
+			)
 		else:
 			num = 0
 	except Exception as e:
@@ -225,10 +229,7 @@ def mail_download(server:str, login:str, password:str
 				else:
 					last_index += 1
 				filename = '{}\\{} - {}.eml'.format(
-					output_dir
-					, last_index
-					, msg_subj
-				)
+					output_dir, last_index, msg_subj)
 				if len(filename) > _MAX_FILE_LEN:
 					pr(f'name too long (len={len(filename)}):\n{msg_subj}\n')
 					new_len = (
@@ -253,6 +254,7 @@ def mail_download(server:str, login:str, password:str
 					len(msg_subj) > _MAX_TITLE_LEN else msg_subj
 				)
 				if file_ok:
+					var_set(_LAST_NUM_VAR + output_dir, last_index)
 					status, data = imap.copy(msg_id, trash_folder)
 					if status == 'OK':
 						imap.store(msg_id, '+FLAGS', '\\Deleted')
@@ -265,6 +267,7 @@ def mail_download(server:str, login:str, password:str
 			pr('logout')
 			imap.logout()
 	except Exception as e:
+		if sett.dev: raise
 		pr(f'error general: {repr(e)}')
 		return [], [f'error general: {repr(e)}']
 	return subjects, errors
@@ -311,7 +314,7 @@ def mail_download_batch(mailboxes:list, output_dir:str, timeout:int=60
 				else:
 					return False, None
 		except Exception as e:
-			return True, 'Failed to open log file: ' + repr(e)
+			return True, 'Failed to open log file: ' + str(e)
 
 	queue = []
 	try:

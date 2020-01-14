@@ -6,7 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import cgi
 import urllib
 import tempfile
-from .tools import dev_print
+from .tools import dev_print, show_log
 
 
 _TASK_TIMEOUT = 60
@@ -58,7 +58,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			my_req = str(s.raw_requestline, 'iso-8859-1').split()[0].upper()
 			if not my_req in ('GET', 'POST'):
 				s.s_print(
-					f'{s.address_string()} wrong HTTP request'
+					f'{s.address_string()[:20]} wrong HTTP request'
 					+ f' ({len(my_req)}): {my_req[:20]}'
 				)
 		except Exception as e:
@@ -71,7 +71,11 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 				
 	def white_list_check(s):
 		if not sett.white_list: return True
-		if s.address_string() in sett.white_list.split(','):
+		if isinstance(sett.white_list, str):
+			sett.white_list = [
+				ip.strip() for ip in sett.white_list.split(',')
+			]
+		if s.address_string() in sett.white_list:
 			return True
 		if sett.dev:
 			s.log_message(
@@ -80,10 +84,13 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 		return False
 
 	def headers_and_page(s, page:str, status:int=200):
-		''' Write headers and page
+		''' Write headers and page.
 		'''
 		s.send_response(status)
-		s.send_header('Content-Type', 'text/plain; charset=utf-8')
+		if '<!doctype html>' in page[:30].lower():
+			s.send_header('Content-Type', 'text/html; charset=utf-8')
+		else:
+			s.send_header('Content-Type', 'text/plain; charset=utf-8')
 		s.end_headers()
 		s.wfile.write(bytes(page, 'utf-8'))
 
@@ -108,11 +115,22 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 		if not s.white_list_check():
 			s.headers_and_page('403')
 			return
-		if not s.path.startswith('/task?'):
+		try:
+			(_, _, s.url_path, s.url_query
+			, s.url_fragment) = (u.lower() for u in urllib.parse.urlsplit(s.path))
+		except Exception as e:
+			dev_print('wrong url:', s.path[:70], 'exception:', str(e))
+			s.headers_and_page('wrong url')
+			return
+		if not s.url_path in ['/task', '/log']:
 			s.headers_and_page('unknown request')
+			return
+		if s.url_path == '/log':
+			s.headers_and_page(show_log())
+			return
 		try:
 			params = {
-				key:urllib.parse.unquote(value[0])
+				key : urllib.parse.unquote(value[0])
 					for key, value in
 						urllib.parse.parse_qs(s.path).items()
 			}
@@ -121,55 +139,58 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			s.headers_and_page('error')
 			return
 		page = 'error'
-		task_name = s.path.split('?')[1].split('&')[0]
-		for task in s.tasks.task_list_http:
-			if task['task_function_name'] != task_name: continue
-			post_file = None
-			form_data = {}
-			if request_type == 'POST':
-				status, data, post_file = start_data_processing(
-					http_dir=task['http_dir'])
-				if not status:
-					s.s_print(f'data_processing error: {data}')
-					s.headers_and_page('error')
-					return
-				form_data = data
-			try:
-				req_data = RequestData(
-					client_ip=s.client_address[0]
-					, path=s.path, headers=dict(s.headers)
-					, params=params, form_data=form_data
-					, post_file=post_file
-				)
-				if task['result']:
-					result = []
-					s.tasks.run_task(
-						task
-						, caller='http'
-						, data=req_data
-						, result=result
-					)
-					i = 0
-					timeout = 0.001
-					page = 'Timeout'
-					while (not result) and (i < (_TASK_TIMEOUT / timeout)):
-						i += 1
-						time.sleep(timeout)
-					if result: page = str(result[0])
-				else:
-					s.tasks.run_task(
-						task
-						, caller='http'
-						, data=req_data
-					)
-					page = 'OK'
+		task_name = s.url_query.split('&')[0]
+		task = None
+		for t in s.tasks.task_list_http:
+			if task_name == t['task_function_name']:
+				task = t
 				break
-			except Exception as e:
-				s.s_print(f'HTTP task exception: {repr(e)}')
-				page = 'error'
 		else:
 			s.s_print('task not found')
-			page = 'task not found'
+			s.headers_and_page('task not found')
+			return
+		post_file = None
+		form_data = {}
+		if request_type == 'POST':
+			status, data, post_file = start_data_processing(
+				http_dir=task['http_dir'])
+			if not status:
+				s.s_print(f'data_processing error: {data}')
+				s.headers_and_page('error')
+				return
+			form_data = data
+		try:
+			req_data = RequestData(
+				client_ip=s.client_address[0]
+				, path=s.path, headers=dict(s.headers)
+				, params=params, form_data=form_data
+				, post_file=post_file
+			)
+			if task['result']:
+				result = []
+				s.tasks.run_task(
+					task
+					, caller='http'
+					, data=req_data
+					, result=result
+				)
+				i = 0
+				timeout = 0.001
+				page = 'Timeout'
+				while (not result) and (i < (_TASK_TIMEOUT / timeout)):
+					i += 1
+					time.sleep(timeout)
+				if result: page = str(result[0])
+			else:
+				s.tasks.run_task(
+					task
+					, caller='http'
+					, data=req_data
+				)
+				page = 'OK'
+		except Exception as e:
+			s.s_print(f'HTTP task exception: {repr(e)}')
+			page = 'error'
 		s.headers_and_page(page)
 
 	def do_GET(s):
@@ -198,7 +219,12 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			data = {}
 			for key in form.keys():
 				if key == 'file': continue
-				data[key] = form.getfirst(key)
+				if key == 'editable':
+					data[key] = (form.getfirst(key) == 'true')
+				elif form.getfirst(key) == 'undefined':
+					data[key] = ''
+				else:
+					data[key] = form.getfirst(key)
 			filename = None
 			if form.getvalue('file', None):
 				if form['file'].file is None:
@@ -218,7 +244,6 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 
 	def log_message(s, format, *args):
 		if not s.silent: super().log_message(format, *args)
-
 
 def http_server_start(tasks):
 	''' Starts HTTP server that will run 'tasks'.

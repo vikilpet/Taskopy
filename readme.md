@@ -1,18 +1,18 @@
 ﻿# Taskopy
-### Python scheduler for Windows with hotkeys, tray menu, HTTP-server and many more.
+### Platform for running Python-based scripts on Windows with hotkeys, tray menu, HTTP server and many more.
 
 <p align="center">
 	<img src="https://i6.imageban.ru/out/2019/07/04/a6f6538a80bc7a62ab06ce5cea295a93.png">
 </p>
 <!---
-2019-08-19_22-22-53
+2020.01.05 22:26:08
 -->
 Run your python code with hotkey or by HTTP-request just like that:
 
 	def my_task(hotkey='ctrl+shift+t', http=True):
 		print('This is my code!')
 
-Then press Ctrl+Shift+T or open in browser URL http://127.0.0.1/task?my_task and your task will be executed.
+Then press Ctrl+Shift+T or open in browser URL http://127.0.0.1:8275/task?my_task and your task will be executed.
 
 Another example: show message box every day at 10:30 and hide this task from menu:
 
@@ -35,6 +35,8 @@ Another example: show message box every day at 10:30 and hide this task from men
 	- [Cryptography](#cryptography)
 	- [Mikrotik RouterOS](#mikrotik-routeros)
 	- [Winamp](#winamp)
+- [Firefox extension](#firefox-extension)
+- [Context menu](#context-menu)
 - [Help Me](#help-me)
 - [Task Examples](#task-examples)
 
@@ -95,7 +97,7 @@ Format: **option name** (default value) — description.
 - **single** (True) — allow only one instance of running task.
 - **submenu** (None) — place task in this sub menu.
 - **result** (False) — task should return some value. Use together with http option to get page with task results.
-- **http** (False) — run task by HTTP request. HTTP request syntax: http://127.0.0.1/task?your_task_name where «your_task_name» is the name of function from crontab.
+- **http** (False) — run task by HTTP request. HTTP request syntax: http://127.0.0.1:8275/task?your_task_name where «your_task_name» is the name of function from crontab.
 	If option **result** also enabled then HTTP request will show what task will return or 'OK' if there is no value returned.
 	Example:
 
@@ -115,9 +117,9 @@ Format: **option name** (default value) — description.
 		taskopy.exe
 
 	See also [settings](#settings) section for IP and port bindings.
-- **http_dir** — folder where to save files sent via HTTP POST request. If not set then use system temporary folder.
-- **caller** — place this option before other options and in task body you will know who actually launched task this time. Possible values: http, menu, scheduler, hotkey. See *def check_free_space* in [Task Examples](#task-examples).
-- **data** — use together with **http** and place this option before other options and it will filled with HTTP request data and you will able to work with them in task body.
+- **http_dir** - folder where to save files sent via HTTP POST request. If not set then use system temporary folder.
+- **caller** - place this option before other options and in task body you will know who actually launched task this time. Possible values: http, menu, scheduler, hotkey. See *def check_free_space* in [Task Examples](#task-examples).
+- **data** - use together with **http** and place this option before other options and it will filled with HTTP request data and you will able to work with them in task body.
 	*data.client_ip* — IP-address of request.
 	*data.path* — full relative path of request including */task?*
 	*data.post_file* - full path to the received file, which was sent to the task via POST request (see **page_get**).
@@ -133,10 +135,10 @@ Format: **option name** (default value) — description.
 			)
 
 	Type in address bar of browser something like this:
-	http://127.0.0.1/task?alert&text=MyMsg&title=MyTitle
+	http://127.0.0.1:8275/task?alert&text=MyMsg&title=MyTitle
 	and you will see messagebox with title and text from URL.
-- **idle** — Perform the task when the user is idle for the specified time. For example, *idle='5 min'* - run when the user is idle for 5 minutes. The task is executed only once during the inactivity.
-- **err_threshold** — do not report any errors in the task until this threshold is exceeded.
+- **idle** - Perform the task when the user is idle for the specified time. For example, *idle='5 min'* - run when the user is idle for 5 minutes. The task is executed only once during the inactivity.
+- **err_threshold** - do not report any errors in the task until this threshold is exceeded.
 
 ## Settings
 Global settings are stored in *settiings.ini* file.
@@ -145,15 +147,15 @@ Format: **setting** (default value) — description.
 
 - **language** (en) — menu and msgbox language. Variants: en, ru.
 - **editor** (notepad) — text editor for «Edit crontab» menu command.
-- **hide_console** — hide the console window.
+- **hide_console** - hide the console window.
 - **server_ip** (127.0.0.1) — bind HTTP server to this local IP. For access from any address set to *0.0.0.0*.
 	**IT IS DANGEROUS TO ALLOW ACCESS FROM ANY IP!** Do not use *0.0.0.0* in public networks or limit access with firewall.
 - **white_list** (127.0.0.1) — a list of IP addresses separated by commas from which requests are received.
-- **server_port** (80) — HTTP server port.
+- **server_port** (8275) — HTTP server port.
 
 ## Keywords
 ### Miscelanneous
-- **balloon(msg:str, title:str=APP_NAME,timeout:int=None, icon:str=None)** — shows *baloon* message from tray icon. `title` - 63 symbols max, `msg` - 255 symbols. `icon` - 'info', 'warning' or 'error'.
+- **balloon(msg:str, title:str=APP_NAME,timeout:int=None, icon:str=None)** - shows *baloon* message from tray icon. `title` - 63 symbols max, `msg` - 255 symbols. `icon` - 'info', 'warning' or 'error'.
 - **jobs_batch(func_list:list, timeout:int)->list**: — Runs functions (they may not be same) in threads and waits when all of them return result or timeout is expired. *func_list* - list of sublist, where sublist should consist of 3 items: function, (args), {kwargs}. Returns list of *job* objects, where *job* have these attributes: function, args, kwargs, result, time. Example:
 
 		func_list = [
@@ -186,7 +188,7 @@ Format: **setting** (default value) — description.
 	Difference between `jobs_batch` and `job_pool`:
 	- `jobs_batch` - different functions with different arguments, waiting for the function is interrupted after the specified timeout and the results are returned as is, and where the function has not been executed yet, it returns *timeout*. All functions runs in parallel.
 	- `jobs_pool` - same function for different arguments. Only the specified number of instances of the function is executed at the same time.
-- **msgbox(msg:str, title:str=APP_NAME, ui:int=None, wait:bool=True, timeout:int=None)->int** — show messagebox and return user choice.
+- **msgbox(msg:str, title:str=APP_NAME, ui:int=None, wait:bool=True, timeout:int=None)->int** - show messagebox and return user choice.
 	Arguments:
 	*msg* — text
 	*title* — messagebox title
@@ -203,25 +205,26 @@ Format: **setting** (default value) — description.
 			else:
 				print('No :-(')
 
-- **sound_play (fullpath:str, wait:bool)->str** — play .wav file. *wait* — do not pause task execution. If fullpath is a folder then pick random file.
-- **time_now(template:str='%Y-%m-%d_%H-%M-%S')->str** — string with current time.
-- **pause(sec:float)** — pause the execution of the task for the specified number of seconds. *interval* - time in seconds or a string specifying a unit like '5 ms' or '6 sec' or '7 min'.
-- **var_set(var_name:str, value:str)** — save *value* of variable *var_name* to disk so it will persist between program starts.
-- **var_get(var_name:str)->str** — retrieve variable value.
-- **clip_set(txt:str)->** — copy text to clipboard.
-- **clip_get()->str->** — get text from clipboard.
-- **re_find(source:str, re_pattern:str, sort:bool=True)->list** — search in *source* with regular expression.
-- **re_replace(source:str, re_pattern:str, repl:str='')** — replace in *source* all matches with *repl* string.
-- **inputbox(message:str, title:str, is_pwd:bool=False)->str** — show a message with an input request. Returns the entered line or empty string if user pressed cancel.
+- **sound_play (fullpath:str, wait:bool)->str** - play .wav file. *wait* — do not pause task execution. If fullpath is a folder then pick random file.
+- **time_now(template:str='%Y-%m-%d_%H-%M-%S')->str** - string with current time.
+- **pause(sec:float)** - pause the execution of the task for the specified number of seconds. *interval* - time in seconds or a string specifying a unit like '5 ms' or '6 sec' or '7 min'.
+- **var_set(var_name:str, value:str)** - save *value* of variable *var_name* to disk so it will persist between program starts.
+- **var_get(var_name:str)->str** - retrieve variable value.
+- **clip_set(txt:str)->** - copy text to clipboard.
+- **clip_get()->str->** - get text from clipboard.
+- **re_find(source:str, re_pattern:str, sort:bool=True)->list** - search in *source* with regular expression.
+- **re_match(source:str, re_pattern:str, re_flags:int=re.IGNORECASE)->bool** - regexp match.
+- **re_replace(source:str, re_pattern:str, repl:str='')** - replace in *source* all matches with *repl* string.
+- **inputbox(message:str, title:str, is_pwd:bool=False)->str** - show a message with an input request. Returns the entered line or empty string if user pressed cancel.
 	*is_pwd* — hide the typed text.
-- **random_num(a, b)->int** — return a random integer in the range from a to b, including a and b.
-- **random_str(string_len:int=10, string_source:str=None)->str** — generate a string of random characters with a given length.
+- **random_num(a, b)->int** - return a random integer in the range from a to b, including a and b.
+- **random_str(string_len:int=10, string_source:str=None)->str** - generate a string of random characters with a given length.
 
 ### Keyboard
 
-- **keys_pressed(hotkey:str)->bool** — is the key pressed?
-- **keys_send(hotkey:str)** — press the key combination.
-- **keys_write(text:str)** — write a text.
+- **keys_pressed(hotkey:str)->bool** - is the key pressed?
+- **keys_send(hotkey:str)** - press the key combination.
+- **keys_write(text:str)** - write a text.
 
 ### Filesystem
 
@@ -229,8 +232,8 @@ Format: **setting** (default value) — description.
 
 **IMPORTANT: always use double backslash "\\\" in paths!**
 
-- **csv_read(fullpath:str, encoding:str='utf-8', fieldnames=None, delimiter:str=';', quotechar:str='"')->list** — read a CSV file and return the contents as a list of dictionaries.
-- **csv_write(fullpath:str, content:list, fieldnames:tuple=None, encoding:str='utf-8', delimiter:str=';', quotechar:str='"', quoting:int=csv.QUOTE_MINIMAL)->str** — writes the list of dictionaries as a CSV file. If *fieldnames* is not specified - it takes the keys of the first dictionary as headers. Returns the full path to the file. *content* example:
+- **csv_read(fullpath:str, encoding:str='utf-8', fieldnames=None, delimiter:str=';', quotechar:str='"')->list** - read a CSV file and return the contents as a list of dictionaries.
+- **csv_write(fullpath:str, content:list, fieldnames:tuple=None, encoding:str='utf-8', delimiter:str=';', quotechar:str='"', quoting:int=csv.QUOTE_MINIMAL)->str** - writes the list of dictionaries as a CSV file. If *fieldnames* is not specified - it takes the keys of the first dictionary as headers. Returns the full path to the file. *content* example:
 
 		[
 			{'name': 'some name',
@@ -239,8 +242,9 @@ Format: **setting** (default value) — description.
 			'number': 2}
 			...	
 		]
-- **dir_delete(fullpath:str)** — delete directory.
-- **dir_list(fullpath:str)->list:** — get list of files in directory.
+- **dir_delete(fullpath:str)** - delete directory.
+- **dir_exists(fullpath:str)->bool** - directory exists?
+- **dir_list(fullpath:str)->list:** - get list of files in directory.
 	Examples:
 	- Get a list of all log files in 'c:\\\Windows' **without** subfolders:
 
@@ -250,39 +254,46 @@ Format: **setting** (default value) — description.
 
 		dir_list('c:\\Windows\\**\\*.log')
 
-- **dir_zip(source:str, destination:str)->str** — zip the folder return the path to the archive.
-- **file_backup(fullpath, folder:str=None)** — make copy of file with added timestamp.
+- **dir_size(fullpath:str, unit:str='b')->int** - folder size in specified units.
+- **dir_zip(source:str, destination:str)->str** - zip the folder return the path to the archive.
+- **drive_list()->list** - list of logical drives.
+- **file_basename(fullpath:str)->str** - returns basename: file name without parent folder and extension.
+- **file_backup(fullpath, folder:str=None)** - make copy of file with added timestamp.
 	*folder* — place copy to this folder. If omitted — place in original folder.
-- **file_copy(fullpath:str, destination:str)** — copy file to destination (fullpath or just folder).
-- **file_delete(fullpath:str)** — delete file.
-- **file_dir(fullpath:str)->str:** — get parent directory name of file.
+- **file_copy(fullpath:str, destination:str)** - copy file to destination (fullpath or just folder).
+- **file_delete(fullpath:str)** - delete file.
+- **file_dialog(title:str=None, multiple:bool=False, default_dir:str='', default_file:str='', wildcard:str='', on_top:bool=True)** - Shows standard file dialog and returns fullpath or list of fullpaths if _multiple_ == True.
+- **file_dir(fullpath:str)->str:** - get parent directory name of file.
+- **file_exists(fullpath:str)->bool** - file exists?
+- **file_ext(fullpath:str)->str** - file extension in lower case without dot.
 - **file_hash(fullpath:str, algorithm:str='crc32')->str** - returns hash of file. *algorithm* - 'crc32' or 'md5'.
-- **file_log(fullpath:str, message:str, encoding:str='utf-8', time_format:str='%Y.%m.%d %H:%M:%S')** — log *message* to *fullpath* file.
-- **file_move(fullpath:str, destination:str)** — move file to destination folder or file.
-- **file_name(fullpath:str)->str:** — get file name without directory.
-- **file_read(fullpath:str)->str:** — get content of file.
-- **file_rename(fullpath:str, dest:str)->str** — rename the file. *dest* is the full path or just a new file name without a folder.
-- **file_size(fullpath:str, unit:str='b')->bool:** — get size of file in units (gb, mb, kb, b).
-- **file_write(fullpath:str, content=str)** — write content to file.
-- **file_zip(fullpath, destination:str)->str** — compress a file or files into an archive.
+- **file_log(fullpath:str, message:str, encoding:str='utf-8', time_format:str='%Y.%m.%d %H:%M:%S')** - log *message* to *fullpath* file.
+- **file_move(fullpath:str, destination:str)** - move file to destination folder or file.
+- **file_name(fullpath:str)->str:** - get file name without directory.
+- **file_name_fix(fullpath:str, repl_char:str='\_')->str** - replaces forbidden characters with _repl_char_. Removes leading and trailing spaces. Adds '\\\\?\\' for long paths.
+- **file_read(fullpath:str)->str:** - get content of file.
+- **file_rename(fullpath:str, dest:str)->str** - rename the file. *dest* is the full path or just a new file name without a folder.
+- **file_size(fullpath:str, unit:str='b')->bool:** - get size of file in units (gb, mb, kb, b).
+- **file_write(fullpath:str, content=str)** - write content to file.
+- **file_zip(fullpath, destination:str)->str** - compress a file or files into an archive.
 	*fullpath* — a string with a full file name or a list of files.
 	*destiniation* — full path to the archive.
-- **free_space(letter:str, unit:str='GB')->int:** — get disk free space in units (gb, mb, kb, b).
-- **is_directory(fullpath:str)->bool:** — fullpath is directory?
-- **path_exists(fullpath:str)->bool:** — fullpath exists (no matter is it folder or file)?
-- **dir_purge(fullpath:str, days:int=0, recursive=False, creation:bool=False, test:bool=False)** — delete files from folder *fullpath* older than n *days*.
+- **drive_free(letter:str, unit:str='GB')->int:** - get drive free space in units (gb, mb, kb, b).
+- **is_directory(fullpath:str)->bool:** - fullpath is directory?
+- **path_exists(fullpath:str)->bool:** - fullpath exists (no matter is it folder or file)?
+- **dir_purge(fullpath:str, days:int=0, recursive=False, creation:bool=False, test:bool=False)** - delete files from folder *fullpath* older than n *days*.
 	If *days* == 0 then delete all files.
 	*creation* — use date of creation, otherwise use last modification date.
 	*recursive* — delete from subfolders too.
 	*test* — do not actually delete files, only print them.
-- **temp_dir(new_dir:str=None)->str** — returns the path to the temporary folder. If *new_dir* is specified, it creates a subfolder in the temporary folder and returns its path.
-- **temp_file(suffix:str='')->str** — returns the name for the temporary file.
+- **temp_dir(new_dir:str=None)->str** - returns the path to the temporary folder. If *new_dir* is specified, it creates a subfolder in the temporary folder and returns its path.
+- **temp_file(suffix:str='')->str** - returns the name for the temporary file.
 
 ### Network
-- **domain_ip(domain:str)->list** — get a list of IP-addresses by domain name.
-- **file_download(url:str, destination:str=None)->str:** — download file and return fullpath.
+- **domain_ip(domain:str)->list** - get a list of IP-addresses by domain name.
+- **file_download(url:str, destination:str=None)->str:** - download file and return fullpath.
 	*destination* — it may be None, fullpath or folder. If None then download to temporary folder with random name.
-- **html_element(url:str, find_all_args)->str:** — download page and retrieve value of html element.
+- **html_element(url:str, find_all_args)->str:** - download page and retrieve value of html element.
 	*find_all_args* — dictionary that contain element information such as name or attributes.
 	*number* - item number, if there are several of them found.
 	Example:
@@ -295,42 +306,44 @@ Format: **setting** (default value) — description.
 		}
 
 	See *get_current_ip* in [task examples](#task-examples)
-- **is_online(*sites, timeout:int=2)->int:** — checks if you have access to the Internet using HEAD queries to specified sites. If sites are not specified, then use google and yandex.
-- **json_element(url:str, element:list)** — same as **html_element** but for json.
+- **html_clean(html_str:str, separator=' ')->str** - removes HTML tags from string.
+- **is_online(*sites, timeout:int=2)->int:** - checks if you have access to the Internet using HEAD queries to specified sites. If sites are not specified, then use google and yandex.
+- **json_element(url:str, element:list)** - same as **html_element** but for json.
 	*element* — a list with a map to desired item.
 	Example: *element=['usd', 2, 'value']*
-- **page_get(url:str, encoding:str='utf-8', post_file:str=None, post_hash:bool=False)->str:** — download page by url and return it's html as a string. *post_file* - send this file with POST request. *post_hash* - add the checksum of the file to request headers to check the integrity (see [Task Options](#task-options)).
-- **url_hostname(url:str)->str** — extract the domain name from the URL.
+- **page_get(url:str, encoding:str='utf-8', post_file:str=None, post_hash:bool=False)->str:** - download page by url and return it's html as a string. *post_file* - send this file with POST request. *post_hash* - add the checksum of the file to request headers to check the integrity (see [Task Options](#task-options)).
+- **pc_name()->str** - computer name.
+- **url_hostname(url:str)->str** - extract the domain name from the URL.
 
 ### System
 In the functions for working with windows, the *window* argument can be either a string with the window title or a number representing the window handle.
 
-- **free_ram(unit:str='percent')** — amount of free memory. *unit* — 'kb', 'mb'... or 'percent'.
-- **idle_duration(unit:str='msec')->int** — how much time has passed since user's last activity.
-- **monitor_off()** — turn off the monitor.
-- **registry_get(fullpath:str)** — get value from Windows Registry.
+- **free_ram(unit:str='percent')** - amount of free memory. *unit* — 'kb', 'mb'... or 'percent'.
+- **idle_duration(unit:str='msec')->int** - how much time has passed since user's last activity.
+- **monitor_off()** - turn off the monitor.
+- **registry_get(fullpath:str)** - get value from Windows Registry.
 	*fullpath* — string like 'HKEY_CURRENT_USER\\Software\\Microsoft\\Calc\\layout'
-- **window_activate(window=None)->int** — bring window to front. *window* may be a string with title or integer with window handle.
-- **window_find(title:str)->list** — find window by title. Returns list of all found windows.
-- **window_hide(window=None)->int** — hide window.
-**- window_on_top(window=None, on_top:bool=True)->int** — makes the window to stay always on top.
-- **window_show(window=None)->int** — show window.
-- **window_title_set(window=None, new_title:str='')->int** — change window title from *cur_title* to *new_title*
+- **window_activate(window=None)->int** - bring window to front. *window* may be a string with title or integer with window handle.
+- **window_find(title:str)->list** - find window by title. Returns list of all found windows.
+- **window_hide(window=None)->int** - hide window.
+**- window_on_top(window=None, on_top:bool=True)->int** - makes the window to stay always on top.
+- **window_show(window=None)->int** - show window.
+- **window_title_set(window=None, new_title:str='')->int** - change window title from *cur_title* to *new_title*
 
 ### Mail
-- **mail_check(server:str, login:str, password:str, folders:list=['inbox'], msg_status:str='UNSEEN')->tuple** — returns the number of new emails and a list of errors.
-- **mail_download(server:str, login:str, password:str, output_dir:str, folders:list=['inbox'], trash_folder:str='Trash')->tuple** — downloads all messages to the specified folder. Successfully downloaded messages are moved to the IMAP *trash_folder* folder on the server. Returns the list with decoded message subjects and the list of errors.
-- **mail_send(recipient:str, subject:str, message:str, smtp_server:str, smtp_port:int, smtp_user:str, smtp_password:str)** — send email.
+- **mail_check(server:str, login:str, password:str, folders:list=['inbox'], msg_status:str='UNSEEN')->tuple** - returns the number of new emails and a list of errors.
+- **mail_download(server:str, login:str, password:str, output_dir:str, folders:list=['inbox'], trash_folder:str='Trash')->tuple** - downloads all messages to the specified folder. Successfully downloaded messages are moved to the IMAP *trash_folder* folder on the server. Returns the list with decoded message subjects and the list of errors.
+- **mail_send(recipient:str, subject:str, message:str, smtp_server:str, smtp_port:int, smtp_user:str, smtp_password:str)** - send email.
 
 ### Process
-- **app_start(app_path:str, app_args:str='', wait:bool=False)** — start application. If *wait=True* — returns process return code, if *False* — returns PID of created process.
+- **app_start(app_path:str, app_args:str='', wait:bool=False)** - start application. If *wait=True* — returns process return code, if *False* — returns PID of created process.
 	*app_path* — path to executable file.
 	*app_args* — command-line arguments.
 	*wait* — wait until application will be closed.
-- **file_open(fullpath:str)** — open file or URL in default application.
-- **process_close(process, timeout:int=10)** — soft completion of the process: first all windows belonging to the specified process are closed, and after the timeout (in seconds) the process itself is killed, if still exists.
-- **process_exist(process, cmd:str=None)->bool** — checks whether the process exists and returns a PID or False. *cmd* is an optional command line search. This way you can distinguish between processes with the same executable but different command lines.
-- **process_list(name:str='')->list** — get list of processes with that name. Item in list have this attributes:
+- **file_open(fullpath:str)** - open file or URL in default application.
+- **process_close(process, timeout:int=10)** - soft completion of the process: first all windows belonging to the specified process are closed, and after the timeout (in seconds) the process itself is killed, if still exists.
+- **process_exist(process, cmd:str=None)->bool** - checks whether the process exists and returns a PID or False. *cmd* is an optional command line search. This way you can distinguish between processes with the same executable but different command lines.
+- **process_list(name:str='')->list** - get list of processes with that name. Item in list have this attributes:
 	*pid* — PID of found process.
 	*name* — short name of executable.
 	*username* — username.
@@ -341,11 +354,11 @@ In the functions for working with windows, the *window* argument can be either a
 		for proc in process_list('firefox.exe'):
 			print(proc.pid)
 
-- **process_cpu(pid:int, interval:int=1)->float** — CPU usage of process with specified PID. *interval* in seconds - how long to measure.
-- **process_kill(process)** — kill process or processes. *process* may be an integer so only process with this PID will be terminated. If *process* is a string then kill every process with that name.
-- **service_start(service:str, args:tuple=None)** — starts the service.
-- **service_stop(service:str)->tuple** — stops the service.
-- **service_running(service:str)->bool** — the service is up and running?
+- **process_cpu(pid:int, interval:int=1)->float** - CPU usage of process with specified PID. *interval* in seconds - how long to measure.
+- **process_kill(process)** - kill process or processes. *process* may be an integer so only process with this PID will be terminated. If *process* is a string then kill every process with that name.
+- **service_start(service:str, args:tuple=None)** - starts the service.
+- **service_stop(service:str)->tuple** - stops the service.
+- **service_running(service:str)->bool** - the service is up and running?
 - **wts_message(sessionid:int, msg:str, title:str, style:int=0, timeout:int=0, wait:bool=False)** - sends message to WTS session. *style* - styles like in msgbox (0 - MB_OK). *timeout* - timeout in seconds (0 - no timeout). Returns same values as msgbox.
 - **wts_cur_sessionid()->int** - returns SessionID of current process
 - **wts_logoff(sessionid:int, wait:bool=False)->int** - logoffs session. *wait* - wait for completion.
@@ -353,12 +366,12 @@ In the functions for working with windows, the *window* argument can be either a
 
 ### Cryptography
 - **file_enc_write(fullpath:str, content:str, password:str, encoding:str='utf-8')->tuple**: — encrypts content with password and writes to a file. Adds salt as file extension. Returns status, fullpath/error.
-- **file_enc_read(fullpath:str, password:str, encoding:str='utf-8')->tuple** — decrypts the contents of the file and returns status, content/error
-- **file_encrypt(fullpath:str, password:str)->tuple** — encrypts file with password. Returns status, fullpath/error. Adds salt as file extension.
-- **file_decrypt(fullpath:str, password:str)->tuple** — decrypts file with password. Returns status, fullpath/or error.
+- **file_enc_read(fullpath:str, password:str, encoding:str='utf-8')->tuple** - decrypts the contents of the file and returns status, content/error
+- **file_encrypt(fullpath:str, password:str)->tuple** - encrypts file with password. Returns status, fullpath/error. Adds salt as file extension.
+- **file_decrypt(fullpath:str, password:str)->tuple** - decrypts file with password. Returns status, fullpath/or error.
 
 ### Mikrotik RouterOS
-- **routeros_query(query:list, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — send query to router and get status and data. Please read wiki [wiki](https://wiki.mikrotik.com/wiki/Manual:API) about query syntax.
+- **routeros_query(query:list, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** - send query to router and get status and data. Please read wiki [wiki](https://wiki.mikrotik.com/wiki/Manual:API) about query syntax.
 	Example — get information about interface 'bridge1':
 
 		status, data = routeros_query(
@@ -400,7 +413,7 @@ In the functions for working with windows, the *window* argument can be either a
 		'=disabled': 'false',
 		'=comment': 'lan'}]
 
-- **routeros_send(cmd:str, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — send command to router and get status and error.
+- **routeros_send(cmd:str, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** - send command to router and get status and error.
 	Example: get list of static items from specified address-list then delete them all:
 
 		status, data = routeros_query(
@@ -436,7 +449,7 @@ In the functions for working with windows, the *window* argument can be either a
 			, device_pwd='PaSsWorD'
 		)	
 
-- **routeros_find_send(cmd_find:list, cmd_send:list, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — find all id's and perform some action on them.
+- **routeros_find_send(cmd_find:list, cmd_send:list, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** - find all id's and perform some action on them.
 	*cmd_find* — list with API *print* command to find what we need.
 	*cmd_send* — list with action to perform.
 	Example — remove all static entries from address-list *my_list*:
@@ -454,77 +467,119 @@ In the functions for working with windows, the *window* argument can be either a
 		)
 
 ### Winamp
-- **winamp_close** — close Winamp.
-- **winamp_fast_forward** — fast forward 5 sec.
-- **winamp_fast_rewind** — rewind 5 sec.
-- **winamp_notification()** — show notification (for «Modern» skin only).
-- **winamp_pause()** — pause.
-- **winamp_play()** — play.
-- **winamp_status()->str:** — playback status ('playing', 'paused' or 'stopped').
-- **winamp_stop()** — stop.
-- **winamp_toggle_always_on_top** — toggle always on top.
-- **winamp_toggle_main_window** — show/hide Winamp window.
-- **winamp_toggle_media_library** — show/hide media library.
-- **winamp_track_info(sep:str='   ')->str:** — return string with samplerate, bitrate and channels. *sep* — separator.
-- **winamp_track_length()->str:** — track length.
-- **winamp_track_title(clean:bool=True)->str:** — current track title.
+- **winamp_close** - close Winamp.
+- **winamp_fast_forward** - fast forward 5 sec.
+- **winamp_fast_rewind** - rewind 5 sec.
+- **winamp_notification()** - show notification (for «Modern» skin only).
+- **winamp_pause()** - pause.
+- **winamp_play()** - play.
+- **winamp_status()->str:** - playback status ('playing', 'paused' or 'stopped').
+- **winamp_stop()** - stop.
+- **winamp_toggle_always_on_top** - toggle always on top.
+- **winamp_toggle_main_window** - show/hide Winamp window.
+- **winamp_toggle_media_library** - show/hide media library.
+- **winamp_track_info(sep:str='   ')->str:** - return string with samplerate, bitrate and channels. *sep* — separator.
+- **winamp_track_length()->str:** - track length.
+- **winamp_track_title(clean:bool=True)->str:** - current track title.
+
+## Firefox extension
+https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/
+
+Extension adds item to context menu. With it you can run task in Taskopy. In object _data_ of this task will be passed this (if any):
+	- data.page_url - URL of current page
+	- data.link_url - URL of link that was clicked
+	- data.editable - it is editable field?
+	- data.selection - selectioin text
+	- data.media_type - type of object (image, video etc)
+	- data.src_url - link to object source.
+
+_editable_ property is boolean, the rest are strings.
+
+In the extension settings specify the URL of your task that will process data, for example:
+
+	http://127.0.0.1:8275/task?get_data_from_browser
+
+This task should have _data_ and _http=True_ properties.
+
+Example - play Youtube video in PotPlayer:
+
+	def get_data_from_browser(data, http=True, menu=False, log=False):
+		if ('youtube.com' in data.link_url
+		or 'youtu.be' in data.link_url):
+			app_start(
+				r'c:\Program Files\DAUM\PotPlayer\PotPlayerMini64.exe'
+				, data.link_url
+			)
+
+## Context menu
+You can add Taskopy to the *Send to* submenu of context menu.
+
+There is a simple powershell script *Taskopy.ps1* in *resources* directory. You need to create a shortcut to this script in user directory:
+
+	%APPDATA%\Microsoft\Windows\SendTo\
+
+Task name is _send\_to_ by default. This task must have properties _data_ and _http_ so inside task you can access the full path of file via _data.fullpath_
+
+Example - pass the file name to the task _virustotal\_demo_ from [Task examples](#task-examples):
+
+	def send_to(data, http, menu=False, log=False):
+		if file_ext(data.fullpath) in ['exe', 'msi']:
+			virustotal_demo(data.fullpath)
+
+Inside _virustotal\_demo_ you can see another way to pass a file name to a task - via **file_dialog**
 
 ## Help me
 - [My StackOverflow question about menu by hotkey in wxPython](https://stackoverflow.com/questions/56079269/wxpython-popupmenu-by-global-hotkey) You can add a bounty if you have a lot of reputation.
 - [Donate via PayPal](https://www.paypal.me/vikil)
 
 ## Task examples
+- iPython + plugins
+- Disk free space
+- Current IP address
+- Add IP-address to MikroTik router
+- Virustotal check
 
-	# Launch iPython and copy all plugins to the clipboard
-	# to quickly paste and access all keywords:
-	def iPython(submenu='Rare', task_name='iPython + plugins'):
-		# softly close existing application:
-		process_close('ipython.exe')
-		# start new process in new console:
+Launch iPython (Jupyter) and copy all plugins to the clipboard to quickly paste and access all keywords:
+
+	def iPython_demo(submenu='demo', task_name='iPython + plugins'):
+		app_dir = r'd:\soft\taskopy'
+
+		# Softly close existing process:
+		process_close('ipython.exe', 3)
+		# Run new process in new console:
 		app_start('ipython', shell=True)
-		# get all plugins from 'plugins' folder:
 		plugs = dir_list('plugins\\*.py')
-		# Add 'from ... import *':
 		plugs[:] = [
 			'from ' + pl[:-3].replace('\\', '.')
 			+ ' import *' for pl in plugs
 		]
-		# give the process time to boot up:
-		while not 'IPython' in window_title_get(): pause('100 ms')
+		for _ in range(100):
+			if 'ipython' in window_title_get().lower():
+				break
+			pause('100 ms')
 		pause(1)
-		# import from plug-ins:
+		if not 'ipython'.lower() in window_title_get().lower():
+			tprint('ipython not found')
+			return
+		keys_write(r'%cd {}'.format(app_dir))
+		keys_send('enter')
 		keys_write(
 			r'%load_ext autoreload' + '\n'
 			+ r'%autoreload 2' + '\n'
 			+ '\n'.join(plugs)
 		)
 		pause('200 ms')
-		# send control + enter to complete the command:
 		keys_send('ctrl+enter')
 
+ Check the free space on all local discs. Scheduled for a random interval between 30 and 45 minutes:
+ 
+	def check_free_space_demo(submenu='demo'
+	, schedule='every(30).to(45).minutes'):
+		for d in drive_list():
+			if drive_free(d) < 10:
+				msgbox(f'low disk space: {d}')
 
-	# Check the free space on all discs.
-	# Add 'caller' to task arguments so inside task you can check
-	# how task was called.
-	# Scheduled to random interval between 30 and 45 minutes
-	def check_free_space(caller, schedule='every(30).to(45).minutes'):
-		# If task was runned from menu then show messagebox
-		if caller == 'menu':
-			msg = (
-				'Free space in GB:\n'
-				+ f'c: {free_space("c")}\n'
-				+ f'd: {free_space("d")}\n'
-				+ f'e: {free_space("e")}\n'
-			)
-			# messagebox will auto-closed after 3 seconds:
-			msgbox(msg, timeout=3)
-		else:
-			# Task is launched by scheduler
-			# check free space in C, D, E and show alert only if
-			# there is less than 3 GB left:
-			for l in 'cde':
-				if free_space(l) < 3:
-					msgbox(f'Low disk space: {l.upper()}')
+Show message with current IP-address using dyndns.org:
 
 	def get_current_ip():
 		# Get the text of the HTML-tag 'body' from the checkip.dyndns.org page
@@ -533,11 +588,11 @@ In the functions for working with windows, the *window* argument can be either a
 			'http://checkip.dyndns.org/'
 			, {'name':'body'}
 		).split(': ')[1]
-		print(f'Current IP: {ip}')
+		tprint(f'Current IP: {ip}')
 		msgbox(f'Current IP: {ip}', timeout=10)
 
-	# Add the IP-address from the clipboard to the address-list
-	# of Mikrotik router
+Add the IP-address from the clipboard to the address-list of Mikrotik router:
+
 	def add_ip_to_list():
 		routeros_send(
 			[
@@ -550,3 +605,22 @@ In the functions for working with windows, the *window* argument can be either a
 			, device_pwd='PaSsWoRd'
 		)
 		msgbox('Done!', timeout=3)
+
+Check MD5 hash of file in the Virustotal. You need to register to obtain free API key:
+
+	def virustotal_demo(fullpath:str=None, submenu='demo'):
+		APIKEY = 'your API key'
+		if not fullpath:
+			fullpath = file_dialog('Virustotal', wildcard='*.exe;*.msi')
+			if not fullpath:
+				return
+		md5 = file_hash(fullpath, 'md5')
+		scan_result = json_element(f'https://www.virustotal.com/vtapi/v2/file/report?apikey={APIKEY}&resource={md5}')
+		if scan_result['response_code'] == 0:
+			msgbox('Unknown file', timeout=3)
+			return
+		res = DictToObj(scan_result)
+		for av in res.scans.keys():
+			if res.scans[av]['detected']:
+				print(f'{av}: ' + res.scans[av]['result'])
+		msgbox(f'Result: {res.positives} of {res.total}', timeout=5)

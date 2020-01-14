@@ -19,7 +19,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2019-12-24'
+APP_VERSION = 'v2020-01-14'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 TASK_OPTIONS = [
@@ -44,6 +44,10 @@ TASK_OPTIONS = [
 	, ['err_counter', False]
 	, ['no_print', False]
 	, ['idle', None]
+	, ['on_load', False]
+	, ['rule', None]
+	, ['thread', None]
+	, ['last_start', None]
 ]
 
 APP_SETTINGS=[
@@ -52,12 +56,13 @@ APP_SETTINGS=[
 	, ['menu_hotkey', None]
 	, ['editor', 'notepad.exe']
 	, ['server_ip', '127.0.0.1']
-	, ['server_port', 80]
+	, ['server_port', 8275]
 	, ['white_list', '127.0.0.1']
 	, ['server_silent', True]
 	, ['hide_console', False]
 	, ['kiosk', False]
 	, ['kiosk_key', 'shift']
+	, ['log_file_name', '%Y.%m.%d']
 ]
 
 _DEFAULT_INI = '''[General]
@@ -130,13 +135,13 @@ def sound_play(fullpath, wait=False):
 	else:
 		winsound.PlaySound(fi, winsound.SND_FILENAME + winsound.SND_ASYNC)
 
-def dev_print(*msg):
+def dev_print(*msg, **kwargs):
 	d = False
 	if getattr(__builtins__, 'sett', None):
 		d = sett.dev
 	else:
 		d = True
-	if d: tprint(*msg)
+	if d: tprint(*msg, **kwargs)
 
 def con_log(*msgs):
 	''' Log to console and logfile
@@ -150,14 +155,14 @@ def con_log(*msgs):
 		)
 	try:
 		with open(
-			f"log\\{time.strftime('%Y.%m.%d')}.log"
+			f'log\\{time.strftime(sett.log_file_name)}.log'
 			, 'ta+', encoding='utf-8'
 		) as f:
 			f.write(log_str)
 	except FileNotFoundError:
 		os.makedirs('log')
 		with open(
-			f"log\\{time.strftime('%Y.%m.%d')}.log"
+			f'log\\{time.strftime(sett.log_file_name)}.log'
 			, 'ta+', encoding='utf-8'
 		) as f:
 			f.write(log_str)
@@ -221,6 +226,7 @@ def var_set(var_name:str, value:str):
 	''' Store variable value in db.sqlite3 in table "variables"
 		It needs sqlite version 3.24+ (just replace dll)
 	'''
+	value = str(value).replace("'", "''")
 	try:
 		conn = sqlite3.connect(_DB_FILE)
 		cur = conn.cursor()
@@ -231,6 +237,7 @@ def var_set(var_name:str, value:str):
 					''')
 		conn.commit()
 	except sqlite3.OperationalError:
+		if sett.dev: raise
 		_create_table_var()
 		cur.execute(f'''INSERT INTO variables (vname, vvalue)
 						VALUES('{var_name}', '{value}')
@@ -271,7 +278,7 @@ def clip_get()->str:
 	return pyperclip.paste()
 
 def re_find(source:str, re_pattern:str, sort:bool=False
-, re_flags:int=re.IGNORECASE)->list:
+, unique:bool=True, re_flags:int=re.IGNORECASE)->list:
 	r''' Return list with matches.
 		re_flags:
 			re.IGNORECASE	ignore case
@@ -282,11 +289,8 @@ def re_find(source:str, re_pattern:str, sort:bool=False
 			re.VERBOSE	allow comment in regex.
 		Non-capturing group: (?:aaa)
 	'''
-	matches = list(
-		set(
-			re.findall(re_pattern, source, flags=re_flags)
-		)
-	)
+	matches = re.findall(re_pattern, source, flags=re_flags)
+	if unique: matches = list(set(matches))
 	if sort: matches.sort()
 	return matches
 
@@ -558,7 +562,7 @@ def file_dialog(title:str=None, multiple:bool=False
 , wildcard:str='', on_top:bool=True):
 	''' Shows standard file dialog
 		and returns fullpath or list of fullpaths
-		if multiple=True.
+		if multiple == True.
 		Will not work in console.
 	'''
 	if not title:
@@ -654,8 +658,17 @@ def jobs_batch(func_list:list, timeout:int
 	for li in func_list:
 		job = {}
 		job['func'] = li[0]
-		job['args'] = li[1]
-		job['kwargs'] = li[2]
+		if len(li) > 1:
+			if isinstance(li[1], (list, tuple)):
+				job['args'] = li[1]
+			else:
+				job['args'] = [li[1]]
+		else:
+			job['args'] = []
+		if len(li) > 2:
+			job['kwargs'] = li[2]
+		else:
+			job['kwargs'] = {}
 		job['result'] = []
 		job['time'] = None
 		jobs.append(job)
@@ -689,7 +702,7 @@ def tprint(*msgs, **kwargs):
 	msgs = list(msgs)
 	if not parent in ['dev_print', 'con_log']:
 		msgs.insert(0, parent + ':')
-	print(time.strftime('%y.%m.%d %H:%M:%S'), *msgs)
+	print(time.strftime('%y.%m.%d %H:%M:%S'), *msgs, **kwargs)
 
 def balloon(msg:str, title:str=APP_NAME, timeout:int=None, icon:str=None):
 	''' Show balloon. title - 63 symbols max, msg - 255.
@@ -704,5 +717,15 @@ def balloon(msg:str, title:str=APP_NAME, timeout:int=None, icon:str=None):
 			, 'warning': wx.ICON_WARNING
 		}.get(icon.lower(), wx.ICON_INFORMATION)
 	app.taskbaricon.ShowBalloon(**kwargs)
+
+def show_log():
+	''' Returns current log file content '''
+	try:
+		fname = f'log\\{time.strftime(sett.log_file_name)}.log'
+		with open(fname, 'tr', encoding='utf-8') as l:
+			return l.read()
+	except Exception as e:
+		dev_print(str(e))
+		return f'error: log not found - {fname}'
 
 

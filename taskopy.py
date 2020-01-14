@@ -44,7 +44,7 @@ else:
 APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
 _TIME_UNITS = {'msec':1, 'ms':1, 'sec':1000, 's':1000, 'min':60000
-				,'m':60000, 'hour':3600000, 'h':3600000}
+	,'m':60000, 'hour':3600000, 'h':3600000}
 
 set_title = ctypes.windll.kernel32.SetConsoleTitleW
 	
@@ -85,14 +85,25 @@ def load_crontab(event=None)->bool:
 	global crontab
 	con_log(f'{lang.load_crontab} {os.getcwd()}')
 	try:
+		run_bef_reload = {}
 		if sys.modules.get('crontab') is None:
 			crontab = importlib.import_module('crontab')
 		else:
+			for task in tasks.task_list:
+				if not task['thread']: continue
+				run_bef_reload[task['task_function_name']] = task['thread']
 			tasks.close()
 			del sys.modules['crontab']
 			del crontab
 			crontab = importlib.import_module('crontab')
 		tasks = Tasks()
+		for key, value in run_bef_reload.items():
+			dev_print('still running', key)
+			for task in tasks.task_list:
+				if task['task_function_name'] == key:
+					task['thread'] = value
+					task['running'] = True
+		tasks.run_at_crontab_load()
 		tasks.enabled = app.enabled
 		return True
 	except Exception as e:
@@ -123,6 +134,7 @@ class Tasks:
 		s.task_list_sys_startup = []
 		s.task_list_http = []
 		s.task_list_idle = []
+		s.task_list_crontab_load = []
 		s.idle_min = 0
 		s.http_server = None
 		s.global_hk = None
@@ -166,6 +178,8 @@ class Tasks:
 				s.task_list_startup.append(task_opts)
 			if task_opts['sys_startup']:
 				s.task_list_sys_startup.append(task_opts)
+			if task_opts['on_load']:
+				s.task_list_crontab_load.append(task_opts)
 			s.task_list.append(task_opts)
 			if task_opts['menu']:
 				if task_opts['submenu']:
@@ -278,6 +292,10 @@ class Tasks:
 			for task in s.task_list_sys_startup:
 				s.run_task(task, caller='sys_startup')
 	
+	def run_at_crontab_load(s):
+		for task in s.task_list_crontab_load:
+			s.run_task(task, caller='load')
+	
 	def task_opt_set(s, task_function_name:str, option:str, value):
 		''' Set option from task dict in tasks.task_list
 		'''
@@ -292,7 +310,7 @@ class Tasks:
 		for task in s.task_list:
 			if task['task_function_name'] == task_function_name:
 				return task.get(option
-						, 'task_opt_get error: option not found')
+					, 'task_opt_get error: option not found')
 		else:
 			return 'task_opt_get error: task not found'
 
@@ -312,13 +330,22 @@ class Tasks:
 		def run_task_inner(result:list=None):
 			def catcher(result:list=None):
 				try:
-					s.task_opt_set(task['task_function_name'], 'running', True)
+					s.task_opt_set(task['task_function_name']
+						, 'running', True)
+					s.task_opt_set(task['task_function_name']
+						, 'thread', threading.current_thread().name)
 					task_kwargs = {}
-					func_args = inspect.signature(task['task_function']).parameters.keys()
+					func_args = [
+						k.lower()
+						for k in inspect.signature(
+							task['task_function']
+						).parameters.keys()
+					]
 					if 'caller' in func_args:
 						task_kwargs['caller'] = caller
 					if 'data' in func_args:
 						task_kwargs['data'] = data
+					task['last_start'] = datetime.datetime.now()
 					if task['no_print']:
 						with SuppressPrint():
 							r = task['task_function'](**task_kwargs)
@@ -327,17 +354,27 @@ class Tasks:
 					if r:
 						if not result is None:
 							result.append(r)
-					s.task_opt_set(task['task_function_name'], 'running', False)
-					s.task_opt_set(task['task_function_name'], 'err_counter', 0)
-				except Exception:
+					for t in tasks.task_list:
+						if t['task_function_name'] == \
+						task['task_function_name']:
+							t['running'] = False
+							t['thread'] = None
+							t['last_start'] = None
+							break
 					s.task_opt_set(task['task_function_name']
-									, 'running', False)
+						, 'err_counter', 0)
+				except Exception:
+					for t in tasks.task_list:
+						if t['task_function_name'] == task['task_function_name']:
+							t['running'] = False
+							t['thread'] = None
+							break
 					err_counter = s.task_opt_get(
 						task['task_function_name']
 						, 'err_counter'
 					) + 1
 					trace_li = traceback.format_exc().splitlines()
-					trace_str = '\n'.join(trace_li[-3:-1])
+					trace_str = '\n'.join(trace_li[-3:])
 					con_log(
 						f'Error in task: {task["task_name_full"]}\n'
 						+ traceback.format_exc()
@@ -362,12 +399,16 @@ class Tasks:
 			if not s.enabled: return
 			if task['single']:
 				if task['running']: return
+			if callable(task['rule']):
+				if not task['rule']():
+					dev_print(f'{task["task_name"]} canceled by rule')
+					return
 			if task['log']:
 				cs = f' ({caller})' if caller else ''
 				con_log(f'task{cs}: {task["task_name_full"]}')
 			if task['result']:
 				t = threading.Thread(target=catcher, args=(result,)
-									, daemon=True)
+				, daemon=True)
 				t.start()
 				t.join()
 			else:
@@ -559,10 +600,17 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			msgbox('No tasks', ui=MB_ICONINFORMATION, timeout=3
 				, wait=False)
 			return
+		cur_threads = []
+		for thread in threading.enumerate():
+			if thread._target is None: continue
+			cur_threads.append(thread.name)
 		print(lang.warn_runn_tasks_con + ':')
-		print(*[
-			t['task_function_name'] for t in running_tasks
-		])
+		for t in running_tasks:
+			dev_print(t['task_function_name'], t['thread'], t['last_start'])
+			if t['thread'] in cur_threads:
+				dev_print('\tthread exists')
+			else:
+				dev_print('\tthread not found')
 		tasks_str = '\r\n'.join(
 			[t['task_name'] for t in running_tasks][:TASKS_MSG_MAX]
 		)
@@ -575,10 +623,10 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		
 
 	def on_edit_crontab(s, event=None):
-		app_start(sett.editor, 'crontab.py')
+		app_start(sett.editor, os.path.join(APP_PATH, 'crontab.py'))
 
 	def on_edit_settings(s, event=None):
-		app_start(sett.editor, r'settings.ini')
+		app_start(sett.editor, os.path.join(APP_PATH, r'settings.ini'))
 
 	def on_disable(s, event=None):
 		tasks.enabled = not tasks.enabled
