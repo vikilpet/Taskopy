@@ -76,7 +76,8 @@ def app_start(
 		wait - wait for execution.
 		capture_output - capture stdout and stderr.
 		env - add this environments to the process
-		window - maximized, minimized or hidden.
+		window - maximized(short - 'max'), minimized('min')
+		 or hidden('hid').
 
 		https://docs.python.org/3/library/subprocess.html
 	'''
@@ -102,11 +103,11 @@ def app_start(
 		window = window.lower()
 	else:
 		window = 'normal'
-	if window == 'minimized':
+	if window in ['minimized', 'min']:
 		startupinfo.wShowWindow = win32con.SW_SHOWMINNOACTIVE
-	elif window == 'maximized':
+	elif window in ['maximized', 'max']:
 		startupinfo.wShowWindow = win32con.SW_SHOWMAXIMIZED
-	elif window == 'hidden':
+	elif window in ['hidden', 'hid']:
 		creationflags |= win32process.CREATE_NO_WINDOW
 		startupinfo.wShowWindow = win32con.SW_HIDE
 	else:

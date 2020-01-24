@@ -188,14 +188,14 @@ Format: **setting** (default value) — description.
 	Difference between `jobs_batch` and `job_pool`:
 	- `jobs_batch` - different functions with different arguments, waiting for the function is interrupted after the specified timeout and the results are returned as is, and where the function has not been executed yet, it returns *timeout*. All functions runs in parallel.
 	- `jobs_pool` - same function for different arguments. Only the specified number of instances of the function is executed at the same time.
-- **msgbox(msg:str, title:str=APP_NAME, ui:int=None, wait:bool=True, timeout:int=None)->int** - show messagebox and return user choice.
+- **msgbox(msg:str, title:str=APP_NAME, ui:int=None, wait:bool=True, timeout=None)->int** - show messagebox and return user choice.
 	Arguments:
 	*msg* — text
 	*title* — messagebox title
 	*ui* — [interface flags](https://docs.microsoft.com/en-us/windows/desktop/api/winuser/nf-winuser-messagebox).
 		Example: *ui = MB_ICONINFORMATION + MB_YESNO*
 	*wait* — if set to False — continue task execution without waiting for user responce.
-	*timeout* (in seconds) — automatically close messagebox. If messagebox is closed by timeout (no button is pressed by user) and *ui* contains more than one button (*MB_YESNO* for example) then it will return 32000.
+	*timeout* (number of seconds or string with interval like '1 hour' or '5 min') — automatically close messagebox. If messagebox is closed by timeout (no button is pressed by user) and *ui* contains more than one button (*MB_YESNO* for example) then it will return 32000.
 	*dis_timeout* (in seconds) — hide the buttons for a specified number of seconds.
 	Example:
 
@@ -242,6 +242,7 @@ Format: **setting** (default value) — description.
 			'number': 2}
 			...	
 		]
+- **dir_copy(fullpath:str, destination:str)->int** - copy the folder and all its contents. Returns the number of errors.
 - **dir_delete(fullpath:str)** - delete directory.
 - **dir_exists(fullpath:str)->bool** - directory exists?
 - **dir_list(fullpath:str)->list:** - get list of files in directory.
@@ -293,14 +294,14 @@ Format: **setting** (default value) — description.
 - **domain_ip(domain:str)->list** - get a list of IP-addresses by domain name.
 - **file_download(url:str, destination:str=None)->str:** - download file and return fullpath.
 	*destination* — it may be None, fullpath or folder. If None then download to temporary folder with random name.
-- **html_element(url:str, find_all_args)->str:** - download page and retrieve value of html element.
-	*find_all_args* — dictionary that contain element information such as name or attributes.
+- **html_element(url:str, element, number:int=0)->str:** - download page and retrieve value of html element.
+	*element* — dictionary that contain element information such as name or attributes, or list with such dictionaries or string with xpath.
 	*number* - item number, if there are several of them found.
 	Example:
 
 		# Get the internal text of span element which has
 		# the attribute itemprop="softwareVersion"
-		find_all_args={
+		element={
 			'name': 'span'
 			, 'attrs': {'itemprop':'softwareVersion'}
 		}
@@ -308,7 +309,7 @@ Format: **setting** (default value) — description.
 	See *get_current_ip* in [task examples](#task-examples)
 - **html_clean(html_str:str, separator=' ')->str** - removes HTML tags from string.
 - **is_online(*sites, timeout:int=2)->int:** - checks if you have access to the Internet using HEAD queries to specified sites. If sites are not specified, then use google and yandex.
-- **json_element(url:str, element:list)** - same as **html_element** but for json.
+- **json_element(url:str, element:list)** - same as **html_element** but for JSON.
 	*element* — a list with a map to desired item.
 	Example: *element=['usd', 2, 'value']*
 - **page_get(url:str, encoding:str='utf-8', post_file:str=None, post_hash:bool=False)->str:** - download page by url and return it's html as a string. *post_file* - send this file with POST request. *post_hash* - add the checksum of the file to request headers to check the integrity (see [Task Options](#task-options)).
@@ -343,13 +344,16 @@ In the functions for working with windows, the *window* argument can be either a
 - **file_open(fullpath:str)** - open file or URL in default application.
 - **process_close(process, timeout:int=10)** - soft completion of the process: first all windows belonging to the specified process are closed, and after the timeout (in seconds) the process itself is killed, if still exists.
 - **process_exist(process, cmd:str=None)->bool** - checks whether the process exists and returns a PID or False. *cmd* is an optional command line search. This way you can distinguish between processes with the same executable but different command lines.
-- **process_list(name:str='')->list** - get list of processes with that name. Item in list have this attributes:
+- **process_list(name:str='', cmd_filter:str=None)->list** - get list of processes with that name. Item in list is a *DictToObj* object with this attributes:
 	*pid* — PID of found process.
 	*name* — short name of executable.
 	*username* — username.
 	*exe* — full path to executable.
 	*cmdline* — command-line as list.
-	Example — print PID of all Firefox processes:
+
+	*cmd_filter* - filter by the presence of this substring on the command line.
+
+	Example — print PIDs of all Firefox processes:
 
 		for proc in process_list('firefox.exe'):
 			print(proc.pid)

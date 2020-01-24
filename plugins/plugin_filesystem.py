@@ -297,7 +297,10 @@ def drive_free(letter:str, unit:str='GB')->int:
 	''' Returns drive free space in GB, MB, KB or B
 	'''
 	e = _SIZE_UNITS.get(unit.lower(), 1073741824)
-	return shutil.disk_usage(f'{letter}:\\')[2] // e
+	try:
+		return shutil.disk_usage(f'{letter}:\\')[2] // e
+	except:
+		return -1
 
 def dir_list(fullpath:str)->list:
 	''' Returns list of files in specified folder.
@@ -308,7 +311,13 @@ def dir_list(fullpath:str)->list:
 			dir_list('d:\\folder\\**\\*.jpg')
 	'''
 	recursive = ('**' in fullpath)
-	return glob.glob(fullpath, recursive=recursive)
+	paths = glob.glob(fullpath, recursive=recursive)
+	if fullpath.endswith('\\**'):
+		try:
+			paths.remove(fullpath.replace('**', ''))
+		except ValueError:
+			pass
+	return paths
 
 def csv_read(fullpath:str, encoding:str='utf-8', fieldnames:tuple=None
 , delimiter:str=';', quotechar:str='"')->list:

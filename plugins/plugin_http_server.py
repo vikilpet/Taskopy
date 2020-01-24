@@ -6,7 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import cgi
 import urllib
 import tempfile
-from .tools import dev_print, show_log
+from .tools import dev_print, app_log_get
 
 
 _TASK_TIMEOUT = 60
@@ -30,6 +30,9 @@ class RequestData:
 		s.client_ip = client_ip
 		s.path = path
 		s.post_file = post_file
+		headers = {
+			k.lower().replace('-', '_') : v for k, v in headers.items()
+		}
 		s.__dict__.update(headers)
 		s.__dict__.update(params)
 		s.__dict__.update(form_data)
@@ -126,7 +129,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			s.headers_and_page('unknown request')
 			return
 		if s.url_path == '/log':
-			s.headers_and_page(show_log())
+			s.headers_and_page(app_log_get())
 			return
 		try:
 			params = {

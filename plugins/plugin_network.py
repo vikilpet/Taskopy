@@ -2,14 +2,16 @@
 import socket
 import requests
 import urllib
+import lxml.etree
 import tempfile
 from hashlib import md5
 from bs4 import BeautifulSoup
 import json
 import warnings
-from .tools import dev_print
+from .tools import dev_print, exception_wrapper
 
 
+@exception_wrapper
 def page_get(url:str, encoding:str='utf-8', session:bool=False
 , cookies:dict=None, headers:dict={}
 , http_method:str='get', json_data:str=None
@@ -18,46 +20,40 @@ def page_get(url:str, encoding:str='utf-8', session:bool=False
 	''' Gets content of the specified URL '''
 	if (post_file or post_form_data): http_method = 'POST'
 	if http_method: http_method = http_method.lower()
-	try:
-		args = {'url': url, 'json': json_data, 'timeout': timeout
-			, 'data': post_form_data}
-		file_obj = None
-		post_file_hash = None
-		if post_file:
-			if post_hash: post_file_hash = _file_hash(post_file)
-			file_obj = open(post_file, 'rb')
-			args['files'] = {'file': file_obj}
-		else:
-			post_file_hash = False
-		if session:
-			req_obj = requests.Session()
-			if headers: req_obj.headers.update(headers)
-			if cookies: req_obj.cookies.update(cookies)
-			if post_file_hash: req_obj.headers.update(
-				{'Content-MD5': post_file_hash})
-		else:
-			req_obj = requests
-			args['cookies'] = cookies
-			if post_file_hash:
-				headers['Content-MD5'] = post_file_hash
-			args['headers'] = headers
-		req = getattr(req_obj, http_method)(**args)
-		if file_obj: file_obj.close()
-
-
-	except Exception as e:
-		if sett.dev:
-			print(f'page_get error: {repr(e)}')
-		return f'error {http_method}: {repr(e)}'
+	args = {'url': url, 'json': json_data, 'timeout': timeout
+		, 'data': post_form_data}
+	file_obj = None
+	post_file_hash = None
+	if post_file:
+		if post_hash: post_file_hash = _file_hash(post_file)
+		file_obj = open(post_file, 'rb')
+		args['files'] = {'file': file_obj}
+	else:
+		post_file_hash = False
+	if session:
+		req_obj = requests.Session()
+		if headers: req_obj.headers.update(headers)
+		if cookies: req_obj.cookies.update(cookies)
+		if post_file_hash: req_obj.headers.update(
+			{'Content-MD5': post_file_hash})
+	else:
+		req_obj = requests
+		args['cookies'] = cookies
+		if post_file_hash:
+			headers['Content-MD5'] = post_file_hash
+		args['headers'] = headers
+	req = getattr(req_obj, http_method)(**args)
+	if file_obj: file_obj.close()
 	if req.status_code == 200:
 		return str(req.content, encoding=encoding, errors='ignore')
 	else:
-		return f'reqest error: {req.status_code}'
+		return req.status_code
 
 def html_whitespace(text:str)->str:
 	''' Removes whitespace characters from string.
 	'''
-
+	if text is None:
+		return text
 	return ' '.join(text.split())
 
 def file_download(url:str, destination:str=None, attempts:int=3)->str:
@@ -97,16 +93,18 @@ def html_clean(html_str:str, separator=' ')->str:
 		).get_text(separator=separator)
 	return text
 
-def html_element(url:str, find_all_args, number:int=0
+@exception_wrapper
+def html_element(url:str, element, number:int=0
 , clean:bool=True , encoding:str='utf-8'
 , session:bool=False, headers:dict=None
+, http_method:str='get', post_form_data:dict=None
 , cookies:dict=None)->str:
 	''' Get text of specified page element (div).
-		find_all_args - dict that will passed to find_all method
+		element - dict that will passed to find_all method
 			https://www.crummy.com/software/BeautifulSoup/bs4/doc/
 			It can be a list of dicts.
 			Example:
-				find_all_args={
+				element={
 					'name': 'span'
 					, 'attrs': {'itemprop':'softwareVersion'}
 				}
@@ -117,12 +115,13 @@ def html_element(url:str, find_all_args, number:int=0
 		cookies - dictionary with cookies like {'GUEST_LANGUAGE_ID': 'ru_RU'}
 	'''
 	html = page_get(url=url, encoding=encoding, session=session
-				, cookies=cookies, headers=headers)
-	if html.startswith('error'): return html
-	soup = BeautifulSoup(html, 'html.parser')
-	if type(find_all_args) is list:
+	, cookies=cookies, headers=headers, http_method=http_method
+	, post_form_data=post_form_data)
+	if isinstance(html, Exception): return html
+	if isinstance(element, list):
+		soup = BeautifulSoup(html, 'html.parser')
 		r = []
-		for d in find_all_args:
+		for d in element:
 			r += soup.find_all(**d)
 		if r:
 			if clean:
@@ -131,8 +130,9 @@ def html_element(url:str, find_all_args, number:int=0
 				return [str(i) for i in r]
 		else:
 			return 'error: not found'
-	else:
-		r = soup.find_all(**find_all_args)
+	elif isinstance(element, dict):
+		soup = BeautifulSoup(html, 'html.parser')
+		r = soup.find_all(**element)
 		if r:
 			if clean:
 				r = r[number].get_text()
@@ -141,6 +141,14 @@ def html_element(url:str, find_all_args, number:int=0
 				return str(r[number])
 		else:
 			return 'error: not found'
+	elif isinstance(element, str):
+		tree = lxml.etree.fromstring(html
+		, parser=lxml.etree.HTMLParser(recover=True))
+		tree_elem = tree.xpath(element)[number]
+		if isinstance(tree_elem, str):
+			return html_whitespace(tree_elem)
+		else:
+			return html_whitespace(tree_elem.text)
 
 def json_element(source:str, element:list=None, headers:dict=None
 , session:bool=False, cookies:dict=None

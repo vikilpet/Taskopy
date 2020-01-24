@@ -11,6 +11,7 @@ import ctypes
 import sqlite3
 import pyperclip
 import random
+import functools
 import string
 import win32api
 import win32gui
@@ -19,8 +20,10 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-01-14'
+APP_VERSION = 'v2020-01-24'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
+
+app_log = []
 
 TASK_OPTIONS = [
 	['task_name', None]
@@ -146,9 +149,11 @@ def dev_print(*msg, **kwargs):
 def con_log(*msgs):
 	''' Log to console and logfile
 	'''
+	global app_log
 	log_str = ''
 	for m in msgs:
 		tprint(m)
+		app_log.append((datetime.datetime.now(), m))
 		log_str += (
 			time.strftime('%Y.%m.%d %H:%M:%S')
 			+ ' ' + str(m) + '\n'
@@ -355,7 +360,7 @@ IDTRYAGAIN = 10
 IDYES = 6
 
 def msgbox(msg:str, title:str=None
-, ui:int=None, wait:bool=True, timeout:int=None
+, ui:int=None, wait:bool=True, timeout=None
 	, dis_timeout:float=None)->int:
 	''' wait - msgbox should be closed to continue task
 		ui - combination of buttons and icons
@@ -718,14 +723,33 @@ def balloon(msg:str, title:str=APP_NAME, timeout:int=None, icon:str=None):
 		}.get(icon.lower(), wx.ICON_INFORMATION)
 	app.taskbaricon.ShowBalloon(**kwargs)
 
-def show_log():
-	''' Returns current log file content '''
-	try:
-		fname = f'log\\{time.strftime(sett.log_file_name)}.log'
-		with open(fname, 'tr', encoding='utf-8') as l:
-			return l.read()
-	except Exception as e:
-		dev_print(str(e))
-		return f'error: log not found - {fname}'
+def app_log_get():
+	''' Returns current log file content.
+		Log can't be empty.
+	'''
+	log = ''
+	for t, m in app_log:
+		log += t.strftime('%Y.%m.%d %H:%M:%S') + f'\t{m}\n'
+	return log
 
 
+
+
+def exception_wrapper(func):
+	''' Make try... except for function
+		and return Exception object on fail.
+
+		Downside - iPython autoreload does not
+		work for decorated 'func'.
+	'''
+	@functools.wraps(func)
+	def wrapper(*args, **kwargs):
+		try:
+			result = func(*args, **kwargs)
+			return result
+		except Exception as e:
+			if getattr(__builtins__, 'sett', None):
+				if sett.dev:
+					print(f'exception_wrapper exception: {func} {repr(e)}')
+			return e
+	return wrapper
