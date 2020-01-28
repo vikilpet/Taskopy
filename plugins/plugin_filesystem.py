@@ -115,7 +115,7 @@ def file_delete(fullpath:str):
 	except FileNotFoundError:
 		pass
 
-def dir_copy(fullpath:str, destination:str, symlinks:bool=False):
+def dir_copy(fullpath:str, destination:str, symlinks:bool=False)->int:
 	''' Copy a folder with all content to a new location.
 		Returns number of errors.
 	'''

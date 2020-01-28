@@ -400,7 +400,12 @@ class Tasks:
 			if task['single']:
 				if task['running']: return
 			if callable(task['rule']):
-				if not task['rule']():
+				try:
+					r = task['rule']()
+				except:
+					dev_print(f'{task["task_name"]} rule exception')
+					r = False
+				if not r:
 					dev_print(f'{task["task_name"]} canceled by rule')
 					return
 			if task['log']:

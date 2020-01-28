@@ -8,10 +8,10 @@ from hashlib import md5
 from bs4 import BeautifulSoup
 import json
 import warnings
-from .tools import dev_print, exception_wrapper
+from .tools import dev_print, decor_except, ManualException
 
 
-@exception_wrapper
+@decor_except
 def page_get(url:str, encoding:str='utf-8', session:bool=False
 , cookies:dict=None, headers:dict={}
 , http_method:str='get', json_data:str=None
@@ -56,6 +56,7 @@ def html_whitespace(text:str)->str:
 		return text
 	return ' '.join(text.split())
 
+@decor_except
 def file_download(url:str, destination:str=None, attempts:int=3)->str:
 	''' Download file from url to destination and return fullpath.
 		Returns the full path to the downloaded file.
@@ -82,8 +83,8 @@ def file_download(url:str, destination:str=None, attempts:int=3)->str:
 		else:
 			break
 		finally:
-			if (attempt + 1) == attempts:
-				return f'error'
+			if (attempt + 1) >= attempts:
+				raise ManualException('No more attempts')
 	return dest_file
 
 def html_clean(html_str:str, separator=' ')->str:
@@ -93,26 +94,31 @@ def html_clean(html_str:str, separator=' ')->str:
 		).get_text(separator=separator)
 	return text
 
-@exception_wrapper
+@decor_except
 def html_element(url:str, element, number:int=0
 , clean:bool=True , encoding:str='utf-8'
 , session:bool=False, headers:dict=None
-, http_method:str='get', post_form_data:dict=None
+, http_method:str='GET', post_form_data:dict=None
 , cookies:dict=None)->str:
 	''' Get text of specified page element (div).
-		element - dict that will passed to find_all method
+		element - dict that will passed to find_all method:
 			https://www.crummy.com/software/BeautifulSoup/bs4/doc/
-			It can be a list of dicts.
-			Example:
+			Or it can be a list of dicts.
+			Or it can be string with xpath.
+			Example for 'find_all':
 				element={
 					'name': 'span'
 					, 'attrs': {'itemprop':'softwareVersion'}
 				}
-		number - number of element in list.
+			Example for xpath:
+				element='/html/body/div[1]/div/div'
+
+		number - number of an element in the list of similar elements.
 		clean - remove html tags and spaces.
 		headers - optional dictionary with request headers.
 		session - use requests.Session instead of get.
-		cookies - dictionary with cookies like {'GUEST_LANGUAGE_ID': 'ru_RU'}
+		cookies - dictionary with cookies
+			like {'GUEST_LANGUAGE_ID': 'ru_RU'}
 	'''
 	html = page_get(url=url, encoding=encoding, session=session
 	, cookies=cookies, headers=headers, http_method=http_method
@@ -129,7 +135,7 @@ def html_element(url:str, element, number:int=0
 			else:
 				return [str(i) for i in r]
 		else:
-			return 'error: not found'
+			raise ManualException('element not found')
 	elif isinstance(element, dict):
 		soup = BeautifulSoup(html, 'html.parser')
 		r = soup.find_all(**element)
@@ -140,7 +146,7 @@ def html_element(url:str, element, number:int=0
 			else:
 				return str(r[number])
 		else:
-			return 'error: not found'
+			raise ManualException('element not found')
 	elif isinstance(element, str):
 		tree = lxml.etree.fromstring(html
 		, parser=lxml.etree.HTMLParser(recover=True))
@@ -150,9 +156,10 @@ def html_element(url:str, element, number:int=0
 		else:
 			return html_whitespace(tree_elem.text)
 
+@decor_except
 def json_element(source:str, element:list=None, headers:dict=None
 , session:bool=False, cookies:dict=None
-, http_method:str='get', json_data:str=None):
+, http_method:str='GET', json_data:str=None):
 	''' Download JSON by url and get its nested element by
 			map of keys like ['list', 0, 'someitem', 1]
 		source - URL to download or string with JSON.
@@ -170,7 +177,7 @@ def json_element(source:str, element:list=None, headers:dict=None
 					, ['banks', 0, 'gbp', 'sale']
 				]
 					result = [71.99, 63.69, 83.0]
-		If nothing found then return 'not found'
+		If nothing found then return exception.
 		headers - optional dictionary with request headers
 		session - use requests.Session instead of get
 		cookies - dictionary with cookies like {'GUEST_LANGUAGE_ID': 'ru_RU'}
@@ -184,11 +191,11 @@ def json_element(source:str, element:list=None, headers:dict=None
 			, http_method=http_method
 			, json_data=json_data
 		)
-		if j.startswith('error'):
+		if isinstance(j, Exception):
 			if isinstance(element[0], list):
-				return [j]
+				return [repr(j)]
 			else:
-				return j
+				return repr(j)
 	else:
 		j = source
 	data = json.loads(j)
@@ -203,17 +210,18 @@ def json_element(source:str, element:list=None, headers:dict=None
 				li.append(da)
 			r = li
 		except:
-			r = ['error: not found']
+			r = ['element not found']
 	else:
 		try:
 			for key in element: data = data[key]
 			r = data
 		except:
-			r = 'error: not found'
+			r = 'element not found'
 	return r
 
 
 
+@decor_except
 def tracking_status_rp(track_number:str)->str:
 	''' Get last status of Russian post parcel 
 	'''

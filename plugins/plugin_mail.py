@@ -11,7 +11,7 @@ import imaplib
 from email import message_from_bytes
 from email.header import Header, decode_header, make_header
 import mimetypes
-from .tools import jobs_batch, var_get, var_set
+from .tools import jobs_batch, var_get, var_set, tprint
 
 CC_LIMIT = 35
 _errors = []
@@ -267,7 +267,8 @@ def mail_download(server:str, login:str, password:str
 			pr('logout')
 			imap.logout()
 	except Exception as e:
-		if sett.dev: raise
+		if sett.dev:
+			tprint('exception: ' + repr(e))
 		pr(f'error general: {repr(e)}')
 		return [], [f'error general: {repr(e)}']
 	return subjects, errors

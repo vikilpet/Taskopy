@@ -20,7 +20,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-01-24'
+APP_VERSION = 'v2020-01-28'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -553,6 +553,7 @@ def inputbox(message:str, title:str=None
 		, 0, 0, 0, 0
 		, win32con.SWP_NOSIZE | win32con.SWP_NOMOVE
 	)
+	win32gui.SetForegroundWindow(dlg.Handle)
 	dlg.SetValue(default)
 	try:
 		dlg.ShowModal()
@@ -735,7 +736,10 @@ def app_log_get():
 
 
 
-def exception_wrapper(func):
+class ManualException(Exception):
+	pass
+
+def decor_except(func):
 	''' Make try... except for function
 		and return Exception object on fail.
 
@@ -750,6 +754,6 @@ def exception_wrapper(func):
 		except Exception as e:
 			if getattr(__builtins__, 'sett', None):
 				if sett.dev:
-					print(f'exception_wrapper exception: {func} {repr(e)}')
+					print(f'decor_except exception: {func} {repr(e)}')
 			return e
 	return wrapper
