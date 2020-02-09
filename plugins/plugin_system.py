@@ -13,9 +13,9 @@ def window_get(window=None)->int:
 	''' Returns hwnd. If window is not specified then
 		finds foreground window.
 	'''
-	if type(window) is str:
+	if isinstance(window, str):
 		return win32gui.FindWindow(None, window)
-	elif type(window) is int:
+	elif isinstance(window, int):
 		return window
 	else:
 		return win32gui.GetForegroundWindow()
@@ -56,7 +56,7 @@ def registry_set(fullpath:str, value, value_type:str=None):
 	if value_type:
 		value_type = getattr(winreg, value_type)
 	else:
-		if type(value) is int:
+		if isinstance(value, int):
 			value_type = winreg.REG_DWORD
 		else:
 			value = str(value)

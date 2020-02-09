@@ -203,7 +203,7 @@ def routeros_send(
 	try:
 		apiros = _ApiRos(soc)
 		apiros.login(device_user, device_pwd)
-		if type(cmd[0]) == list:
+		if isinstance(cmd[0], list):
 			for c in cmd: apiros.talk(c)
 		else:
 			apiros.talk(cmd)

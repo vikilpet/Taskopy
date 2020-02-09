@@ -13,6 +13,9 @@ import win32api
 from pathlib import Path
 import shutil
 from .tools import random_str
+from watchdog.observers import Observer
+from watchdog.events import LoggingEventHandler
+
 
 _SIZE_UNITS = {'gb':1073741824, 'mb':1048576, 'kb':1024, 'b':1}
 
@@ -165,7 +168,8 @@ def file_size(fullpath:str, unit:str='b')->int:
 
 def file_ext(fullpath:str)->str:
 	''' Returns file extension in lower case
-		without dot. '''
+		without dot.
+	'''
 	ext = os.path.splitext(fullpath)[1].lower()
 	if ext == '': return ext
 	return ext[1:]
@@ -176,6 +180,18 @@ def file_basename(fullpath:str)->str:
 	'''
 	fname = os.path.basename(fullpath)
 	return os.path.splitext(fname)[0]
+
+def file_name_add(fullpath:str, suffix:str='')->str:
+	''' Adds suffix to file name before extension:
+		file_name_add('my_file.txt', '_1') ->
+		my_file_1.txt
+		If suffix if not specified then add
+		random string.
+	'''
+	if not suffix:
+		suffix = '_' + random_str(5)
+	name, ext = os.path.splitext(fullpath)
+	return name + suffix + ext
 
 def file_name_fix(fullpath:str, repl_char:str='_')->str:
 	''' Replaces forbidden characters with repl_char.
@@ -273,25 +289,24 @@ def file_dir(fullpath:str)->str:
 	''' Returns directory from fullpath
 	'''
 	return os.path.dirname(fullpath)
-		
-def file_backup(fullpath:str, folder:str=None):
+
+def file_backup(fullpath:str, dest_dir:str=''
+, now_format:str='_%y-%m-%d_%H-%M-%S'):
 	''' Copy somefile.txt to somefile_2019-05-19_21-23-02.txt
-		folder - destination. If not specified - current folder
+		dest_dir - destination. If not specified - current folder.
+		Returns full path of new file.
 	'''
-	timestamp = time.strftime('%y-%m-%d_%H-%M-%S')
-	fi_pa = Path(fullpath)
-	if folder:
-		folder = Path(folder)
-	else:
-		folder = fi_pa.parent
-	if not folder.exists(): folder.mkdir(parents=True, exist_ok = True)
-	destination = (
-		str(folder) + '\\'
-		+ '.'.join(fi_pa.name.split('.')[0:-1])
-		+ '_' + timestamp
-		+ fi_pa.suffix
+	if not dest_dir: dest_dir = os.path.dirname(fullpath)
+	if not os.path.isdir(dest_dir): dir_create(dest_dir)
+	name, ext = os.path.splitext(
+		os.path.basename(fullpath)
+	)
+	destination = os.path.join(
+		dest_dir
+		, name	+ time.strftime(now_format) + ext
 	)
 	shutil.copy(fullpath, destination)
+	return destination
 
 def drive_free(letter:str, unit:str='GB')->int:
 	''' Returns drive free space in GB, MB, KB or B
@@ -392,14 +407,14 @@ def file_zip(fullpath, destination:str)->str:
 		destination - fullpath to the archive.
 	'''
 	fullpath = _long_path(fullpath)
-	if type(fullpath) is str:
+	if isinstance(fullpath, str):
 		with zipfile.ZipFile(
 			destination, 'w'
 		) as zipf:
 			zipf.write(fullpath, arcname=os.path.basename(fullpath)
 						, compress_type=zipfile.ZIP_DEFLATED)
 		return destination
-	elif type(fullpath) is list:
+	elif isinstance(fullpath, list):
 		with zipfile.ZipFile(
 			destination, 'w'
 		) as zipf:
@@ -412,7 +427,8 @@ def file_zip(fullpath, destination:str)->str:
 
 def temp_dir(new_dir:str=None)->str:
 	''' Returns full path of temp dir (without trailing slash).
-		If new_dir - creates folder in temp dir and returns its full path.
+		If new_dir - creates folder in temp dir
+		and returns its full path.
 	'''
 	if not new_dir:
 		return tempfile.gettempdir()

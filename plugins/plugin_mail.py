@@ -287,13 +287,13 @@ def mail_download_batch(mailboxes:list, output_dir:str, timeout:int=60
 		'''
 		try:
 			if errors:
-				with open(log_file, 'at+') as f:
+				with open(log_file, 'at+') as fd:
 					for er in errors:
-						f.write('%s\t%s\n' %
+						fd.write('%s\t%s\n' %
 							(time.strftime('%Y-%m-%d %H:%M:%S'), er))
 			else:
 				try:
-					os.remove(log_file)
+					open(log_file, 'w').close()
 				except FileNotFoundError:
 					pass
 			return True, log_file

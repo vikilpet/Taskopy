@@ -267,7 +267,7 @@ class Tasks:
 		''' task - dict with task options
 		'''
 		intervals = task['schedule']
-		if type(intervals) is str: intervals = [intervals]
+		if isinstance(intervals, str): intervals = [intervals]
 		for inter in intervals:
 			try:
 				sched_rule = (
@@ -480,7 +480,7 @@ def create_menu_item(menu, task, func=None, parent_menu=None):
 		If task is dict then func = tasks.run_task
 		parent_menu - only for submenu items.
 	'''
-	if type(task) is dict:
+	if isinstance(task, dict):
 		tn = task['task_name']
 		if task['hotkey']:
 			tn = f"{tn}\t{task['hotkey'].title()}"

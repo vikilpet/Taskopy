@@ -20,7 +20,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-01-28'
+APP_VERSION = 'v2020-02-09'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -104,7 +104,7 @@ def value_unit(value, unit_dict:dict, default:int)->tuple:
 	'''
 
 
-	if type(value) is int:
+	if isinstance(value, int):
 		return value, default
 	elif value.isdigit():
 		return int(value), default
@@ -553,8 +553,11 @@ def inputbox(message:str, title:str=None
 		, 0, 0, 0, 0
 		, win32con.SWP_NOSIZE | win32con.SWP_NOMOVE
 	)
-	win32gui.SetForegroundWindow(dlg.Handle)
-	dlg.SetValue(default)
+	if default: dlg.SetValue(default)
+	try:
+		win32gui.SetForegroundWindow(dlg.Handle)
+	except:
+		pass
 	try:
 		dlg.ShowModal()
 	except wx._core.wxAssertionError: 	
@@ -626,7 +629,7 @@ def jobs_pool(function:str, args:tuple, pool_size:int=None)->list:
 			)
 	'''
 	pool = ThreadPool(pool_size)
-	if type(args[0]) in [tuple, list, dict]:
+	if isinstance(args[0], (tuple, list, dict)):
 		map_func = pool.starmap
 	else:
 		map_func = pool.map
@@ -735,9 +738,6 @@ def app_log_get():
 
 
 
-
-class ManualException(Exception):
-	pass
 
 def decor_except(func):
 	''' Make try... except for function

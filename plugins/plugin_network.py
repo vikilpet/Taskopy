@@ -8,7 +8,7 @@ from hashlib import md5
 from bs4 import BeautifulSoup
 import json
 import warnings
-from .tools import dev_print, decor_except, ManualException
+from .tools import dev_print, decor_except
 
 
 @decor_except
@@ -84,7 +84,7 @@ def file_download(url:str, destination:str=None, attempts:int=3)->str:
 			break
 		finally:
 			if (attempt + 1) >= attempts:
-				raise ManualException('No more attempts')
+				raise Exception('No more attempts')
 	return dest_file
 
 def html_clean(html_str:str, separator=' ')->str:
@@ -135,7 +135,7 @@ def html_element(url:str, element, number:int=0
 			else:
 				return [str(i) for i in r]
 		else:
-			raise ManualException('element not found')
+			raise Exception('element not found')
 	elif isinstance(element, dict):
 		soup = BeautifulSoup(html, 'html.parser')
 		r = soup.find_all(**element)
@@ -146,7 +146,7 @@ def html_element(url:str, element, number:int=0
 			else:
 				return str(r[number])
 		else:
-			raise ManualException('element not found')
+			raise Exception('element not found')
 	elif isinstance(element, str):
 		tree = lxml.etree.fromstring(html
 		, parser=lxml.etree.HTMLParser(recover=True))
@@ -201,7 +201,7 @@ def json_element(source:str, element:list=None, headers:dict=None
 	data = json.loads(j)
 	if element is None:
 		return data
-	if type(element[0]) is list:
+	if isinstance(element[0], list):
 		li = []
 		try:
 			for elem in element:
