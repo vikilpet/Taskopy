@@ -8,7 +8,6 @@ import inspect
 import configparser
 import wx.adv
 import wx
-import ctypes
 import schedule
 import keyboard
 import win32api
@@ -46,7 +45,7 @@ APP_ICON_DIS = r'resources\icon_dis.png'
 _TIME_UNITS = {'msec':1, 'ms':1, 'sec':1000, 's':1000, 'min':60000
 	,'m':60000, 'hour':3600000, 'h':3600000}
 
-set_title = ctypes.windll.kernel32.SetConsoleTitleW
+set_title = win32api.SetConsoleTitle
 	
 class Settings:
 	''' Load global settings from settings.ini
@@ -255,7 +254,7 @@ class Tasks:
 		else:
 			try:
 				keyboard.add_hotkey(
-					hotkey=task['hotkey'].lower()
+					hotkey=str(task['hotkey']).lower()
 					, callback=s.run_task
 					, suppress=False
 					, args=[task, 'hotkey']

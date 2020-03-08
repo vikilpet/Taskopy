@@ -620,6 +620,10 @@ Check MD5 hash of file in the Virustotal. You need to register to obtain free AP
 				return
 		md5 = file_hash(fullpath, 'md5')
 		scan_result = json_element(f'https://www.virustotal.com/vtapi/v2/file/report?apikey={APIKEY}&resource={md5}')
+		if isinstance(scan_result, Exception):
+			tprint(scan_result)
+			msgbox('HTTP request exception')
+			return
 		if scan_result['response_code'] == 0:
 			msgbox('Unknown file', timeout=3)
 			return

@@ -119,8 +119,12 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			s.headers_and_page('403')
 			return
 		try:
-			(_, _, s.url_path, s.url_query
-			, s.url_fragment) = (u.lower() for u in urllib.parse.urlsplit(s.path))
+			(
+				_, _
+				, s.url_path, s.url_query, s.url_fragment
+			) = (
+				u.lower() for u in urllib.parse.urlsplit(s.path)
+			)
 		except Exception as e:
 			dev_print('wrong url:', s.path[:70], 'exception:', str(e))
 			s.headers_and_page('wrong url')
@@ -142,7 +146,8 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			s.headers_and_page('error')
 			return
 		page = 'error'
-		task_name = s.url_query.split('&')[0]
+		task_name = urllib.parse.unquote(
+			s.url_query.split('&')[0] )
 		task = None
 		for t in s.tasks.task_list_http:
 			if task_name == t['task_function_name']:

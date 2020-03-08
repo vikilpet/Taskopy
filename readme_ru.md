@@ -635,6 +635,10 @@ https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/
 				return
 		md5 = file_hash(fullpath, 'md5')
 		scan_result = json_element(f'https://www.virustotal.com/vtapi/v2/file/report?apikey={APIKEY}&resource={md5}')
+		if isinstance(scan_result, Exception):
+			tprint(scan_result)
+			msgbox('Ошибка HTTP-запроса')
+			return
 		if scan_result['response_code'] == 0:
 			msgbox('Неизвестный файл', timeout=3)
 			return

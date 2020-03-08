@@ -13,8 +13,6 @@ import win32api
 from pathlib import Path
 import shutil
 from .tools import random_str
-from watchdog.observers import Observer
-from watchdog.events import LoggingEventHandler
 
 
 _SIZE_UNITS = {'gb':1073741824, 'mb':1048576, 'kb':1024, 'b':1}
@@ -45,23 +43,44 @@ def file_read(fullpath:str, encoding:str='utf-8')->str:
 		with open(fullpath, 'tr', encoding=encoding) as f:
 			return f.read()
 
-def file_write(fullpath:str, content:str, encoding:str='utf-8'):
-	''' Save content to file. Create file if the fullpath doesn't exist.
+def file_write(fullpath, content:str, encoding:str='utf-8'):
+	''' Saves content to file.
+		Creates file if the fullpath doesn't exist.
+		If fullpath is '' or None - uses temp_file().
+		Returns fullpath.
 	'''
 	if encoding == 'binary':
-		with open(fullpath, 'wb+') as f:
-			f.write(content)
+		open_args = {'mode': 'wb+'}
 	else:
-		with open(fullpath, 'wt+', encoding=encoding, errors='ignore') as f:
-			f.write(content)
+		open_args = {'mode': 'wt+', 'encoding': encoding
+		, 'errors': 'ignore'}
+	if fullpath:
+		if not os.path.exists(os.path.dirname(fullpath)):
+			os.makedirs(os.path.dirname(fullpath))
+	else:
+		fullpath = temp_file()
+	with open(fullpath, **open_args) as f:
+		f.write(content)
+	return fullpath
 
-def file_rename(fullpath:str, dest:str)->str:
+def file_rename(fullpath:str, dest:str
+, overwrite:bool=False)->str:
 	''' Rename path.
-		dest - fullpath or just new file name without parent directory.
+		dest - fullpath or just new file name
+		without parent directory.
+		overwrite - overwrite destination file
+		if exists.
 		Returns destination.
 	'''
 	if not ':' in dest: dest = os.path.dirname(fullpath) + '\\' + dest
-	os.rename(fullpath, dest)
+	try:
+		os.rename(fullpath, dest)
+	except FileExistsError as e:
+		if overwrite:
+			file_delete(dest)
+			os.rename(fullpath, dest)
+		else:
+			raise e
 	return dest
 
 dir_rename = file_rename
@@ -90,13 +109,24 @@ def file_copy(fullpath:str, destination:str):
 			return shutil.copy(fullpath, destination)
 		except FileExistsError: pass
 
+def file_append(fullpath:str, content:str)->str:
+	''' Append content to a file. Creates fullpath
+		if not specified.
+		Returns fullpath.
+	'''
+	if not fullpath: fullpath = temp_file()
+	with open(fullpath, 'a+') as fd:
+		fd.write(content)
+	return fullpath
+
 def file_move(fullpath:str, destination:str):
 	''' Move file to destination.
 		Destination may be fullpath or folder name.
 		If destination path exist it will be overwritten.
 	'''
 	if os.path.isdir(destination):
-		new_fullpath = _dir_slash(destination) + os.path.basename(fullpath)
+		new_fullpath = _dir_slash(destination) \
+			+ os.path.basename(fullpath)
 	else:
 		new_fullpath = destination
 	try:
@@ -104,6 +134,7 @@ def file_move(fullpath:str, destination:str):
 	except FileNotFoundError:
 		pass
 	shutil.move(fullpath, new_fullpath)
+	return new_fullpath
 
 def file_delete(fullpath:str):
 	''' Deletes the file. '''
@@ -188,7 +219,9 @@ def file_name_add(fullpath:str, suffix:str='')->str:
 		If suffix if not specified then add
 		random string.
 	'''
-	if not suffix:
+	if suffix:
+		suffix = str(suffix)
+	else:
 		suffix = '_' + random_str(5)
 	name, ext = os.path.splitext(fullpath)
 	return name + suffix + ext

@@ -7,6 +7,7 @@ from multiprocessing.dummy import Pool as ThreadPool
 import re
 import winsound
 import glob
+import traceback
 import ctypes
 import sqlite3
 import pyperclip
@@ -20,7 +21,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-02-09'
+APP_VERSION = 'v2020-03-08'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -117,6 +118,13 @@ def value_unit(value, unit_dict:dict, default:int)->tuple:
 	else:
 		dev_print(f'value_unit wrong value: {value}')
 		return value, default
+
+def _get_parent_func_name(title)->str:
+	''' Get name of parent function if any '''
+	if title: return str(title)
+	title = sys._getframe(2).f_code.co_name.replace('_', ' ')
+	if title.startswith('<'): title = APP_NAME
+	return title
 
 def task(**kwargs):
 	def with_attrs(func):
@@ -402,11 +410,7 @@ def msgbox(msg:str, title:str=None
 			win32gui.EnumChildWindows(hwnd, dis_butt, True)
 		except:
 			pass
-	if title:
-		title = str(title)
-	else:
-		title = sys._getframe(1).f_code.co_name.replace('_', ' ')
-		if title.startswith('<'): title = APP_NAME
+	title = _get_parent_func_name(title)
 	if ui: ui += MB_SYSTEMMODAL
 	else:
 		ui = MB_ICONINFORMATION + MB_SYSTEMMODAL
@@ -537,9 +541,7 @@ def inputbox(message:str, title:str=None
 		Problem: don't use default or you will get it value
 		whatever button user will press.
 	'''
-	if not title:
-		title = sys._getframe(1).f_code.co_name.replace('_', ' ')
-		if title.startswith('<'): title = APP_NAME
+	title = _get_parent_func_name(title)
 	if is_pwd:
 		box_func = wx.PasswordEntryDialog
 	else:
@@ -611,9 +613,11 @@ def create_default_ini_file():
 	with open('settings.ini', 'xt', encoding='utf-8-sig') as ini:
 		ini.write(_DEFAULT_INI)
 
-def jobs_pool(function:str, args:tuple, pool_size:int=None)->list:
+def jobs_pool(function:str, args:tuple
+, pool_size:int=None)->list:
 	''' Launches 'pool_size' functions at a time for
-		all the 'args'. Returns list of results.
+		all 'args'.
+		Returns list of results.
 		'args' may be a tuple of tuples or tuple of values.
 		If 'pool_size' not specified, pool_size = number of CPU.
 		Example:
@@ -752,8 +756,189 @@ def decor_except(func):
 			result = func(*args, **kwargs)
 			return result
 		except Exception as e:
-			if getattr(__builtins__, 'sett', None):
-				if sett.dev:
-					print(f'decor_except exception: {func} {repr(e)}')
+			trace_li = traceback.format_exc().splitlines()
+			trace_str = '\n'.join(trace_li[-3:])
+			dev_print(f'decor_except exception:\n{trace_str}')
 			return e
 	return wrapper
+
+TDCBF_OK_BUTTON = 1
+TDCBF_YES_BUTTON = 2
+TDCBF_NO_BUTTON = 4
+TDCBF_CANCEL_BUTTON = 8
+TDCBF_RETRY_BUTTON = 16
+TDCBF_CLOSE_BUTTON = 32
+
+TD_ICON_BLANK = 100
+TD_ICON_WARNING = 101
+TD_ICON_QUESTION = 102
+TD_ICON_ERROR = 103
+TD_ICON_INFORMATION = 104
+TD_ICON_BLANK_AGAIN = 105
+TD_ICON_SHIELD = 106
+
+TDF_ENABLE_HYPERLINKS = 1
+TDF_USE_HICON_MAIN = 2
+TDF_USE_HICON_FOOTER = 4
+TDF_ALLOW_DIALOG_CANCELLATION = 8
+TDF_USE_COMMAND_LINKS = 16
+TDF_USE_COMMAND_LINKS_NO_ICON = 32
+TDF_EXPAND_FOOTER_AREA = 64
+TDF_EXPANDED_BY_DEFAULT = 128
+TDF_VERIFICATION_FLAG_CHECKED = 256
+TDF_SHOW_PROGRESS_BAR = 512
+TDF_SHOW_MARQUEE_PROGRESS_BAR = 1024
+TDF_CALLBACK_TIMER = 2048
+TDF_POSITION_RELATIVE_TO_WINDOW = 4096
+TDF_RTL_LAYOUT = 8192
+TDF_NO_DEFAULT_RADIO_BUTTON = 16384
+TDF_CAN_BE_MINIMIZED = 32768
+
+_TaskDialogIndirect = ctypes.WinDLL('comctl32.dll').TaskDialogIndirect
+
+_callback_type = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.wintypes.HWND, ctypes.wintypes.UINT
+	, ctypes.c_uint, ctypes.c_uint, ctypes.POINTER(ctypes.c_long))
+
+class _TaskDialogConfig(ctypes.Structure):
+	class TASKDIALOG_BUTTON(ctypes.Structure):
+		_pack_ = 1
+		_fields_ = [
+			('nButtonID', ctypes.wintypes.INT)
+			, ('pszButtonText', ctypes.wintypes.LPCWSTR)
+		]
+
+	class DUMMYUNIONNAME(ctypes.Union):
+		_pack_ = 1
+		_fields_ = [
+			('hMainIcon', ctypes.wintypes.HICON)
+			, ('pszMainIcon', ctypes.wintypes.LPCWSTR)
+		]
+
+	class DUMMYUNIONNAME2(ctypes.Union):
+		_pack_ = 1
+		_fields_ = [
+			('hFooterIcon', ctypes.wintypes.HICON)
+			, ('sFooterIcon', ctypes.wintypes.LPCWSTR)
+		]
+
+	_pack_ = 1
+	_fields_ = [
+		('cbSize', ctypes.wintypes.UINT)
+		, ('hwndParent', ctypes.wintypes.HWND)
+		, ('hInstance', ctypes.wintypes.HINSTANCE)
+		, ('dwFlags', ctypes.wintypes.UINT)
+		, ('dwCommonButtons', ctypes.wintypes.UINT)
+		, ('pszWindowTitle', ctypes.wintypes.LPCWSTR)
+		, ('DUMMYUNIONNAME', DUMMYUNIONNAME)
+		, ('pszMainInstruction', ctypes.wintypes.LPCWSTR)
+		, ('pszContent', ctypes.wintypes.LPCWSTR)
+		, ('cButtons', ctypes.wintypes.UINT)
+		, ('pButtons', ctypes.POINTER(TASKDIALOG_BUTTON))
+		, ('nDefaultButton', ctypes.wintypes.INT)
+		, ('cRadioButtons', ctypes.wintypes.UINT)
+		, ('pRadioButtons', ctypes.POINTER(TASKDIALOG_BUTTON))
+		, ('nDefaultRadioButton', ctypes.wintypes.INT)
+		, ('pszVerificationText', ctypes.wintypes.LPCWSTR)
+		, ('pszExpandedInformation', ctypes.wintypes.LPCWSTR)
+		, ('pszExpandedControlText', ctypes.wintypes.LPCWSTR)
+		, ('pszCollapsedControlText', ctypes.wintypes.LPCWSTR)
+		, ('DUMMYUNIONNAME2', DUMMYUNIONNAME2)
+		, ('pszFooter', ctypes.wintypes.LPCWSTR)
+		, ('pfCallBack', ctypes.POINTER(_callback_type))
+		, ('lpCallbackData', ctypes.wintypes.LPLONG)
+		, ('cxWidth', ctypes.wintypes.UINT)
+	]
+
+	def __init__(self):
+		self.cbSize = ctypes.sizeof(self)
+
+def dialog(msg:str=None, title:str=None
+, content:str=None, flags:int=None, buttons:list=None
+, common_buttons:int=None, default_button:int=0
+, timeout:int=None, icon=None)->int:
+	''' Shows dialog with multiple optional buttons.
+		Returns ID of selected button starting with 1000.
+	'''
+	TDN_TIMER = 4
+	S_OK = 0
+	TDM_CLICK_BUTTON = win32con.WM_USER + 102
+	TDM_SET_ELEMENT_TEXT = win32con.WM_USER + 108
+	TDE_FOOTER = 2
+	on_top_flag = False
+	@_callback_type
+	def callback_timer(hwnd, uNotification:int
+	, wParam:int, lParam:int, lpRefData:int):
+		nonlocal on_top_flag
+		if uNotification == TDN_TIMER:
+			mm_ss = time.strftime(
+				'%M:%S'
+				, time.gmtime(
+					1 + (lpRefData.contents.value - wParam) / 1000
+				)
+			)
+			win32gui.SendMessage(
+				hwnd, TDM_SET_ELEMENT_TEXT
+				, TDE_FOOTER, mm_ss
+			)
+			if wParam  >= lpRefData.contents.value:
+				wParam = 0
+				win32gui.SendMessage(
+					hwnd, TDM_CLICK_BUTTON, None, None)
+		else:
+			if not on_top_flag:
+				win32gui.SetWindowPos(
+					hwnd
+					, win32con.HWND_TOPMOST
+					, 0, 0, 0, 0
+					, win32con.SWP_NOSIZE | win32con.SWP_NOMOVE
+				)
+				on_top_flag = True
+		
+		return S_OK
+	if isinstance(msg, list):
+		buttons = msg
+		msg = ''
+	title = _get_parent_func_name(title)
+	result = ctypes.c_int()
+	tdc = _TaskDialogConfig()
+	if common_buttons:
+		tdc.dwCommonButtons = common_buttons
+	if flags:
+		tdc.dwFlags = flags
+	else:
+		tdc.dwFlags = TDCBF_CANCEL_BUTTON
+		if timeout: tdc.dwFlags |= TDF_CALLBACK_TIMER
+	if isinstance(buttons, (list, tuple)):
+		tdc.dwFlags |= TDF_USE_COMMAND_LINKS
+		p_buttons = (tdc.TASKDIALOG_BUTTON * len(buttons))
+		buttons_li = []
+		for num, button_text in enumerate(buttons):
+			button = _TaskDialogConfig.TASKDIALOG_BUTTON()
+			button.nButtonID = ctypes.c_int(1000 + num)
+			button.pszButtonText = ctypes.c_wchar_p(button_text)
+			buttons_li.append(button)
+		p_buttons = p_buttons(*buttons_li)
+		tdc.pButtons = ctypes.cast(
+			p_buttons
+			, ctypes.POINTER(
+				_TaskDialogConfig.TASKDIALOG_BUTTON)
+		)
+		tdc.cButtons = ctypes.c_uint(len(buttons))
+		tdc.nDefaultButton = 1000 + default_button
+	tdc.pszMainIcon = TD_ICON_INFORMATION
+	tdc.pfCallBack = ctypes.cast(
+		callback_timer, ctypes.POINTER(_callback_type))
+	if timeout:
+		tdc.dwFlags |= TDF_EXPAND_FOOTER_AREA
+		tdc.pszFooter = ctypes.c_wchar_p(f'{timeout}')
+		value, coef = value_unit(timeout, _TIME_UNITS, 1000)
+		timeout = int(value * coef)
+		tdc.lpCallbackData = ctypes.pointer(ctypes.c_long(timeout))
+	tdc.pszMainInstruction = ctypes.c_wchar_p(msg)
+	tdc.pszWindowTitle = ctypes.c_wchar_p(title)
+	tdc.pszContent = ctypes.c_wchar_p(content)
+	_TaskDialogIndirect(ctypes.byref(tdc)
+		, ctypes.byref(result), None, None)
+	return result.value
+
+# - - - TaskDialog - - -

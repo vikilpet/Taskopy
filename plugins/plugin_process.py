@@ -275,12 +275,34 @@ def process_close(process, timeout:int=10):
 		dev_print(f'PID {pid} was not found')
 	return False
 
+def wts_user_sessionid(users, only_active:bool=True)->list:
+	''' Convert list of users to list of
+		session id's.
+		only_active - return only WTSActive sessions.
+	'''
+	if isinstance(users, str):
+		user_dict = {users:''}
+	else:
+		user_dict = {u:'' for u in users}
+	for ses in win32ts.WTSEnumerateSessions():
+		if only_active:
+			if ses['State'] != win32ts.WTSActive: continue
+		user = win32ts.WTSQuerySessionInformation(
+			None, ses['SessionId'], win32ts.WTSUserName
+		)
+		if user in user_dict.keys():
+			user_dict[user] = ses['SessionId']
+	if isinstance(users, str):
+		return user_dict.get(users, -1)
+	else:
+		return [s for s in user_dict.values() if s]
+
 def wts_message(sessionid:int, msg:str, title:str, style:int=0
 , timeout:int=0, wait:bool=False)->int:
 	''' Sends message to WTS session.
 		style - styles like in MessageBox (0 - MB_OK).
 		timeout - timeout in seconds (0 - no timeout).
-		Returns same values as MessageBox.
+		Returns same values as the MessageBox.
 	'''
 	return win32ts.WTSSendMessage(0, sessionid
 	, msg, title, style, timeout, wait)
