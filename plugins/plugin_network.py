@@ -7,6 +7,7 @@ import tempfile
 from hashlib import md5
 from bs4 import BeautifulSoup
 import json
+import datetime
 import warnings
 import json2html
 from .tools import dev_print, decor_except, time_sleep
@@ -113,9 +114,8 @@ def file_download(url:str, destination:str=None, attempts:int=3)->str:
 def html_clean(html_str:str, separator=' ')->str:
 	''' Removes HTML tags from string '''
 	warnings.filterwarnings("ignore", category=UserWarning, module='bs4')
-	text = BeautifulSoup(html_str, 'html.parser'
-		).get_text(separator=separator)
-	return text
+	soup = BeautifulSoup(html_str, 'html.parser')
+	return soup.get_text(separator=separator)
 
 @decor_except
 def html_element(url:str, element, number:int=0
@@ -293,4 +293,16 @@ def json_to_html(json_data, **kwargs)->str:
 		module json2html '''
 	return json2html.json2html.convert(
 		json=json_data, **kwargs)
+
+def http_header(url:str, header:str)->str:
+	'Get HTTP header of url'
+	req = requests.head(url)
+	return req.headers[header]
+
+def http_h_last_modified(url:str):
+	'HTTP Last Modified time in datetime format'
+	date_str = http_header(url, 'Last-Modified')
+	date_dt = datetime.datetime.strptime(date_str
+		, '%a, %d %b %Y %X %Z')
+	return date_dt
 

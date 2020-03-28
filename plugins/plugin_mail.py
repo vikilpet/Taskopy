@@ -268,9 +268,9 @@ def mail_download(server:str, login:str, password:str
 			imap.logout()
 	except Exception as e:
 		if sett.dev:
-			tprint('exception: ' + repr(e))
-		pr(f'error general: {repr(e)}')
-		return [], [f'error general: {repr(e)}']
+			tprint(f'{server} {login} exception: {e}')
+		pr(f'general error: {e}')
+		return [], [f'general error: {e}']
 	return subjects, errors
 
 def mail_download_batch(mailboxes:list, output_dir:str, timeout:int=60

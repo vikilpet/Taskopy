@@ -187,7 +187,10 @@ def process_list(name:str='', cmd_filter:str=None)->list:
 	proc_list = []
 	for proc in psutil.process_iter():
 		if name:
-			if proc.name().lower() != name: continue
+			try:
+				if proc.name().lower() != name: continue
+			except psutil.AccessDenied as e:
+				dev_print('process_list error: ' + repr(e))
 		di = proc.as_dict(attrs=ATTRS)
 		for key in di:
 			if isinstance(di[key], str):

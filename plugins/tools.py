@@ -21,7 +21,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-03-08'
+APP_VERSION = 'v2020-03-28'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -87,7 +87,8 @@ else:
 
 _DB_FILE = _APP_PATH + r'\resources\db.sqlite3'
 _TIME_UNITS = {'msec':1, 'ms':1, 'sec':1000, 's':1000, 'min':60000
-				,'m':60000, 'hour':3600000, 'h':3600000}
+	, 'm':60_000, 'hour':3_600_000, 'h':3_600_000, 'day': 86_400_000
+	, 'd': 86_400_000}
 
 class DictToObj:
 	''' Converts dictionary to object.
@@ -100,8 +101,9 @@ class DictToObj:
 		return 'DictToObj - unknown key'
 
 def value_unit(value, unit_dict:dict, default:int)->tuple:
-	''' Returns (int, int) - value and coefficient found in unit_dict.
-		If no unit is found, it returns the default value.
+	''' Returns (int, int) - value and coefficient
+		found in unit_dict.
+		If no unit is found, it returns the 'default' value.
 	'''
 
 
@@ -180,8 +182,13 @@ def con_log(*msgs):
 		) as f:
 			f.write(log_str)
 
-def time_now(template:str='%Y-%m-%d_%H-%M-%S'):
+def time_now_str(template:str='%Y-%m-%d_%H-%M-%S'):
+	'String with time'
 	return time.strftime(template)
+
+def time_now():
+	'Returns datetime object'
+	return datetime.datetime.now()
 
 def time_hour()->int:
 	'''Returns current hour'''
@@ -194,6 +201,22 @@ def time_minute()->int:
 def time_second()->int:
 	'''Returns current second'''
 	return datetime.datetime.now().second
+
+def time_diff(start, end, unit:str='sec')->int:
+	'''	Returns difference in units.
+		start and end should be in datetime format.
+	'''
+	seconds = (end - start).total_seconds()
+	coef = _TIME_UNITS.get(unit, 1000) / 1000
+	return int(seconds // coef)
+
+def time_diff_str(start, end)->str:
+	'''	Returns time difference in string like that:
+		'3:01:35'
+		start and end should be in datetime format.
+	'''
+	return str(end - start)
+	
 
 def date_year()->int:
 	'''Returns current year'''
@@ -212,6 +235,13 @@ def date_weekday(tdate=None, template:str='%A')->str:
 	'''
 	if not tdate: tdate = datetime.date.today()
 	return tdate.strftime(template)
+
+def date_weekday_num(tdate=None, template:str='%A')->str:
+	''' Weekday number (Monday is 0).
+		tdate may be datetime.date(2019, 6, 12)
+	'''
+	if not tdate: tdate = datetime.date.today()
+	return tdate.weekday()
 
 def time_sleep(interval):
 	''' Pauses for specified amount of time.
