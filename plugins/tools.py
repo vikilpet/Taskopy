@@ -21,7 +21,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-03-28'
+APP_VERSION = 'v2020-04-05'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -882,8 +882,8 @@ class _TaskDialogConfig(ctypes.Structure):
 	def __init__(self):
 		self.cbSize = ctypes.sizeof(self)
 
-def dialog(msg:str=None, title:str=None
-, content:str=None, flags:int=None, buttons:list=None
+def dialog(msg:str=None, buttons:list=None
+, title:str=None, content:str=None, flags:int=None
 , common_buttons:int=None, default_button:int=0
 , timeout:int=None, icon=None)->int:
 	''' Shows dialog with multiple optional buttons.

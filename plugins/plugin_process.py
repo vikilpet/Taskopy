@@ -43,14 +43,26 @@ def file_open(fullpath:str, parameters:str=None, operation:str='open'
 	win32api.ShellExecute(None, operation.lower(), fullpath
 	, parameters, cwd, showcmd)
 
-def process_get(process)->int:
+def process_get(process, cmd_filter:str=None)->int:
 	''' Returns PID of process.
+		cmd_filter - find process with that
+			string in command line.
 	'''
 	if isinstance(process, int): return process
+	if cmd_filter: cmd_filter = cmd_filter.lower()
 	name = process.lower()
 	if not name.endswith('.exe'): name = name + '.exe'
 	for proc in psutil.process_iter():
-		if proc.name().lower() == name: return proc.pid
+		try:
+			proc_name = proc.name().lower()
+		except psutil.AccessDenied as e:
+			dev_print('process_get error: ' + repr(e))
+			continue
+		if proc_name == name:
+			if not cmd_filter:
+				return proc.pid
+			if cmd_filter in ' '.join(proc.cmdline()).lower():
+				return proc.pid
 	return False
 
 def app_start(
@@ -218,18 +230,24 @@ def process_cpu(pid:int, interval:int=1)->float:
 	except psutil.NoSuchProcess:
 		return 0
 
-def process_kill(process):
+def process_kill(process, cmd_filter:str=None):
 	''' Kills the prosess.
 	'''
 	if isinstance(process, int):
 		try:
 			psutil.Process(process).kill()
 		except ProcessLookupError:
-			if sett.dev: print(f'PID {process} not found')
+			dev_print(f'process_kill: PID {process} not found')
 	elif isinstance(process, str):
 		name = process.lower()
+		if cmd_filter: cmd_filter = cmd_filter.lower()
 		for proc in psutil.process_iter(attrs=['name']):
-			if proc.name().lower() == name: proc.kill()
+			if proc.name().lower() == name:
+				if cmd_filter:
+					if cmd_filter in ' '.join(proc.cmdline()).lower():
+						proc.kill()
+				else:
+					proc.kill()
 	else:
 		raise ValueError(
 			f'Unknown type of "process" argument: {type(process)}'
@@ -245,8 +263,8 @@ def free_ram(unit:str='percent'):
 	else:
 		return psutil.virtual_memory()[4] // e
 
-
-def process_close(process, timeout:int=10):
+def process_close(process, timeout:int=10
+, cmd_filter:str=None):
 	''' Kills the process 'softly'. Returns 'True' if process
 		was closed 'softly' and False if process was killed
 		after timeout.
@@ -255,7 +273,7 @@ def process_close(process, timeout:int=10):
 		nonlocal windows
 		windows.append(hwnd)
 		return True
-	pid = process_get(process)
+	pid = process_get(process, cmd_filter)
 	if not pid: return False
 	windows = []
 	try:

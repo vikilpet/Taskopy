@@ -20,7 +20,7 @@ def page_get(url:str, encoding:str='utf-8', session:bool=False
 , cookies:dict=None, headers:dict=None
 , http_method:str='get', json_data:str=None
 , post_file:str=None, post_hash:bool=False
-, post_form_data:dict=None, timeout:tuple=(10, 600)
+, post_form_data:dict=None, timeout:int=3
 , attempts:int=3)->str:
 	''' Gets content of the specified URL '''
 	if (post_file or post_form_data): http_method = 'POST'
@@ -81,7 +81,8 @@ def html_whitespace(text:str)->str:
 	return ' '.join(text.split())
 
 @decor_except
-def file_download(url:str, destination:str=None, attempts:int=3)->str:
+def file_download(url:str, destination:str=None
+, attempts:int=3, timeout:int=1)->str:
 	''' Download file from url to destination and return fullpath.
 		Returns the full path to the downloaded file.
 		attempts - how many times to retry download if failed.
@@ -101,9 +102,14 @@ def file_download(url:str, destination:str=None, attempts:int=3)->str:
 	dest.close()
 	for attempt in range(attempts):
 		try:
-			urllib.request.urlretrieve (url, dest_file)
+			req = requests.get(url, stream=True
+				, timeout=timeout)
+			with open(dest_file, 'wb+') as fd:
+				for chunk in req.iter_content(
+				chunk_size=1_048_576):
+					fd.write(chunk)
 		except Exception as e:
-			dev_print(f'{attempt} dl failed, err="{repr(e)[:20]}", url={url}')
+			dev_print(f'{attempt} dl failed, err="{repr(e)[:50]}", url={url}')
 		else:
 			break
 		finally:
