@@ -1,7 +1,7 @@
 ﻿import time
 import os
 import re
-from hashlib import md5
+import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import cgi
 import urllib
@@ -17,7 +17,10 @@ else:
 	from .tools import msgbox_warning, random_str
 
 class RequestData:
-	''' To keep HTTP request data in instance instead of dictionary
+	''' To keep HTTP request data in
+		object instead of dictionary.
+		{'User-Agent' : ... } ->
+		req_data.user_agent
 	'''
 	def __init__(s, client_ip:str, path:str
 					, headers:dict={}, params:dict={}
@@ -112,7 +115,13 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 				if file_hash_local == file_hash_header:
 					return True, data, fullpath
 				else:
-					return False, 'hashes do not match', None
+					return (
+						False
+						, 'hashes do not match:'
+							+ f' local {file_hash_local}'
+							+ f' header {file_hash_header}'
+						, None
+					)
 			else:
 				return False, data, None
 		if not s.white_list_check():
@@ -269,11 +278,11 @@ def http_server_start(tasks):
 		tasks.http_server = httpd
 		httpd.serve_forever()
 	except Exception as e:
-		print(f'HTTP Server error:\n{repr(e)[:200]}')
-		msgbox_warning(f'HTTP Server error:\n{repr(e)[:100]}')
+		print(f'HTTP Server error:\n{repr(e)}')
+		msgbox_warning(f'HTTP Server error:\n{repr(e)}')
 
 def _file_hash(fullpath:str)->str:
-	hash_md5 = md5()
+	hash_md5 = hashlib.md5()
 	with open(fullpath, 'rb') as fi:
 		for chunk in iter(lambda: fi.read(4096), b''):
 			hash_md5.update(chunk)

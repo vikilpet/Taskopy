@@ -15,7 +15,6 @@ from .tools import dev_print, decor_except, time_sleep
 
 USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36'}
 
-@decor_except
 def page_get(url:str, encoding:str='utf-8', session:bool=False
 , cookies:dict=None, headers:dict=None
 , http_method:str='get', json_data:str=None
@@ -30,7 +29,8 @@ def page_get(url:str, encoding:str='utf-8', session:bool=False
 	file_obj = None
 	post_file_hash = None
 	if post_file:
-		if post_hash: post_file_hash = _file_hash(post_file)
+		if post_hash:
+			post_file_hash = _file_hash(post_file)
 		file_obj = open(post_file, 'rb')
 		args['files'] = {'file': file_obj}
 	else:
@@ -40,15 +40,15 @@ def page_get(url:str, encoding:str='utf-8', session:bool=False
 		req_obj.headers.update(USER_AGENT)
 		if headers: req_obj.headers.update(headers)
 		if cookies: req_obj.cookies.update(cookies)
-		if post_file_hash: req_obj.headers.update(
-			{'Content-MD5': post_file_hash})
+		if post_file_hash:
+			req_obj.headers.update(
+				{'Content-MD5': post_file_hash})
 	else:
 		req_obj = requests
 		if cookies: args['cookies'] = cookies
-		args['headers'] = USER_AGENT
+		args['headers'] = {**USER_AGENT}
 		if post_file_hash:
 			args['headers']['Content-MD5'] = post_file_hash
-		if headers: args['headers'].update(headers)
 	for attempt in range(attempts):
 		try:
 			time_sleep(attempt)
@@ -56,18 +56,14 @@ def page_get(url:str, encoding:str='utf-8', session:bool=False
 			if req.status_code >= 500:
 				raise Exception(
 					f'bad status code {req.status_code}')
-			elif req.status_code == 404:
+			elif req.status_code in [403, 404]:
 				break
 		except Exception as e:
-			dev_print(f'failed again ({attempt}).'
-			,  f'Error: {repr(e)}\nurl={url}')
+			if (attempt + 1) == attempts:
+				raise Exception(
+					f'no more attempts ({attempts}) {url[:100]}')
 		else:
 			break
-		finally:
-			if (attempt + 1) >= attempts:
-				dev_print('no more attempts')
-				raise Exception(
-					f'no more attempts {url[:100]}')
 	if file_obj: file_obj.close()
 	content = str(req.content
 	, encoding=encoding, errors='ignore')
@@ -103,18 +99,19 @@ def file_download(url:str, destination:str=None
 	for attempt in range(attempts):
 		try:
 			req = requests.get(url, stream=True
-				, timeout=timeout)
+				, timeout=timeout, headers={**USER_AGENT})
 			with open(dest_file, 'wb+') as fd:
 				for chunk in req.iter_content(
 				chunk_size=1_048_576):
 					fd.write(chunk)
 		except Exception as e:
-			dev_print(f'{attempt} dl failed, err="{repr(e)[:50]}", url={url}')
+			dev_print(f'dl attempt {attempt} failed'
+				+ f', err="{repr(e)[:50]}", url={url[-30:]}')
+			if (attempt + 1) == attempts:
+				raise Exception(
+					f'No more attempts ({attempt}), url={url[:100]}')
 		else:
 			break
-		finally:
-			if (attempt + 1) >= attempts:
-				raise Exception('No more attempts')
 	return dest_file
 
 def html_clean(html_str:str, separator=' ')->str:
@@ -278,7 +275,8 @@ def is_online(*sites, timeout:int=2)->int:
 	r = 0
 	for site in sites:
 		try:
-			requests.head(site, timeout=timeout)
+			requests.head(site, timeout=timeout
+				, headers={**USER_AGENT})
 			r += 1
 		except: pass
 	return r
@@ -302,7 +300,7 @@ def json_to_html(json_data, **kwargs)->str:
 
 def http_header(url:str, header:str)->str:
 	'Get HTTP header of url'
-	req = requests.head(url)
+	req = requests.head(url, headers={**USER_AGENT})
 	return req.headers[header]
 
 def http_h_last_modified(url:str):

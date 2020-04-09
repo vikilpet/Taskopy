@@ -91,12 +91,41 @@ def window_title_set(window=None, new_title:str='')->int:
 		win32gui.SetWindowText(hwnd, new_title)
 		return hwnd
 
+def window_list(title_filter:str=None
+, case_sensitive:bool=False)->list:
+	''' List titles of all the windows.
+		title_filter - optional filter
+	'''
+	def get_title(hwnd, _):
+		title = win32gui.GetWindowText(hwnd)
+		if not title: return
+		titles.append(title)
+	titles = []
+	win32gui.EnumWindows(
+		get_title
+		, None
+	)
+	if title_filter:
+		if case_sensitive:
+			title_filter = title_filter.lower()
+			titles = [
+				t for t in titles
+					if title_filter in t.lower()
+			]
+		else:
+			titles = [
+				t for t in titles
+					if title_filter in t
+			]
+	return titles
+
 def window_find(title:str)->list:
 	''' Find window handle by Title.
 		Returns list of found window handles.
 	'''
 	def check_title(hwnd, title:str):
-		if win32gui.GetWindowText(hwnd) == title: result.append(hwnd)
+		if win32gui.GetWindowText(hwnd) == title: 
+			result.append(hwnd)
 	result = []
 	win32gui.EnumWindows(check_title, title)
 	return result
