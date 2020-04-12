@@ -2,6 +2,7 @@
 import stat
 import time
 import glob
+from contextlib import contextmanager
 import csv
 import pyodbc
 import zipfile
@@ -422,17 +423,39 @@ def dir_size(fullpath:str, unit:str='b')->int:
 				total_size += os.path.getsize(fp)
 	return total_size // e
 
-def dir_zip(fullpath:str, destination:str)->str:
-	''' Compresses folder and returns the full path to archive.
+def dir_zip(fullpath:str, destination:str
+, do_cwd:bool=True)->str:
+	''' Compresses folder and returns the full
+		path to archive.
+		If destination is a folder then take
+		archive name from fullpath directory name.
+		Replaces destination if it exists.
+		Returns destination.
 	'''
-	filename = os.path.basename(destination)
-	name, suffix = filename.split('.')
-	archive_from = os.path.dirname(fullpath)
-	archive_to = os.path.basename(fullpath.strip(os.sep))
-	shutil.make_archive(name, format=suffix, root_dir=archive_from
-						, base_dir=archive_to)
-	shutil.move(f'{name}.{suffix}', destination)
-	return destination
+	EXT = 'zip'
+	if os.path.isdir(destination):
+		new_fullpath = _dir_slash(destination) \
+			+ os.path.basename(fullpath)
+		base_name = os.path.basename(fullpath)
+	else:
+		new_fullpath = destination
+		base_name = os.path.basename(
+			destination
+		)
+		if base_name.lower().endswith('.zip'):
+			base_name = base_name[:-4]
+	root_dir = os.path.dirname(fullpath)
+	base_dir = os.path.basename(
+		fullpath.strip(os.sep))
+	if do_cwd:
+		with working_directory(os.path.dirname(new_fullpath)):
+			result = shutil.make_archive(base_name, format=EXT
+				, root_dir=root_dir, base_dir=base_dir)
+	else:
+		result = shutil.make_archive(base_name, format=EXT
+			, root_dir=root_dir, base_dir=base_dir)
+		shutil.move(result, new_fullpath)
+	return result
 
 def file_zip(fullpath, destination:str)->str:
 	''' Compresses a file or files to archive.
@@ -504,3 +527,15 @@ def drive_list()->list:
 	''' Returns a list of local drive letters '''
 	drives = win32api.GetLogicalDriveStrings().split('\000')[:-1]
 	return [d[0].lower() for d in drives]
+
+@contextmanager
+def working_directory(directory:str):
+	''' Change current working directory
+		and revert it back.
+	'''
+	owd = os.getcwd()
+	try:
+		os.chdir(directory)
+		yield directory
+	finally:
+		os.chdir(owd)

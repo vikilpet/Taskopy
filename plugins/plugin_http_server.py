@@ -259,8 +259,9 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 	def do_POST(s):
 		s.launch_task('POST')
 
-	def log_message(s, format, *args):
-		if not s.silent: super().log_message(format, *args)
+	def log_message(s, msg_format, *args):
+		if not s.silent:
+			super().log_message(msg_format, *args)
 
 def http_server_start(tasks):
 	''' Starts HTTP server that will run 'tasks'.

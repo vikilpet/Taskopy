@@ -52,7 +52,8 @@ def mail_send(
 	):
 	''' Send email.
 		recipient - emails separated with commas.
-		Return True on success or False and error
+		Returns (True, None) on success or
+		(False, 'error text').
 	'''
 	context = ssl.create_default_context()
 	msg = EmailMessage()
