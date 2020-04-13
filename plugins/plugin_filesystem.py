@@ -424,7 +424,7 @@ def dir_size(fullpath:str, unit:str='b')->int:
 	return total_size // e
 
 def dir_zip(fullpath:str, destination:str
-, do_cwd:bool=True)->str:
+, do_cwd:bool=False)->str:
 	''' Compresses folder and returns the full
 		path to archive.
 		If destination is a folder then take

@@ -15,6 +15,7 @@ from .tools import dev_print, decor_except, time_sleep
 
 USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36'}
 
+@decor_except
 def page_get(url:str, encoding:str='utf-8', session:bool=False
 , cookies:dict=None, headers:dict=None
 , http_method:str='get', json_data:str=None
@@ -54,16 +55,18 @@ def page_get(url:str, encoding:str='utf-8', session:bool=False
 			time_sleep(attempt)
 			req = getattr(req_obj, http_method)(**args)
 			if req.status_code >= 500:
-				raise Exception(
-					f'bad status code {req.status_code}')
+				continue
 			elif req.status_code in [403, 404]:
 				break
+			else:
+			 	break
 		except Exception as e:
-			if (attempt + 1) == attempts:
-				raise Exception(
-					f'no more attempts ({attempts}) {url[:100]}')
-		else:
-			break
+			dev_print(f'failed again ({attempt}).'
+				,  f'Error: {repr(e)}\nurl={url}')
+			pass
+	else:
+		raise Exception(
+			f'no more attempts ({attempts}) {url[:100]}')
 	if file_obj: file_obj.close()
 	content = str(req.content
 	, encoding=encoding, errors='ignore')
@@ -104,14 +107,12 @@ def file_download(url:str, destination:str=None
 				for chunk in req.iter_content(
 				chunk_size=1_048_576):
 					fd.write(chunk)
+			break
 		except Exception as e:
 			dev_print(f'dl attempt {attempt} failed'
-				+ f', err="{repr(e)[:50]}", url={url[-30:]}')
-			if (attempt + 1) == attempts:
-				raise Exception(
-					f'No more attempts ({attempt}), url={url[:100]}')
-		else:
-			break
+				+ f', err="{repr(e)[:50]}...", url={url[-30:]}')
+	else:
+		raise Exception(f'No more attempts ({attempt}), url={url[:100]}')
 	return dest_file
 
 def html_clean(html_str:str, separator=' ')->str:
@@ -309,4 +310,15 @@ def http_h_last_modified(url:str):
 	date_dt = datetime.datetime.strptime(date_str
 		, '%a, %d %b %Y %X %Z')
 	return date_dt
+
+def port_scan(host:str, port:int
+, timeout:float=0.5)->bool:
+	' Scan TCP port '
+	SUCCESS = 0
+	sock = socket.socket()
+	sock.settimeout(timeout)
+	sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+	connected = sock.connect_ex((host, port)) is SUCCESS
+	sock.close()
+	return connected
 
