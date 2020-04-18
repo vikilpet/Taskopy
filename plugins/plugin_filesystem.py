@@ -1,4 +1,4 @@
-﻿import os
+import os
 import stat
 import time
 import glob
@@ -44,8 +44,9 @@ def file_read(fullpath:str, encoding:str='utf-8')->str:
 		with open(fullpath, 'tr', encoding=encoding) as f:
 			return f.read()
 
-def file_write(fullpath, content:str, encoding:str='utf-8'):
-	''' Saves content to file.
+def file_write(fullpath, content:str
+, encoding:str='utf-8')->str:
+	''' Saves content to a file.
 		Creates file if the fullpath doesn't exist.
 		If fullpath is '' or None - uses temp_file().
 		Returns fullpath.
@@ -325,7 +326,7 @@ def file_dir(fullpath:str)->str:
 	return os.path.dirname(fullpath)
 
 def file_backup(fullpath:str, dest_dir:str=''
-, now_format:str='_%y-%m-%d_%H-%M-%S'):
+, now_format:str='_%y-%m-%d_%H-%M-%S')->str:
 	''' Copy somefile.txt to somefile_2019-05-19_21-23-02.txt
 		dest_dir - destination. If not specified - current folder.
 		Returns full path of new file.
@@ -503,26 +504,26 @@ def temp_file(suffix:str='')->str:
 	return (tempfile.gettempdir() + '\\'
 			+ time.strftime('%m%d%H%M%S') + random_str(5) + suffix)
 
-def file_hash(fullpath:str, algorithm:str='crc32')->str:
+def file_hash(fullpath:str, algorithm:str='crc32'
+, buf_size:int=65536)->str:
 	''' Returns hash of file.
-		algorithm - 'crc32' or 'md5'.
+		algorithm - 'crc32' or any algorithm
+		from hashlib (md5, sha512 etc).
 	'''
 	fullpath = _long_path(fullpath)
-	algorithm = algorithm.lower()
-	if algorithm == 'md5':
-		hash_md5 = hashlib.md5()
-		with open(fullpath, 'rb') as fi:
-			for chunk in iter(lambda: fi.read(4096), b''):
-				hash_md5.update(chunk)
-		return hash_md5.hexdigest()
-	elif algorithm == 'crc32':
+	algorithm = algorithm.lower().replace('-', '')
+	if algorithm == 'crc32':
 		prev = 0
-		for eachLine in open(fullpath,"rb"):
+		for eachLine in open(fullpath, 'rb'):
 			prev = crc32(eachLine, prev)
 		return '%X' % (prev & 0xFFFFFFFF)		
 	else:
-		return 'error: unknown algorithm'
-
+		hash_obj = getattr(hashlib, algorithm)()
+		with open(fullpath, 'rb') as fi:
+			for chunk in iter(lambda: fi.read(buf_size), b''):
+				hash_obj.update(chunk)
+		return hash_obj.hexdigest()
+	
 def drive_list()->list:
 	''' Returns a list of local drive letters '''
 	drives = win32api.GetLogicalDriveStrings().split('\000')[:-1]

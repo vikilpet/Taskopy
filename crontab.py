@@ -1,4 +1,4 @@
-﻿from plugins.tools import *
+from plugins.tools import *
 from plugins.plugin_process import *
 from plugins.plugin_filesystem import *
 from plugins.plugin_network import *

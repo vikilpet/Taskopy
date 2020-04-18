@@ -1,4 +1,4 @@
-﻿import subprocess
+import subprocess
 import smtplib
 import ssl
 import argparse
@@ -237,7 +237,8 @@ def mail_download(server:str, login:str, password:str
 						_MAX_FILE_LEN
 						- len(str(last_index))
 						- len(output_dir)
-						- 11					)
+						- 11
+					)
 					filename = '{}\\{} - {}....eml'.format(
 						output_dir,
 						last_index,

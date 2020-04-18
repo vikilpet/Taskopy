@@ -1,4 +1,4 @@
-﻿import sys
+import sys
 
 class Language:
 	def __init__(s, language:str='en'):

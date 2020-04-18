@@ -1,4 +1,4 @@
-﻿# Taskopy
+# Taskopy
 ### Platform for running Python-based scripts on Windows with hotkeys, tray menu, HTTP server and many more.
 
 <p align="center">
@@ -156,6 +156,18 @@ Format: **setting** (default value) — description.
 ## Keywords
 ### Miscelanneous
 - **balloon(msg:str, title:str=APP_NAME,timeout:int=None, icon:str=None)** - shows *baloon* message from tray icon. `title` - 63 symbols max, `msg` - 255 symbols. `icon` - 'info', 'warning' or 'error'.
+- **dialog(msg:str=None, buttons:list=None, title:str=None, content:str=None, default_button:int=0, timeout:int=None)->int** - shows a dialog with many buttons. Returns ID of selected buttons starting with 1000.
+	*buttons* - a list with text on the buttons. Number of strings = number of buttons.
+	*title* - dialog title.
+	*content* - supplementary text.
+	*default_button* - button number starting with 0, which is selected by default.
+	*timeout* - timeout after which the message will be closed automatically.
+	Example:
+
+		dialog('File is downloaded', ['Run', 'Copy full path', 'Cancel'], content='File source: GitHub', timeout=60, default_button=2)
+
+	![Dialog EN](https://user-images.githubusercontent.com/43970835/79643653-13d4d380-81b5-11ea-9548-eb28fc515d7b.png)
+
 - **jobs_batch(func_list:list, timeout:int)->list**: — Runs functions (they may not be same) in threads and waits when all of them return result or timeout is expired. *func_list* - list of sublist, where sublist should consist of 3 items: function, (args), {kwargs}. Returns list of *job* objects, where *job* have these attributes: function, args, kwargs, result, time. Example:
 
 		func_list = [
@@ -204,9 +216,14 @@ Format: **setting** (default value) — description.
 				print('Yes!')
 			else:
 				print('No :-(')
+	
+	If you need a message with many buttons see **dialog**.
 
 - **sound_play (fullpath:str, wait:bool)->str** - play .wav file. *wait* — do not pause task execution. If fullpath is a folder then pick random file.
-- **time_now(template:str='%Y-%m-%d_%H-%M-%S')->str** - string with current time.
+- **time_diff(start, end, unit:str='sec')->int** - returns difference between dates in units. *start* and *end* should be in datetime format.
+- **time_diff_str(start, end)->str** - returns difference between dates in string like that: '3:01:35'.	*start* and *end* should be in datetime format.
+- **time_now()** - returns the current time in datetime format.
+- **time_now_str(template:str='%Y-%m-%d_%H-%M-%S')->str** - string with current time.
 - **pause(sec:float)** - pause the execution of the task for the specified number of seconds. *interval* - time in seconds or a string specifying a unit like '5 ms' or '6 sec' or '7 min'.
 - **var_set(var_name:str, value:str)** - save *value* of variable *var_name* to disk so it will persist between program starts.
 - **var_get(var_name:str)->str** - retrieve variable value.
@@ -258,6 +275,8 @@ Format: **setting** (default value) — description.
 - **dir_size(fullpath:str, unit:str='b')->int** - folder size in specified units.
 - **dir_zip(source:str, destination:str)->str** - zip the folder return the path to the archive.
 - **drive_list()->list** - list of logical drives.
+- **file_append(fullpath:str, content:str)->str** - appends *content* to a file. Creates fullpath if not specified. Returns fullpath.
+- **file_backup(fullpath:str, dest_dir:str='', now_format:str='_%y-%m-%d_%H-%M-%S')->str** - copy 'somefile.txt' to 'somefile_2019-05-19_21-23-02.txt'. *dest_dir* - destination directory. If not specified - current folder. Returns full path of new file.
 - **file_basename(fullpath:str)->str** - returns basename: file name without parent folder and extension.
 - **file_backup(fullpath, folder:str=None)** - make copy of file with added timestamp.
 	*folder* — place copy to this folder. If omitted — place in original folder.
@@ -267,15 +286,20 @@ Format: **setting** (default value) — description.
 - **file_dir(fullpath:str)->str:** - get parent directory name of file.
 - **file_exists(fullpath:str)->bool** - file exists?
 - **file_ext(fullpath:str)->str** - file extension in lower case without dot.
-- **file_hash(fullpath:str, algorithm:str='crc32')->str** - returns hash of file. *algorithm* - 'crc32' or 'md5'.
+- **file_hash(fullpath:str, algorithm:str='crc32')->str** - returns hash of file. *algorithm* - 'crc32' or any algorithm from hashlib ('md5', 'sha512' etc)
 - **file_log(fullpath:str, message:str, encoding:str='utf-8', time_format:str='%Y.%m.%d %H:%M:%S')** - log *message* to *fullpath* file.
 - **file_move(fullpath:str, destination:str)** - move file to destination folder or file.
-- **file_name(fullpath:str)->str:** - get file name without directory.
+- **file_name(fullpath:str)->str** - get file name without directory.
+- **file_name_add(fullpath:str, suffix:str='')->str** - adds a line (suffix) to the file name before the extension. If no suffix is specified, adds a line of random characters. Example:
+	
+	>>> file_name_add('my_file.txt', '_1')
+	'my_file_1.txt'
+
 - **file_name_fix(fullpath:str, repl_char:str='\_')->str** - replaces forbidden characters with _repl_char_. Removes leading and trailing spaces. Adds '\\\\?\\' for long paths.
 - **file_read(fullpath:str)->str:** - get content of file.
 - **file_rename(fullpath:str, dest:str)->str** - rename the file. *dest* is the full path or just a new file name without a folder.
 - **file_size(fullpath:str, unit:str='b')->bool:** - get size of file in units (gb, mb, kb, b).
-- **file_write(fullpath:str, content=str)** - write content to file.
+- **file_write(fullpath:str, content=str, encoding:str='utf-8')->str** - saves *content* to a file. Creates file if the fullpath doesn't exist. If fullpath is '' or None - uses temp_file(). Returns fullpath.
 - **file_zip(fullpath, destination:str)->str** - compress a file or files into an archive.
 	*fullpath* — a string with a full file name or a list of files.
 	*destiniation* — full path to the archive.
@@ -327,6 +351,7 @@ In the functions for working with windows, the *window* argument can be either a
 - **window_activate(window=None)->int** - bring window to front. *window* may be a string with title or integer with window handle.
 - **window_find(title:str)->list** - find window by title. Returns list of all found windows.
 - **window_hide(window=None)->int** - hide window.
+- **window_list(title_filter:str=None)->list** - list of titles of all windows. *title_filter* - optional filter for titles.
 **- window_on_top(window=None, on_top:bool=True)->int** - makes the window to stay always on top.
 - **window_show(window=None)->int** - show window.
 - **window_title_set(window=None, new_title:str='')->int** - change window title from *cur_title* to *new_title*
@@ -342,7 +367,7 @@ In the functions for working with windows, the *window* argument can be either a
 	*app_args* — command-line arguments.
 	*wait* — wait until application will be closed.
 - **file_open(fullpath:str)** - open file or URL in default application.
-- **process_close(process, timeout:int=10)** - soft completion of the process: first all windows belonging to the specified process are closed, and after the timeout (in seconds) the process itself is killed, if still exists.
+- **process_close(process, timeout:int=10, cmd_filter:str=None)** - soft completion of the process: first all windows belonging to the specified process are closed, and after the timeout (in seconds) the process itself is killed, if still exists. *cmd_filter* - only kill processes with that string in command line.
 - **process_exist(process, cmd:str=None)->bool** - checks whether the process exists and returns a PID or False. *cmd* is an optional command line search. This way you can distinguish between processes with the same executable but different command lines.
 - **process_list(name:str='', cmd_filter:str=None)->list** - get list of processes with that name. Item in list is a *DictToObj* object with this attributes:
 	*pid* — PID of found process.
@@ -367,6 +392,7 @@ In the functions for working with windows, the *window* argument can be either a
 - **wts_cur_sessionid()->int** - returns SessionID of current process
 - **wts_logoff(sessionid:int, wait:bool=False)->int** - logoffs session. *wait* - wait for completion.
 - **wts_proc_list(process:str=None)->list** - returns list of DictToObj objects with properties: *.sessionid:int*, *.pid:int*, *.process:str* (name of exe file), *.pysid:obj*, *.username:str*, *.cmdline:list*. *process* - filter by process name.
+- **wts_user_sessionid(users, only_active:bool=True)->list** - converts list of users to a list of session ID's. *only_active* - return only WTSActive sessions.
 
 ### Cryptography
 - **file_enc_write(fullpath:str, content:str, password:str, encoding:str='utf-8')->tuple**: — encrypts content with password and writes to a file. Adds salt as file extension. Returns status, fullpath/error.
@@ -537,26 +563,19 @@ Inside _virustotal\_demo_ you can see another way to pass a file name to a task 
 - [Donate via PayPal](https://www.paypal.me/vikil)
 
 ## Task examples
-- iPython + plugins
+- iPython + Taskopy
 - Disk free space
 - Current IP address
 - Add IP-address to MikroTik router
 - Virustotal check
 
-Launch iPython (Jupyter) and copy all plugins to the clipboard to quickly paste and access all keywords:
+Launch iPython (Jupyter) animport crontab for quick access to all keywords from plugins:
 
-	def iPython_demo(submenu='demo', task_name='iPython + plugins'):
-		app_dir = r'd:\soft\taskopy'
-
-		# Softly close existing process:
-		process_close('ipython.exe', 3)
-		# Run new process in new console:
-		app_start('ipython', shell=True)
-		plugs = dir_list('plugins\\*.py')
-		plugs[:] = [
-			'from ' + pl[:-3].replace('\\', '.')
-			+ ' import *' for pl in plugs
-		]
+	def iPython(on_load=False, submenu='WIP'
+	, task_name='iPython + Taskopy'):
+		TASKOPY_DIR = r'd:\soft\taskopy'
+		process_kill('ipython.exe')
+		file_open('ipython')
 		for _ in range(100):
 			if 'ipython' in window_title_get().lower():
 				break
@@ -565,12 +584,12 @@ Launch iPython (Jupyter) and copy all plugins to the clipboard to quickly paste 
 		if not 'ipython'.lower() in window_title_get().lower():
 			tprint('ipython not found')
 			return
-		keys_write(r'%cd {}'.format(app_dir))
+		keys_write('%cd ' + TASKOPY_DIR)
 		keys_send('enter')
 		keys_write(
 			r'%load_ext autoreload' + '\n'
 			+ r'%autoreload 2' + '\n'
-			+ '\n'.join(plugs)
+			+ 'from crontab import *\n'
 		)
 		pause('200 ms')
 		keys_send('ctrl+enter')
@@ -632,3 +651,12 @@ Check MD5 hash of file in the Virustotal. You need to register to obtain free AP
 			if res.scans[av]['detected']:
 				print(f'{av}: ' + res.scans[av]['result'])
 		msgbox(f'Result: {res.positives} of {res.total}', timeout=5)
+
+Receive a file via HTTP POST request and show a message with a comment and the full name of the file:
+
+	def http_post_demo(data, http=True, log=False, menu=False):
+		dialog(f'{data.filecomment}\n\n{data.post_file}')
+
+Example of sending a request to a task:
+
+	curl -F "filecomment=Take this!" -F "file=@d:\my_picture.jpg" http://127.0.0.1:8275/task?http_post_demo

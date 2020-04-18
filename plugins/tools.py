@@ -1,4 +1,4 @@
-﻿import sys
+import sys
 import os
 import time
 import datetime
@@ -21,7 +21,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-04-13'
+APP_VERSION = 'v2020-04-18'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []

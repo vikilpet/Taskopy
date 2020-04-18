@@ -1,4 +1,4 @@
-﻿import win32api
+import win32api
 import win32gui
 from .tools import *
 from .plugin_process import app_start

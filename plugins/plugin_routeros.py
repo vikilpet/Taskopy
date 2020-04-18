@@ -1,4 +1,4 @@
-﻿# source: https://wiki.mikrotik.com/wiki/Manual:API_Python3
+# source: https://wiki.mikrotik.com/wiki/Manual:API_Python3
 
 import sys
 import time

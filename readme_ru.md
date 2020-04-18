@@ -1,4 +1,4 @@
-﻿
+
 ### Платформа для запуска скриптов под Windows на основе Python с горячими клавишами, меню в трее, HTTP-сервером и многим другим.
 
 <p align="center">
@@ -156,6 +156,18 @@
 ## Ключевые слова
 ### Общие
 - **balloon(msg:str, title:str=APP_NAME,timeout:int=None, icon:str=None)** - показывает сообщение у иконки в трее. `title` - 63 символа максимум, `msg` - 255 символов. `icon` - 'info', 'warning' или 'error'.
+- **dialog(msg:str=None, buttons:list=None, title:str=None, content:str=None, default_button:int=0, timeout:int=None)->int** - показывает сообщение с несколькими кнопками. Возвращает ID нажатой кнопки, начиная с 1000.
+	*buttons* - список строк с текстом на кнопках. Сколько строк, столько и кнопок.
+	*title* - заголовок.
+	*content* - дополнительный текст.
+	*default_button* - номер кнопки, начиная с 1000, которая выбрана по умолчанию.
+	*timeout* - таймаут, после которого сообщение закроется автоматически.
+	Пример:
+
+		dialog('Файл успешно скачан', ['Запустить', 'Скопировать путь', 'Отмена'], content='Источник файла: GitHub', timeout=60, default_button=2)
+
+	![Dialog RU](https://user-images.githubusercontent.com/43970835/79643801-bc833300-81b5-11ea-8a2e-ea6baa045480.png)
+
 - **jobs_batch(func_list:list, timeout:int)->list**: — запускает функции параллельно и ждёт, когда они закончат работу или истечёт таймаут. *func_list* — список со списками, где внутренний список должен содержать 3 элемента: функция, (args), {kwargs}. Возвращает список с DictToObj объектами *jobs*, которые иметю такие аттрибуты: func, args, kwargs, результат, время выполнения. Пример:
 
 		func_list = [
@@ -205,8 +217,13 @@
 			else:
 				print('Нельзя :-(')
 
+	Если вам нужно сообщение с несколькими кнопками, смотрите **dialog**.
+
 - **sound_play (fullpath:str, wait:bool)->str** - воспроизвести .wav файл. *wait* — ждать конца воспроизведения. Если *fullpath* это папка, значит проиграть случайный файл из неё.
-- **time_now(template:str='%Y-%m-%d\_%H-%M-%S')->str** - строка с текущей датой и временем.
+- **time_diff(start, end, unit:str='sec')->int** - возвращает разницу между датами в выбранных единицах. *start* и *end* должны быть в формате datetime.
+- **time_diff_str(start, end)->str** - возвращает разницу между датами в виде строки типа: '3:01:35'. *start* и *end* должны быть в формате datetime.
+- **time_now()** - возвращает текущее время в формате datetime.
+- **time_now_str(template:str='%Y-%m-%d\_%H-%M-%S')->str** - строка с текущей датой и временем.
 - **pause(interval)** - приостановить выполнение задачи на указанное кол-во секунд. *interval* — время в секундах или строка с указанием единицы вроде '5 ms' или '6 sec' или '7 min'.
 - **var_set(var_name:str, value:str)** - сохранить _значение_ переменной на диск. Таким образом можно хранить данные между запусками Taskopy.
 - **var_get(var_name:str)->str** - получить значение переменной.
@@ -258,6 +275,8 @@
 - **dir_size(fullpath:str, unit:str='b')->int** - размер папки в указанных единицах.
 - **dir_zip(source:str, destination:str)->str** - упаковать папку в архив и вернуть путь к архиву.
 - **drive_list()->list** - список логических дисков.
+- **file_append(fullpath:str, content:str)->str** - дописывает *content* к файлу. Создаёт файл, если он не существует. Возвращает полное имя файла.
+- **file_backup(fullpath:str, dest_dir:str='', now_format:str='_%y-%m-%d_%H-%M-%S')->str** - копировать 'somefile.txt' в 'somefile_2019-05-19_21-23-02.txt'. *dest_dir* - папка назначения. Если не указана - текущая папка файла. Возвращает полное имя нового файла.
 - **file_basename(fullpath:str)->str** - возвращает *базовое* имя файла - без папки и расширения.
 - **file_backup(fullpath, folder:str=None):** - сделать копию файла, дописав в имя текущую дату и время.
 	*folder* — папка, куда следует поместить копию. Если не указано — поместить в папке оригинального файла.
@@ -267,15 +286,20 @@
 - **file_dir(fullpath:str)->str:** - получить полное имя папки, в которой файл лежит.
 - **file_exists(fullpath:str)->bool** - файл существует?
 - **file_ext(fullpath:str)->str** - расширение файла без точки.
-- **file_hash(fullpath:str, algorithm:str='crc32')->str**: - возвращает хэш файла. *algorithm* - 'crc32' или 'md5'.
+- **file_hash(fullpath:str, algorithm:str='crc32')->str**: - возвращает хэш файла. *algorithm* - 'crc32' или любой алгоритм из hashlib ('md5', 'sha512' и т.д.)
 - **file_log(fullpath:str, message:str, encoding:str='utf-8', time_format:str='%Y.%m.%d %H:%M:%S')** - записать *message* в файл *fullpath*.
 - **file_move(fullpath:str, destination:str):** - переместить файл.
-- **file_name(fullpath:str)->str:** - получить имя файла без папки.
+- **file_name(fullpath:str)->str** - получить имя файла без папки.
+- **file_name_add(fullpath:str, suffix:str='')->str** - добавляет строку (суффикс) к файлу перед расширением. Если суффикс не указан, добавляет строку из случайных символов. Пример: 
+	
+	>>> file_name_add('my_file.txt', '_1')
+	'my_file_1.txt'
+
 - **file_name_fix(fullpath:str, repl_char:str='\_')->str** - заменяет запрещённые символы на _repl_char_. Удаляет пробелы в начале и в конце. Добавляет '\\\\?\\' к длинным путям.
 - **file_read(fullpath:str)->str:** - получить содержимое файла.
 - **file_rename(fullpath:str, dest:str)->str** - переименовать файл. *dest* — полный путь или просто новое имя файла без папки.
 - **file_size(fullpath:str, unit:str='b')->bool:** - получить размер файла (gb, mb, kb, b).
-- **file_write(fullpath:str, content=str):** - записать текст в файл.
+- **file_write(fullpath:str, content=str, encoding:str='utf-8')->str** - сохраняет *content* в файл. Создаёт файл, если он не существует. Если fullpath = '' или None, используется temp_file(). Возвращает полное имя файла.
 - **file_zip(fullpath, destination:str)->str** - сжать файл или файлы в архив.
 	*fullpath* — строка с полным именем файла или список с файлами.
 	*destiniation* — полный путь к архиву.
@@ -327,6 +351,7 @@
 - **window_activate(window=None)->int** - вывести указанное окно на передний план. *window* может строкой с заголовком или числовым хэндлом нужного окна.
 - **window_find(title:str)->list** - вернуть список хэндлов окон, с указанным заголовком.
 - **window_hide(window=None)->int** - скрыть окно.
+- **window_list(title_filter:str=None)->list** - список заголовков всех окон. *title_filter* - вернуть только заголовки с этой подстрокой.
 **- window_on_top(window=None, on_top:bool=True)->int** - делает указанное окно поверх других окон.
 - **window_show(window=None)->int** - показать окно.
 - **window_title_set(window=None, new_title:str='')->int** -  найти окно по заголовку *cur_title* и поменять на *new_title*.
@@ -342,7 +367,7 @@
 	*app_args* — аргументы командной строки.
 	*wait* — приостановить выполнение задачи, пока не завершится запущенный процесс.
 - **file_open(fullpath:str):** - открыть файл или URL в приложении по умолчанию.
-- **process_close(process, timeout:int=10)** - мягкое завершение процесса: сначала закрываются все окна, принадлежащие указанному процессу, а по истечении таймаута (в секундах) убивается сам процесс, если ещё существует.
+- **process_close(process, timeout:int=10, cmd_filter:str=None)** - мягкое завершение процесса: сначала закрываются все окна, принадлежащие указанному процессу, а по истечении таймаута (в секундах) убивается сам процесс, если ещё существует. *cmd_filter* - убивать только процессы, содержащие эту строку в командной строке.
 - **process_exist(process, cmd:str=None)->bool** - проверяет, существует ли процесс и возвращает PID или False. *cmd* - необязательная строка для поиска в командной строке. Таким образом можно различать процессы с одинаковым исполняемым файлом но разной командной строкой.
 - **process_list(name:str='', cmd_filter:str=None)->list —** получить список процессов. Список содержит объекты *DictToObj*, у которых есть следующие свойства:
 	*pid* — числовой идентификатор.
@@ -367,6 +392,7 @@
 - **wts_cur_sessionid()->int** - возвращает SessionID текущего процесса.
 - **wts_logoff(sessionid:int, wait:bool=False)->int** - завершает терминальную сессию. *wait* - ждать завершения работы.
 - **wts_proc_list(process:str=None)->list** - возвращает список объектов *DictToObj* с такими свойствами: *.sessionid:int*, *.pid:int*, *.process:str* (имя исполняемого файла), *.pysid:obj*, *.username:str*, *.cmdline:list*. *process* - фильтровать выдачу по имени процесса.
+- **wts_user_sessionid(users, only_active:bool=True)->list** - преобразует список пользователей в список Session ID. *only_active* - вернуть только  WTSActive сессии.
 
 ### Шифрование
 - **file_enc_write(fullpath:str, content:str, password:str, encoding:str='utf-8')**: — зашифровывает *content* и записывает в файл. Соль добавляется в виде расширения файла. Возвращает статус и полный путь/ошибку.
@@ -537,27 +563,20 @@ https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/
 - Расскажите о Taskopy друзьям.
 
 ## Примеры задач
-- iPython + plugins
+- iPython + Taskopy
 - Свободное место на дисках
 - Текущий IP адрес
 - Добавление IP-адреса в маршрутизатор MikroTik
 - Калькулятор и курс валют
 - Проверка на Virustotal
 
-Запуск iPython (Jupyter) и загрузка всех плагинов, чтобы можно было получить доступ ко всем функциям из плагинов:
+Запуск iPython (Jupyter) и загрузка кронтаба для быстрого доступа ко всем функциям из плагинов:
 
-	def iPython_demo(submenu='demo', task_name='iPython + плагины'):
-		app_dir = r'd:\soft\taskopy'
-
-		# Мягко завершаем существующий процесс:
-		process_close('ipython.exe', 3)
-		# запускаем новый процесс в отдельной консоли:
-		app_start('ipython', shell=True)
-		plugs = dir_list('plugins\\*.py')
-		plugs[:] = [
-			'from ' + pl[:-3].replace('\\', '.')
-			+ ' import *' for pl in plugs
-		]
+	def iPython(on_load=False, submenu='WIP'
+	, task_name='iPython + Taskopy'):
+		TASKOPY_DIR = r'd:\soft\taskopy'
+		process_kill('ipython.exe')
+		file_open('ipython')
 		for _ in range(100):
 			if 'ipython' in window_title_get().lower():
 				break
@@ -566,12 +585,12 @@ https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/
 		if not 'ipython'.lower() in window_title_get().lower():
 			tprint('ipython not found')
 			return
-		keys_write(r'%cd {}'.format(app_dir))
+		keys_write('%cd ' + TASKOPY_DIR)
 		keys_send('enter')
 		keys_write(
 			r'%load_ext autoreload' + '\n'
 			+ r'%autoreload 2' + '\n'
-			+ '\n'.join(plugs)
+			+ 'from crontab import *\n'
 		)
 		pause('200 ms')
 		keys_send('ctrl+enter')
@@ -647,3 +666,12 @@ https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/
 			if res.scans[av]['detected']:
 				print(f'{av}: ' + res.scans[av]['result'])
 		msgbox(f'Результат: {res.positives} из {res.total}', timeout=5)
+
+Получаем файл через HTTP POST запрос и выводим сообщение с комментарием и полным именем файла:
+
+	def http_post_demo(data, http=True, log=False, menu=False):
+		dialog(f'{data.filecomment}\n\n{data.post_file}')
+
+Пример отправки запроса в задачу:
+
+	curl -F "filecomment=Take this!" -F "file=@d:\my_picture.jpg" http://127.0.0.1:8275/task?http_post_demo

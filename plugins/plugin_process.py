@@ -1,4 +1,4 @@
-﻿import subprocess
+import subprocess
 import os
 import ctypes
 import psutil
@@ -431,7 +431,16 @@ LPPROCESS_INFORMATION = ctypes.POINTER(PROCESS_INFORMATION)
 kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
 
 advapi32.CreateProcessWithTokenW.argtypes = (
-	wintypes.HANDLE,	   	wintypes.DWORD,	wintypes.LPCWSTR,	  	wintypes.LPWSTR,	   	wintypes.DWORD,	wintypes.LPCWSTR,	  	wintypes.LPCWSTR,	  	LPSTARTUPINFO,		 	LPPROCESS_INFORMATION) 
+	wintypes.HANDLE,
+	wintypes.DWORD,
+	wintypes.LPCWSTR,
+	wintypes.LPWSTR,
+	wintypes.DWORD,
+	wintypes.LPCWSTR,
+	wintypes.LPCWSTR,
+	LPSTARTUPINFO,
+	LPPROCESS_INFORMATION)
+
 user32.GetShellWindow.restype = wintypes.HWND
 
 def adjust_token_privileges(htoken, state):

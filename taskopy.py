@@ -1,4 +1,4 @@
-﻿import time
+import time
 import sys
 import os
 import importlib
@@ -682,7 +682,6 @@ class App(wx.App):
 		time.sleep(0.1)
 		s.frame.PopupMenu(s.taskbaricon.CreatePopupMenu())
 		
-
 
 def main():
 	global app
