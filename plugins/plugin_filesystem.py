@@ -10,7 +10,9 @@ from distutils import dir_util
 from zlib import crc32
 import tempfile
 import hashlib
+
 import win32api
+from win32com.shell import shell, shellcon
 from pathlib import Path
 import shutil
 from .tools import random_str
@@ -65,9 +67,13 @@ def file_write(fullpath, content:str
 		f.write(content)
 	return fullpath
 
+def file_ext_replace(fullpath:str, new_ext:str)->str:
+	' Replaces file extension '
+	return os.path.splitext(fullpath)[0] + '.' + new_ext
+
 def file_rename(fullpath:str, dest:str
 , overwrite:bool=False)->str:
-	''' Rename path.
+	''' Renames path.
 		dest - fullpath or just new file name
 		without parent directory.
 		overwrite - overwrite destination file
@@ -89,7 +95,7 @@ dir_rename = file_rename
 
 def file_log(fullpath:str, message:str, encoding:str='utf-8'
 , time_format:str='%Y.%m.%d %H:%M:%S'):
-	''' Write message to log '''
+	''' Writes message to log '''
 	fullpath = _long_path(fullpath)
 	with open(fullpath, 'at+', encoding=encoding) as f:
 		f.write(time.strftime(time_format) + '\t' + message + '\n')
@@ -147,9 +153,30 @@ def file_delete(fullpath:str):
 			os.chmod(fullpath, stat.S_IWRITE)
 			os.remove(fullpath)
 		except Exception as e:
-			print(f'file_delete error: ' + str(e))
+			print(f'file_delete error: {e}')
 	except FileNotFoundError:
 		pass
+
+def file_recycle(fullpath:str, silent:bool=True):
+	''' Move file to the recycle bin
+		silent - do not show standard windows
+		dialog to confirm deletion.
+	'''
+	flags = shellcon.FOF_ALLOWUNDO
+	if silent:
+		flags = flags | shellcon.FOF_SILENT | shellcon.FOF_NOCONFIRMATION
+	result = shell.SHFileOperation(
+		(
+			0
+			, shellcon.FO_DELETE
+			, fullpath
+			, None
+			, flags
+			, None
+			, None
+		)
+	)
+	return result[0] <= 3 
 
 def dir_copy(fullpath:str, destination:str, symlinks:bool=False)->int:
 	''' Copy a folder with all content to a new location.
@@ -319,6 +346,9 @@ def file_name(fullpath:str)->str:
 	''' Returns only name from fullpath
 	'''
 	return os.path.basename(fullpath)
+
+def file_name_wo_ext(fullpath:str)->str:
+	return os.path.splitext(fullpath)[0]
 
 def file_dir(fullpath:str)->str:
 	''' Returns directory from fullpath
@@ -540,3 +570,4 @@ def working_directory(directory:str):
 		yield directory
 	finally:
 		os.chdir(owd)
+

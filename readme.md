@@ -367,7 +367,7 @@ In the functions for working with windows, the *window* argument can be either a
 	*app_args* — command-line arguments.
 	*wait* — wait until application will be closed.
 - **file_open(fullpath:str)** - open file or URL in default application.
-- **process_close(process, timeout:int=10, cmd_filter:str=None)** - soft completion of the process: first all windows belonging to the specified process are closed, and after the timeout (in seconds) the process itself is killed, if still exists. *cmd_filter* - only kill processes with that string in command line.
+- **process_close(process, timeout:int=10, cmd_filter:str=None)** - soft completion of the process: first all windows belonging to the specified process are closed, and after the timeout (in seconds) the process itself is killed, if still exists. *cmd_filter* - kill only processes with that string in command line.
 - **process_exist(process, cmd:str=None)->bool** - checks whether the process exists and returns a PID or False. *cmd* is an optional command line search. This way you can distinguish between processes with the same executable but different command lines.
 - **process_list(name:str='', cmd_filter:str=None)->list** - get list of processes with that name. Item in list is a *DictToObj* object with this attributes:
 	*pid* — PID of found process.
@@ -384,7 +384,7 @@ In the functions for working with windows, the *window* argument can be either a
 			print(proc.pid)
 
 - **process_cpu(pid:int, interval:int=1)->float** - CPU usage of process with specified PID. *interval* in seconds - how long to measure.
-- **process_kill(process)** - kill process or processes. *process* may be an integer so only process with this PID will be terminated. If *process* is a string then kill every process with that name.
+- **process_kill(process, cmd_filter:str=None)** - kill process or processes. *process* may be an integer so only process with this PID will be terminated. If *process* is a string then kill every process with that name. *cmd_filter* - kill only processes with that string in command line.
 - **service_start(service:str, args:tuple=None)** - starts the service.
 - **service_stop(service:str)->tuple** - stops the service.
 - **service_running(service:str)->bool** - the service is up and running?

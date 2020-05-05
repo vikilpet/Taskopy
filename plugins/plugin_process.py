@@ -75,6 +75,7 @@ def app_start(
 	, cwd:str=None
 	, env:dict=None
 	, window:str=None
+	, priority:str=None
 ):
 	''' Starts application.
 		Returns:
@@ -89,11 +90,21 @@ def app_start(
 		capture_output - capture stdout and stderr.
 		env - add this environments to the process
 		window - maximized(short - 'max'), minimized('min')
-		 or hidden('hid').
+			or hidden('hid').
+		priority - 'above', 'below', 'high', 'idle', 'normal'
+			or 'realtime'.
 
 		https://docs.python.org/3/library/subprocess.html
 	'''
 
+	PRIORITIES = {
+		'above': subprocess.ABOVE_NORMAL_PRIORITY_CLASS
+		, 'below': subprocess.BELOW_NORMAL_PRIORITY_CLASS
+		, 'high': subprocess.HIGH_PRIORITY_CLASS
+		, 'idle': subprocess.IDLE_PRIORITY_CLASS
+		, 'normal': subprocess.NORMAL_PRIORITY_CLASS
+		, 'realtime': subprocess.REALTIME_PRIORITY_CLASS
+	}
 	if isinstance(app_path, str):
 		app_path = [app_path]
 	elif not isinstance(app_path, list):
@@ -105,12 +116,18 @@ def app_start(
 			app_path += app_args
 		else:
 			raise 'Unknown type of app_args'
+	app_path = list( map(str, app_path) )
 	if not cwd:
 		if ':\\' in app_path[0]:
 			cwd = os.path.dirname(app_path[0])
 	startupinfo = subprocess.STARTUPINFO()
 	creationflags = win32con.DETACHED_PROCESS
 	startupinfo.dwFlags = subprocess.STARTF_USESHOWWINDOW
+	if priority:
+		creationflags |= PRIORITIES.get(
+			priority.lower()
+			, subprocess.NORMAL_PRIORITY_CLASS
+		)
 	if window:
 		window = window.lower()
 	else:

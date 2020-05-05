@@ -3,6 +3,7 @@ import os
 import time
 import datetime
 import threading
+import subprocess
 from multiprocessing.dummy import Pool as ThreadPool
 import re
 import winsound
@@ -21,7 +22,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-04-18'
+APP_VERSION = 'v2020-05-05'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -629,8 +630,11 @@ random_num = random.randint
 def random_str(string_len:int=10, string_source:str=None)->str:
 	''' Generate a random string of fixed length
 	'''
-	if not string_source: string_source = string.ascii_letters + string.digits
-	return ''.join(random.choice(string_source) for i in range(string_len))
+	if not string_source:
+		string_source = string.ascii_letters + string.digits
+	return ''.join(
+		random.choice(string_source) for i in range(string_len)
+	)
 
 def app_icon_text_set(text:str=APP_FULLNAME):
 	''' Set hint text for taskbar icon.
@@ -887,7 +891,8 @@ def dialog(msg:str=None, buttons:list=None
 , common_buttons:int=None, default_button:int=0
 , timeout:int=None, icon=None)->int:
 	''' Shows dialog with multiple optional buttons.
-		Returns ID of selected button starting with 1000.
+		Returns ID of selected button starting with 1000
+		or 0 if timeout is over.
 	'''
 	TDN_TIMER = 4
 	S_OK = 0
@@ -925,9 +930,14 @@ def dialog(msg:str=None, buttons:list=None
 				on_top_flag = True
 		
 		return S_OK
-	if isinstance(msg, list):
+	if content: content = str(content)
+	if title: title = str(title)
+	if isinstance(msg, (list, tuple)):
 		buttons = msg
 		msg = ''
+	else:
+		if msg: msg = str(msg)
+	if buttons: buttons = list(map(str, buttons))
 	title = _get_parent_func_name(title)
 	result = ctypes.c_int()
 	tdc = _TaskDialogConfig()
@@ -954,6 +964,7 @@ def dialog(msg:str=None, buttons:list=None
 				_TaskDialogConfig.TASKDIALOG_BUTTON)
 		)
 		tdc.cButtons = ctypes.c_uint(len(buttons))
+		if default_button >= 1000: default_button -= 1000
 		tdc.nDefaultButton = 1000 + default_button
 	tdc.pszMainIcon = TD_ICON_INFORMATION
 	tdc.pfCallBack = ctypes.cast(
@@ -971,4 +982,16 @@ def dialog(msg:str=None, buttons:list=None
 		, ctypes.byref(result), None, None)
 	return result.value
 
-# - - - TaskDialog - - -
+
+def hint(text:str, position:tuple=None):
+	'''	Shows hint.
+		Returns PID of new process.
+	'''
+	args = [
+		'python'
+		, os.getcwd() + '/resources/hint.py'
+		, '--text', str(text)
+	]
+	if position:
+		args += '--position', '{}_{}'.format(*position)
+	return subprocess.Popen(args=args).pid
