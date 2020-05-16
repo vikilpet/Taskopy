@@ -22,7 +22,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-05-05'
+APP_VERSION = 'v2020-05-16'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -157,13 +157,13 @@ def dev_print(*msg, **kwargs):
 		d = True
 	if d: tprint(*msg, **kwargs)
 
-def con_log(*msgs):
+def con_log(*msgs, **kwargs):
 	''' Log to console and logfile
 	'''
 	global app_log
 	log_str = ''
 	for m in msgs:
-		tprint(m)
+		tprint(m, **kwargs)
 		app_log.append((datetime.datetime.now(), m))
 		log_str += (
 			time.strftime('%Y.%m.%d %H:%M:%S')
@@ -690,7 +690,7 @@ def jobs_batch(func_list:list, timeout:int
 			, [function2, (), {'par1':'foo', 'par2':'bar'}]
 			...
 		]
-		jobs:
+		Result = 'jobs' object:
 		[
 			<job.func=function1, job.args = (1, 3, 4), job.kwargs={'par1': 2, 'par2':3}
 				, job.result=True, job.time='0:00:00.0181'>

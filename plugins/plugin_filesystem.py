@@ -274,7 +274,7 @@ def file_name_fix(fullpath:str, repl_char:str='_')->str:
 	return _long_path(new_fn)
 
 def dir_purge(fullpath:str, days:int=0, recursive:bool=False
-			, creation:bool=False, test:bool=False):
+, creation:bool=False, test:bool=False, rule=None):
 	''' Deletes files older than x days.
 		Returns number of deleted files and folders. 
 		days=0 - delete everything
@@ -283,10 +283,15 @@ def dir_purge(fullpath:str, days:int=0, recursive:bool=False
 		recursive - delete in subfolders too. Empty subfolders 
 			will be deleted.
 		test - only print files and folders that should be removed.
+		rule - function that receivs file name and returns True
+			if file should be deleted.
+			Example: rule=lambda f: file_size(f) == 0
 	'''
 	counter = 0
 	def robust_remove_file(fullpath):
 		nonlocal counter
+		if rule:
+			if not rule(fullpath): return
 		try:
 			file_delete(fullpath)
 			counter += 1
@@ -294,6 +299,8 @@ def dir_purge(fullpath:str, days:int=0, recursive:bool=False
 			pass
 	def robust_remove_dir(fullpath):
 		nonlocal counter
+		if rule:
+			if not rule(fullpath): return
 		try:
 			shutil.rmtree(fullpath)
 			counter += 1
@@ -491,15 +498,20 @@ def dir_zip(fullpath:str, destination:str
 def file_zip(fullpath, destination:str)->str:
 	''' Compresses a file or files to archive.
 		fullpath - string with fullpath or list with fullpaths.
-		destination - fullpath to the archive.
+		destination - full path to the archive or destination
+		directory.
 	'''
 	fullpath = _long_path(fullpath)
 	if isinstance(fullpath, str):
+		if file_ext(destination) != 'zip':
+			dir_create(destination)
+			destination = destination + '\\' \
+				+ file_ext_replace(os.path.basename(fullpath), 'zip')
 		with zipfile.ZipFile(
 			destination, 'w'
 		) as zipf:
 			zipf.write(fullpath, arcname=os.path.basename(fullpath)
-						, compress_type=zipfile.ZIP_DEFLATED)
+				, compress_type=zipfile.ZIP_DEFLATED)
 		return destination
 	elif isinstance(fullpath, list):
 		with zipfile.ZipFile(
@@ -507,10 +519,10 @@ def file_zip(fullpath, destination:str)->str:
 		) as zipf:
 			for fi in fullpath:
 				zipf.write(fi, arcname=os.path.basename(fi)
-						, compress_type=zipfile.ZIP_DEFLATED)
+					, compress_type=zipfile.ZIP_DEFLATED)
 		return destination
 	else:
-		return 'error: unknown type of fullpath'
+		return Exception('file_zip: unknown type of fullpath')
 
 def temp_dir(new_dir:str=None)->str:
 	''' Returns full path of temp dir (without trailing slash).

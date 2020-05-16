@@ -2,7 +2,7 @@ import os
 import socket
 import requests
 import urllib
-import lxml.etree
+import lxml.html
 import tempfile
 from hashlib import md5
 from bs4 import BeautifulSoup
@@ -121,59 +121,78 @@ def html_clean(html_str:str, separator=' ')->str:
 	soup = BeautifulSoup(html_str, 'html.parser')
 	return soup.get_text(separator=separator)
 
+
+
 @decor_except
-def html_element(url:str, element, number:int=0
-, clean:bool=True, **kwargs)->str:
+def html_element(url:str, element
+, clean:bool=True, element_num:int=0, **kwargs)->str:
 	''' Get text of specified page element (div).
-		element - dict that will passed to find_all method:
-			https://www.crummy.com/software/BeautifulSoup/bs4/doc/
-			Or it can be a list of dicts.
-			Or it can be string with xpath.
-			Example for 'find_all':
+		Returns str or list of str.
+		url - URL or string with HTML.
+		element - dict (list of dictionaries)
+			, or str (list of strings). If 'element' is a list
+			then 'html_element' returns list of found elements.
+			If it's a dict or list of dicts then method find_all
+			of Beautiful Soup will be used.
+			If it's a str or list of str then xpath will be used.
+			Example for Soup:
 				element={
 					'name': 'span'
 					, 'attrs': {'itemprop':'softwareVersion'}
 				}
 			Example for xpath:
 				element='/html/body/div[1]/div/div'
-
-		number - number of an element in the list of similar elements.
-		clean - remove html tags and spaces.
+		clean - remove html tags and spaces (Soup).
 		kwargs - additional arguments for page_get.
 	'''
-	html = page_get(url=url, **kwargs)
-	if isinstance(html, Exception): return html
+	if not url[:4].lower().startswith('http'):
+		html = url
+	else:
+		html = page_get(url=url, **kwargs)
+		if isinstance(html, Exception): return html
 	if isinstance(element, list):
-		soup = BeautifulSoup(html, 'html.parser')
-		r = []
-		for d in element:
-			r += soup.find_all(**d)
-		if r:
-			if clean:
-				return [html_whitespace(i.get_text()) for i in r]
+		element_li = element
+	else:
+		element_li = [element]
+	result = []
+	if isinstance(element_li[0], dict):
+		parser = BeautifulSoup(html, 'html.parser')
+	else:
+		parser = lxml.html.fromstring(html
+			, parser=lxml.html.HTMLParser(recover=True))
+	for elem in element_li:
+		if isinstance(parser, BeautifulSoup):
+			if len(element_li) == 1:
+				el_num = element_num
 			else:
-				return [str(i) for i in r]
-		else:
-			raise Exception('html_element: element not found')
-	elif isinstance(element, dict):
-		soup = BeautifulSoup(html, 'html.parser')
-		r = soup.find_all(**element)
-		if r:
-			if clean:
-				r = r[number].get_text()
-				return html_whitespace(r)
+				el_num = 0
+			found_elem = parser.find_all(**elem)
+			if found_elem:
+				if clean:
+					result.append(
+						html_whitespace(found_elem[el_num].get_text() )
+					)
+				else:
+					result.append( str(found_elem) )
 			else:
-				return str(r[number])
+				raise Exception('html_element: element not found')
 		else:
-			raise Exception('element not found')
-	elif isinstance(element, str):
-		tree = lxml.etree.fromstring(html
-		, parser=lxml.etree.HTMLParser(recover=True))
-		tree_elem = tree.xpath(element)[number]
-		if isinstance(tree_elem, str):
-			return html_whitespace(tree_elem)
-		else:
-			return html_whitespace(tree_elem.text)
+			if len(element_li) == 1:
+				el_num = element_num
+			else:
+				el_num = 0
+			found_elem = parser.xpath(elem)[el_num]
+			if isinstance(found_elem, str):
+				result.append( html_whitespace(found_elem) )
+			else:
+				result.append(
+					html_whitespace(found_elem.text_content())
+				)
+	if len(element_li) == 1:
+		return result[0]
+	else:
+		return result
+
 
 @decor_except
 def json_element(source:str, element:list=None
@@ -299,16 +318,16 @@ def json_to_html(json_data, **kwargs)->str:
 	return json2html.json2html.convert(
 		json=json_data, **kwargs)
 
-def http_header(url:str, header:str)->str:
+def http_header(url:str, header:str, **kwargs)->str:
 	'Get HTTP header of url'
-	req = requests.head(url, headers={**USER_AGENT})
+	req = requests.head(url, headers={**USER_AGENT}, **kwargs)
 	return req.headers[header]
 
-def http_h_last_modified(url:str):
+def http_h_last_modified(url:str, **kwargs):
 	'HTTP Last Modified time in datetime format'
 	date_str = http_header(url, 'Last-Modified')
 	date_dt = datetime.datetime.strptime(date_str
-		, '%a, %d %b %Y %X %Z')
+		, '%a, %d %b %Y %H:%M:%S GMT')
 	return date_dt
 
 def port_scan(host:str, port:int
