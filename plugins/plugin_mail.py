@@ -17,7 +17,7 @@ CC_LIMIT = 35
 _errors = []
 
 _FORBIDDEN_CHARS = '<>:"/\\|?*\n\r\x1a'
-_MAX_FILE_LEN = 250
+_MAX_FILE_LEN = 200
 _MAX_ERR_STR_LEN = 200
 _MAX_TITLE_LEN = 80
 _LAST_NUM_VAR = 'last_mail_msg_num_in_'
@@ -341,10 +341,13 @@ def mail_download_batch(mailboxes:list, output_dir:str, timeout:int=60
 		msg = ''
 		for job in jobs:
 			if job.func == mail_check:
-				if job.time == 'timeout':
+				if job.error:
 					errors.append(
-						'{}@{}: timeout'.format(job.kwargs['login']
-							, job.kwargs['server'])
+						'{}@{} error: {}'.format(
+							job.kwargs['login']
+							, job.kwargs['server']
+							, job.result
+						)
 					)
 				else:
 					if job.result[0]:
@@ -352,14 +355,22 @@ def mail_download_batch(mailboxes:list, output_dir:str, timeout:int=60
 							, job.result[0])
 					errors.extend(job.result[1])
 			else:
-				if job.time == 'timeout':
-					errors.append('{}@{}: timeout'.format(job.kwargs['login']
-						, job.kwargs['server']))
+				if job.error:
+					errors.append(
+						'{}@{} error: {}'.format(
+							job.kwargs['login']
+							, job.kwargs['server']
+							, job.result
+						)
+					)
 				else:
 					if len(job.result[0]):
 						msg += '\r\n'.join(job.result[0]) + '\r\n'
 					errors.extend(job.result[1])
-			if not silent: print('{}\t\t{}'.format(job.kwargs['login'], job.time) )
+			if not silent:
+				print(
+					'{}\t\t{}'.format(job.kwargs['login'], job.time)
+				)
 		status, data = write_log()
 		if not status: msg += (f'\r\nLogging error:\r\n{data}')
 		warning, last_error = log_warning()

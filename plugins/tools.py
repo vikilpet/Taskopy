@@ -22,7 +22,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-05-16'
+APP_VERSION = 'v2020-07-04'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -322,7 +322,7 @@ def clip_get()->str:
 	return pyperclip.paste()
 
 def re_find(source:str, re_pattern:str, sort:bool=False
-, unique:bool=True, re_flags:int=re.IGNORECASE)->list:
+, unique:bool=False, re_flags:int=re.IGNORECASE)->list:
 	r''' Return list with matches.
 		re_flags:
 			re.IGNORECASE	ignore case
@@ -680,8 +680,9 @@ def jobs_batch(func_list:list, timeout:int
 , sleep_timeout:float=0.001)->list:
 	''' Runs functions (they may not be same) in threads and waits
 		when all of them return result or timeout is expired.
-		func_list - list of sublist, where sublist should consist of 3
+		func_list - list of sublists, where sublist should consist of 3
 		items: function, (args), {kwargs}.
+		
 		Returns list of job objects, where job have these attributes:
 		func, args, kwargs, result, time
 		Example:
@@ -700,48 +701,58 @@ def jobs_batch(func_list:list, timeout:int
 			...
 		]
 	'''
+	class Job:
+		def __init__(s):
+			s.func = None
+			s.args = []
+			s.kwargs = {}
+			s.status = False
+			s.result = None
+			s.time = None
+			s.error = False
+		
+		def job_run(s):
+			time_start = time.time()
+			try:
+				s.result = job.func(*job.args, **job.kwargs)
+				s.status = True
+			except Exception as e:
+				s.result = repr(e)
+				s.status = True
+				s.error = True
+			s.time = datetime.timedelta(
+				seconds=(time.time() - time_start)
+			)
+
 	jobs = []
-	time_start = time.time()
 	for li in func_list:
-		job = {}
-		job['func'] = li[0]
+		job = Job()
+		job.func = li[0]
 		if len(li) > 1:
 			if isinstance(li[1], (list, tuple)):
-				job['args'] = li[1]
+				job.args = li[1]
 			else:
-				job['args'] = [li[1]]
-		else:
-			job['args'] = []
-		if len(li) > 2:
-			job['kwargs'] = li[2]
-		else:
-			job['kwargs'] = {}
-		job['result'] = []
-		job['time'] = None
+				job.args = [li[1]]
+		if len(li) > 2: job.kwargs = li[2]
+		job.timetime = None
 		jobs.append(job)
 		threading.Thread(
-			target=lambda *a, **kw: job['result'].extend([
-				job['func'](*a, **kw)
-				, datetime.timedelta(seconds=(time.time() - time_start))
-			])
-			, args=job['args']
-			, kwargs=job['kwargs']
+			target=job.job_run
 			, daemon=True
 		).start()
 	for _ in range(int(timeout / sleep_timeout)):
-		if all([len(j['result'])==2 for j in jobs]):
-			for job in jobs:
-				job['result'], job['time'] = job['result']
-			return [DictToObj(j) for j in jobs]
+		if all([j.status for j in jobs]):
+			return jobs
 		time.sleep(sleep_timeout)
 	else:
 		for job in jobs:
-			if len(job['result']):
-				job['result'], job['time'] = job['result']
-			else:
-				job['result'] = 'timeout'
-				job['time'] = 'timeout'
-		return [DictToObj(j) for j in jobs]
+			if not job.status:
+				job.error = True
+				job.result = 'timeout'
+				job.time = 'timeout'
+		return jobs
+
+	
 
 def tprint(*msgs, **kwargs):
 	''' Print with task name and time '''
@@ -778,7 +789,7 @@ def app_log_get():
 
 
 def decor_except(func):
-	''' Make try... except for function
+	''' Add 'try... except' for function
 		and return Exception object on fail.
 
 		Downside - iPython autoreload does not

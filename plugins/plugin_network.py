@@ -183,16 +183,23 @@ def html_element(url:str, element
 				el_num = 0
 			found_elem = parser.xpath(elem)[el_num]
 			if isinstance(found_elem, str):
-				result.append( html_whitespace(found_elem) )
+				if clean:
+					result.append( html_whitespace(found_elem) )
+				else:
+					result.append(found_elem)
 			else:
-				result.append(
-					html_whitespace(found_elem.text_content())
-				)
+				if clean:
+					result.append(
+						html_whitespace(found_elem.text_content())
+					)
+				else:
+					result.append(
+						lxml.etree.tostring(found_elem, encoding=str)
+					)
 	if len(element_li) == 1:
 		return result[0]
 	else:
 		return result
-
 
 @decor_except
 def json_element(source:str, element:list=None
