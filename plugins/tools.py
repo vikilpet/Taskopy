@@ -647,7 +647,31 @@ def create_default_ini_file():
 	with open('settings.ini', 'xt', encoding='utf-8-sig') as ini:
 		ini.write(_DEFAULT_INI)
 
-def jobs_pool(function:str, args:tuple
+def job_pool(jobs:list, pool_size:int=None):
+	'''	Launches 'pool_size' jobs at a time.
+		Returns the same jobs list.
+		See Job class for job properties.
+		If 'pool_size' not specified, pool_size = number of CPU.
+		Example:
+
+			jobs = []
+			for w in "Let's test job pool".split():
+				jobs.append(
+					Job(
+						dialog
+						, w
+					)
+				)
+			for job in job_pool(jobs, pool_size=2):
+				print(job.error, job.result, job.time)
+	'''
+	pool = ThreadPool(pool_size)
+	pool.map(lambda f: f(), [j.job_run for j in jobs])
+	pool.close()
+	pool.join()
+	return jobs
+
+def jobs_pool(function, args:tuple
 , pool_size:int=None)->list:
 	''' Launches 'pool_size' functions at a time for
 		all 'args'.
@@ -655,6 +679,7 @@ def jobs_pool(function:str, args:tuple
 		'args' may be a tuple of tuples or tuple of values.
 		If 'pool_size' not specified, pool_size = number of CPU.
 		Example:
+
 			jobs_pool(
 				msgbox
 				, (
@@ -716,7 +741,7 @@ def job_batch(jobs:list, timeout:int
 		jobs - list of Job objects (see class Job for details).
 		
 		timeout - timeout in seconds.
-		
+
 		Returns same list of job objects.
 		Usage example:
 			
