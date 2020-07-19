@@ -168,22 +168,19 @@ Format: **setting** (default value) — description.
 
 	![Dialog EN](https://user-images.githubusercontent.com/43970835/79643653-13d4d380-81b5-11ea-9548-eb28fc515d7b.png)
 
-- **jobs_batch(func_list:list, timeout:int)->list**: — Runs functions (they may not be same) in threads and waits when all of them return result or timeout is expired. *func_list* - list of sublist, where sublist should consist of 3 items: function, (args), {kwargs}. Returns list of *job* objects, where *job* have these attributes: function, args, kwargs, result, time. Example:
+- **job_batch(jobs:list, timeout:int)->list**: — starts functions (they do not necessarily have to be the same) in parallel and waits for them to be executed or timeout. Use this when you don't want to wait because of one hung function.
+Example - create jobs list out of *dialog* function with different parameters:
 
-		func_list = [
-			[function1, (1, 3, 4), {'par1': 2, 'par2':3}]
-			, [function2, (), {'par1':'foo', 'par2':'bar'}]
-			...
-		]
-		jobs:
-		[
-			<job.func=function1, job.args = (1, 3, 4), job.kwargs={'par1': 2, 'par2':3}
-				, job.result=True, job.time='0:00:00.0181'>
-			, <job.func=function2, job.args = (), job.kwargs={'par1':'foo', 'par2':'bar'}
-				, job.result=[True, data], job.time='0:00:05.827'>
+	jobs = []
+	jobs.append(
+		Job(dialog, 'Test job 1')
+	)
+	jobs.append(
+		Job(dialog, ['Button 1', 'Button 2'])
+	)
+	for job in job_batch(jobs, timeout=5):
+		print(job.error, job.result, job.time)
 
-			...
-		]
 - **jobs_pool(function:str, pool_size:int, args:tuple)->list** - Launches 'pool_size' functions at a time for all the 'args'. 'args' may be a tuple of tuples or tuple of values. If 'pool_size' not specified, then pool_size = number of CPU. Example:
 
 		jobs_pool(

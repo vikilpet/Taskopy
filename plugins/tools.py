@@ -22,7 +22,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-07-04'
+APP_VERSION = 'v2020-07-19'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -676,83 +676,77 @@ def jobs_pool(function:str, args:tuple
 	pool.join()
 	return results
 
-def jobs_batch(func_list:list, timeout:int
+class Job:
+	'To use with job_batch'
+	def __init__(
+		s
+		, func
+		, *args
+		, **kwargs
+	):
+		s.func = func
+		s.args = args
+		s.kwargs = kwargs
+		s.finished = False
+		s.result = None
+		s.time = None
+		s.error = False
+	
+	def job_run(s):
+		time_start = time.time()
+		try:
+			s.result = s.func(*s.args, **s.kwargs)
+			s.finished = True
+		except Exception as e:
+			s.result = repr(e)
+			s.finished = True
+			s.error = True
+		s.time = datetime.timedelta(
+			seconds=(time.time() - time_start)
+		)
+
+def job_batch(jobs:list, timeout:int
 , sleep_timeout:float=0.001)->list:
-	''' Runs functions (they may not be same) in threads and waits
-		when all of them return result or timeout is expired.
-		func_list - list of sublists, where sublist should consist of 3
-		items: function, (args), {kwargs}.
-		
-		Returns list of job objects, where job have these attributes:
-		func, args, kwargs, result, time
-		Example:
-		func_list = [
-			[function1, (1, 3, 4), {'par1': 2, 'par2':3}]
-			, [function2, (), {'par1':'foo', 'par2':'bar'}]
-			...
-		]
-		Result = 'jobs' object:
-		[
-			<job.func=function1, job.args = (1, 3, 4), job.kwargs={'par1': 2, 'par2':3}
-				, job.result=True, job.time='0:00:00.0181'>
-			, <job.func=function2, job.args = (), job.kwargs={'par1':'foo', 'par2':'bar'}
-				, job.result=[True, data], job.time='0:00:05.827'>
+	''' Starts functions (they do not necessarily
+		have to be the same) in parallel and waits for
+		them to be executed or timeout.
+		Use this when you don't want to wait because
+		of one hung function.
 
-			...
-		]
-	'''
-	class Job:
-		def __init__(s):
-			s.func = None
-			s.args = []
-			s.kwargs = {}
-			s.status = False
-			s.result = None
-			s.time = None
-			s.error = False
+		jobs - list of Job objects (see class Job for details).
 		
-		def job_run(s):
-			time_start = time.time()
-			try:
-				s.result = job.func(*job.args, **job.kwargs)
-				s.status = True
-			except Exception as e:
-				s.result = repr(e)
-				s.status = True
-				s.error = True
-			s.time = datetime.timedelta(
-				seconds=(time.time() - time_start)
+		timeout - timeout in seconds.
+		
+		Returns same list of job objects.
+		Usage example:
+			
+			jobs = []
+			jobs.append(
+				Job(dialog, 'Test job 1')
 			)
-
-	jobs = []
-	for li in func_list:
-		job = Job()
-		job.func = li[0]
-		if len(li) > 1:
-			if isinstance(li[1], (list, tuple)):
-				job.args = li[1]
-			else:
-				job.args = [li[1]]
-		if len(li) > 2: job.kwargs = li[2]
-		job.timetime = None
-		jobs.append(job)
+			jobs.append(
+				Job(dialog, ['Button 1', 'Button 2'])
+			)
+			for job in job_batch(jobs, timeout=5):
+				print(job.error, job.result, job.time)
+		
+	'''
+	for job in jobs:
 		threading.Thread(
 			target=job.job_run
 			, daemon=True
 		).start()
 	for _ in range(int(timeout / sleep_timeout)):
-		if all([j.status for j in jobs]):
+		if all([j.finished for j in jobs]):
 			return jobs
 		time.sleep(sleep_timeout)
 	else:
 		for job in jobs:
-			if not job.status:
+			if not job.finished:
 				job.error = True
 				job.result = 'timeout'
 				job.time = 'timeout'
 		return jobs
-
-	
 
 def tprint(*msgs, **kwargs):
 	''' Print with task name and time '''

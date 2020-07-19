@@ -11,7 +11,7 @@ import imaplib
 from email import message_from_bytes
 from email.header import Header, decode_header, make_header
 import mimetypes
-from .tools import jobs_batch, var_get, var_set, tprint
+from .tools import Job, job_batch, var_get, var_set, tprint
 
 CC_LIMIT = 35
 _errors = []
@@ -318,28 +318,28 @@ def mail_download_batch(mailboxes:list, output_dir:str, timeout:int=60
 					return False, None
 		except Exception as e:
 			return True, 'Failed to open log file: ' + str(e)
-
-	queue = []
 	try:
+		jobs = []
 		for box in mailboxes:
 			box['silent'] = silent
 			if box.get('check_only', False):
-				queue.append([
-					mail_check
-					, ()
-					, {k:box[k] for k in box if k!='check_only'}
-				])
-			else:
-				box['output_dir'] = output_dir
-				queue.append([
+				jobs.append(
+					Job(
+						mail_check
+						, **{k:box[k] for k in box if k!='check_only'}
+					)
+				)
+				continue
+			box['output_dir'] = output_dir
+			jobs.append(
+				Job(
 					mail_download
-					, ()
-					, {k:box[k] for k in box if k!='check_only'}
-				])
-		jobs = jobs_batch(queue, timeout=timeout)
+					, **{k:box[k] for k in box if k!='check_only'}
+				)
+			)
 		errors = []
 		msg = ''
-		for job in jobs:
+		for job in job_batch(jobs, timeout=timeout):
 			if job.func == mail_check:
 				if job.error:
 					errors.append(

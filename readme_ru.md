@@ -168,22 +168,19 @@
 
 	![Dialog RU](https://user-images.githubusercontent.com/43970835/79643801-bc833300-81b5-11ea-8a2e-ea6baa045480.png)
 
-- **jobs_batch(func_list:list, timeout:int)->list**: — запускает функции параллельно и ждёт, когда они закончат работу или истечёт таймаут. *func_list* — список со списками, где внутренний список должен содержать 3 элемента: функция, (args), {kwargs}. Возвращает список с DictToObj объектами *jobs*, которые иметю такие аттрибуты: func, args, kwargs, результат, время выполнения. Пример:
+- **job_batch(jobs:list, timeout:int)->list**: — запускает функции параллельно и ждёт, когда они закончат работу или истечёт таймаут. *jobs* — список с объектами типа Job. Используйте это, когда вы не хотите долго ждать, если одна из выполняемых функций зависла.
+Пример - создаём список из двух заданий с *dialog*, с разными параметрами:
 
-		func_list = [
-			[function1, (1, 3, 4), {'par1': 2, 'par2':3}]
-			, [function2, (), {'par1':'foo', 'par2':'bar'}]
-			...
-		]
-		jobs:
-		[
-			<job.func=function1, job.args = (1, 3, 4), job.kwargs={'par1': 2, 'par2':3}
-				, job.result=True, job.time='0:00:00.0181'>
-			, <job.func=function2, job.args = (), job.kwargs={'par1':'foo', 'par2':'bar'}
-				, job.result=[True, data], job.time='0:00:05.827'>
+	jobs = []
+	jobs.append(
+		Job(dialog, 'Test job 1')
+	)
+	jobs.append(
+		Job(dialog, ['Button 1', 'Button 2'])
+	)
+	for job in job_batch(jobs, timeout=5):
+		print(job.error, job.result, job.time)
 
-			...
-		]
 - **jobs_pool(function:str, pool_size:int, args:tuple)->list** - запускает функции по очереди, так чтобы одновременно выполнялось только `pool_size` функций. Если `pool_size` не указан, то он равен количеству процессоров в системе. Пример:
 
 		jobs_pool(

@@ -4,6 +4,7 @@ import win32gui
 import win32con
 import winreg
 import uptime
+from time import sleep
 
 
 _TIME_UNITS = {'msec':1, 'ms':1, 'sec':1000, 's':1000, 'min':60000
