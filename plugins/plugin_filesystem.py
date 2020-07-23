@@ -475,6 +475,7 @@ def dir_zip(fullpath:str, destination:str
 		new_fullpath = _dir_slash(destination) \
 			+ os.path.basename(fullpath)
 		base_name = os.path.basename(fullpath)
+		new_fullpath += '.zip'
 	else:
 		new_fullpath = destination
 		base_name = os.path.basename(
@@ -493,7 +494,7 @@ def dir_zip(fullpath:str, destination:str
 		result = shutil.make_archive(base_name, format=EXT
 			, root_dir=root_dir, base_dir=base_dir)
 		shutil.move(result, new_fullpath)
-	return result
+	return new_fullpath
 
 def file_zip(fullpath, destination:str)->str:
 	''' Compresses a file or files to archive.

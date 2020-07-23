@@ -22,7 +22,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-07-19'
+APP_VERSION = 'v2020-07-23'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -666,7 +666,7 @@ def job_pool(jobs:list, pool_size:int=None):
 				print(job.error, job.result, job.time)
 	'''
 	pool = ThreadPool(pool_size)
-	pool.map(lambda f: f(), [j.job_run for j in jobs])
+	pool.map(lambda f: f(), [j.run for j in jobs])
 	pool.close()
 	pool.join()
 	return jobs
@@ -702,7 +702,7 @@ def jobs_pool(function, args:tuple
 	return results
 
 class Job:
-	'To use with job_batch'
+	'To use with job_batch and job_pool'
 	def __init__(
 		s
 		, func
@@ -714,18 +714,20 @@ class Job:
 		s.kwargs = kwargs
 		s.finished = False
 		s.result = None
-		s.time = None
+		s.time = 0
 		s.error = False
 	
-	def job_run(s):
+	def run(s):
 		time_start = time.time()
 		try:
 			s.result = s.func(*s.args, **s.kwargs)
-			s.finished = True
+			if isinstance(s.result, Exception):
+				s.error = True
+				s.result = repr(s.result)
 		except Exception as e:
 			s.result = repr(e)
-			s.finished = True
 			s.error = True
+		s.finished = True
 		s.time = datetime.timedelta(
 			seconds=(time.time() - time_start)
 		)
@@ -758,7 +760,7 @@ def job_batch(jobs:list, timeout:int
 	'''
 	for job in jobs:
 		threading.Thread(
-			target=job.job_run
+			target=job.run
 			, daemon=True
 		).start()
 	for _ in range(int(timeout / sleep_timeout)):

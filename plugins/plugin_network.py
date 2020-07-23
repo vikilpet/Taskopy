@@ -30,6 +30,8 @@ def page_get(url:str, encoding:str='utf-8', session:bool=False
 	file_obj = None
 	post_file_hash = None
 	if post_file:
+		if not os.path.isfile(post_file):
+			return Exception('The post file does not exist')
 		if post_hash:
 			post_file_hash = _file_hash(post_file)
 		file_obj = open(post_file, 'rb')
@@ -81,7 +83,8 @@ def html_whitespace(text:str)->str:
 
 @decor_except
 def file_download(url:str, destination:str=None
-, attempts:int=3, timeout:int=1)->str:
+, attempts:int=3, timeout:int=1
+, del_bad_file:bool=False)->str:
 	''' Download file from url to destination and return fullpath.
 		Returns the full path to the downloaded file.
 		attempts - how many times to retry download if failed.
@@ -112,6 +115,11 @@ def file_download(url:str, destination:str=None
 			dev_print(f'dl attempt {attempt} failed'
 				+ f', err="{repr(e)[:50]}...", url={url[-30:]}')
 	else:
+		if del_bad_file:
+			try:
+				os.remove(dest_file)
+			except Exception as e:
+				dev_print('Couldn not delete a bad file: ' + str(e))
 		raise Exception(f'No more attempts ({attempt}), url={url[:100]}')
 	return dest_file
 

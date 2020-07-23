@@ -5,7 +5,7 @@
 	<img src="https://i6.imageban.ru/out/2019/07/04/a6f6538a80bc7a62ab06ce5cea295a93.png">
 </p>
 <!---
-2020.01.05 22:26:08
+2020.07.19
 -->
 Run your python code with hotkey or by HTTP-request just like that:
 
@@ -168,6 +168,10 @@ Format: **setting** (default value) — description.
 
 	![Dialog EN](https://user-images.githubusercontent.com/43970835/79643653-13d4d380-81b5-11ea-9548-eb28fc515d7b.png)
 
+- **Job(func, args, kwargs)** - class for concurrent function execution in *job_batch* and *job_pool*. Properties:
+	- *result* - functional result
+	- *time* - time in seconds
+	- *error* - there was an error
 - **job_batch(jobs:list, timeout:int)->list**: — starts functions (they do not necessarily have to be the same) in parallel and waits for them to be executed or timeout. Use this when you don't want to wait because of one hung function.
 Example - create jobs list out of *dialog* function with different parameters:
 
