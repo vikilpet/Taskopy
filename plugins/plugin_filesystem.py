@@ -242,7 +242,7 @@ def file_basename(fullpath:str)->str:
 	return os.path.splitext(fname)[0]
 
 def file_name_add(fullpath:str, suffix:str='')->str:
-	''' Adds suffix to file name before extension:
+	''' Adds suffix to a file name before extension:
 		file_name_add('my_file.txt', '_1') ->
 		my_file_1.txt
 		If suffix if not specified then add

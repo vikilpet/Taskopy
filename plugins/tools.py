@@ -22,7 +22,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-07-23'
+APP_VERSION = 'v2020-07-26'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
