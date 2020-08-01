@@ -168,16 +168,17 @@ Format: **setting** (default value) — description.
 
 	![Dialog EN](https://user-images.githubusercontent.com/43970835/79643653-13d4d380-81b5-11ea-9548-eb28fc515d7b.png)
 
+- **hint(text:str, position:tuple=None)->int** - shows a small window with the specified text. Only for the *Python* version. *position* - a tuple with coordinates. If no coordinates are specified, it appears in the center of the screen. Returns the PID of the hint process.
 - **Job(func, args, kwargs)** - class for concurrent function execution in *job_batch* and *job_pool*. Properties:
 	- *result* - functional result
 	- *time* - time in seconds
 	- *error* - there was an error
-- **job_batch(jobs:list, timeout:int)->list**: — starts functions (they do not necessarily have to be the same) in parallel and waits for them to be executed or timeout. Use this when you don't want to wait because of one hung function.
+- **job_batch(jobs:list, timeout:int)->list**: — starts functions (they do not necessarily have to be the same) in parallel and waits for them to be executed or timeout. *jobs* - list of **Job** class instances. Use job_batch when you don't want to wait because of one hung function.
 Example - create jobs list out of *dialog* function with different parameters:
 
 	jobs = []
 	jobs.append(
-		Job(dialog, 'Test job 1')
+		Job(dialog, 'Test job 1', timeout=10)
 	)
 	jobs.append(
 		Job(dialog, ['Button 1', 'Button 2'])
@@ -185,22 +186,24 @@ Example - create jobs list out of *dialog* function with different parameters:
 	for job in job_batch(jobs, timeout=5):
 		print(job.error, job.result, job.time)
 
-- **jobs_pool(function:str, pool_size:int, args:tuple)->list** - Launches 'pool_size' functions at a time for all the 'args'. 'args' may be a tuple of tuples or tuple of values. If 'pool_size' not specified, then pool_size = number of CPU. Example:
+- **job_pool(jobs:list, pool_size:int, args:tuple)->list** - Launches 'pool_size' functions at a time for all the 'args'. 'args' may be a tuple of tuples or tuple of values. If 'pool_size' not specified, then pool_size = number of CPU. Example:
 
-		jobs_pool(
-			msgbox
-			, (
-				'one'
-				, 'two'
-				, 'three'
-				, 'four'
-			)
-			, 4
-		)
+	jobs = []
+	jobs.append(
+		Job(dialog, 'Test job 1', timeout=10)
+	)
+	jobs.append(
+		Job(dialog, ['Button 1', 'Button 2'])
+	)
+	jobs.append(
+		Job(dialog, 'Third job')
+	)
+	for job in job_pool(jobs, pool_size=2):
+		print(job.error, job.result, job.time)
 	
-	Difference between `jobs_batch` and `job_pool`:
-	- `jobs_batch` - different functions with different arguments, waiting for the function is interrupted after the specified timeout and the results are returned as is, and where the function has not been executed yet, it returns *timeout*. All functions runs in parallel.
-	- `jobs_pool` - same function for different arguments. Only the specified number of instances of the function is executed at the same time.
+	Difference between `job_batch` and `job_pool`:
+	- `job_batch` - all *jobs* are started simultaneously. If some *job* is not finished during specified *timeout*, it returns error (job.error = True, job.result = 'timeout').
+	- `job_pool` - only the specified number of jobs is executed simultaneously.
 - **msgbox(msg:str, title:str=APP_NAME, ui:int=None, wait:bool=True, timeout=None)->int** - show messagebox and return user choice.
 	Arguments:
 	*msg* — text
@@ -282,7 +285,7 @@ Example - create jobs list out of *dialog* function with different parameters:
 - **file_backup(fullpath, folder:str=None)** - make copy of file with added timestamp.
 	*folder* — place copy to this folder. If omitted — place in original folder.
 - **file_copy(fullpath:str, destination:str)** - copy file to destination (fullpath or just folder).
-- **file_delete(fullpath:str)** - delete file.
+- **file_delete(fullpath:str)** - delete file. See also *file_recycle*.
 - **file_dialog(title:str=None, multiple:bool=False, default_dir:str='', default_file:str='', wildcard:str='', on_top:bool=True)** - Shows standard file dialog and returns fullpath or list of fullpaths if _multiple_ == True.
 - **file_dir(fullpath:str)->str:** - get parent directory name of file.
 - **file_exists(fullpath:str)->bool** - file exists?
@@ -298,6 +301,7 @@ Example - create jobs list out of *dialog* function with different parameters:
 
 - **file_name_fix(fullpath:str, repl_char:str='\_')->str** - replaces forbidden characters with _repl_char_. Removes leading and trailing spaces. Adds '\\\\?\\' for long paths.
 - **file_read(fullpath:str)->str:** - get content of file.
+- **file_recycle(fullpath:str, silent:bool=True)->bool** - move file to the recycle bin. *silent* - do not show standard windows dialog to confirm deletion. Returns True on successful operation.
 - **file_rename(fullpath:str, dest:str)->str** - rename the file. *dest* is the full path or just a new file name without a folder.
 - **file_size(fullpath:str, unit:str='b')->bool:** - get size of file in units (gb, mb, kb, b).
 - **file_write(fullpath:str, content=str, encoding:str='utf-8')->str** - saves *content* to a file. Creates file if the fullpath doesn't exist. If fullpath is '' or None - uses temp_file(). Returns fullpath.
@@ -312,6 +316,7 @@ Example - create jobs list out of *dialog* function with different parameters:
 	*creation* — use date of creation, otherwise use last modification date.
 	*recursive* — delete from subfolders too.
 	*test* — do not actually delete files, only print them.
+	*rule* - function that gets the full file name and returns True if the file is to be deleted.
 - **temp_dir(new_dir:str=None)->str** - returns the path to the temporary folder. If *new_dir* is specified, it creates a subfolder in the temporary folder and returns its path.
 - **temp_file(suffix:str='')->str** - returns the name for the temporary file.
 
@@ -319,9 +324,9 @@ Example - create jobs list out of *dialog* function with different parameters:
 - **domain_ip(domain:str)->list** - get a list of IP-addresses by domain name.
 - **file_download(url:str, destination:str=None)->str:** - download file and return fullpath.
 	*destination* — it may be None, fullpath or folder. If None then download to temporary folder with random name.
-- **html_element(url:str, element, number:int=0)->str:** - download page and retrieve value of html element.
+- **html_element(url:str, element, element_num:int=0)->str:** - download page and retrieve value of html element.
 	*element* — dictionary that contain element information such as name or attributes, or list with such dictionaries or string with xpath.
-	*number* - item number, if there are several of them found.
+	*element_num* - item number, if there are several of them found.
 	Example:
 
 		# Get the internal text of span element which has

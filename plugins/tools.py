@@ -22,7 +22,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-07-26'
+APP_VERSION = 'v2020-08-01'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -1015,7 +1015,7 @@ def dialog(msg:str=None, buttons:list=None
 	return result.value
 
 
-def hint(text:str, position:tuple=None):
+def hint(text:str, position:tuple=None)->int:
 	'''	Shows hint.
 		Returns PID of new process.
 	'''

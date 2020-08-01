@@ -157,10 +157,11 @@ def file_delete(fullpath:str):
 	except FileNotFoundError:
 		pass
 
-def file_recycle(fullpath:str, silent:bool=True):
+def file_recycle(fullpath:str, silent:bool=True)->bool:
 	''' Move file to the recycle bin
 		silent - do not show standard windows
 		dialog to confirm deletion.
+		Returns True on successful operation.
 	'''
 	flags = shellcon.FOF_ALLOWUNDO
 	if silent:

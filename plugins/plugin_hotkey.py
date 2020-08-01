@@ -2,7 +2,10 @@ import ctypes
 import ctypes.wintypes
 import win32con
 import keyboard
-from .tools import msgbox_warning
+try:
+	from .tools import msgbox_warning
+except ImportError:
+	msgbox_warning = print
 
 # Key codes https://docs.microsoft.com/en-us/windows/desktop/inputdev/virtual-key-codes
 # https://github.com/boppreh/keyboard
@@ -12,8 +15,8 @@ kernel32 = ctypes.windll.kernel32
 
 class GlobalHotKeys():
 	''' Register a global hotkey using the register() method.
-		Start listening with listen() method which MUST run in
-		another thread
+		Start the listening mode with 'listen' method which
+		SHALL be run in another thread.
 	'''
 	
 	def __init__(s):
@@ -118,16 +121,18 @@ keys_press = keyboard.press
 keys_release = keyboard.release
 
 if __name__ == '__main__':
+	''' Test this module: bind test_func to 'ctrl+t'
+		global hotkey and exit test with 'ctrl+shift+t'
+	'''
 	import threading
-
 	def test_func(t:str='no arg'):
-		print(f'my function: {t}')
+		print(t)
 	
 	ghk = GlobalHotKeys()
-	ghk.register
 	ghk.register(
-		'[', func=test_func, func_args=['test passed']
+		'ctrl+t', func=test_func, func_args=['test passed']
 	)
-	ghk.register('ctrl+multiply', func=ghk.stop_listener)
+	ghk.register('ctrl+shift+t', func=ghk.stop_listener)
+	print('Start hotkey test')
 	threading.Thread(target=ghk.listen).start()
 	

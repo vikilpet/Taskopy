@@ -168,16 +168,17 @@
 
 	![Dialog RU](https://user-images.githubusercontent.com/43970835/79643801-bc833300-81b5-11ea-8a2e-ea6baa045480.png)
 
+- **hint(text:str, position:tuple=None)->int** - показывает небольшое окошко с указанным текстом. Только для *Python* версии. *position* - кортеж с координатами. Если координаты не указаны - появится в центре экрана. Возвращает PID процесса с окошком.
 - **Job(func, args, kwargs)** - класс для параллельного запуска функций в *job_batch* и *job_pool*. Свойства:
 	- *result* - результат выполнения функции
 	- *time* - время в секундах
 	- *error* - произошла ошибка
-- **job_batch(jobs:list, timeout:int)->list**: — запускает функции параллельно и ждёт, когда они закончат работу или истечёт таймаут. *jobs* — список с объектами типа Job. Используйте это, когда вы не хотите долго ждать, если одна из выполняемых функций зависла.
+- **job_batch(jobs:list, timeout:int)->list**: — запускает функции параллельно и ждёт, когда они закончат работу или истечёт таймаут. *jobs* — список с объектами типа **Job**. Используйте job_batch, когда вы не хотите долго ждать, если одна из выполняемых функций зависла.
 Пример - создаём список из двух заданий с *dialog*, с разными параметрами:
 
 	jobs = []
 	jobs.append(
-		Job(dialog, 'Test job 1')
+		Job(dialog, 'Test job 1', timeout=10)
 	)
 	jobs.append(
 		Job(dialog, ['Button 1', 'Button 2'])
@@ -185,22 +186,24 @@
 	for job in job_batch(jobs, timeout=5):
 		print(job.error, job.result, job.time)
 
-- **jobs_pool(function:str, pool_size:int, args:tuple)->list** - запускает функции по очереди, так чтобы одновременно выполнялось только `pool_size` функций. Если `pool_size` не указан, то он равен количеству процессоров в системе. Пример:
+- **job_pool(jobs:list, pool_size:int, args:tuple)->list** - запускает задания (Job) по очереди, так чтобы одновременно выполнялось только `pool_size` заданий. Если `pool_size` не указан, то он равен количеству процессоров в системе. Пример:
 
-		jobs_pool(
-			msgbox
-			, (
-				'one'
-				, 'two'
-				, 'three'
-				, 'four'
-			)
-			, 4
-		)
-	
-	Разница между `jobs_batch` и `job_pool`:
-	- `jobs_batch` - разные функции с разными аргументами, ожидание работы функции прерывается через указанный таймаут и результаты возвращаются как есть, а где функция не успела выполниться - возвращается *timeout*. Все функции выполняются одновременно.
-	- `jobs_pool` - одна и та же функция для набора аргументов, где количество аргументов совпадает. Одновременно выполняется только указанное количество экземпляров функции.
+	jobs = []
+	jobs.append(
+		Job(dialog, 'Test job 1', timeout=10)
+	)
+	jobs.append(
+		Job(dialog, ['Button 1', 'Button 2'])
+	)
+	jobs.append(
+		Job(dialog, 'Third job')
+	)
+	for job in job_pool(jobs, pool_size=2):
+		print(job.error, job.result, job.time)
+
+	Разница между `job_batch` и `job_pool`:
+	- `job_batch` - все задания запускаются одновременно. Если какое-то задание не выполняется за указанный таймаут, оно возвращается с ошибкой (job.error = True, job.result = 'timeout').
+	- `job_pool` - одновременно выполняется только указанное количество заданий.
 - **msgbox(msg:str, title:str=APP_NAME, ui:int=None, wait:bool=True, timeout=None)->int** - показать сообщение и вернуть код нажатой кнопки.
 	Аргументы:
 	*msg* — сообщение
@@ -282,7 +285,7 @@
 - **file_backup(fullpath, folder:str=None):** - сделать копию файла, дописав в имя текущую дату и время.
 	*folder* — папка, куда следует поместить копию. Если не указано — поместить в папке оригинального файла.
 - **file_copy(fullpath:str, destination:str):** - копировать файл. *destination* может быть папкой или полным путём к копии файла.
-- **file_delete(fullpath:str):** - удалить файл.
+- **file_delete(fullpath:str):** - удалить файл. Смотрите так же *file_recycle*.
 - **file_dialog(title:str=None, multiple:bool=False, default_dir:str='', default_file:str='', wildcard:str='', on_top:bool=True)** - открывает стандартный диалог выбора файла. Возвращает полный путь или список полных путей, если _multiple_ == True.
 - **file_dir(fullpath:str)->str:** - получить полное имя папки, в которой файл лежит.
 - **file_exists(fullpath:str)->bool** - файл существует?
@@ -298,6 +301,7 @@
 
 - **file_name_fix(fullpath:str, repl_char:str='\_')->str** - заменяет запрещённые символы на _repl_char_. Удаляет пробелы в начале и в конце. Добавляет '\\\\?\\' к длинным путям.
 - **file_read(fullpath:str)->str:** - получить содержимое файла.
+- **file_recycle(fullpath:str, silent:bool=True)->bool** - переместить файл в корзину. *silent* - не показывать стандартный системный диалог подтверждения удаления в корзину. Возвращает True в случае успешного удаления.
 - **file_rename(fullpath:str, dest:str)->str** - переименовать файл. *dest* — полный путь или просто новое имя файла без папки.
 - **file_size(fullpath:str, unit:str='b')->bool:** - получить размер файла (gb, mb, kb, b).
 - **file_write(fullpath:str, content=str, encoding:str='utf-8')->str** - сохраняет *content* в файл. Создаёт файл, если он не существует. Если fullpath = '' или None, используется temp_file(). Возвращает полное имя файла.
@@ -307,11 +311,12 @@
 - **drive_free(letter:str, unit:str='GB')->int:** - размер свободного места на диске (gb, mb, kb, b).
 - **is_directory(fullpath:str)->bool:** - указанный путь является папкой?
 - **path_exists(fullpath:str)->bool:** - указанный путь существует (не важно файл это или папка)?
-- **dir_purge(fullpath:str, days:int=0, recursive=False, creation:bool=False, test:bool=False):** - удалить файлы из папки старше указанного числа дней.
+- **dir_purge(fullpath:str, days:int=0, recursive=False, creation:bool=False, test:bool=False, rule=None):** - удалить файлы из папки старше указанного числа дней.
 	Если *days* == 0 значит удалить вообще все файлы в папке.
 	*creation* — использовать дату создания, иначе использовать дату последнего изменения.
 	*recursive* — включая подпапки.
 	*test* — не удалять на самом деле, а просто вывести в консоль список файлов, которые должны быть удалены.
+	*rule* - функция, получающая полное имя файла и возвращающая True, если файл должен быть удалён.
 - **temp_dir(new_dir:str=None)->str** - возвращает путь ко временной папке. Если указана *new_dir* - создаёт подпапку во временной папке и возвращает её путь.
 - **temp_file(suffix:str='')->str** - возвращает имя для временного файла.
 
@@ -319,9 +324,9 @@
 - **domain_ip(domain:str)->list** - получить список IP-адресов по имени домена.
 - **file_download(url:str, destination:str=None)->str:** - скачать файл и вернуть полный путь.
 	*destination* — может быть *None*, полным путём к файлу или папкой. Если *None*, то скачать во временную папку и вернуть полное имя.
-- **html_element(url:str, element, number:int=0)->str:** - получить текст HTML-элемента по указанной ссылке.
+- **html_element(url:str, element, element_num:int=0)->str:** - получить текст HTML-элемента по указанной ссылке.
 	*element* — словарь, который содержит информацию о нужном элементе (его имя, атрибуты); или список таких словарей; или строка с xpath.
-	*number* - номер элемента, если таких находится несколько.
+	*element_num* - номер элемента, если таких находится несколько.
 	Пример со словарём:
 
 		# Получить внутренний текст элемента span, у которого есть
