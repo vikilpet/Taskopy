@@ -9,6 +9,7 @@ import zipfile
 from distutils import dir_util
 from zlib import crc32
 import tempfile
+import datetime
 import hashlib
 
 import win32api
@@ -199,6 +200,7 @@ def dir_create(fullpath:str=None)->str:
 		If fullpath=None then creates temporary directory.
 	'''
 	if not fullpath: return temp_dir('temp')
+	fullpath = fullpath.rstrip('.').rstrip(' ')
 	try:
 		os.makedirs(fullpath)
 	except FileExistsError: pass
@@ -256,23 +258,21 @@ def file_name_add(fullpath:str, suffix:str='')->str:
 	name, ext = os.path.splitext(fullpath)
 	return name + suffix + ext
 
-def file_name_fix(fullpath:str, repl_char:str='_')->str:
+def file_name_fix(filename:str, repl_char:str='_')->str:
 	''' Replaces forbidden characters with repl_char.
-		Removes leading and trailing spaces.
-		Adds '\\\\?\\' for long paths.
+		Don't use it with full path or it will replace
+		all backslashes.
+		Removes leading and trailing spaces and dots.
 	'''
 
-	parent = os.path.dirname(fullpath)
-	fn = os.path.basename(fullpath)
 	new_fn = ''
-	if parent: new_fn = parent + '\\'
-	for char in fn.strip():
-		if (char in '<>:"/|?*'
+	for char in filename.strip(' .'):
+		if (char in '<>:"\\/|?*'
 		or ord(char) < 32):
 			new_fn += repl_char
 		else:
 			new_fn += char
-	return _long_path(new_fn)
+	return new_fn
 
 def dir_purge(fullpath:str, days:int=0, recursive:bool=False
 , creation:bool=False, test:bool=False, rule=None):
@@ -585,3 +585,18 @@ def working_directory(directory:str):
 	finally:
 		os.chdir(owd)
 
+
+def file_date_m(fullpath:str):
+	' Returns file modification date in datetime '
+	ts = os.path.getmtime(fullpath)
+	return datetime.datetime.fromtimestamp(ts)
+
+def file_date_c(fullpath:str):
+	' Returns file creation date in datetime '
+	ts = os.path.getctime(fullpath)
+	return datetime.datetime.fromtimestamp(ts)
+
+def file_date_a(fullpath:str):
+	' Returns file access date in datetime '
+	ts = os.path.getatime(fullpath)
+	return datetime.datetime.fromtimestamp(ts)

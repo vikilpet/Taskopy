@@ -174,32 +174,35 @@
 	- *time* - время в секундах
 	- *error* - произошла ошибка
 - **job_batch(jobs:list, timeout:int)->list**: — запускает функции параллельно и ждёт, когда они закончат работу или истечёт таймаут. *jobs* — список с объектами типа **Job**. Используйте job_batch, когда вы не хотите долго ждать, если одна из выполняемых функций зависла.
-Пример - создаём список из двух заданий с *dialog*, с разными параметрами:
 
-	jobs = []
-	jobs.append(
-		Job(dialog, 'Test job 1', timeout=10)
-	)
-	jobs.append(
-		Job(dialog, ['Button 1', 'Button 2'])
-	)
-	for job in job_batch(jobs, timeout=5):
-		print(job.error, job.result, job.time)
+	Пример - создаём список из двух заданий с *dialog*, с разными параметрами:
 
-- **job_pool(jobs:list, pool_size:int, args:tuple)->list** - запускает задания (Job) по очереди, так чтобы одновременно выполнялось только `pool_size` заданий. Если `pool_size` не указан, то он равен количеству процессоров в системе. Пример:
+		jobs = []
+		jobs.append(
+			Job(dialog, 'Test job 1', timeout=10)
+		)
+		jobs.append(
+			Job(dialog, ['Button 1', 'Button 2'])
+		)
+		for job in job_batch(jobs, timeout=5):
+			print(job.error, job.result, job.time)
 
-	jobs = []
-	jobs.append(
-		Job(dialog, 'Test job 1', timeout=10)
-	)
-	jobs.append(
-		Job(dialog, ['Button 1', 'Button 2'])
-	)
-	jobs.append(
-		Job(dialog, 'Third job')
-	)
-	for job in job_pool(jobs, pool_size=2):
-		print(job.error, job.result, job.time)
+- **job_pool(jobs:list, pool_size:int, args:tuple)->list** - запускает задания (Job) по очереди, так чтобы одновременно выполнялось только `pool_size` заданий. Если `pool_size` не указан, то он равен количеству процессоров в системе.
+
+	Пример:
+
+		jobs = []
+		jobs.append(
+			Job(dialog, 'Test job 1', timeout=10)
+		)
+		jobs.append(
+			Job(dialog, ['Button 1', 'Button 2'])
+		)
+		jobs.append(
+			Job(dialog, 'Third job')
+		)
+		for job in job_pool(jobs, pool_size=2):
+			print(job.error, job.result, job.time)
 
 	Разница между `job_batch` и `job_pool`:
 	- `job_batch` - все задания запускаются одновременно. Если какое-то задание не выполняется за указанный таймаут, оно возвращается с ошибкой (job.error = True, job.result = 'timeout').

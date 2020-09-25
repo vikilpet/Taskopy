@@ -120,13 +120,17 @@ def window_list(title_filter:str=None
 			]
 	return titles
 
-def window_find(title:str)->list:
+def window_find(title:str, exact:bool=True)->list:
 	''' Find window handle by Title.
 		Returns list of found window handles.
 	'''
 	def check_title(hwnd, title:str):
-		if win32gui.GetWindowText(hwnd) == title: 
-			result.append(hwnd)
+		if exact:
+			if win32gui.GetWindowText(hwnd) == title:
+				result.append(hwnd)
+		else:
+			if title.lower() in win32gui.GetWindowText(hwnd).lower():
+				result.append(hwnd)
 	result = []
 	win32gui.EnumWindows(check_title, title)
 	return result

@@ -22,7 +22,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-08-01'
+APP_VERSION = 'v2020-09-24'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -316,7 +316,7 @@ def var_get(var_name:str, table:str='variables')->str:
 	return r
 
 def clip_set(txt:str):
-	pyperclip.copy(txt)
+	pyperclip.copy(str(txt))
 
 def clip_get()->str:
 	return pyperclip.paste()
@@ -572,6 +572,7 @@ def inputbox(message:str, title:str=None
 		Problem: don't use default or you will get it value
 		whatever button user will press.
 	'''
+	if tdebug(): return input(f'inputbox ({message}): ')
 	title = _get_parent_func_name(title)
 	if is_pwd:
 		box_func = wx.PasswordEntryDialog
@@ -671,35 +672,7 @@ def job_pool(jobs:list, pool_size:int=None):
 	pool.join()
 	return jobs
 
-def jobs_pool(function, args:tuple
-, pool_size:int=None)->list:
-	''' Launches 'pool_size' functions at a time for
-		all 'args'.
-		Returns list of results.
-		'args' may be a tuple of tuples or tuple of values.
-		If 'pool_size' not specified, pool_size = number of CPU.
-		Example:
 
-			jobs_pool(
-				msgbox
-				, (
-					'one'
-					, 'two'
-					, 'three'
-					, 'four'
-				)
-				, 4
-			)
-	'''
-	pool = ThreadPool(pool_size)
-	if isinstance(args[0], (tuple, list, dict)):
-		map_func = pool.starmap
-	else:
-		map_func = pool.map
-	results = map_func(function, args)
-	pool.close()
-	pool.join()
-	return results
 
 class Job:
 	'To use with job_batch and job_pool'
@@ -783,6 +756,18 @@ def tprint(*msgs, **kwargs):
 		msgs.insert(0, parent + ':')
 	print(time.strftime('%y.%m.%d %H:%M:%S'), *msgs, **kwargs)
 
+def tdebug(*msgs, **kwargs)->bool:
+	''' Is function launched from console? '''
+	if not hasattr(sys, 'ps1'): return False
+	if msgs:
+		msg = sys._getframe(1).f_code.co_name + ': '
+		if isinstance(msgs, dict):
+			msg += '\n'.join(f'{k}\t{v}' for k, v in m.items())
+		else:
+			msg += ' '.join(map(str, msgs)) + '\n'
+		print(msg, **kwargs)
+	return True
+
 def balloon(msg:str, title:str=APP_NAME, timeout:int=None, icon:str=None):
 	''' Show balloon. title - 63 symbols max, msg - 255.
 		icon - 'info', 'warning' or 'error'.
@@ -824,7 +809,7 @@ def decor_except(func):
 		except Exception as e:
 			trace_li = traceback.format_exc().splitlines()
 			trace_str = '\n'.join(trace_li[-3:])
-			dev_print(f'decor_except exception:\n{trace_str}')
+			tdebug(f'decor_except exception:\n{trace_str}')
 			return e
 	return wrapper
 
@@ -925,6 +910,8 @@ def dialog(msg:str=None, buttons:list=None
 	''' Shows dialog with multiple optional buttons.
 		Returns ID of selected button starting with 1000
 		or 0 if timeout is over.
+		Note: do not start button text with \n or dialog
+		will fail silently.
 	'''
 	TDN_TIMER = 4
 	S_OK = 0
@@ -953,13 +940,16 @@ def dialog(msg:str=None, buttons:list=None
 					hwnd, TDM_CLICK_BUTTON, None, None)
 		else:
 			if not on_top_flag:
-				win32gui.SetWindowPos(
-					hwnd
-					, win32con.HWND_TOPMOST
-					, 0, 0, 0, 0
-					, win32con.SWP_NOSIZE | win32con.SWP_NOMOVE
-				)
-				on_top_flag = True
+				try:
+					win32gui.SetWindowPos(
+						hwnd
+						, win32con.HWND_TOPMOST
+						, 0, 0, 0, 0
+						, win32con.SWP_NOSIZE | win32con.SWP_NOMOVE
+					)
+					on_top_flag = True
+				except Exception as e:
+					dev_print(f'SetWindowPos exception {hwnd=}: {e}')
 		
 		return S_OK
 	if content: content = str(content)

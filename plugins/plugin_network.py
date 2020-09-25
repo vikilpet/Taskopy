@@ -9,11 +9,24 @@ from bs4 import BeautifulSoup
 import json
 import datetime
 import warnings
+import locale
+import contextlib
+import threading
 import json2html
-from .tools import dev_print, decor_except, time_sleep
+from .tools import dev_print, decor_except, time_sleep, tdebug
 
 
 USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36'}
+_LOCALE_LOCK = threading.Lock()
+
+@contextlib.contextmanager
+def _setlocale(name):
+    with _LOCALE_LOCK:
+        saved = locale.setlocale(locale.LC_ALL)
+        try:
+            yield locale.setlocale(locale.LC_ALL, name)
+        finally:
+            locale.setlocale(locale.LC_ALL, saved)
 
 @decor_except
 def page_get(url:str, encoding:str='utf-8', session:bool=False
@@ -63,7 +76,7 @@ def page_get(url:str, encoding:str='utf-8', session:bool=False
 			else:
 			 	break
 		except Exception as e:
-			dev_print(f'failed again ({attempt}).'
+			tdebug(f'failed again ({attempt}).'
 				,  f'Error: {repr(e)}\nurl={url}')
 			pass
 	else:
@@ -112,7 +125,7 @@ def file_download(url:str, destination:str=None
 					fd.write(chunk)
 			break
 		except Exception as e:
-			dev_print(f'dl attempt {attempt} failed'
+			tdebug(f'dl attempt {attempt} failed'
 				+ f', err="{repr(e)[:50]}...", url={url[-30:]}')
 	else:
 		if del_bad_file:
@@ -306,7 +319,8 @@ def is_online(*sites, timeout:int=2)->int:
 	''' Checks if there is an internet connection using HEAD
 		requests to the specified web sites.
 	'''
-	if not sites: sites = ['https://www.google.com/', 'https://yandex.ru/']
+	if not sites: sites = ['https://www.google.com/'
+		, 'https://yandex.ru/']
 	r = 0
 	for site in sites:
 		try:
@@ -336,13 +350,14 @@ def json_to_html(json_data, **kwargs)->str:
 def http_header(url:str, header:str, **kwargs)->str:
 	'Get HTTP header of url'
 	req = requests.head(url, headers={**USER_AGENT}, **kwargs)
-	return req.headers[header]
+	return req.headers.get(header)
 
 def http_h_last_modified(url:str, **kwargs):
 	'HTTP Last Modified time in datetime format'
-	date_str = http_header(url, 'Last-Modified')
-	date_dt = datetime.datetime.strptime(date_str
-		, '%a, %d %b %Y %H:%M:%S GMT')
+	date_str = http_header(url, header='Last-Modified', **kwargs)
+	with _setlocale('C'):
+		date_dt = datetime.datetime.strptime(date_str
+			, '%a, %d %b %Y %H:%M:%S GMT')
 	return date_dt
 
 def port_scan(host:str, port:int

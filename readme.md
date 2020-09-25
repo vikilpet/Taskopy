@@ -174,32 +174,35 @@ Format: **setting** (default value) — description.
 	- *time* - time in seconds
 	- *error* - there was an error
 - **job_batch(jobs:list, timeout:int)->list**: — starts functions (they do not necessarily have to be the same) in parallel and waits for them to be executed or timeout. *jobs* - list of **Job** class instances. Use job_batch when you don't want to wait because of one hung function.
-Example - create jobs list out of *dialog* function with different parameters:
 
-	jobs = []
-	jobs.append(
-		Job(dialog, 'Test job 1', timeout=10)
-	)
-	jobs.append(
-		Job(dialog, ['Button 1', 'Button 2'])
-	)
-	for job in job_batch(jobs, timeout=5):
-		print(job.error, job.result, job.time)
+	Example - create jobs list out of *dialog* function with different parameters:
 
-- **job_pool(jobs:list, pool_size:int, args:tuple)->list** - Launches 'pool_size' functions at a time for all the 'args'. 'args' may be a tuple of tuples or tuple of values. If 'pool_size' not specified, then pool_size = number of CPU. Example:
+		jobs = []
+		jobs.append(
+			Job(dialog, 'Test job 1', timeout=10)
+		)
+		jobs.append(
+			Job(dialog, ['Button 1', 'Button 2'])
+		)
+		for job in job_batch(jobs, timeout=5):
+			print(job.error, job.result, job.time)
 
-	jobs = []
-	jobs.append(
-		Job(dialog, 'Test job 1', timeout=10)
-	)
-	jobs.append(
-		Job(dialog, ['Button 1', 'Button 2'])
-	)
-	jobs.append(
-		Job(dialog, 'Third job')
-	)
-	for job in job_pool(jobs, pool_size=2):
-		print(job.error, job.result, job.time)
+- **job_pool(jobs:list, pool_size:int, args:tuple)->list** - Launches 'pool_size' functions at a time for all the 'args'. 'args' may be a tuple of tuples or tuple of values. If 'pool_size' not specified, then pool_size = number of CPU.
+
+	Example:
+
+		jobs = []
+		jobs.append(
+			Job(dialog, 'Test job 1', timeout=10)
+		)
+		jobs.append(
+			Job(dialog, ['Button 1', 'Button 2'])
+		)
+		jobs.append(
+			Job(dialog, 'Third job')
+		)
+		for job in job_pool(jobs, pool_size=2):
+			print(job.error, job.result, job.time)
 	
 	Difference between `job_batch` and `job_pool`:
 	- `job_batch` - all *jobs* are started simultaneously. If some *job* is not finished during specified *timeout*, it returns error (job.error = True, job.result = 'timeout').
