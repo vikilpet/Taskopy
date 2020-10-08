@@ -9,24 +9,13 @@ from bs4 import BeautifulSoup
 import json
 import datetime
 import warnings
-import locale
-import contextlib
 import threading
 import json2html
-from .tools import dev_print, decor_except, time_sleep, tdebug
+from .tools import dev_print, decor_except, time_sleep, tdebug \
+, locale_set
 
 
-USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36'}
-_LOCALE_LOCK = threading.Lock()
-
-@contextlib.contextmanager
-def _setlocale(name):
-    with _LOCALE_LOCK:
-        saved = locale.setlocale(locale.LC_ALL)
-        try:
-            yield locale.setlocale(locale.LC_ALL, name)
-        finally:
-            locale.setlocale(locale.LC_ALL, saved)
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36'}
 
 @decor_except
 def page_get(url:str, encoding:str='utf-8', session:bool=False
@@ -53,7 +42,7 @@ def page_get(url:str, encoding:str='utf-8', session:bool=False
 		post_file_hash = False
 	if session:
 		req_obj = requests.Session()
-		req_obj.headers.update(USER_AGENT)
+		req_obj.headers.update(_USER_AGENT)
 		if headers: req_obj.headers.update(headers)
 		if cookies: req_obj.cookies.update(cookies)
 		if post_file_hash:
@@ -62,7 +51,7 @@ def page_get(url:str, encoding:str='utf-8', session:bool=False
 	else:
 		req_obj = requests
 		if cookies: args['cookies'] = cookies
-		args['headers'] = {**USER_AGENT}
+		args['headers'] = {**_USER_AGENT}
 		if post_file_hash:
 			args['headers']['Content-MD5'] = post_file_hash
 	for attempt in range(attempts):
@@ -118,7 +107,7 @@ def file_download(url:str, destination:str=None
 	for attempt in range(attempts):
 		try:
 			req = requests.get(url, stream=True
-				, timeout=timeout, headers={**USER_AGENT})
+				, timeout=timeout, headers={**_USER_AGENT})
 			with open(dest_file, 'wb+') as fd:
 				for chunk in req.iter_content(
 				chunk_size=1_048_576):
@@ -325,7 +314,7 @@ def is_online(*sites, timeout:int=2)->int:
 	for site in sites:
 		try:
 			requests.head(site, timeout=timeout
-				, headers={**USER_AGENT})
+				, headers={**_USER_AGENT})
 			r += 1
 		except: pass
 	return r
@@ -349,13 +338,13 @@ def json_to_html(json_data, **kwargs)->str:
 
 def http_header(url:str, header:str, **kwargs)->str:
 	'Get HTTP header of url'
-	req = requests.head(url, headers={**USER_AGENT}, **kwargs)
+	req = requests.head(url, headers={**_USER_AGENT}, **kwargs)
 	return req.headers.get(header)
 
 def http_h_last_modified(url:str, **kwargs):
 	'HTTP Last Modified time in datetime format'
 	date_str = http_header(url, header='Last-Modified', **kwargs)
-	with _setlocale('C'):
+	with locale_set('C'):
 		date_dt = datetime.datetime.strptime(date_str
 			, '%a, %d %b %Y %H:%M:%S GMT')
 	return date_dt

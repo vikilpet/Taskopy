@@ -13,6 +13,7 @@ import keyboard
 import win32api
 import win32gui
 import win32con
+import win32evtlog
 import uptime
 from plugins.tools import *
 from plugins.plugin_filesystem import *
@@ -44,6 +45,8 @@ APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
 _TIME_UNITS = {'msec':1, 'ms':1, 'sec':1000, 's':1000, 'min':60000
 	,'m':60000, 'hour':3600000, 'h':3600000}
+TASK_DATE_FORMAT = \
+	r'^(\d\d\d\d|\*)\.(\d\d|\*)\.(\d\d|\*) (\d\d|\*):(\d\d|\*)$'
 
 set_title = win32api.SetConsoleTitle
 	
@@ -134,6 +137,7 @@ class Tasks:
 		s.task_list_http = []
 		s.task_list_idle = []
 		s.task_list_crontab_load = []
+		s.event_handlers = []
 		s.idle_min = 0
 		s.http_server = None
 		s.global_hk = None
@@ -165,6 +169,7 @@ class Tasks:
 				task_opts['task_name_full'] = task_opts['task_name']
 			if task_opts['schedule']:
 				s.add_schedule(task_opts)
+			if task_opts['date']: s.add_schedule_date(task_opts)
 			if task_opts['hotkey']: s.add_hotkey(task_opts)
 			if task_opts['left_click']:
 				s.task_list_left_click.append(task_opts)
@@ -197,6 +202,7 @@ class Tasks:
 					task_opts['http_dir'] = temp_dir()
 				s.task_list_http.append(task_opts)
 			if task_opts['idle']: s.add_idle_task(task_opts)
+			if task_opts['event_log']: s.add_event_handler(task_opts)
 		s.task_list_menu.sort( key=lambda k: k['task_name'].lower() )
 		s.task_list_submenus.sort( key=lambda k: k[0].lower() )
 		for subm in s.task_list_submenus:
@@ -270,7 +276,8 @@ class Tasks:
 		for inter in intervals:
 			try:
 				sched_rule = (
-					'schedule.' + inter + f'.do(s.run_task, task=task, caller="scheduler")'
+					'schedule.' + inter
+					+ f'.do(s.run_task, task=task, caller="scheduler")'
 				)
 				eval(sched_rule)
 			except Exception as e:
@@ -279,6 +286,49 @@ class Tasks:
 					lang.warn_schedule.format(task['task_name_full'])
 					+ ':\n' + inter
 				)
+
+	def add_schedule_date(s, task):
+		''' task - dict with task options '''
+
+		def date_replace_ast(date:str)->str:
+			'''	Replace asterisk to current date time value.
+				date_replace_ast('*.*.01 12:30')
+				->	'2020.10.01 12:30'
+			'''
+			if not '*' in date: return date
+			date = date.replace('.', ' ').replace(':', ' ')
+			new_date_li = list( time_now().timetuple() )
+			for pos, value  in enumerate( date.split() ):
+				if value != '*': new_date_li[pos] = value
+			return '{:0>4}.{:0>2}.{:0>2} {:0>2}:{:0>2}' \
+				.format(*new_date_li)
+
+		def run_task_date(date:str, task:dict):
+			if time_now_str('%Y.%m.%d %H:%M') != \
+			date_replace_ast(date):
+				return
+			if task['last_start']:
+				if time_diff(
+					task['last_start']
+					, time_now()
+					, unit='min'
+				) < 1:
+					return
+			s.run_task(task=task, caller='scheduler')
+
+		dates = task['date']
+		if isinstance(dates, str): dates = [dates]
+		for date in dates:
+			if not re_match(date, TASK_DATE_FORMAT):
+				msgbox_warning(
+					lang.warn_date_format.format(
+						task['task_name_full']
+						, date
+					)
+				)
+				continue
+			schedule.every().second.do(
+				run_task_date, date=date, task=task)
 
 	def run_at_startup(s):
 		if sett.hide_console:
@@ -358,7 +408,6 @@ class Tasks:
 						task['task_function_name']:
 							t['running'] = False
 							t['thread'] = None
-							t['last_start'] = None
 							break
 					s.task_opt_set(task['task_function_name']
 						, 'err_counter', 0)
@@ -431,7 +480,26 @@ class Tasks:
 		task['idle_dur'] = value * coef
 		task['idle_done'] = False
 		s.task_list_idle.append(task)
-		
+	
+	def add_event_handler(s, task):
+		try:
+			s.event_handlers.append(
+				win32evtlog.EvtSubscribe(
+					task['event_log']
+					, win32evtlog.EvtSubscribeToFutureEvents
+					, None
+					, lambda *a, task=task: s.run_task(task=task
+						, caller='event')
+					, None
+					, task['event_xpath']
+					, None
+					, None
+				)
+			)
+		except:
+			msgbox_warning(
+				lang.warn_event_format.format(task['task_name_full']) )
+
 	def run_scheduler(s):
 		time.sleep(0.01)
 		local_id = tasks.sched_thread_id
@@ -459,7 +527,8 @@ class Tasks:
 
 	def close(s):
 		''' Destructor.
-			Remove scheduler jobs, hotkey bindings, stop http server.
+			Remove scheduler jobs, hotkey bindings, stop http server
+			, close event handlers.
 		'''
 		if s.http_server:
 			s.http_server.shutdown()
@@ -473,6 +542,7 @@ class Tasks:
 			s.global_hk.stop_listener()
 			s.global_hk = None
 		schedule.clear()
+		for eh in s.event_handlers: eh.close()
 
 def create_menu_item(menu, task, func=None, parent_menu=None):
 	''' Task - task dict or menu item label

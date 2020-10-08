@@ -35,6 +35,8 @@ warn_task_error=Error when executing a task «{}»
 warn_left_click=Attempt to bind more than one task to left click: {}
 warn_runn_tasks_con=Running tasks
 warn_runn_tasks_msg=Some tasks ({}) are being performed now. Close anyway?
+warn_date_format=Wrong date format in task «{}»: {}
+warn_event_format=Wrong event specification in task «{}»
 '''
 
 _dict_ru='''\
@@ -57,4 +59,6 @@ warn_task_error=Ошибка при выполнении задачи «{}»
 warn_left_click=Попытка привязать левому клику больше одной задачи: {}
 warn_runn_tasks_con=Работающие задачи
 warn_runn_tasks_msg=Некоторые задачи ({} шт.) выполняются в текущий момент. Всё равно закрыть?
+warn_date_format=Неправильный формат даты в задаче «{}»: {}
+warn_event_format=Неправильный формат события в задаче «{}»
 '''

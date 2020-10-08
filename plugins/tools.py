@@ -7,6 +7,8 @@ import subprocess
 from multiprocessing.dummy import Pool as ThreadPool
 import re
 import winsound
+import locale
+import contextlib
 import glob
 import traceback
 import ctypes
@@ -22,7 +24,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-09-24'
+APP_VERSION = 'v2020-10-08'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -53,6 +55,9 @@ TASK_OPTIONS = [
 	, ['rule', None]
 	, ['thread', None]
 	, ['last_start', None]
+	, ['date', None]
+	, ['event_log', None]
+	, ['event_xpath', '*']
 ]
 
 APP_SETTINGS=[
@@ -90,6 +95,8 @@ _DB_FILE = _APP_PATH + r'\resources\db.sqlite3'
 _TIME_UNITS = {'msec':1, 'ms':1, 'sec':1000, 's':1000, 'min':60000
 	, 'm':60_000, 'hour':3_600_000, 'h':3_600_000, 'day': 86_400_000
 	, 'd': 86_400_000}
+
+_LOCALE_LOCK = threading.Lock()
 
 class DictToObj:
 	''' Converts dictionary to object.
@@ -190,6 +197,14 @@ def time_now_str(template:str='%Y-%m-%d_%H-%M-%S'):
 def time_now():
 	'Returns datetime object'
 	return datetime.datetime.now()
+
+def time_from_str(date_string:str, template:str='%Y-%m-%d_%H-%M-%S'
+, use_locale:str='C'):
+	'''	Returns datetime object from string and
+		specified locale.
+	'''
+	with locale_set(use_locale):
+		return datetime.datetime.strptime(date_string, template)
 
 def time_hour()->int:
 	'''Returns current hour'''
@@ -1017,3 +1032,13 @@ def hint(text:str, position:tuple=None)->int:
 	if position:
 		args += '--position', '{}_{}'.format(*position)
 	return subprocess.Popen(args=args).pid
+
+@contextlib.contextmanager
+def locale_set(name:str='C'):
+    with _LOCALE_LOCK:
+        saved = locale.setlocale(locale.LC_ALL)
+        try:
+            yield locale.setlocale(locale.LC_ALL, name)
+        finally:
+            locale.setlocale(locale.LC_ALL, saved)
+
