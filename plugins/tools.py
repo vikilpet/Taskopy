@@ -24,7 +24,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-10-08'
+APP_VERSION = 'v2020-10-14'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -925,7 +925,7 @@ def dialog(msg:str=None, buttons:list=None
 	''' Shows dialog with multiple optional buttons.
 		Returns ID of selected button starting with 1000
 		or 0 if timeout is over.
-		Note: do not start button text with \n or dialog
+		Note: do not start button text with new line (\\n) or dialog
 		will fail silently.
 	'''
 	TDN_TIMER = 4

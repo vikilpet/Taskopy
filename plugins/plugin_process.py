@@ -7,6 +7,7 @@ import win32gui
 import win32api
 import win32con
 import win32com
+import win32event
 import win32process
 import win32security
 import win32ts
@@ -623,5 +624,18 @@ def runas_shell_user(cmd, executable=None, creationflags=0, cwd=None,
 	if return_handles:
 		return hProcess, hThread
 	return pi.dwProcessId, pi.dwThreadId
+
+def event_wait_obj(handle, timeout:int):
+	''' Wrapper for win32 WaitForSingleObject function.
+		handle - pywintypes.HANDLE
+		timeout - milliseconds
+		Example (with admin rights):
+			event_wait_obj(
+				runas_shell_user('calc', return_handles=True)[0]
+				, 10_000
+			)
+	'''
+	win32event.WaitForSingleObject(handle, timeout)
+
 
 
