@@ -24,7 +24,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-10-14'
+APP_VERSION = 'v2020-10-26'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -581,10 +581,11 @@ def msgbox_warning(msg:str):
 	msgbox(msg=msg, title=APP_NAME, ui=MB_ICONWARNING, wait=False)
 
 def inputbox(message:str, title:str=None
-, is_pwd:bool=False, default:str='', multiline:bool=False)->str:
+, is_pwd:bool=False, default:str=''
+, multiline:bool=False, topmost:bool=True)->str:
 	''' Request input from user.
 		is_pwd - use password dialog (hide input).
-		Problem: don't use default or you will get it value
+		Problem: don't use default or you will get this value
 		whatever button user will press.
 	'''
 	if tdebug(): return input(f'inputbox ({message}): ')
@@ -598,7 +599,8 @@ def inputbox(message:str, title:str=None
 	dlg = box_func(app.frame, message, title, style=style)
 	win32gui.SetWindowPos(
 		dlg.Handle
-		, win32con.HWND_TOPMOST
+		, win32con.HWND_TOPMOST \
+			if topmost else win32con.HWND_TOP
 		, 0, 0, 0, 0
 		, win32con.SWP_NOSIZE | win32con.SWP_NOMOVE
 	)
@@ -695,6 +697,7 @@ class Job:
 		s
 		, func
 		, *args
+		, job_name:str=''
 		, **kwargs
 	):
 		s.func = func
@@ -704,6 +707,7 @@ class Job:
 		s.result = None
 		s.time = 0
 		s.error = False
+		s.job_name = job_name
 	
 	def run(s):
 		time_start = time.time()

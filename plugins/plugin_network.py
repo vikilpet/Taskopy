@@ -15,7 +15,7 @@ from .tools import dev_print, decor_except, time_sleep, tdebug \
 , locale_set
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.121 Safari/537.36'}
 
 @decor_except
 def page_get(url:str, encoding:str='utf-8', session:bool=False

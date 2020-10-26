@@ -172,27 +172,36 @@ def app_start(
 	else:
 		return r.pid
 
-def process_exist(process, cmd:str=None)->bool:
+def process_exist(process, cmd_filter:str=None
+, user_filter:str=None)->bool:
 	''' Returns PID if the process with the specified name exists.
 		process - image name or PID.
-		cmd - optional string to search in the
+		cmd_filter - optional string to search in the
 			command line of the process.
+		user_filter - only search within processes of
+			specified user. Format: pc\\username
 	'''
-	if cmd: cmd=cmd.lower()
+	if cmd_filter: cmd_filter = cmd_filter.lower()
+	if user_filter: user_filter = user_filter.lower()
 	if isinstance(process, str): process = process.lower()
 	for proc in psutil.process_iter():
 		try:
 			if isinstance(process, str):
 				if proc.name().lower() == process:
-					if cmd:
-						if cmd in ' '.join(proc.cmdline()).lower():
+					if user_filter:
+						if proc.username().lower() != user_filter: continue
+					if cmd_filter:
+						if cmd_filter in ' '.join(proc.cmdline()).lower():
 							return proc.pid
 					else:
 						return proc.pid
 			else:
 				if proc.pid == process:
-					if cmd:
-						if cmd in ' '.join(proc.cmdline()).lower(): return proc.pid
+					if user_filter:
+						if proc.username().lower() != user_filter: continue
+					if cmd_filter:
+						if cmd_filter in ' '.join(proc.cmdline()).lower():
+							return proc.pid
 					else:
 						return proc.pid
 		except psutil.AccessDenied:
@@ -625,17 +634,30 @@ def runas_shell_user(cmd, executable=None, creationflags=0, cwd=None,
 		return hProcess, hThread
 	return pi.dwProcessId, pi.dwThreadId
 
-def event_wait_obj(handle, timeout:int):
-	''' Wrapper for win32 WaitForSingleObject function.
-		handle - pywintypes.HANDLE
-		timeout - milliseconds
-		Example (with admin rights):
-			event_wait_obj(
-				runas_shell_user('calc', return_handles=True)[0]
-				, 10_000
-			)
-	'''
-	win32event.WaitForSingleObject(handle, timeout)
+def runas_shell_user_wait(cmd, executable=None
+, creationflags=0, cwd=None,
+startupinfo=None, timeout:int=-1)->int:
+	'''	runas_shell_user and get process return code
+		
+		timeout - how many milliseconds to wait.
+		Default is -1 - return only when process is closed.
 
+		Test (with admin rights):
+			runas_shell_user_wait('ping 8.8.8.8 -n 1')
+			runas_shell_user_wait('ping asdfasdfasdfasdf -n 1')
+	'''
+	proc_handle = runas_shell_user(
+		cmd=cmd
+		, executable=executable
+		, creationflags=creationflags
+		, cwd=cwd
+		, startupinfo=startupinfo
+		, return_handles=True
+	)[0]
+	win32event.WaitForSingleObject(
+		proc_handle
+		, timeout
+	)
+	return win32process.GetExitCodeProcess(proc_handle)
 
 

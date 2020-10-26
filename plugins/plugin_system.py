@@ -227,7 +227,16 @@ def window_is_visible(window=None)->bool:
 		return win32gui.IsWindowVisible(hwnd) == 1
 	else:
 		return False
-	
+
+def window_close(window=None, wait:bool=True)->bool:
+	'''	Closes window and returns True on success.
+	'''
+	hwnd = window_get(window)
+	if not hwnd: return False
+	func = win32gui.SendMessage if wait else win32gui.PostMessage
+	func(hwnd, win32con.WM_CLOSE, 0, 0)
+	return True
+
 
 
 def _test():

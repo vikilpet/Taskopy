@@ -164,7 +164,7 @@ class _ApiRos:
 		return ret
 
 def routeros_send(
-	cmd:str
+	cmd:list
 	, device_ip:str=None
 	, device_port:str='8728'
 	, device_user:str='admin'
@@ -173,7 +173,7 @@ def routeros_send(
 ):
 	''' Send command 'cmd' through api.
 		cmd - list of strings (single command) or list
-		of lists (many commands)
+		of lists (many commands at once).
 		Return True, None on success or False, 'error'
 	'''
 	soc = None
@@ -284,12 +284,31 @@ def routeros_query(
 ):
 	''' Send query and return True, data = list of dictionaries
 		or False, 'error'
-		query - list with commands as string.
-		Example:
-		query=[
-			'/ip/firewall/address-list/print'
-			, '?list=my_list'
-		]
+		query - list with commands or list with such lists.
+
+		Example (single query):
+			routeros_query(
+				query=[
+					'/ip/address/print'
+					, '?interface=BRIDGE'
+				]
+				, device_ip='router.lan'
+				, device_user=u
+				, device_pwd=p
+			)
+
+		Example (multiple queries):
+			routeros_query(
+				query=[
+					['/ip/address/print'
+						, '?interface=BRIDGE']
+					, ['/ip/address/print'
+						, '?interface=ISP1']
+				]
+				, device_ip='router.lan'
+				, device_user=u
+				, device_pwd=p
+			)
 	'''
 	soc = None
 	for res in socket.getaddrinfo(
@@ -319,18 +338,32 @@ def routeros_query(
 	try:
 		apiros = _ApiRos(soc)
 		apiros.login(device_user, device_pwd)
-		api_data = apiros.talk(query)
-
-		
-
-		if len(api_data) > 1:
-			if api_data[0][0] == '!trap':
-				if info: print(f'routeros_query: bad query')
-				return False, 'bad query'
-			else:
-				return True, [t[1] for t in api_data[:-1]]
+		results = []
+		if isinstance(query[0], list):
+			queries = query
 		else:
-			return True, []
+			queries = [query]
+		for q in queries:
+			data = apiros.talk(q)
+
+			
+
+
+			if len(data) > 1:
+				if data[0][0] == '!trap':
+					if info: print(f'routeros_query: bad query')
+					results.append( (False, 'bad query') )
+				else:
+					results.append(
+						(True, [t[1] for t in data[:-1]] )
+					)
+			else:
+				results.append( (True, []) )
+	
+		if isinstance(query[0], list):
+			return True, results
+		else:
+			return results[0]
 	except Exception as e:
 		if info: print(f'routeros_query exception:\n{repr(e)}')
 		return False, repr(e)[:200]
