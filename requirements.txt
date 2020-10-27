@@ -9,6 +9,6 @@ psutil==5.7.0
 pyodbc==4.0.30
 requests==2.23.0
 schedule==0.6.0
-cryptography==2.8
+cryptography==3.2
 beautifulsoup4==4.9.3
 win32gui==221.6
