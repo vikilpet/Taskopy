@@ -15,7 +15,7 @@ from .tools import dev_print, decor_except, time_sleep, tdebug \
 , locale_set
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.121 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.66 Safari/537.36'}
 
 @decor_except
 def page_get(url:str, encoding:str='utf-8', session:bool=False
@@ -86,7 +86,7 @@ def html_whitespace(text:str)->str:
 @decor_except
 def file_download(url:str, destination:str=None
 , attempts:int=3, timeout:int=1
-, del_bad_file:bool=False)->str:
+, del_bad_file:bool=False, headers:dict={})->str:
 	''' Download file from url to destination and return fullpath.
 		Returns the full path to the downloaded file.
 		attempts - how many times to retry download if failed.
@@ -107,7 +107,7 @@ def file_download(url:str, destination:str=None
 	for attempt in range(attempts):
 		try:
 			req = requests.get(url, stream=True
-				, timeout=timeout, headers={**_USER_AGENT})
+				, timeout=timeout, headers={**_USER_AGENT, **headers})
 			with open(dest_file, 'wb+') as fd:
 				for chunk in req.iter_content(
 				chunk_size=1_048_576):

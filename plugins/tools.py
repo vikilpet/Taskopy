@@ -5,6 +5,7 @@ import datetime
 import threading
 import subprocess
 from multiprocessing.dummy import Pool as ThreadPool
+from operator import itemgetter
 import re
 import winsound
 import locale
@@ -24,7 +25,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-10-26'
+APP_VERSION = 'v2020-11-20'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -226,12 +227,15 @@ def time_diff(start, end, unit:str='sec')->int:
 	coef = _TIME_UNITS.get(unit, 1000) / 1000
 	return int(seconds // coef)
 
-def time_diff_str(start, end)->str:
+def time_diff_str(start, end, str_format:str=None)->str:
 	'''	Returns time difference in string like that:
 		'3:01:35'
-		start and end should be in datetime format.
+		start and end should be in _datetime_ format.
+		str_format - standard time formating like '%y.%m.%d %H:%M:%S'
 	'''
-	return str(end - start)
+	if not str_format: return str(end - start)
+	delta_as_time = time.gmtime( (end - start).total_seconds() )
+	return time.strftime(str_format, delta_as_time)
 	
 
 def date_year()->int:
@@ -604,7 +608,7 @@ def inputbox(message:str, title:str=None
 		, 0, 0, 0, 0
 		, win32con.SWP_NOSIZE | win32con.SWP_NOMOVE
 	)
-	if default: dlg.SetValue(default)
+	if default: dlg.SetValue(str(default))
 	try:
 		win32gui.SetForegroundWindow(dlg.Handle)
 	except:
@@ -1035,14 +1039,63 @@ def hint(text:str, position:tuple=None)->int:
 	]
 	if position:
 		args += '--position', '{}_{}'.format(*position)
-	return subprocess.Popen(args=args).pid
+	return subprocess.Popen(args=args
+	, creationflags=win32con.DETACHED_PROCESS).pid
 
 @contextlib.contextmanager
 def locale_set(name:str='C'):
-    with _LOCALE_LOCK:
-        saved = locale.setlocale(locale.LC_ALL)
-        try:
-            yield locale.setlocale(locale.LC_ALL, name)
-        finally:
-            locale.setlocale(locale.LC_ALL, saved)
+	with _LOCALE_LOCK:
+		saved = locale.setlocale(locale.LC_ALL)
+		try:
+			yield locale.setlocale(locale.LC_ALL, name)
+		finally:
+			locale.setlocale(locale.LC_ALL, saved)
+
+def table_print(table, use_headers=True, sep:str=None
+, col_pad:str='  ', row_sep_step:int=0, sort_keys:list=None):
+	'''	Print list of lists as a table.
+		_sep_ - string to repeat as a row separator.
+	'''
+
+	def print_sep():
+		nonlocal max_row_len
+		if not sep: return
+		print( sep * (max_row_len // len(sep) ) )
+
+	if not table: return
+	if isinstance(table[0], list): rows = table.copy()
+	if isinstance(use_headers, list):
+		rows.insert(0, use_headers)
+	elif isinstance(table[0], dict):
+		rows = [di.values() for di in table]
+		if use_headers == True: rows.insert(0, list( table[0].keys() ) )
+	if sort_keys:
+		if use_headers:
+			rows = [
+				rows[0], * sorted(rows[1:], key=itemgetter(*sort_keys) )
+			]
+		else:
+			rows.sort(key=itemgetter(*sort_keys))
+	if use_headers and not sep: sep='-'
+	for row in rows:
+		row[:] = ['-' if i in [None, ''] else str(i) for i in row]
+	col_sizes = [ max( map(len, col) ) for col in zip(*rows) ]
+	max_row_len = sum(col_sizes) + len(col_pad) * (len(col_sizes) - 1)
+	template = col_pad.join(
+		[ '{{:<{}}}'.format(s) for s in col_sizes ]
+	)
+	print()
+	if use_headers:
+		print(template.format(*rows[0]))
+		print_sep()
+		rows.pop(0)
+	for row_num, row in enumerate(rows):
+		if row_sep_step:
+			if (row_num > 0)  and (row_num % row_sep_step == 0):
+				print_sep()
+			print(template.format(*row))
+		else:
+			print(template.format(*row))
+	print()
+
 

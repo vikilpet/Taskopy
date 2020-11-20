@@ -145,6 +145,7 @@ class Tasks:
 		for item in dir(crontab):
 			task_obj = getattr(crontab, item)
 			if not callable(task_obj): continue
+			if isinstance(task_obj, type): continue
 			if task_obj.__module__ != 'crontab': continue
 			
 			task_opts = {}

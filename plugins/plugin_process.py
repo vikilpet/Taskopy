@@ -208,14 +208,21 @@ def process_exist(process, cmd_filter:str=None
 			dev_print(f'proc_exist access denied: {process}')
 	return False
 
-def process_list(name:str='', cmd_filter:str=None)->list:
+def process_list(name:str='', cmd_filter:str=None
+, ad_value=None)->list:
 	''' Returns list of DictToObj with process information.
 		name - image name. If not specified then list all
 			processes.
 		cmd_filter - a substring to look for in command line.
+
 		Process information includes: pid:int, name:str
 		, username:str, fullpath:str, cmdline:list
 		, cmdline_str:str.
+
+        ad_value - is the value which gets assigned in case
+        AccessDenied or ZombieProcess exception is raised when
+        retrieving that particular process information.
+
 		You may need admin rights to read info for every
 		process.
 		All strings in lowercase.
@@ -230,7 +237,7 @@ def process_list(name:str='', cmd_filter:str=None)->list:
 				if proc.name().lower() != name: continue
 			except psutil.AccessDenied as e:
 				dev_print('process_list error: ' + repr(e))
-		di = proc.as_dict(attrs=ATTRS)
+		di = proc.as_dict(attrs=ATTRS, ad_value=ad_value)
 		for key in di:
 			if isinstance(di[key], str):
 				di[key] = di[key].lower()

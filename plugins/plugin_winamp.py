@@ -28,9 +28,10 @@ def winamp_toggle_main_window(): winamp_command(WM_COMMAND, 40258, 0)
 def winamp_toggle_media_library(): winamp_command(WM_COMMAND, 40379, 0)
 def winamp_toggle_always_on_top(): winamp_command(WM_COMMAND, 40019, 0)
 def winamp_close(): winamp_command(WM_COMMAND, 40001, 0)
+def winamp_volume_set(volume:int): winamp_command(WM_USER, volume, 122)
 
 def winamp_status()->str:
-	''' Playing, paused, stopped
+	''' -> 'playing', 'paused', 'stopped'
 	'''
 	status = winamp_command(WM_USER, 0, 104)
 	if status == 1:
