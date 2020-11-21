@@ -23,7 +23,7 @@ def page_get(url:str, encoding:str='utf-8', session:bool=False
 , http_method:str='get', json_data:str=None
 , post_file:str=None, post_hash:bool=False
 , post_form_data:dict=None, timeout:int=3
-, attempts:int=3)->str:
+, attempts:int=3, **kwargs)->str:
 	''' Gets content of the specified URL '''
 	if (post_file or post_form_data): http_method = 'POST'
 	if http_method: http_method = http_method.lower()
@@ -57,7 +57,7 @@ def page_get(url:str, encoding:str='utf-8', session:bool=False
 	for attempt in range(attempts):
 		try:
 			time_sleep(attempt)
-			req = getattr(req_obj, http_method)(**args)
+			req = getattr(req_obj, http_method)(**args, **kwargs)
 			if req.status_code >= 500:
 				continue
 			elif req.status_code in [403, 404]:
@@ -65,6 +65,8 @@ def page_get(url:str, encoding:str='utf-8', session:bool=False
 			else:
 			 	break
 		except Exception as e:
+			if isinstance(e, requests.exceptions.SSLError):
+				return e
 			tdebug(f'failed again ({attempt}).'
 				,  f'Error: {repr(e)}\nurl={url}')
 			pass
@@ -86,7 +88,8 @@ def html_whitespace(text:str)->str:
 @decor_except
 def file_download(url:str, destination:str=None
 , attempts:int=3, timeout:int=1
-, del_bad_file:bool=False, headers:dict={})->str:
+, del_bad_file:bool=False, headers:dict={}
+, **kwargs)->str:
 	''' Download file from url to destination and return fullpath.
 		Returns the full path to the downloaded file.
 		attempts - how many times to retry download if failed.
@@ -106,8 +109,11 @@ def file_download(url:str, destination:str=None
 	dest.close()
 	for attempt in range(attempts):
 		try:
-			req = requests.get(url, stream=True
-				, timeout=timeout, headers={**_USER_AGENT, **headers})
+			req = requests.get(
+				url, stream=True, timeout=timeout
+				, headers={**_USER_AGENT, **headers}
+				, **kwargs
+			)
 			with open(dest_file, 'wb+') as fd:
 				for chunk in req.iter_content(
 				chunk_size=1_048_576):
