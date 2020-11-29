@@ -10,14 +10,16 @@ from time import sleep
 _TIME_UNITS = {'msec':1, 'ms':1, 'sec':1000, 's':1000, 'min':60000
 				,'m':60000, 'hour':3600000, 'h':3600000}
 
-def window_get(window=None)->int:
+def window_get(window=None, class_name:str=None)->int:
 	''' Returns hwnd. If window is not specified then
 		finds foreground window.
 	'''
 	if isinstance(window, str):
-		return win32gui.FindWindow(None, window)
+		return win32gui.FindWindow(class_name, window)
 	elif isinstance(window, int):
 		return window
+	elif not window and class_name:
+		return win32gui.FindWindow(class_name, window)
 	else:
 		return win32gui.GetForegroundWindow()
 	
@@ -101,6 +103,7 @@ def window_list(title_filter:str=None
 		title = win32gui.GetWindowText(hwnd)
 		if not title: return
 		titles.append(title)
+		
 	titles = []
 	win32gui.EnumWindows(
 		get_title

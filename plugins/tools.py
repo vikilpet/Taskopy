@@ -25,7 +25,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-11-21'
+APP_VERSION = 'v2020-11-29'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -191,9 +191,10 @@ def con_log(*msgs, **kwargs):
 		) as f:
 			f.write(log_str)
 
-def time_now_str(template:str='%Y-%m-%d_%H-%M-%S'):
+def time_now_str(template:str='%Y-%m-%d_%H-%M-%S', use_locale:str='C'):
 	'String with time'
-	return time.strftime(template)
+	with locale_set(use_locale):
+		return time.strftime(template)
 
 def time_now():
 	'Returns datetime object'
@@ -246,9 +247,10 @@ def date_month()->int:
 	'''Returns current month'''
 	return datetime.datetime.now().month
 
-def date_day()->int:
+def date_day(delta:dict=None )->int:
 	'''Returns current day'''
-	return datetime.datetime.now().day
+	if not delta: return datetime.datetime.now().day
+	return ( datetime.datetime.now() + datetime.timedelta(**delta) ).day
 
 def date_weekday(tdate=None, template:str='%A')->str:
 	''' tdate may be datetime.date(2019, 6, 12)
@@ -1051,51 +1053,77 @@ def locale_set(name:str='C'):
 		finally:
 			locale.setlocale(locale.LC_ALL, saved)
 
-def table_print(table, use_headers=True, sep:str=None
-, col_pad:str='  ', row_sep_step:int=0, sort_keys:list=None):
+def table_print(table, use_headers=False, row_sep:str=None
+, headers_sep:str='-', col_pad:str='  ', row_sep_step:int=0
+, sort_keys:list=None, repeat_headers:int=None
+, empty_sign:str='-', consider_empty:list=[None, '']):
 	'''	Print list of lists as a table.
-		_sep_ - string to repeat as a row separator.
+		`sep` - string to repeat as a row separator.
 	'''
 
-	def print_sep():
+	DEF_SEP = '-'
+
+	def print_sep(sep=row_sep):
 		nonlocal max_row_len
 		if not sep: return
 		print( sep * (max_row_len // len(sep) ) )
+	
+	def print_headers(both=False):
+		nonlocal headers, template
+		if not headers: return
+		if both: print_sep(sep=headers_sep)
+		print(template.format(*headers))
+		print_sep(sep=headers_sep)
 
+	headers = []
 	if not table: return
-	if isinstance(table[0], list): rows = table.copy()
-	if isinstance(use_headers, list):
-		rows.insert(0, use_headers)
+	if use_headers and not headers_sep: headers_sep = DEF_SEP
+	if row_sep_step and not row_sep: row_sep = DEF_SEP
+	if row_sep and not headers_sep: headers_sep = row_sep
+	if isinstance(table[0], list):
+		rows = [l[:] for l in table]
+	elif isinstance(table[0], tuple):
+		rows = [list(t) for t in table]
 	elif isinstance(table[0], dict):
-		rows = [di.values() for di in table]
-		if use_headers == True: rows.insert(0, list( table[0].keys() ) )
+		rows = [list( di.values() ) for di in table]
+		if use_headers == True: headers = list( table[0].keys() )
+	if isinstance(use_headers, list):
+		headers = use_headers
+	elif use_headers == True:
+		headers = rows.pop(0)
 	if sort_keys:
 		if use_headers:
 			rows = [
-				rows[0], * sorted(rows[1:], key=itemgetter(*sort_keys) )
+				headers, *sorted(rows, key=itemgetter(*sort_keys) )
 			]
 		else:
 			rows.sort(key=itemgetter(*sort_keys))
-	if use_headers and not sep: sep='-'
+	else:
+		if headers: rows.insert(0, headers)
 	for row in rows:
-		row[:] = ['-' if i in [None, ''] else str(i) for i in row]
+		row[:] = [empty_sign if i in consider_empty else str(i) for i in row]
 	col_sizes = [ max( map(len, col) ) for col in zip(*rows) ]
 	max_row_len = sum(col_sizes) + len(col_pad) * (len(col_sizes) - 1)
 	template = col_pad.join(
 		[ '{{:<{}}}'.format(s) for s in col_sizes ]
 	)
+	if headers: rows.pop(0)
 	print()
-	if use_headers:
-		print(template.format(*rows[0]))
-		print_sep()
-		rows.pop(0)
+	if headers: print_headers(False)
 	for row_num, row in enumerate(rows):
 		if row_sep_step:
-			if (row_num > 0)  and (row_num % row_sep_step == 0):
+			pr = (row_num > 0)  and (row_num % row_sep_step == 0)
+			if pr:
 				print_sep()
-			print(template.format(*row))
+			if repeat_headers:
+				if headers and row_num > 0 \
+				and (row_num % repeat_headers == 0):
+					print_headers(not pr)
 		else:
-			print(template.format(*row))
+			if repeat_headers:
+				if row_num > 0 and (row_num % repeat_headers == 0):
+					print_headers(True)
+		print(template.format(*row))
 	print()
 
 
