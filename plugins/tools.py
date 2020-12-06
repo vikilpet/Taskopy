@@ -25,7 +25,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-11-29'
+APP_VERSION = 'v2020-12-06'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -1055,10 +1055,12 @@ def locale_set(name:str='C'):
 
 def table_print(table, use_headers=False, row_sep:str=None
 , headers_sep:str='-', col_pad:str='  ', row_sep_step:int=0
-, sort_keys:list=None, repeat_headers:int=None
-, empty_sign:str='-', consider_empty:list=[None, '']):
+, sorting=None, sorting_func=None, sorting_rev:bool=False
+, repeat_headers:int=None
+, empty_str:str='-', consider_empty:list=[None, '']):
 	'''	Print list of lists as a table.
-		`sep` - string to repeat as a row separator.
+		row_sep - string to repeat as a row separator.
+		headers_sep - same for header(s).
 	'''
 
 	DEF_SEP = '-'
@@ -1091,17 +1093,24 @@ def table_print(table, use_headers=False, row_sep:str=None
 		headers = use_headers
 	elif use_headers == True:
 		headers = rows.pop(0)
-	if sort_keys:
-		if use_headers:
-			rows = [
-				headers, *sorted(rows, key=itemgetter(*sort_keys) )
-			]
+	for row in rows:
+		row[:] = [empty_str if i in consider_empty else str(i) for i in row]
+	if sorting: sort_key = itemgetter(*sorting)
+	if sorting_func:
+		if isinstance(sorting_func, (tuple, list)):
+			sfunc, item = sorting_func
 		else:
-			rows.sort(key=itemgetter(*sort_keys))
+			sfunc = sorting_func
+			item = 0
+		sort_key = lambda l, f=sfunc, i=item: f(l[i])
+	if sorting or sorting_func:
+		if use_headers:
+			rows = [ headers, *sorted(rows, key=sort_key
+				, reverse=sorting_rev) ]
+		else:
+			rows.sort(key=sort_key, reverse=sorting_rev)
 	else:
 		if headers: rows.insert(0, headers)
-	for row in rows:
-		row[:] = [empty_sign if i in consider_empty else str(i) for i in row]
 	col_sizes = [ max( map(len, col) ) for col in zip(*rows) ]
 	max_row_len = sum(col_sizes) + len(col_pad) * (len(col_sizes) - 1)
 	template = col_pad.join(
