@@ -1,4 +1,5 @@
 import os
+import sys
 import stat
 import time
 import glob
@@ -11,13 +12,15 @@ from zlib import crc32
 import tempfile
 import datetime
 import win32con
+import win32com
 import hashlib
+import pythoncom
 
 import win32api
 from win32com.shell import shell, shellcon
 from pathlib import Path
 import shutil
-from .tools import random_str
+from .tools import random_str, tdebug
 
 
 _SIZE_UNITS = {'gb':1073741824, 'mb':1048576, 'kb':1024, 'b':1}
@@ -84,7 +87,8 @@ def file_rename(fullpath:str, dest:str
 		if exists.
 		Returns destination.
 	'''
-	if not ':' in dest: dest = os.path.dirname(fullpath) + '\\' + dest
+	if not ':' in dest:
+		dest = os.path.join(os.path.dirname(fullpath), dest)
 	try:
 		os.rename(fullpath, dest)
 	except FileExistsError as e:
@@ -181,7 +185,7 @@ def file_recycle(fullpath:str, silent:bool=True)->bool:
 			, None
 		)
 	)
-	return result[0] <= 3 
+	return result[0] <= 3
 
 def dir_copy(fullpath:str, destination:str, symlinks:bool=False)->int:
 	''' Copy a folder with all content to a new location.
@@ -510,8 +514,10 @@ def file_zip(fullpath, destination:str)->str:
 	if isinstance(fullpath, str):
 		if file_ext(destination) != 'zip':
 			dir_create(destination)
-			destination = destination + '\\' \
-				+ file_ext_replace(os.path.basename(fullpath), 'zip')
+			destination = os.path.join(
+				destination
+				, file_ext_replace(os.path.basename(fullpath), 'zip')
+			)
 		with zipfile.ZipFile(
 			destination, 'w'
 		) as zipf:
@@ -537,10 +543,12 @@ def temp_dir(new_dir:str=None)->str:
 	if not new_dir:
 		return tempfile.gettempdir()
 	if new_dir == 'temp':
-		new_dir = (tempfile.gettempdir()
-			+ '\\' + time.strftime("%m%d%H%M%S") + random_str(5))
+		new_dir = os.path.join(
+			tempfile.gettempdir()
+			, time.strftime("%m%d%H%M%S") + random_str(5)
+		)
 	else:
-		new_dir = tempfile.gettempdir() + '\\' + new_dir
+		new_dir = os.path.join(tempfile.gettempdir(), new_dir)
 	try:
 		os.mkdir(new_dir)
 	except FileExistsError: pass
@@ -548,8 +556,8 @@ def temp_dir(new_dir:str=None)->str:
 
 def temp_file(suffix:str='')->str:
 	''' Returns temporary file name. '''
-	return (tempfile.gettempdir() + '\\'
-			+ time.strftime('%m%d%H%M%S') + random_str(5) + suffix)
+	return os.path.join(tempfile.gettempdir()
+		, time.strftime('%m%d%H%M%S') + random_str(5) + suffix)
 
 def file_hash(fullpath:str, algorithm:str='crc32'
 , buf_size:int=65536)->str:
@@ -604,10 +612,61 @@ def file_date_a(fullpath:str):
 	ts = os.path.getatime(fullpath)
 	return datetime.datetime.fromtimestamp(ts)
 
-def file_attr_set(fullpath:str, attribute:int):
+def file_attr_set(fullpath:str, attribute:int=FILE_ATTRIBUTE_NORMAL):
 	'''	Sets file attribute.
 		Type 'FILE_' to get syntax hints for
 		attribute constants.
 	'''
 	win32api.SetFileAttributes(fullpath, attribute)
-	
+
+def shortcut_create(fullpath:str, dest:str=None, descr:str=None
+, icon_fullpath:str=None, icon_index:int=None
+, win_style:int=win32con.SW_SHOWNORMAL, cwd:str=None):
+	''' Creates shortcut to the file.
+		Returns full path of shortcut.
+
+		dest - shortcut destination. If None then
+			use desktop path of current user.
+		descr - shortcut description.
+		icon_fullpath - source file for icon.
+		icon_index - if specified and icon_fullpath is None
+			then fullpath is used as icon_fullpath.
+	'''
+	if not descr: descr = file_name(fullpath)
+	if not dest:
+		dest = os.path.join(
+			dir_user_desktop()
+			, file_name(fullpath)
+		)
+	elif dir_exists(dest):
+		dest = os.path.join(dest, file_name(fullpath) )
+	if not dest.endswith('lnk'): dest = file_ext_replace(dest, 'lnk')
+	if icon_index != None and not icon_fullpath:
+		icon_fullpath = fullpath
+	if icon_fullpath and icon_index == None: icon_index = 0
+	pythoncom.CoInitialize()
+	shortcut = pythoncom.CoCreateInstance (
+		win32com.shell.shell.CLSID_ShellLink
+		, None
+		, pythoncom.CLSCTX_INPROC_SERVER
+		, win32com.shell.shell.IID_IShellLink
+	)
+	shortcut.SetPath( os.path.abspath(fullpath) )
+	shortcut.SetDescription(descr)
+	shortcut.SetShowCmd(win_style)
+	if cwd: shortcut.SetWorkingDirectory(cwd)
+	if icon_index != None: shortcut.SetIconLocation(fullpath, 0)
+	persist_file = shortcut.QueryInterface(pythoncom.IID_IPersistFile)
+	persist_file.Save(dest, 0)
+	pythoncom.CoUninitialize()
+	return dest
+
+def dir_user_desktop()->str:
+	' Returns full path to the desktop directory of current user '
+	return win32com.shell.shell.SHGetFolderPath(
+		0, shellcon.CSIDL_DESKTOP, 0, 0)
+
+def dir_user_startup()->str:
+	' Returns full path to the startup directory of current user '
+	return win32com.shell.shell.SHGetFolderPath(
+		0, win32com.shell.shellcon.CSIDL_STARTUP, 0, 0)

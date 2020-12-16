@@ -173,23 +173,28 @@ def html_element(url:str, element
 	result = []
 	if isinstance(element_li[0], dict):
 		parser = BeautifulSoup(html, 'html.parser')
-	else:
+	elif element_li[0].startswith('/'):
 		parser = lxml.html.fromstring(html
 			, parser=lxml.html.HTMLParser(recover=True))
+	else:
+		parser = parser = BeautifulSoup(html, 'html.parser')
 	for elem in element_li:
 		if isinstance(parser, BeautifulSoup):
 			if len(element_li) == 1:
 				el_num = element_num
 			else:
 				el_num = 0
-			found_elem = parser.find_all(**elem)
+			if isinstance(elem, dict):
+				found_elem = parser.find_all(**elem)
+			else:
+				found_elem = parser.select(elem)
 			if found_elem:
 				if clean:
-					result.append(
-						html_whitespace(found_elem[el_num].get_text() )
-					)
+					result.append( html_whitespace(
+						found_elem[el_num].get_text()
+					))
 				else:
-					result.append( str(found_elem) )
+					result.append( str(found_elem[el_num]) )
 			else:
 				raise Exception('html_element: element not found')
 		else:
@@ -344,16 +349,17 @@ def json_to_html(json_data, **kwargs)->str:
 
 def http_header(url:str, header:str, **kwargs)->str:
 	'Get HTTP header of url'
-	req = requests.head(url, headers={**_USER_AGENT}, **kwargs)
+	headers={**_USER_AGENT}
+	if kwargs.get('headers'): headers.update(kwargs['headers'])
+	req = requests.head(url, headers=headers, **kwargs)
 	return req.headers.get(header)
 
 def http_h_last_modified(url:str, **kwargs):
 	'HTTP Last Modified time in datetime format'
 	date_str = http_header(url, header='Last-Modified', **kwargs)
 	with locale_set('C'):
-		date_dt = datetime.datetime.strptime(date_str
+		return datetime.datetime.strptime(date_str
 			, '%a, %d %b %Y %H:%M:%S GMT')
-	return date_dt
 
 def port_scan(host:str, port:int
 , timeout:float=0.5)->bool:

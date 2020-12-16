@@ -77,6 +77,14 @@ def registry_set(fullpath:str, value, value_type:str=None):
 	except WindowsError as e:
 		return f'error: {e}'
 
+def window_class_name(window=None)->str:
+	''' Gets the name of the window class '''
+	hwnd = window_get(window)
+	if hwnd:
+		return win32gui.GetClassName(hwnd)
+	else:
+		return None
+
 def window_title_get(window=None)->str:
 	''' Gets the title of the window.
 	'''

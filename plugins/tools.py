@@ -17,6 +17,7 @@ import sqlite3
 import pyperclip
 import random
 import functools
+import importlib
 import string
 import win32api
 import win32gui
@@ -25,7 +26,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-12-06'
+APP_VERSION = 'v2020-12-16'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -1036,7 +1037,7 @@ def hint(text:str, position:tuple=None)->int:
 	'''
 	args = [
 		'python'
-		, os.getcwd() + '/resources/hint.py'
+		, os.path.join(os.getcwd(), 'resources', 'hint.py')
 		, '--text', str(text)
 	]
 	if position:
@@ -1136,3 +1137,16 @@ def table_print(table, use_headers=False, row_sep:str=None
 	print()
 
 
+
+
+def patch_import():
+	' Import patch for current module if any '
+	try:
+		patch = '.'.join(__file__.split('\\')[-2:])[:-3] + '_patch'
+		mdl = importlib.import_module(patch)
+		names = [x for x in mdl.__dict__ if not x.startswith('_')]
+		globals().update({k: getattr(mdl, k) for k in names})
+	except ModuleNotFoundError:
+		pass
+
+if __name__ != '__main__': patch_import()
