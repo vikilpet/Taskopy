@@ -47,6 +47,7 @@ _TIME_UNITS = {'msec':1, 'ms':1, 'sec':1000, 's':1000, 'min':60000
 	,'m':60000, 'hour':3600000, 'h':3600000}
 TASK_DATE_FORMAT = \
 	r'^(\d\d\d\d|\*)\.(\d\d|\*)\.(\d\d|\*) (\d\d|\*):(\d\d|\*)$'
+PLUGIN_SOURCE = 'plugins\\*.py'
 
 set_title = win32api.SetConsoleTitle
 	
@@ -90,6 +91,7 @@ def load_crontab(event=None)->bool:
 		run_bef_reload = {}
 		if sys.modules.get('crontab') is None:
 			crontab = importlib.import_module('crontab')
+			plugin_reload()
 		else:
 			for task in tasks.task_list:
 				if not task['thread']: continue
@@ -97,6 +99,7 @@ def load_crontab(event=None)->bool:
 			tasks.close()
 			del sys.modules['crontab']
 			del crontab
+			plugin_reload()
 			crontab = importlib.import_module('crontab')
 		tasks = Tasks()
 		for key, value in run_bef_reload.items():
@@ -114,6 +117,41 @@ def load_crontab(event=None)->bool:
 		con_log(traceback.format_exc())
 		msgbox_warning(f'{lang.warn_crontab_reload}:\n\n{trace_str}')
 		return False
+
+def plugin_reload():
+	''' Reload all application plugins '''
+	
+	if not hasattr(app, 'plugins'):
+		app.plugins = set()
+		for obj_name, obj in crontab.__dict__.items():
+			if hasattr(obj, '__module__') \
+			and obj.__module__ != 'crontab' \
+			and hasattr(sys.modules[obj.__module__], '__file__'):
+				try:
+					if not os.path.relpath(
+						inspect.getfile(sys.modules[obj.__module__])
+					).startswith('.'):
+						app.plugins.add(obj.__module__)
+				except ValueError:
+					continue
+		return
+	for mdl_name in app.plugins:
+		try:
+			del sys.modules[mdl_name]
+		except KeyError:
+			tprint('module not found:', mdl_name)
+			pass
+		mdl = importlib.import_module(mdl_name)
+		mdl_objects = {}
+		for obj_name, obj in mdl.__dict__.items():
+			if (
+				not obj_name.startswith('_')
+				and not inspect.ismodule(obj)
+				and mdl.__name__ in getattr(obj, '__module__', mdl.__name__)
+			):
+				mdl_objects[obj_name] = obj
+		globals().update(mdl_objects)
+
 
 class SuppressPrint:
 	def __enter__(self):
@@ -722,7 +760,6 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			file_open(f'{APP_PATH}\\{APP_NAME}.py')
 
 	def popup_menu_hk(s):
-		print('tb menu by hotkey')
 		app.frame.SetFocus()
 		time.sleep(0.1)
 		app.frame.PopupMenu(s.CreatePopupMenu())
@@ -748,7 +785,7 @@ class App(wx.App):
 		return True
 
 	def popup_menu_hk(s):
-		print('app menu by hotkey')
+		tprint('app menu by hotkey')
 		s.frame.SetFocus()
 		time.sleep(0.1)
 		s.frame.PopupMenu(s.taskbaricon.CreatePopupMenu())
@@ -793,7 +830,7 @@ def main():
 		msgbox_warning(msg)
 		input('Press Enter to exit...')
 	except KeyboardInterrupt:
-		print('Interrupted by keyboard')
+		tprint('Interrupted by keyboard')
 		time.sleep(2)
 
 

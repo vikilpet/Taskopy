@@ -24,10 +24,6 @@ from .tools import random_str, tdebug
 
 
 _SIZE_UNITS = {'gb':1073741824, 'mb':1048576, 'kb':1024, 'b':1}
-FILE_ATTRIBUTE_READONLY = win32con.FILE_ATTRIBUTE_READONLY
-FILE_ATTRIBUTE_HIDDEN = win32con.FILE_ATTRIBUTE_HIDDEN
-FILE_ATTRIBUTE_ARCHIVE = win32con.FILE_ATTRIBUTE_ARCHIVE
-FILE_ATTRIBUTE_NORMAL = win32con.FILE_ATTRIBUTE_NORMAL
 
 def _dir_slash(dirpath:str)->str:
 	''' Adds a trailing slash if it's not there. '''
@@ -612,10 +608,11 @@ def file_date_a(fullpath:str):
 	ts = os.path.getatime(fullpath)
 	return datetime.datetime.fromtimestamp(ts)
 
-def file_attr_set(fullpath:str, attribute:int=FILE_ATTRIBUTE_NORMAL):
+def file_attr_set(fullpath:str
+, attribute:int=win32con.FILE_ATTRIBUTE_NORMAL):
 	'''	Sets file attribute.
-		Type 'FILE_' to get syntax hints for
-		attribute constants.
+		Type 'win32con.FILE_' to get syntax hints for
+		constants.
 	'''
 	win32api.SetFileAttributes(fullpath, attribute)
 

@@ -1,10 +1,10 @@
 
 import os
 import base64
+import glob
 from cryptography.hazmat.backends import default_backend
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
-from glob import glob
 
 class Crypt:
 	''' Get login and password from file.
@@ -55,7 +55,7 @@ class Crypt:
 			If encoding='binary' writes content as is.
 		'''
 		try:
-			li = glob(fullpath + '.*')
+			li = glob.glob(fullpath + '.*')
 			list(map(os.remove, li))
 		except Exception as e:
 			return False, ['glob remove error: ' + repr(e)]
@@ -110,7 +110,7 @@ class Crypt:
 		''' Finds encoded file (we don't know extension because
 			it's salt)
 		'''
-		li = glob(fullpath + '*')
+		li = glob.glob(fullpath + '*')
 		if len(li) == 1:
 			return True, li[0]
 		elif len(li) > 1:

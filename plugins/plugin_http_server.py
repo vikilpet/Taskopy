@@ -6,7 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import cgi
 import urllib
 import tempfile
-from .tools import dev_print, app_log_get
+from .tools import dev_print, app_log_get, tprint
 
 
 _TASK_TIMEOUT = 60
@@ -272,7 +272,7 @@ def http_server_start(tasks):
 			(sett.server_ip, sett.server_port)
 			, lambda *a, tasks=tasks: HTTPHandlerTasks(*a, tasks=tasks)
 		)
-		print(
+		tprint(
 			'The HTTP server is running at'
 			+ f' {sett.server_ip}:{sett.server_port}'
 		)

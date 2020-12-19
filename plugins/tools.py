@@ -26,7 +26,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-12-16'
+APP_VERSION = 'v2020-12-19'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -817,9 +817,6 @@ def app_log_get():
 		log += t.strftime('%Y.%m.%d %H:%M:%S') + f'\t{m}\n'
 	return log
 
-
-
-
 def decor_except(func):
 	''' Add 'try... except' for function
 		and return Exception object on fail.
@@ -1148,5 +1145,6 @@ def patch_import():
 		globals().update({k: getattr(mdl, k) for k in names})
 	except ModuleNotFoundError:
 		pass
+
 
 if __name__ != '__main__': patch_import()
