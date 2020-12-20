@@ -5,6 +5,7 @@ import importlib
 import traceback
 import threading
 import inspect
+import types
 import configparser
 import wx.adv
 import wx
@@ -91,7 +92,6 @@ def load_crontab(event=None)->bool:
 		run_bef_reload = {}
 		if sys.modules.get('crontab') is None:
 			crontab = importlib.import_module('crontab')
-			plugin_reload()
 		else:
 			for task in tasks.task_list:
 				if not task['thread']: continue
@@ -99,8 +99,8 @@ def load_crontab(event=None)->bool:
 			tasks.close()
 			del sys.modules['crontab']
 			del crontab
-			plugin_reload()
 			crontab = importlib.import_module('crontab')
+		load_modules()
 		tasks = Tasks()
 		for key, value in run_bef_reload.items():
 			dev_print('still running', key)
@@ -118,29 +118,37 @@ def load_crontab(event=None)->bool:
 		msgbox_warning(f'{lang.warn_crontab_reload}:\n\n{trace_str}')
 		return False
 
-def plugin_reload():
-	''' Reload all application plugins '''
-	
-	if not hasattr(app, 'plugins'):
-		app.plugins = set()
+def load_modules():
+	''' (Re)Loads all application plugins and additional
+		crontab modules if any.
+		Adds safe execution (decor_except_status) for
+		functions in this modules.
+	'''
+	if not hasattr(sett, 'own_modules'):
+		sett.own_modules = set()
 		for obj_name, obj in crontab.__dict__.items():
-			if hasattr(obj, '__module__') \
-			and obj.__module__ != 'crontab' \
-			and hasattr(sys.modules[obj.__module__], '__file__'):
+			if (
+				hasattr(obj, '__module__')
+				and obj.__module__ != 'crontab'
+				and obj.__module__ != '__main__'
+				and hasattr(sys.modules[obj.__module__], '__file__')
+			):
 				try:
 					if not os.path.relpath(
 						inspect.getfile(sys.modules[obj.__module__])
 					).startswith('.'):
-						app.plugins.add(obj.__module__)
+						dev_print('add module:', obj.__module__
+						, 'from object:', obj_name)
+						sett.own_modules.add(obj.__module__)
 				except ValueError:
 					continue
-		return
-	for mdl_name in app.plugins:
+	for mdl_name in sett.own_modules:
 		try:
 			del sys.modules[mdl_name]
 		except KeyError:
 			tprint('module not found:', mdl_name)
 			pass
+		dev_print('reload module:', mdl_name)
 		mdl = importlib.import_module(mdl_name)
 		mdl_objects = {}
 		for obj_name, obj in mdl.__dict__.items():
@@ -150,6 +158,14 @@ def plugin_reload():
 				and mdl.__name__ in getattr(obj, '__module__', mdl.__name__)
 			):
 				mdl_objects[obj_name] = obj
+				if not isinstance(obj, types.FunctionType): continue
+				if not crontab.__dict__.get(obj_name): continue
+				func_args = [
+					k.lower() for k in
+						inspect.signature(obj).parameters.keys()
+				]
+				if not 'safe' in func_args: continue
+				crontab.__dict__[obj_name] = decor_except_status(obj)
 		globals().update(mdl_objects)
 
 

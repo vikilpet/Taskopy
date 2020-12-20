@@ -26,7 +26,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-12-19'
+APP_VERSION = 'v2020-12-20'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -834,6 +834,30 @@ def decor_except(func):
 			trace_str = '\n'.join(trace_li[-3:])
 			tdebug(f'decor_except exception:\n{trace_str}')
 			return e
+	return wrapper
+
+def decor_except_status(func):
+	''' Adds 'try... except' for function and returns
+		(True, result) or (False, Exception).
+
+		Downside - iPython autoreload does not
+		work for decorated 'func'.
+	'''
+	@functools.wraps(func)
+	def wrapper(*args, **kwargs) -> tuple:
+		try:
+			if kwargs.get('safe', False):
+				return (True, func(*args, **kwargs))
+			else:
+				return func(*args, **kwargs)
+		except Exception as e:
+			trace_li = traceback.format_exc().splitlines()
+			trace_str = '\n'.join(trace_li[-3:])
+			tdebug(f'decor_except exception:\n{trace_str}')
+			if kwargs.get('safe', False):
+				return (False, e)
+			else:
+				return e
 	return wrapper
 
 TDCBF_OK_BUTTON = 1
