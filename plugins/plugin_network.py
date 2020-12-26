@@ -11,7 +11,7 @@ import datetime
 import warnings
 import threading
 import json2html
-from .tools import dev_print, decor_except, time_sleep, tdebug \
+from .tools import dev_print, time_sleep, tdebug \
 , locale_set
 
 
@@ -136,8 +136,6 @@ def html_clean(html_str:str, separator=' ')->str:
 	soup = BeautifulSoup(html_str, 'html.parser')
 	return soup.get_text(separator=separator)
 
-
-
 def html_element(url:str, element
 , clean:bool=True, element_num:int=0, safe=False, **kwargs)->str:
 	''' Get text of specified page element (div).
@@ -162,8 +160,8 @@ def html_element(url:str, element
 	if not url[:4].lower().startswith('http'):
 		html = url
 	else:
-		html = page_get(url=url, **kwargs)
-		if isinstance(html, Exception): return html
+		status, html = page_get(url=url, safe=True, **kwargs)
+		if not status: raise html
 	if isinstance(element, list):
 		element_li = element
 	else:
@@ -243,8 +241,8 @@ def json_element(source:str, element:list=None
 		kwargs - additional arguments for page_get.
 	'''
 	if source.lower().startswith('http'):
-		j = page_get(url=source, **kwargs)
-		if isinstance(j, Exception): raise j
+		status, j = page_get(url=source, safe=True, **kwargs)
+		if not status: raise j
 	else:
 		j = source
 	data = json.loads(j)
@@ -267,10 +265,41 @@ def json_element(source:str, element:list=None
 			raise Exception('element not found')
 	return r
 
+def xml_element(url:str, element:str
+, element_num:int=0, encoding:str='utf-8'
+, safe=False, **kwargs):
+	'''	Download the XML document from the specified URL and get the value
+		by the list with 'map' of parent elements like ['foo', 'bar']
+		
+		element - XPath or list of XPath's.
+		Example: element='/result/array/msgContact[1]/msgCtnt'
 
+		kwargs - additional arguments for page_get.
+	'''
+	if url.startswith('http'):
+		status, content = page_get(url=url, **kwargs)
+		if not status: raise content
+	else:
+		status = True
+		content = url
+	if isinstance(element, list):
+		element_li = element
+	else:
+		element_li = [element]
+	result = []
+	tree = lxml.etree.fromstring(content.encode(encoding=encoding))
+	for element in element_li:
+		value = tree.xpath(element)[element_num]
+		if value != None:
+			result.append(value.text)
+		else:
+			raise Exception(f'xml_element: element not found: {element}')
+	if isinstance(element, list):
+		return result
+	else:
+		return result[0]
 
-@decor_except
-def tracking_status_rp(track_number:str)->str:
+def tracking_status_rp(track_number:str, safe=False)->str:
 	''' Get last status of Russian post parcel 
 	'''
 	url = r'https://www.pochta.ru/tracking?p_p_id=trackingPortlet_WAR_portalportlet&p_p_lifecycle=2&p_p_state=normal&p_p_mode=view&p_p_resource_id=getList&p_p_cacheability=cacheLevelPage&p_p_col_id=column-1&p_p_col_pos=1&p_p_col_count=2&barcodeList={}&pos'

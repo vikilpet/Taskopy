@@ -1,31 +1,34 @@
 import argparse
+import random
 import wx
 
-sett = {
-	'win_title'			: 'Hint'
-	, 'win_title_max'	: 20
-	, 'win_style'		: wx.STAY_ON_TOP | wx.FRAME_NO_TASKBAR
+class _HintSett:
+	win_title = 'Hint'
+	win_title_max = 20
+	win_style =wx.STAY_ON_TOP | wx.FRAME_NO_TASKBAR \
 		| wx.FRAME_TOOL_WINDOW
-	, 'font_size'		: 18
-	, 'font_name'		: 'Lucida Console'
-	, 'back_color'		: (210, 210, 0)
-}
+	font_size = 18
+	font_name = 'Lucida Console'
+	back_color = None
 
 class HintFrame(wx.Frame):
 	'''' We simply derive a new class of Frame. '''
 	def __init__(self, parent, text:str='', position:tuple=None):
 		DRAG_AREA_SIZE = 20
-		global sett
-		size_w = int( len(text) * int(sett['font_size']) * 0.85 + DRAG_AREA_SIZE )
-		size_h = int(sett['font_size'] * 1.7)
-		title = text[:sett['win_title_max']]
-		if len(text) > sett['win_title_max']: title += '...'
+		hsett = _HintSett
+		size_w = int( len(text) * int(hsett.font_size) * 0.85 + DRAG_AREA_SIZE )
+		size_h = int(hsett.font_size * 1.7)
+		if not hsett.back_color:
+			hsett.back_color = (random.randint(180, 220)
+				, random.randint(180, 220), 0)
+		title = text[:hsett.win_title_max]
+		if len(text) > hsett.win_title_max: title += '...'
 		wx.Frame.__init__(
 			self
 			, parent
-			, title=sett['win_title'] + ': ' + title
+			, title=hsett.win_title + ': ' + title
 			, size=(size_w, size_h)
-			, style=sett['win_style']
+			, style=hsett.win_style
 		)
 		self.control = wx.TextCtrl(
 			self
@@ -33,12 +36,12 @@ class HintFrame(wx.Frame):
 			, size=(size_w - DRAG_AREA_SIZE, size_h)
 			, style=wx.BORDER_NONE | wx.TE_READONLY | wx.TE_CENTRE
 		)
-		self.control.BackgroundColour = wx.Colour(sett['back_color'])
-		clr = sett['back_color']
+		self.control.BackgroundColour = wx.Colour(hsett.back_color)
+		clr = hsett.back_color
 		clr = int(clr[0] * 0.9), int(clr[1] * 0.9), int(clr[2] * 0.9)
 		self.BackgroundColour = wx.Colour(clr)
-		self.control.Font = wx.Font(sett['font_size'], wx.MODERN
-		, wx.NORMAL, wx.NORMAL, False, sett['font_name'])
+		self.control.Font = wx.Font(hsett.font_size, wx.MODERN
+		, wx.NORMAL, wx.NORMAL, False, hsett.font_name)
 		if position:
 			self.SetPosition(position)
 		else:
@@ -68,7 +71,7 @@ class HintFrame(wx.Frame):
 def _parse_args():
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--text', '-t', help='Hint text'
-		, type=str, default='Hint')
+		, type=str, default='Hint test')
 	parser.add_argument('--position', '-p', help='Position'
 		, type=str, default=None)
 	parser.add_argument('--color', '-c', help='Hint color'

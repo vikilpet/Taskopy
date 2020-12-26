@@ -117,7 +117,7 @@ def load_crontab(event=None)->bool:
 		con_log(traceback.format_exc())
 		msgbox_warning(f'{lang.warn_crontab_reload}:\n\n{trace_str}')
 		return False
-
+	
 def load_modules():
 	''' (Re)Loads all application plugins and additional
 		crontab modules if any.
@@ -125,7 +125,7 @@ def load_modules():
 		functions in this modules.
 	'''
 	if not hasattr(sett, 'own_modules'):
-		sett.own_modules = set()
+		sett.own_modules = {'plugins.constants'}
 		for obj_name, obj in crontab.__dict__.items():
 			if (
 				hasattr(obj, '__module__')
@@ -137,36 +137,30 @@ def load_modules():
 					if not os.path.relpath(
 						inspect.getfile(sys.modules[obj.__module__])
 					).startswith('.'):
-						dev_print('add module:', obj.__module__
-						, 'from object:', obj_name)
 						sett.own_modules.add(obj.__module__)
 				except ValueError:
 					continue
 	for mdl_name in sett.own_modules:
+		dev_print(f'reload module: {mdl_name}')
 		try:
 			del sys.modules[mdl_name]
 		except KeyError:
 			tprint('module not found:', mdl_name)
 			pass
-		dev_print('reload module:', mdl_name)
 		mdl = importlib.import_module(mdl_name)
-		mdl_objects = {}
 		for obj_name, obj in mdl.__dict__.items():
 			if (
-				not obj_name.startswith('_')
-				and not inspect.ismodule(obj)
-				and mdl.__name__ in getattr(obj, '__module__', mdl.__name__)
+				obj_name.startswith('_')
+				or inspect.ismodule(obj)
+				or not mdl_name in getattr(obj, '__module__', mdl_name)
 			):
-				mdl_objects[obj_name] = obj
-				if not isinstance(obj, types.FunctionType): continue
-				if not crontab.__dict__.get(obj_name): continue
-				func_args = [
-					k.lower() for k in
-						inspect.signature(obj).parameters.keys()
-				]
-				if not 'safe' in func_args: continue
-				crontab.__dict__[obj_name] = decor_except_status(obj)
-		globals().update(mdl_objects)
+				continue
+			if not isinstance(obj, types.FunctionType): continue
+			setattr(mdl, obj_name, decor_except_status(obj))
+			if hasattr(crontab, obj_name):
+				setattr(crontab, obj_name, decor_except_status(obj))
+		sys.modules[mdl_name] = mdl
+
 
 
 class SuppressPrint:
@@ -198,8 +192,7 @@ class Tasks:
 		s.global_hk_thread_id = None
 		for item in dir(crontab):
 			task_obj = getattr(crontab, item)
-			if not callable(task_obj): continue
-			if isinstance(task_obj, type): continue
+			if not isinstance(task_obj, types.FunctionType): continue
 			if task_obj.__module__ != 'crontab': continue
 			
 			task_opts = {}
@@ -597,7 +590,10 @@ class Tasks:
 			s.global_hk.stop_listener()
 			s.global_hk = None
 		schedule.clear()
-		for eh in s.event_handlers: eh.close()
+		try:
+			for eh in s.event_handlers: eh.close()
+		except Exception as e:
+			dev_print(f'event close error: {e}')
 
 def create_menu_item(menu, task, func=None, parent_menu=None):
 	''' Task - task dict or menu item label
@@ -832,10 +828,10 @@ def main():
 	try:
 		app = App(False)
 		__builtins__.app = app
-		load_crontab()
-		tasks.run_at_startup()
-		tasks.run_at_sys_startup()
-		if sett.dev: app.taskbaricon.popup_menu_hk()
+		if load_crontab():
+			tasks.run_at_startup()
+			tasks.run_at_sys_startup()
+			if sett.dev: app.taskbaricon.popup_menu_hk()
 		
 		app.MainLoop()
 	except Exception as e:

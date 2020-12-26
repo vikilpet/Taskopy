@@ -422,7 +422,7 @@ TOKEN_ADJUST_SESSIONID = 0x0100
 PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 LPBYTE = ctypes.POINTER(wintypes.BYTE)
 
-class STARTUPINFO(ctypes.Structure):
+class _STARTUPINFO(ctypes.Structure):
 	"""https://msdn.microsoft.com/en-us/library/ms686331"""
 	__slots__ = ()
 
@@ -447,9 +447,9 @@ class STARTUPINFO(ctypes.Structure):
 
 	def __init__(self, **kwds):
 		self.cb = ctypes.sizeof(self)
-		super(STARTUPINFO, self).__init__(**kwds)
+		super(_STARTUPINFO, self).__init__(**kwds)
 
-LPSTARTUPINFO = ctypes.POINTER(STARTUPINFO)
+LPSTARTUPINFO = ctypes.POINTER(_STARTUPINFO)
 
 class PROCESS_INFORMATION(ctypes.Structure):
 	"""https://msdn.microsoft.com/en-us/library/ms684873"""
@@ -616,7 +616,7 @@ def runas_shell_user(cmd, executable=None, creationflags=0, cwd=None,
 		creationflags |= win32con.CREATE_NEW_CONSOLE
 	if cwd is None:
 		cwd = os.getcwd()
-	si = STARTUPINFO()
+	si = _STARTUPINFO()
 	if startupinfo:
 		startupinfo_update(startupinfo, si)
 	pi = PROCESS_INFORMATION()

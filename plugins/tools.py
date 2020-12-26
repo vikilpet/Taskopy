@@ -12,6 +12,7 @@ import locale
 import contextlib
 import glob
 import traceback
+import inspect
 import ctypes
 import sqlite3
 import pyperclip
@@ -26,7 +27,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-12-20'
+APP_VERSION = 'v2020-12-26'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -131,12 +132,29 @@ def value_unit(value, unit_dict:dict, default:int)->tuple:
 		dev_print(f'value_unit wrong value: {value}')
 		return value, default
 
-def _get_parent_func_name(title)->str:
+def _get_parent_func_name(parent=None, repl_undrsc:bool=' ')->str:
 	''' Get name of parent function if any '''
-	if title: return str(title)
-	title = sys._getframe(2).f_code.co_name.replace('_', ' ')
-	if title.startswith('<'): title = APP_NAME
-	return title
+	EXCLUDE = ('wrapper', 'run_task', 'run', 'dev_print', 'tprint'
+		, 'main', 'run_task_inner', 'popup_menu_hk'
+		, 'MainLoop', 'catcher', 'run_code')
+	if parent: return str(parent)
+	for i in range(2, 10):
+		try:
+			parent = sys._getframe(i).f_code.co_name
+		except ValueError:
+			parent = ''
+			break
+		if parent == 'con_log': return ''
+		if (
+			not parent in EXCLUDE
+			and not parent.startswith('_')
+			and not parent.startswith('<')
+		):
+			break
+	else:
+		parent = ''
+	if repl_undrsc: parent.replace('_', repl_undrsc)
+	return parent
 
 def task(**kwargs):
 	def with_attrs(func):
@@ -632,9 +650,7 @@ def file_dialog(title:str=None, multiple:bool=False
 		if multiple == True.
 		Will not work in console.
 	'''
-	if not title:
-		title = sys._getframe(1).f_code.co_name.replace('_', ' ')
-		if title.startswith('<'): title = APP_NAME
+	title = _get_parent_func_name(title)
 	style = wx.FD_OPEN | wx.FD_FILE_MUST_EXIST
 	if multiple: style = style | wx.FD_MULTIPLE
 	if on_top: style = style | wx.STAY_ON_TOP
@@ -776,19 +792,18 @@ def job_batch(jobs:list, timeout:int
 
 def tprint(*msgs, **kwargs):
 	''' Print with task name and time '''
-	parent = sys._getframe(1).f_code.co_name
+	parent = _get_parent_func_name(repl_undrsc=None)
 	msgs = list(msgs)
-	if not parent in ['dev_print', 'con_log']:
-		msgs.insert(0, parent + ':')
+	if parent: msgs.insert(0, parent + ':')
 	print(time.strftime('%y.%m.%d %H:%M:%S'), *msgs, **kwargs)
 
 def tdebug(*msgs, **kwargs)->bool:
 	''' Is function launched from console? '''
 	if not hasattr(sys, 'ps1'): return False
 	if msgs:
-		msg = sys._getframe(1).f_code.co_name + ': '
+		msg = _get_parent_func_name(repl_undrsc=None) + ': '
 		if isinstance(msgs, dict):
-			msg += '\n'.join(f'{k}\t{v}' for k, v in m.items())
+			msg += '\n'.join(f'{k}\t{v}' for k, v in msgs.items())
 		else:
 			msg += ' '.join(map(str, msgs)) + '\n'
 		print(msg, **kwargs)
@@ -827,8 +842,7 @@ def decor_except(func):
 	@functools.wraps(func)
 	def wrapper(*args, **kwargs):
 		try:
-			result = func(*args, **kwargs)
-			return result
+			return func(*args, **kwargs)
 		except Exception as e:
 			trace_li = traceback.format_exc().splitlines()
 			trace_str = '\n'.join(trace_li[-3:])
@@ -855,10 +869,19 @@ def decor_except_status(func):
 			trace_str = '\n'.join(trace_li[-3:])
 			tdebug(f'decor_except exception:\n{trace_str}')
 			if kwargs.get('safe', False):
+				e.args = (f'From safe function {func.__name__}:', *e.args)
 				return (False, e)
 			else:
 				return e
-	return wrapper
+	if getattr(func, 'homemade', False):
+		return func
+	else:
+		wrapper.homemade = True
+		if 'safe' in inspect.signature(func).parameters.keys():
+			return wrapper
+		else:
+			return func
+decor_except_status.homemade = True
 
 TDCBF_OK_BUTTON = 1
 TDCBF_YES_BUTTON = 2
@@ -1056,15 +1079,23 @@ def hint(text:str, position:tuple=None)->int:
 	'''	Shows hint.
 		Returns PID of new process.
 	'''
+	hint_file = os.path.join(os.getcwd(), 'resources', 'hint.py')
 	args = [
 		'python'
-		, os.path.join(os.getcwd(), 'resources', 'hint.py')
+		, hint_file
 		, '--text', str(text)
 	]
 	if position:
 		args += '--position', '{}_{}'.format(*position)
-	return subprocess.Popen(args=args
-	, creationflags=win32con.DETACHED_PROCESS).pid
+	if getattr(sys, 'frozen', False):
+		tprint('hint from .exe:')
+		mdl = importlib.util.spec_from_file_location(
+			'hint', location=hint_file)
+		mdl.main()
+		tprint('hint exit')
+	else:
+		return subprocess.Popen(args=args
+		, creationflags=win32con.DETACHED_PROCESS).pid
 
 @contextlib.contextmanager
 def locale_set(name:str='C'):
@@ -1163,12 +1194,26 @@ def table_print(table, use_headers=False, row_sep:str=None
 def patch_import():
 	' Import patch for current module if any '
 	try:
-		patch = '.'.join(__file__.split('\\')[-2:])[:-3] + '_patch'
+		caller = inspect.currentframe().f_back
+		caller_name = caller.f_globals['__name__']
+		patch = '.'.join(
+			caller.f_globals['__file__'].split('\\')[-2:]
+		)[:-3] + '_patch'
 		mdl = importlib.import_module(patch)
-		names = [x for x in mdl.__dict__ if not x.startswith('_')]
-		globals().update({k: getattr(mdl, k) for k in names})
+		names=[x for x in mdl.__dict__ if not x.startswith('_')]
+		sys.modules[caller_name].__dict__.update(
+			{k: getattr(mdl, k) for k in names} )
+		dev_print('patch loaded:', caller_name)
 	except ModuleNotFoundError:
 		pass
+
+def screen_width()->int:
+	' Returns screen widht in pixels '
+	return win32api.GetSystemMetrics(0)
+
+def screen_height()->int:
+	' Returns screen height in pixels '
+	return win32api.GetSystemMetrics(1)
 
 
 if __name__ != '__main__': patch_import()
