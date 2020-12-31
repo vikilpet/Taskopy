@@ -115,7 +115,8 @@ def load_crontab(event=None)->bool:
 		trace_li = traceback.format_exc().splitlines()
 		trace_str = '\n'.join(trace_li[-3:])
 		con_log(traceback.format_exc())
-		msgbox_warning(f'{lang.warn_crontab_reload}:\n\n{trace_str}')
+		msgbox_warning(f'{lang.warn_crontab_reload}:\n\n{trace_str}'
+			, title=lang.menu_reload)
 		return False
 	
 def load_modules():
@@ -124,6 +125,13 @@ def load_modules():
 		Adds safe execution (decor_except_status) for
 		functions in this modules.
 	'''
+	
+
+
+
+	
+	
+	
 	if not hasattr(sett, 'own_modules'):
 		sett.own_modules = {'plugins.constants'}
 		for obj_name, obj in crontab.__dict__.items():
@@ -155,7 +163,10 @@ def load_modules():
 				or not mdl_name in getattr(obj, '__module__', mdl_name)
 			):
 				continue
-			if not isinstance(obj, types.FunctionType): continue
+			if not isinstance(obj, types.FunctionType):
+				setattr(crontab, obj_name, obj)
+				dev_print('setattr', obj_name)
+				continue
 			setattr(mdl, obj_name, decor_except_status(obj))
 			if hasattr(crontab, obj_name):
 				setattr(crontab, obj_name, decor_except_status(obj))
@@ -648,7 +659,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		if sett.dev:
 			create_menu_item(menu, lang.menu_restart, s.on_restart)
 			create_menu_item(menu, lang.menu_edit_settings, s.on_edit_settings)
-			create_menu_item(menu, 'List of running tasks', s.running_tasks)
+			create_menu_item(menu, lang.menu_list_run_tasks, s.running_tasks)
 		if sett.dev or keyboard.is_pressed('shift'):
 			create_menu_item(menu, lang.menu_command, s.run_command)
 		create_menu_item(menu, lang.menu_exit, s.on_exit)
@@ -703,11 +714,13 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 				[t['task_name'] for t in running_tasks][:TASKS_MSG_MAX]
 			)
 			if len(running_tasks) > TASKS_MSG_MAX: tasks_str += '\r\n...'
-			if msgbox(
-				lang.warn_runn_tasks_msg.format(len(running_tasks))
+			if dialog(
+				lang.warn_runn_tasks_msg.format( len(running_tasks) )
 				+ '\r\n\r\n' + tasks_str
-				, ui=MB_ICONEXCLAMATION + MB_YESNO
-			) != IDYES:
+				, title=lang.menu_exit
+				, buttons=[lang.button_close, lang.button_cancel]
+				, return_button=True
+			)[1] != lang.button_close:
 				return False
 		con_log(lang.menu_exit)
 		tasks.close()
@@ -722,8 +735,9 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			t for t in tasks.task_list if t['running']
 		]
 		if not running_tasks:
-			msgbox('No tasks', ui=MB_ICONINFORMATION, timeout=3
-				, wait=False)
+			dialog(lang.warn_no_run_tasks
+				, title=lang.menu_list_run_tasks
+				, timeout=3)
 			return
 		cur_threads = []
 		for thread in threading.enumerate():
@@ -740,11 +754,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			[t['task_name'] for t in running_tasks][:TASKS_MSG_MAX]
 		)
 		if len(running_tasks) > TASKS_MSG_MAX: tasks_str += '\r\n...'
-		msgbox(
-			tasks_str
-			, ui=MB_ICONINFORMATION
-			, wait=False
-		)
+		dialog(tasks_str, timeout=10)
 		
 
 	def on_edit_crontab(s, event=None):
@@ -788,7 +798,8 @@ class App(wx.App):
 			s.app_hwnd = hwnd_list[0]
 			if sett.dev:
 				msgbox_warning(
-					f'Too many {APP_NAME} windows was found: {len(hwnd_list)}'
+					lang.warn_too_many_win.format(
+					APP_NAME, len(hwnd_list) )
 				)
 		else:
 			s.app_hwnd = 0

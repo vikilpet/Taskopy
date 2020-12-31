@@ -27,7 +27,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-12-26'
+APP_VERSION = 'v2020-12-31'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -396,47 +396,11 @@ def re_match(source:str, re_pattern:str
 
 _MessageBox = ctypes.windll.user32.MessageBoxW
 _MessageBoxTimeout = ctypes.windll.user32.MessageBoxTimeoutW
-MB_ABORTRETRYIGNORE = 0x00000002
-MB_CANCELTRYCONTINUE = 0x00000006
-MB_HELP = 0x00004000
-MB_OK = 0x00000000
-MB_OKCANCEL = 0x00000001
-MB_RETRYCANCEL = 0x00000005
-MB_YESNO =0x00000004
-MB_YESNOCANCEL = 0x00000003
 
-MB_DEFBUTTON1 = 0x00000000
-MB_DEFBUTTON2 = 0x00000100
-MB_DEFBUTTON3 = 0x00000200
-MB_DEFBUTTON4 = 0x00000300
 
-MB_ICONEXCLAMATION = 0x00000030
-MB_ICONWARNING = 0x00000030
-MB_ICONINFORMATION = 0x00000040
-MB_ICONASTERISK = 0x00000040
-MB_ICONQUESTION = 0x00000020
-MB_ICONSTOP = 0x00000010
-MB_ICONERROR = 0x00000010
-MB_ICONHAND = 0x00000010
 
-MB_APPLMODAL = 0x00000000
-MB_SYSTEMMODAL = 0x00001000
-MB_TASKMODAL = 0x00002000
 
-MB_RIGHT = 0x00080000
-MB_RTLREADING = 0x00100000
-MB_SETFOREGROUND = 0x00010000
-MB_TOPMOST = 0x00040000
 
-IDABORT = 3
-IDCANCEL = 2
-IDCONTINUE = 11
-IDIGNORE = 5
-IDNO = 7
-IDOK = 1
-IDRETRY = 4
-IDTRYAGAIN = 10
-IDYES = 6
 
 def msgbox(msg:str, title:str=None
 , ui:int=None, wait:bool=True, timeout=None
@@ -482,9 +446,9 @@ def msgbox(msg:str, title:str=None
 		except:
 			pass
 	title = _get_parent_func_name(title)
-	if ui: ui += MB_SYSTEMMODAL
+	if ui: ui += win32con.MB_SYSTEMMODAL
 	else:
-		ui = MB_ICONINFORMATION + MB_SYSTEMMODAL
+		ui = win32con.MB_ICONINFORMATION + win32con.MB_SYSTEMMODAL
 	if timeout:
 		mb_func = _MessageBoxTimeout
 		title_tmp = title + '          rand' + str(random.randint(100000, 1000000))
@@ -602,8 +566,13 @@ def msgbox(msg:str, title:str=None
 					, daemon=True
 				).start()
 
-def msgbox_warning(msg:str):
-	msgbox(msg=msg, title=APP_NAME, ui=MB_ICONWARNING, wait=False)
+def msgbox_warning(msg:str, title:str=None):
+	if title:
+		title = f'{APP_NAME}: {title}'
+	else:
+		title = APP_FULLNAME
+	msgbox(msg=msg, title=title
+	, ui=win32con.MB_ICONWARNING, wait=False)
 
 def inputbox(message:str, title:str=None
 , is_pwd:bool=False, default:str=''
@@ -711,8 +680,6 @@ def job_pool(jobs:list, pool_size:int=None):
 	pool.close()
 	pool.join()
 	return jobs
-
-
 
 class Job:
 	'To use with job_batch and job_pool'
@@ -869,7 +836,7 @@ def decor_except_status(func):
 			trace_str = '\n'.join(trace_li[-3:])
 			tdebug(f'decor_except exception:\n{trace_str}')
 			if kwargs.get('safe', False):
-				e.args = (f'From safe function {func.__name__}:', *e.args)
+				e.args = (f'Safe {func.__name__}: {", ".join(e.args)}', )
 				return (False, e)
 			else:
 				return e
@@ -882,38 +849,6 @@ def decor_except_status(func):
 		else:
 			return func
 decor_except_status.homemade = True
-
-TDCBF_OK_BUTTON = 1
-TDCBF_YES_BUTTON = 2
-TDCBF_NO_BUTTON = 4
-TDCBF_CANCEL_BUTTON = 8
-TDCBF_RETRY_BUTTON = 16
-TDCBF_CLOSE_BUTTON = 32
-
-TD_ICON_BLANK = 100
-TD_ICON_WARNING = 101
-TD_ICON_QUESTION = 102
-TD_ICON_ERROR = 103
-TD_ICON_INFORMATION = 104
-TD_ICON_BLANK_AGAIN = 105
-TD_ICON_SHIELD = 106
-
-TDF_ENABLE_HYPERLINKS = 1
-TDF_USE_HICON_MAIN = 2
-TDF_USE_HICON_FOOTER = 4
-TDF_ALLOW_DIALOG_CANCELLATION = 8
-TDF_USE_COMMAND_LINKS = 16
-TDF_USE_COMMAND_LINKS_NO_ICON = 32
-TDF_EXPAND_FOOTER_AREA = 64
-TDF_EXPANDED_BY_DEFAULT = 128
-TDF_VERIFICATION_FLAG_CHECKED = 256
-TDF_SHOW_PROGRESS_BAR = 512
-TDF_SHOW_MARQUEE_PROGRESS_BAR = 1024
-TDF_CALLBACK_TIMER = 2048
-TDF_POSITION_RELATIVE_TO_WINDOW = 4096
-TDF_RTL_LAYOUT = 8192
-TDF_NO_DEFAULT_RADIO_BUTTON = 16384
-TDF_CAN_BE_MINIMIZED = 32768
 
 _TaskDialogIndirect = ctypes.WinDLL('comctl32.dll').TaskDialogIndirect
 
@@ -976,10 +911,13 @@ class _TaskDialogConfig(ctypes.Structure):
 def dialog(msg:str=None, buttons:list=None
 , title:str=None, content:str=None, flags:int=None
 , common_buttons:int=None, default_button:int=0
-, timeout:int=None, icon=None)->int:
+, timeout:int=None, icon=None, return_button:bool=False)->int:
 	''' Shows dialog with multiple optional buttons.
 		Returns ID of selected button starting with 1000
 		or 0 if timeout is over.
+		return_button - return (status, selected button value).
+			Status == True if some of button was selected and
+			False if no button was selected (timeout or escape).
 		Note: do not start button text with new line (\\n) or dialog
 		will fail silently.
 	'''
@@ -989,6 +927,12 @@ def dialog(msg:str=None, buttons:list=None
 	TDM_SET_ELEMENT_TEXT = win32con.WM_USER + 108
 	TDE_FOOTER = 2
 	on_top_flag = False
+	TDCBF_CANCEL_BUTTON = 8
+	TDF_CALLBACK_TIMER = 2048
+	TDF_USE_COMMAND_LINKS = 16
+	TDF_EXPAND_FOOTER_AREA = 64
+	TD_ICON_INFORMATION = 104
+	
 	@_callback_type
 	def callback_timer(hwnd, uNotification:int
 	, wParam:int, lParam:int, lpRefData:int):
@@ -1022,6 +966,7 @@ def dialog(msg:str=None, buttons:list=None
 					dev_print(f'SetWindowPos exception {hwnd=}: {e}')
 		
 		return S_OK
+
 	if content: content = str(content)
 	if title: title = str(title)
 	if isinstance(msg, (list, tuple)):
@@ -1029,7 +974,9 @@ def dialog(msg:str=None, buttons:list=None
 		msg = ''
 	else:
 		if msg: msg = str(msg)
-	if buttons: buttons = list(map(str, buttons))
+	if buttons:
+		orig_buttons = buttons
+		buttons = list(map(str, buttons))
 	title = _get_parent_func_name(title)
 	result = ctypes.c_int()
 	tdc = _TaskDialogConfig()
@@ -1072,7 +1019,13 @@ def dialog(msg:str=None, buttons:list=None
 	tdc.pszContent = ctypes.c_wchar_p(content)
 	_TaskDialogIndirect(ctypes.byref(tdc)
 		, ctypes.byref(result), None, None)
-	return result.value
+	if buttons and return_button:
+		if result.value >= 1000:
+			return True, orig_buttons[result.value - 1000]
+		else: 
+			return False, result.value
+	else:
+		return result.value
 
 
 def hint(text:str, position:tuple=None)->int:

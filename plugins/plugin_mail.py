@@ -13,7 +13,7 @@ from email.header import Header, decode_header, make_header
 import mimetypes
 from .tools import Job, job_batch, var_get, var_set, tprint
 
-CC_LIMIT = 35
+_CC_LIMIT = 35
 _errors = []
 
 _FORBIDDEN_CHARS = '<>:"/\\|?*\n\r\x1a'
@@ -99,7 +99,7 @@ def mail_send_batch(recipients:str='', **mail_send_args):
 	'''
 	rec_li = recipients.replace(' ', '').split(',')
 	rec_li = list(set(rec_li))
-	if cc_limit == -1: cc_limit = CC_LIMIT
+	if cc_limit == -1: cc_limit = _CC_LIMIT
 	recipients = [rec_li[x:x+cc_limit] for x in range(0, len(rec_li), cc_limit)]
 	for r in recipients:
 		mail_send(
