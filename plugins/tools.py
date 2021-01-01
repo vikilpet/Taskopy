@@ -27,7 +27,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2020-12-31'
+APP_VERSION = 'v2021-01-02'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -911,13 +911,19 @@ class _TaskDialogConfig(ctypes.Structure):
 def dialog(msg:str=None, buttons:list=None
 , title:str=None, content:str=None, flags:int=None
 , common_buttons:int=None, default_button:int=0
-, timeout:int=None, icon=None, return_button:bool=False)->int:
+, timeout:int=None, icon=None, return_button:bool= False
+, wait:bool=True)->int:
 	''' Shows dialog with multiple optional buttons.
 		Returns ID of selected button starting with 1000
 		or 0 if timeout is over.
 		return_button - return (status, selected button value).
 			Status == True if some of button was selected and
 			False if no button was selected (timeout or escape).
+
+		wait - non-blocking mode. It returns c_long object
+		so it is possible to get user responce later with
+		'.value' property (=2 before user makes any choice)
+		
 		Note: do not start button text with new line (\\n) or dialog
 		will fail silently.
 	'''
@@ -1017,8 +1023,16 @@ def dialog(msg:str=None, buttons:list=None
 	tdc.pszMainInstruction = ctypes.c_wchar_p(msg)
 	tdc.pszWindowTitle = ctypes.c_wchar_p(title)
 	tdc.pszContent = ctypes.c_wchar_p(content)
-	_TaskDialogIndirect(ctypes.byref(tdc)
-		, ctypes.byref(result), None, None)
+	if wait:
+		_TaskDialogIndirect(ctypes.byref(tdc)
+			, ctypes.byref(result), None, None)
+	else:
+		threading.Thread(
+			target=lambda: _TaskDialogIndirect(ctypes.byref(tdc) \
+				, ctypes.byref(result), None, None)
+			, daemon=True
+		).start()
+		return result
 	if buttons and return_button:
 		if result.value >= 1000:
 			return True, orig_buttons[result.value - 1000]
@@ -1167,6 +1181,57 @@ def screen_width()->int:
 def screen_height()->int:
 	' Returns screen height in pixels '
 	return win32api.GetSystemMetrics(1)
+
+class HTTPReqData:
+	''' To keep HTTP request data in
+		object instead of dictionary.
+		{'User-Agent' : ... } ->
+		req_data.user_agent
+	'''
+	def __init__(s, client_ip:str, path:str
+	, headers:dict={}, params:dict={}
+	, form_data:dict={}, post_file:str=None):
+		''' client_ip - str
+			path - '/task_name'
+			headers - HTTP request headers
+			params - 'par1':'123'
+		'''
+		s.client_ip = client_ip
+		s.path = path
+		s.post_file = post_file
+		s.cookie = ''
+		s.host = ''
+		s.user_agent = ''
+		s.accept = ''
+		s.accept_encoding = ''
+		s.accept_language = ''
+		s.referer = ''
+		headers = {
+			k.lower().replace('-', '_'): v
+			for k, v in headers.items()
+		}
+		s.__dict__.update(headers)
+		s.__dict__.update(params)
+		s.__dict__.update(form_data)
+
+	def __getattr__(s, name):
+		return f'HTTPReqData: unknown property «{name}»'
+
+class ExtensionReqData(HTTPReqData):
+	''' HTTP request data from 'SendToTaskopy'
+		browser extension.
+	'''
+	def __init__(s):
+		s.link_url = ''
+		s.page_url = ''
+		s.editable = False
+		s.media_type = ''
+		s.src_url = ''
+		s.selection = ''
+
+
+	def __getattr__(s, name):
+		return f'ExtensionReqData: unknown property «{name}»'
 
 
 if __name__ != '__main__': patch_import()

@@ -248,6 +248,13 @@ def window_close(window=None, wait:bool=True)->bool:
 	func(hwnd, win32con.WM_CLOSE, 0, 0)
 	return True
 
+def window_coor_get(window=None)->tuple:
+	''' Returns coordinates of window:
+		(top left x, y, bottom right x, y)
+	'''
+	hwnd = window_get(window)
+	if hwnd: return win32gui.GetWindowRect(hwnd)
+
 
 
 def _test():

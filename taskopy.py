@@ -700,20 +700,15 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			
 
 	def on_exit(s, event=None)->bool:
-		TASKS_MSG_MAX = 2
-		running_tasks = []
-		for task in tasks.task_list:
-			if task['running']:
-				running_tasks.append(task)
+		TASKS_MSG_MAX = 5
+		running_tasks = s.running_tasks(show_msg=False)
 		if running_tasks:
-			print(lang.warn_runn_tasks_con + ':')
-			print(*[
-				t['task_function_name'] for t in running_tasks
-			])
 			tasks_str = '\r\n'.join(
-				[t['task_name'] for t in running_tasks][:TASKS_MSG_MAX]
+				[t['task_name'] for t in running_tasks]
+				[:TASKS_MSG_MAX]
 			)
-			if len(running_tasks) > TASKS_MSG_MAX: tasks_str += '\r\n...'
+			if len(running_tasks) > TASKS_MSG_MAX:
+				tasks_str += '\r\n...'
 			if dialog(
 				lang.warn_runn_tasks_msg.format( len(running_tasks) )
 				+ '\r\n\r\n' + tasks_str
@@ -727,35 +722,56 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		wx.CallAfter(s.Destroy)
 		s.frame.Close()
 		return True
-	
-	def running_tasks(s, event=None):
-		''' Print running tasks and show msgbox '''
+
+	def running_tasks(s, show_msg: bool = True
+	, event=None)->list:
+		''' Prints running tasks and shows dialog
+			(if show_msg == True).
+			Returns list of running task names.
+		'''
 		TASKS_MSG_MAX = 5
-		running_tasks = [
-			t for t in tasks.task_list if t['running']
-		]
+		running_tasks = [t for t in tasks.task_list
+			if t['running'] ]
 		if not running_tasks:
-			dialog(lang.warn_no_run_tasks
-				, title=lang.menu_list_run_tasks
-				, timeout=3)
+			if show_msg:
+				dialog(lang.warn_no_run_tasks
+					, title=lang.menu_list_run_tasks
+					, timeout=3
+					, wait=False)
 			return
 		cur_threads = []
 		for thread in threading.enumerate():
 			if thread._target is None: continue
 			cur_threads.append(thread.name)
-		print(lang.warn_runn_tasks_con + ':')
+		table = [['Task function', 'Thread'
+		, 'Start time', 'Running time']]
 		for t in running_tasks:
-			dev_print(t['task_function_name'], t['thread'], t['last_start'])
 			if t['thread'] in cur_threads:
-				dev_print('\tthread exists')
+				thread = t['thread']
 			else:
-				dev_print('\tthread not found')
+				thread = str(t['thread']) + ' (nonexistent)'
+			table.append([
+				t['task_function_name']
+				, thread
+				, t['last_start'].strftime(
+					'%y.%m.%d %H:%M:%S')
+				, time_diff_str(
+					t['last_start']
+					, time_now()
+					, '%H:%M:%S'
+				)
+			])
+		if len(table) > 1:
+			print(lang.warn_runn_tasks_con + ':')
+			table_print(table, use_headers=True)
+		if not show_msg: return running_tasks
 		tasks_str = '\r\n'.join(
-			[t['task_name'] for t in running_tasks][:TASKS_MSG_MAX]
+			[t['task_name'] for t in running_tasks]
+			[:TASKS_MSG_MAX]
 		)
-		if len(running_tasks) > TASKS_MSG_MAX: tasks_str += '\r\n...'
-		dialog(tasks_str, timeout=10)
-		
+		if len(running_tasks) > TASKS_MSG_MAX:
+			tasks_str += '\r\n...'
+		dialog(tasks_str, timeout=10, wait=False)
 
 	def on_edit_crontab(s, event=None):
 		app_start(sett.editor, os.path.join(APP_PATH, 'crontab.py'))
@@ -835,7 +851,6 @@ def main():
 	print(f'{APP_NAME} version {APP_VERSION}')
 	print(lang.load_homepage)
 	print(lang.load_donate + '\n\n')
-	dev_print(f'APP_PATH: {APP_PATH}')
 	try:
 		app = App(False)
 		__builtins__.app = app

@@ -137,7 +137,8 @@ def html_clean(html_str:str, separator=' ')->str:
 	return soup.get_text(separator=separator)
 
 def html_element(url:str, element
-, clean:bool=True, element_num:int=0, safe=False, **kwargs)->str:
+, clean: bool = True, element_num: int = 0
+, safe=False, **kwargs)->str:
 	''' Get text of specified page element (div).
 		Returns str or list of str.
 		url - URL or string with HTML.

@@ -6,7 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import cgi
 import urllib
 import tempfile
-from .tools import dev_print, app_log_get, tprint
+from .tools import dev_print, app_log_get, tprint, HTTPReqData
 
 
 _TASK_TIMEOUT = 60
@@ -16,32 +16,6 @@ if __name__ == '__main__':
 else:
 	from .tools import msgbox_warning, random_str
 
-class RequestData:
-	''' To keep HTTP request data in
-		object instead of dictionary.
-		{'User-Agent' : ... } ->
-		req_data.user_agent
-	'''
-	def __init__(s, client_ip:str, path:str
-					, headers:dict={}, params:dict={}
-					, form_data:dict={}, post_file:str=None):
-		''' client_ip - str
-			path - '/task_name'
-			headers - HTTP request headers
-			params - 'par1':'123'
-		'''
-		s.client_ip = client_ip
-		s.path = path
-		s.post_file = post_file
-		headers = {
-			k.lower().replace('-', '_') : v for k, v in headers.items()
-		}
-		s.__dict__.update(headers)
-		s.__dict__.update(params)
-		s.__dict__.update(form_data)
-
-	def __getattr__(s, name):
-		return f'RequestData - unknown property: {name}'
 
 class HTTPHandlerTasks(BaseHTTPRequestHandler):
 	def __init__(s, request, client_address, server
@@ -177,7 +151,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 				return
 			form_data = data
 		try:
-			req_data = RequestData(
+			req_data = HTTPReqData(
 				client_ip=s.client_address[0]
 				, path=s.path, headers=dict(s.headers)
 				, params=params, form_data=form_data

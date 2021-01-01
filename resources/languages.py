@@ -1,7 +1,8 @@
 import sys
 
+_DEF_LANGUAGE = 'en'
 class Language:
-	def __init__(s, language: str = 'en'):
+	def __init__(s, language: str = _DEF_LANGUAGE):
 		s.button_close = 'Close'
 		s.button_cancel = 'Cancel'
 		s.menu_exit = 'Exit'
@@ -36,16 +37,32 @@ class Language:
 			sys.modules[__name__]
 			, '_dict_' + language
 			, None
-		)): return
-		di = dict(
-			v.split('=') for v in di_str[:-1].split('\n')
-		)
-		s.__dict__.update(di)
+		)):
+			if language != _DEF_LANGUAGE:
+				print(f'Dictionary for language {language} not found')
+			return
+		new_trans = set()
+		for line in di_str.split('\n'):
+			if not line or not '=' in line: continue
+			item, trans = line.split('=')
+			item = item.strip(); trans = trans.strip()
+			if s.__dict__.get(item, None):
+				s.__dict__[item] = trans
+				new_trans.add(trans)
+			else:
+				print(f'Unknown item «{item}» in «{language}» language')
+		missed = [
+			i for i,t in s.__dict__.items()
+			if not t in new_trans
+		]
+		if missed:
+			print('No translation for this items:'
+			, *missed, sep='\n')
 	
 	def __getattr__(s, name):
-		return 'Language: unknown phrase'
+		return 'Language: unknown phrase — «{name}»'
 
-_dict_ru='''\
+_dict_ru='''
 load_crontab=Загрузка кронтаба из папки
 load_homepage=Домашняя страница: https://vikilpet.wordpress.com/taskopy/
 load_donate=Благодарю за использование.
@@ -60,6 +77,7 @@ menu_command=Ввести команду
 menu_command_con=Введите команду
 menu_list_run_tasks=Список работающих задач
 warn_no_run_tasks=Нет работающих задач
+warn_crontab_reload=Не удалось перезагрузить кронтаб
 warn_hotkey=Неправильный формат горячей клавиши в задаче «{}»
 warn_schedule=Неправильный формат планировщика в задаче «{}»
 warn_task_error=Ошибка при выполнении задачи «{}»
