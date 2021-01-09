@@ -1,3 +1,4 @@
+import win32con
 from .tools import patch_import
 WA_PLAYING = 'playing'
 WA_PAUSED = 'paused'
@@ -43,5 +44,8 @@ TDF_POSITION_RELATIVE_TO_WINDOW = 4096
 TDF_RTL_LAYOUT = 8192
 TDF_NO_DEFAULT_RADIO_BUTTON = 16384
 TDF_CAN_BE_MINIMIZED = 32768
+WINDOW_MINIMIZED = win32con.SW_SHOWMINNOACTIVE
+WINDOW_MAXIMIZED = win32con.SW_SHOWMAXIMIZED
+WINDOW_HIDDEN = win32con.SW_HIDE
 
 if __name__ != '__main__': patch_import()

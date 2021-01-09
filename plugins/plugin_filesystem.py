@@ -30,18 +30,24 @@ def _dir_slash(dirpath:str)->str:
 	if dirpath.endswith('\\'): return dirpath
 	return dirpath + '\\'
 
-def _long_path(fullpath:str):
-	''' Fix for path longer than 256 '''
-	if (len(fullpath) > 255
-	and not '\\\\?\\' in fullpath
-	and fullpath[1:3] == ':\\'):
+def _fix_fullpath(fullpath):
+	''' Join list of paths and optionally
+		fix long path.
+	'''
+	if isinstance(fullpath, (list, tuple)):
+		fullpath = os.path.join(fullpath)
+	if (
+		len(fullpath) > 255
+		and not '\\\\?\\' in fullpath
+		and fullpath[1:3] == ':\\'
+	):
 		return '\\\\?\\' + fullpath
 	else:
 		return fullpath
 
 def file_read(fullpath:str, encoding:str='utf-8')->str:
 	''' Returns content of file '''
-	fullpath = _long_path(fullpath)
+	fullpath = _fix_fullpath(fullpath)
 	if encoding == 'binary':
 		with open(fullpath, 'rb') as f:
 			return f.read()
@@ -100,7 +106,7 @@ dir_rename = file_rename
 def file_log(fullpath:str, message:str, encoding:str='utf-8'
 , time_format:str='%Y.%m.%d %H:%M:%S'):
 	''' Writes message to log '''
-	fullpath = _long_path(fullpath)
+	fullpath = _fix_fullpath(fullpath)
 	with open(fullpath, 'at+', encoding=encoding) as f:
 		f.write(time.strftime(time_format) + '\t' + message + '\n')
 
@@ -396,10 +402,13 @@ def drive_free(letter:str, unit:str='GB')->int:
 def dir_list(fullpath:str)->list:
 	''' Returns list of files in specified folder.
 		Fullpath passed to glob.glob
-		Example (current folder):
-			dir_list('d:\\folder\\*.jpg')
-		with subfolders:
-			dir_list('d:\\folder\\**\\*.jpg')
+		Example:
+			
+			only files in folder:
+				dir_list('d:\\folder\\*.jpg')
+
+			with subfolders:
+				dir_list('d:\\folder\\**\\*.jpg')
 	'''
 	recursive = ('**' in fullpath)
 	paths = glob.glob(fullpath, recursive=recursive)
@@ -416,7 +425,7 @@ def csv_read(fullpath:str, encoding:str='utf-8', fieldnames:tuple=None
 		If no fieldnames is provided uses first row as fieldnames.
 		All cell values is strings.
 	'''
-	fullpath = _long_path(fullpath)
+	fullpath = _fix_fullpath(fullpath)
 	with open(fullpath, 'r', encoding=encoding) as f:
 		reader = csv.DictReader(f, skipinitialspace=True, fieldnames=fieldnames
 		, delimiter=delimiter, quotechar=quotechar)
@@ -506,7 +515,7 @@ def file_zip(fullpath, destination:str)->str:
 		destination - full path to the archive or destination
 		directory.
 	'''
-	fullpath = _long_path(fullpath)
+	fullpath = _fix_fullpath(fullpath)
 	if isinstance(fullpath, str):
 		if file_ext(destination) != 'zip':
 			dir_create(destination)
@@ -561,7 +570,7 @@ def file_hash(fullpath:str, algorithm:str='crc32'
 		algorithm - 'crc32' or any algorithm
 		from hashlib (md5, sha512 etc).
 	'''
-	fullpath = _long_path(fullpath)
+	fullpath = _fix_fullpath(fullpath)
 	algorithm = algorithm.lower().replace('-', '')
 	if algorithm == 'crc32':
 		prev = 0

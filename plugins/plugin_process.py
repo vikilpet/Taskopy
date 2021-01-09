@@ -129,19 +129,20 @@ def app_start(
 			priority.lower()
 			, subprocess.NORMAL_PRIORITY_CLASS
 		)
-	if window:
+	if isinstance(window, int):
+		startupinfo.wShowWindow = window
+	else:
+		if window is None: window = 'normal'
 		window = window.lower()
-	else:
-		window = 'normal'
-	if window in ['minimized', 'min']:
-		startupinfo.wShowWindow = win32con.SW_SHOWMINNOACTIVE
-	elif window in ['maximized', 'max']:
-		startupinfo.wShowWindow = win32con.SW_SHOWMAXIMIZED
-	elif window in ['hidden', 'hid']:
-		creationflags |= win32process.CREATE_NO_WINDOW
-		startupinfo.wShowWindow = win32con.SW_HIDE
-	else:
-		startupinfo.wShowWindow = win32con.SW_SHOWNORMAL
+		if window in ['minimized', 'min']:
+			startupinfo.wShowWindow = win32con.SW_SHOWMINNOACTIVE
+		elif window in ['maximized', 'max']:
+			startupinfo.wShowWindow = win32con.SW_SHOWMAXIMIZED
+		elif window in ['hidden', 'hid']:
+			creationflags |= win32process.CREATE_NO_WINDOW
+			startupinfo.wShowWindow = win32con.SW_HIDE
+		else:
+			startupinfo.wShowWindow = win32con.SW_SHOWNORMAL
 	proc_args = {
 		'args': app_path
 		, 'shell': shell

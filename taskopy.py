@@ -128,10 +128,7 @@ def load_modules():
 	
 
 
-
-	
-	
-	
+	global crontab
 	if not hasattr(sett, 'own_modules'):
 		sett.own_modules = {'plugins.constants'}
 		for obj_name, obj in crontab.__dict__.items():
@@ -750,16 +747,21 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 				thread = t['thread']
 			else:
 				thread = str(t['thread']) + ' (nonexistent)'
-			table.append([
-				t['task_function_name']
-				, thread
-				, t['last_start'].strftime(
+			last_start = None
+			duration = None
+			if t['last_start']:
+				last_start = t['last_start'].strftime(
 					'%y.%m.%d %H:%M:%S')
-				, time_diff_str(
+				duration = time_diff_str(
 					t['last_start']
 					, time_now()
 					, '%H:%M:%S'
 				)
+			table.append([
+				t['task_function_name']
+				, thread
+				, last_start
+				, duration
 			])
 		if len(table) > 1:
 			print(lang.warn_runn_tasks_con + ':')

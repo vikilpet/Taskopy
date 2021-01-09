@@ -27,7 +27,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-01-02'
+APP_VERSION = 'v2021-01-09'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -136,7 +136,7 @@ def _get_parent_func_name(parent=None, repl_undrsc:bool=' ')->str:
 	''' Get name of parent function if any '''
 	EXCLUDE = ('wrapper', 'run_task', 'run', 'dev_print', 'tprint'
 		, 'main', 'run_task_inner', 'popup_menu_hk'
-		, 'MainLoop', 'catcher', 'run_code')
+		, 'MainLoop', 'catcher', 'run_code', 'mapstar')
 	if parent: return str(parent)
 	for i in range(2, 10):
 		try:
@@ -323,11 +323,12 @@ def var_set(var_name:str, value:str):
 	except sqlite3.OperationalError:
 		if sett.dev: raise
 		_create_table_var()
-		cur.execute(f'''INSERT INTO variables (vname, vvalue)
-						VALUES('{var_name}', '{value}')
-						ON CONFLICT(vname)
-						DO UPDATE SET vvalue=excluded.vvalue;
-					''')
+		cur.execute(f'''
+			INSERT INTO variables (vname, vvalue)
+			VALUES('{var_name}', '{value}')
+			ON CONFLICT(vname)
+			DO UPDATE SET vvalue=excluded.vvalue;
+		''')
 		conn.commit()
 	conn.close()
 

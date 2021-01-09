@@ -15,7 +15,7 @@ from .tools import dev_print, time_sleep, tdebug \
 , locale_set
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.141 Safari/537.36'}
 
 def page_get(url:str, encoding:str='utf-8', session:bool=False
 , cookies:dict=None, headers:dict=None
