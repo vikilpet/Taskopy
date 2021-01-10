@@ -262,10 +262,8 @@ def _file_hash(fullpath:str)->str:
 		for chunk in iter(lambda: fi.read(4096), b''):
 			hash_md5.update(chunk)
 	return hash_md5.hexdigest()
-
-def main():
-	''' Just for testing
-	'''
+ 
+if __name__ == '__main__':
 	print('Test http task handler')
 	serv_ip = '127.0.0.1'
 	serv_port = 80
@@ -280,5 +278,4 @@ def main():
 		print('\nTerminated by keyboard')
 	except Exception as e:
 		print(f'General error: {repr(e)[:100]}')
- 
-if __name__ == '__main__': main()
+

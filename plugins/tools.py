@@ -27,7 +27,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-01-09'
+APP_VERSION = 'v2021-01-10'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -573,7 +573,8 @@ def msgbox_warning(msg:str, title:str=None):
 	else:
 		title = APP_FULLNAME
 	msgbox(msg=msg, title=title
-	, ui=win32con.MB_ICONWARNING, wait=False)
+	, ui=win32con.MB_ICONWARNING, wait=False
+	, timeout='1 hour')
 
 def inputbox(message:str, title:str=None
 , is_pwd:bool=False, default:str=''

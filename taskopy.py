@@ -29,6 +29,7 @@ from resources.languages import Language
 # https://github.com/boppreh/keyboard
 # https://schedule.readthedocs.io/en/stable/
 
+
 tasks = None
 app = None
 crontab = None
@@ -162,9 +163,14 @@ def load_modules():
 				continue
 			if not isinstance(obj, types.FunctionType):
 				setattr(crontab, obj_name, obj)
-				dev_print('setattr', obj_name)
+				dev_print('non func', obj_name)
 				continue
-			setattr(mdl, obj_name, decor_except_status(obj))
+			
+
+			for mdl_name_2 in sett.own_modules:
+				if hasattr(sys.modules[mdl_name_2], obj_name):
+					setattr(sys.modules[mdl_name_2]
+						, obj_name, decor_except_status(obj))
 			if hasattr(crontab, obj_name):
 				setattr(crontab, obj_name, decor_except_status(obj))
 		sys.modules[mdl_name] = mdl

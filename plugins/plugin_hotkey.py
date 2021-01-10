@@ -10,8 +10,8 @@ except ImportError:
 # Key codes https://docs.microsoft.com/en-us/windows/desktop/inputdev/virtual-key-codes
 # https://github.com/boppreh/keyboard
 
-user32 = ctypes.windll.user32
-kernel32 = ctypes.windll.kernel32
+_user32 = ctypes.windll.user32
+_kernel32 = ctypes.windll.kernel32
 
 class GlobalHotKeys():
 	''' Register a global hotkey using the register() method.
@@ -77,22 +77,22 @@ class GlobalHotKeys():
 		''' Stop current listen thread
 		'''
 		WM_QUIT = 0x0012
-		user32.PostThreadMessageW(s.thread_id, WM_QUIT, 0, 0)
+		_user32.PostThreadMessageW(s.thread_id, WM_QUIT, 0, 0)
 
 	def unregister(s):
 		for index, (vk, modifiers, func) in enumerate(s.key_mapping):
-			user32.UnregisterHotKey(None, index)
+			_user32.UnregisterHotKey(None, index)
 
 	def listen(s):
 		''' Start listening for hotkeys
 		'''
-		s.thread_id = kernel32.GetCurrentThreadId()
+		s.thread_id = _kernel32.GetCurrentThreadId()
 		for index, (vk, modifiers, func) in enumerate(s.key_mapping):
-			if not user32.RegisterHotKey(None, index, modifiers, vk):
+			if not _user32.RegisterHotKey(None, index, modifiers, vk):
 				error = (
 					'Unable to register hot key: '
 					+ str(vk) + ' error code is: '
-					+ str(kernel32.GetLastError())
+					+ str(_kernel32.GetLastError())
 				)
 
 				print(error)
@@ -100,14 +100,14 @@ class GlobalHotKeys():
  
 		try:
 			msg = ctypes.wintypes.MSG()
-			while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) != 0:
+			while _user32.GetMessageW(ctypes.byref(msg), None, 0, 0) != 0:
 				if msg.message == win32con.WM_HOTKEY:
 					(vk, modifiers, func) = s.key_mapping[msg.wParam]
 					if not func:
 						break
 					func()
-				user32.TranslateMessage(ctypes.byref(msg))
-				user32.DispatchMessageA(ctypes.byref(msg))
+				_user32.TranslateMessage(ctypes.byref(msg))
+				_user32.DispatchMessageA(ctypes.byref(msg))
 		finally:
 			s.unregister()
 
@@ -133,6 +133,6 @@ if __name__ == '__main__':
 		'ctrl+t', func=test_func, func_args=['test passed']
 	)
 	ghk.register('ctrl+shift+t', func=ghk.stop_listener)
-	print('Start hotkey test')
+	print('Hotkey test: press ctrl+t')
 	threading.Thread(target=ghk.listen).start()
 	

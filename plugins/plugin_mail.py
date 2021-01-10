@@ -382,8 +382,8 @@ def mail_download_batch(mailboxes:list, output_dir:str, timeout:int=60
 		return msg, warning
 	except Exception as e:
 		return f'error mail_download_batch: {repr(e)}', True
-
-def main():
+	
+if __name__ == '__main__':
 	if len(sys.argv) > 3:
 		args = _parse_args()
 		try:
@@ -395,6 +395,3 @@ def main():
 	else:
 		print(f'Not enough arguments!')
 		sys.exit(1)
-	
-if __name__ == '__main__': main()
-	
