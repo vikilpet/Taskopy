@@ -47,5 +47,6 @@ TDF_CAN_BE_MINIMIZED = 32768
 WINDOW_MINIMIZED = win32con.SW_SHOWMINNOACTIVE
 WINDOW_MAXIMIZED = win32con.SW_SHOWMAXIMIZED
 WINDOW_HIDDEN = win32con.SW_HIDE
+DATE_FORMAT = '%A, %d %B %Y %H:%M:%S.%f'
 
 if __name__ != '__main__': patch_import()

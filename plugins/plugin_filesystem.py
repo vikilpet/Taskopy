@@ -13,6 +13,7 @@ import tempfile
 import datetime
 import win32con
 import win32com
+import win32print
 import hashlib
 import pythoncom
 
@@ -35,17 +36,16 @@ def _fix_fullpath(fullpath):
 		fix long path.
 	'''
 	if isinstance(fullpath, (list, tuple)):
-		fullpath = os.path.join(fullpath)
+		fullpath = os.path.join(*map(str, fullpath))
 	if (
 		len(fullpath) > 255
 		and not '\\\\?\\' in fullpath
 		and fullpath[1:3] == ':\\'
 	):
 		return '\\\\?\\' + fullpath
-	else:
-		return fullpath
+	return fullpath
 
-def file_read(fullpath:str, encoding:str='utf-8')->str:
+def file_read(fullpath, encoding:str='utf-8')->str:
 	''' Returns content of file '''
 	fullpath = _fix_fullpath(fullpath)
 	if encoding == 'binary':
@@ -68,6 +68,7 @@ def file_write(fullpath, content:str
 		open_args = {'mode': 'wt+', 'encoding': encoding
 		, 'errors': 'ignore'}
 	if fullpath:
+		fullpath = _fix_fullpath(fullpath)
 		if not os.path.exists(os.path.dirname(fullpath)):
 			os.makedirs(os.path.dirname(fullpath))
 	else:
@@ -76,11 +77,11 @@ def file_write(fullpath, content:str
 		f.write(content)
 	return fullpath
 
-def file_ext_replace(fullpath:str, new_ext:str)->str:
+def file_ext_replace(fullpath, new_ext:str)->str:
 	' Replaces file extension '
-	return os.path.splitext(fullpath)[0] + '.' + new_ext
+	return os.path.splitext(_fix_fullpath(fullpath))[0] + '.' + new_ext
 
-def file_rename(fullpath:str, dest:str
+def file_rename(fullpath, dest:str
 , overwrite:bool=False)->str:
 	''' Renames path.
 		dest - fullpath or just new file name
@@ -89,6 +90,7 @@ def file_rename(fullpath:str, dest:str
 		if exists.
 		Returns destination.
 	'''
+	fullpath = _fix_fullpath(fullpath)
 	if not ':' in dest:
 		dest = os.path.join(os.path.dirname(fullpath), dest)
 	try:
@@ -103,45 +105,52 @@ def file_rename(fullpath:str, dest:str
 
 dir_rename = file_rename
 
-def file_log(fullpath:str, message:str, encoding:str='utf-8'
+def file_log(fullpath, message:str, encoding:str='utf-8'
 , time_format:str='%Y.%m.%d %H:%M:%S'):
 	''' Writes message to log '''
 	fullpath = _fix_fullpath(fullpath)
 	with open(fullpath, 'at+', encoding=encoding) as f:
 		f.write(time.strftime(time_format) + '\t' + message + '\n')
 
-def file_copy(fullpath:str, destination:str):
+def file_copy(fullpath, destination:str
+, copy_metadata:bool=False):
 	''' Copies file to destination.
 		Destination may be fullpath or folder name.
 		If destination file exists it will be overwritten.
 		If destination is a folder, subfolders will
 		be created if they don't exist.
 	'''
+	fullpath = _fix_fullpath(fullpath)
+	func = shutil.copy2 if copy_metadata else shutil.copy
 	try:
-		return shutil.copy(fullpath, destination)
+		return func(fullpath, destination)
 	except FileNotFoundError:
 		try:
 			os.makedirs(
 				os.path.dirname(destination)
 			)
-			return shutil.copy(fullpath, destination)
+			return func(fullpath, destination)
 		except FileExistsError: pass
 
-def file_append(fullpath:str, content:str)->str:
+def file_append(fullpath, content:str)->str:
 	''' Append content to a file. Creates fullpath
 		if not specified.
 		Returns fullpath.
 	'''
-	if not fullpath: fullpath = temp_file()
+	if fullpath:
+		fullpath = _fix_fullpath(fullpath)
+	else:
+		fullpath = temp_file()
 	with open(fullpath, 'a+') as fd:
 		fd.write(content)
 	return fullpath
 
-def file_move(fullpath:str, destination:str):
+def file_move(fullpath, destination:str):
 	''' Move file to destination.
 		Destination may be fullpath or folder name.
 		If destination path exist it will be overwritten.
 	'''
+	fullpath = _fix_fullpath(fullpath)
 	if os.path.isdir(destination):
 		new_fullpath = _dir_slash(destination) \
 			+ os.path.basename(fullpath)
@@ -154,8 +163,9 @@ def file_move(fullpath:str, destination:str):
 	shutil.move(fullpath, new_fullpath)
 	return new_fullpath
 
-def file_delete(fullpath:str):
+def file_delete(fullpath):
 	''' Deletes the file. '''
+	fullpath = _fix_fullpath(fullpath)
 	try:
 		os.remove(fullpath)
 	except PermissionError:
@@ -167,12 +177,13 @@ def file_delete(fullpath:str):
 	except FileNotFoundError:
 		pass
 
-def file_recycle(fullpath:str, silent:bool=True)->bool:
+def file_recycle(fullpath, silent:bool=True)->bool:
 	''' Move file to the recycle bin
 		silent - do not show standard windows
 		dialog to confirm deletion.
 		Returns True on successful operation.
 	'''
+	fullpath = _fix_fullpath(fullpath)
 	flags = shellcon.FOF_ALLOWUNDO
 	if silent:
 		flags = flags | shellcon.FOF_SILENT | shellcon.FOF_NOCONFIRMATION
@@ -189,10 +200,12 @@ def file_recycle(fullpath:str, silent:bool=True)->bool:
 	)
 	return result[0] <= 3
 
-def dir_copy(fullpath:str, destination:str, symlinks:bool=False)->int:
+def dir_copy(fullpath, destination:str
+, symlinks:bool=False)->int:
 	''' Copy a folder with all content to a new location.
 		Returns number of errors.
 	'''
+	fullpath = _fix_fullpath(fullpath)
 	err = 0
 	try:
 		shutil.copytree(fullpath, destination, symlinks=symlinks)
@@ -204,10 +217,11 @@ def dir_copy(fullpath:str, destination:str, symlinks:bool=False)->int:
 		print(f'dir_copy error: {repr(e)}')
 	return err
 
-def dir_create(fullpath:str=None)->str:
+def dir_create(fullpath=None)->str:
 	''' Creates new dir and returns full path.
 		If fullpath=None then creates temporary directory.
 	'''
+	fullpath = _fix_fullpath(fullpath)
 	if not fullpath: return temp_dir('temp')
 	fullpath = fullpath.rstrip('.').rstrip(' ')
 	try:
@@ -215,51 +229,57 @@ def dir_create(fullpath:str=None)->str:
 	except FileExistsError: pass
 	return fullpath
 
-def dir_delete(fullpath:str):
+def dir_delete(fullpath):
 	''' Deletes folder with it's contents '''
+	fullpath = _fix_fullpath(fullpath)
 	try:
 		shutil.rmtree(fullpath
 		, onerror=lambda func, path, exc: file_delete(path))
 	except FileNotFoundError:
 		pass
 
-def dir_exists(fullpath:str)->bool:
-	return os.path.isdir(fullpath)
+def dir_exists(fullpath)->bool:
+	return os.path.isdir( _fix_fullpath(fullpath) )
 
-def file_exists(fullpath:str)->bool:
-	return os.path.isfile(fullpath)
+def file_exists(fullpath)->bool:
+	return os.path.isfile( _fix_fullpath(fullpath) )
 
-def path_exists(fullpath:str)->bool:
+def path_exists(fullpath)->bool:
 	''' Check if directory or file exist '''
+	fullpath = _fix_fullpath(fullpath)
 	p = Path(fullpath)
 	return p.exists()
 
-def file_size(fullpath:str, unit:str='b')->int:
+def file_size(fullpath, unit:str='b')->int:
+	fullpath = _fix_fullpath(fullpath)
 	e = _SIZE_UNITS.get(unit.lower(), 1)
 	return os.stat(fullpath).st_size // e
 
-def file_ext(fullpath:str)->str:
+def file_ext(fullpath)->str:
 	''' Returns file extension in lower case
 		without dot.
 	'''
+	fullpath = _fix_fullpath(fullpath)
 	ext = os.path.splitext(fullpath)[1].lower()
 	if ext == '': return ext
 	return ext[1:]
 
-def file_basename(fullpath:str)->str:
+def file_basename(fullpath)->str:
 	''' Returns basename: file name without 
 		parent folder and extension.
 	'''
+	fullpath = _fix_fullpath(fullpath)
 	fname = os.path.basename(fullpath)
 	return os.path.splitext(fname)[0]
 
-def file_name_add(fullpath:str, suffix:str='')->str:
+def file_name_add(fullpath, suffix:str='')->str:
 	''' Adds suffix to a file name before extension:
 		file_name_add('my_file.txt', '_1') ->
 		my_file_1.txt
 		If suffix if not specified then add
 		random string.
 	'''
+	fullpath = _fix_fullpath(fullpath)
 	if suffix:
 		suffix = str(suffix)
 	else:
@@ -283,7 +303,7 @@ def file_name_fix(filename:str, repl_char:str='_')->str:
 			new_fn += char
 	return new_fn
 
-def dir_purge(fullpath:str, days:int=0, recursive:bool=False
+def dir_purge(fullpath, days:int=0, recursive:bool=False
 , creation:bool=False, test:bool=False, rule=None):
 	''' Deletes files older than x days.
 		Returns number of deleted files and folders. 
@@ -297,6 +317,7 @@ def dir_purge(fullpath:str, days:int=0, recursive:bool=False
 			if file should be deleted.
 			Example: rule=lambda f: file_size(f) == 0
 	'''
+	fullpath = _fix_fullpath(fullpath)
 	counter = 0
 	def robust_remove_file(fullpath):
 		nonlocal counter
@@ -359,25 +380,26 @@ def dir_purge(fullpath:str, days:int=0, recursive:bool=False
 				file_func(fi)
 	return counter
 
-def file_name(fullpath:str)->str:
+def file_name(fullpath)->str:
 	''' Returns only name from fullpath
 	'''
-	return os.path.basename(fullpath)
+	return os.path.basename(_fix_fullpath(fullpath))
 
-def file_name_wo_ext(fullpath:str)->str:
-	return os.path.splitext(fullpath)[0]
+def file_name_wo_ext(fullpath)->str:
+	return os.path.splitext(_fix_fullpath(fullpath))[0]
 
-def file_dir(fullpath:str)->str:
+def file_dir(fullpath)->str:
 	''' Returns directory from fullpath
 	'''
-	return os.path.dirname(fullpath)
+	return os.path.dirname(_fix_fullpath(fullpath))
 
-def file_backup(fullpath:str, dest_dir:str=''
-, now_format:str='_%y-%m-%d_%H-%M-%S')->str:
+def file_backup(fullpath, dest_dir:str=''
+, suffix_format:str='_%y-%m-%d_%H-%M-%S')->str:
 	''' Copy somefile.txt to somefile_2019-05-19_21-23-02.txt
 		dest_dir - destination. If not specified - current folder.
 		Returns full path of new file.
 	'''
+	fullpath = _fix_fullpath(fullpath)
 	if not dest_dir: dest_dir = os.path.dirname(fullpath)
 	if not os.path.isdir(dest_dir): dir_create(dest_dir)
 	name, ext = os.path.splitext(
@@ -385,9 +407,9 @@ def file_backup(fullpath:str, dest_dir:str=''
 	)
 	destination = os.path.join(
 		dest_dir
-		, name	+ time.strftime(now_format) + ext
+		, name	+ time.strftime(suffix_format) + ext
 	)
-	shutil.copy(fullpath, destination)
+	shutil.copy2(fullpath, destination)
 	return destination
 
 def drive_free(letter:str, unit:str='GB')->int:
@@ -399,9 +421,13 @@ def drive_free(letter:str, unit:str='GB')->int:
 	except:
 		return -1
 
-def dir_list(fullpath:str)->list:
+def dir_list(fullpath, only_files:bool=False)->list:
 	''' Returns list of files in specified folder.
-		Fullpath passed to glob.glob
+		'fullpath' passed to glob.glob
+
+		only_files - return only files and not
+		files and directories.
+
 		Example:
 			
 			only files in folder:
@@ -410,6 +436,7 @@ def dir_list(fullpath:str)->list:
 			with subfolders:
 				dir_list('d:\\folder\\**\\*.jpg')
 	'''
+	fullpath = _fix_fullpath(fullpath)
 	recursive = ('**' in fullpath)
 	paths = glob.glob(fullpath, recursive=recursive)
 	if fullpath.endswith('\\**'):
@@ -417,9 +444,14 @@ def dir_list(fullpath:str)->list:
 			paths.remove(fullpath.replace('**', ''))
 		except ValueError:
 			pass
-	return paths
+	if not only_files: return paths
+	files = []
+	for path in paths:
+		if os.path.isfile(path):
+			files.append(path)
+	return files
 
-def csv_read(fullpath:str, encoding:str='utf-8', fieldnames:tuple=None
+def csv_read(fullpath, encoding:str='utf-8', fieldnames:tuple=None
 , delimiter:str=';', quotechar:str='"')->list:
 	''' Read whole CSV file and return content as list of dictionaries.
 		If no fieldnames is provided uses first row as fieldnames.
@@ -432,7 +464,7 @@ def csv_read(fullpath:str, encoding:str='utf-8', fieldnames:tuple=None
 		li = [dict(row) for row in reader]
 	return li
 
-def csv_write(fullpath:str, content:list, fieldnames:tuple=None
+def csv_write(fullpath, content:list, fieldnames:tuple=None
 , encoding:str='utf-8', delimiter:str=';', quotechar:str='"'
 , quoting:int=csv.QUOTE_MINIMAL)->str:
 	''' Writes list of dictionaries as CSV file.
@@ -448,6 +480,7 @@ def csv_write(fullpath:str, content:list, fieldnames:tuple=None
 			...	
 		]
 	'''
+	fullpath = _fix_fullpath(fullpath)
 	if not fieldnames:
 		fieldnames = content[0].keys()
 	with open(fullpath, 'w', encoding=encoding
@@ -463,8 +496,9 @@ def csv_write(fullpath:str, content:list, fieldnames:tuple=None
 		writer.writerows([di for di in content])
 	return fullpath
 
-def dir_size(fullpath:str, unit:str='b')->int:
+def dir_size(fullpath, unit:str='b')->int:
 	''' Returns directory size without symlinks '''
+	fullpath = _fix_fullpath(fullpath)
 	e = _SIZE_UNITS.get(unit.lower(), 1)
 	total_size = 0
 	for dirpath, _, filenames in os.walk(fullpath):
@@ -474,7 +508,7 @@ def dir_size(fullpath:str, unit:str='b')->int:
 				total_size += os.path.getsize(fp)
 	return total_size // e
 
-def dir_zip(fullpath:str, destination:str
+def dir_zip(fullpath, destination:str
 , do_cwd:bool=False)->str:
 	''' Compresses folder and returns the full
 		path to archive.
@@ -483,6 +517,7 @@ def dir_zip(fullpath:str, destination:str
 		Replaces destination if it exists.
 		Returns destination.
 	'''
+	fullpath = _fix_fullpath(fullpath)
 	EXT = 'zip'
 	if os.path.isdir(destination):
 		new_fullpath = _dir_slash(destination) \
@@ -564,7 +599,7 @@ def temp_file(suffix:str='')->str:
 	return os.path.join(tempfile.gettempdir()
 		, time.strftime('%m%d%H%M%S') + random_str(5) + suffix)
 
-def file_hash(fullpath:str, algorithm:str='crc32'
+def file_hash(fullpath, algorithm:str='crc32'
 , buf_size:int=65536)->str:
 	''' Returns hash of file.
 		algorithm - 'crc32' or any algorithm
@@ -602,30 +637,33 @@ def working_directory(directory:str):
 		os.chdir(owd)
 
 
-def file_date_m(fullpath:str):
+def file_date_m(fullpath):
 	' Returns file modification date in datetime '
+	fullpath = _fix_fullpath(fullpath)
 	ts = os.path.getmtime(fullpath)
 	return datetime.datetime.fromtimestamp(ts)
 
-def file_date_c(fullpath:str):
+def file_date_c(fullpath):
 	' Returns file creation date in datetime '
+	fullpath = _fix_fullpath(fullpath)
 	ts = os.path.getctime(fullpath)
 	return datetime.datetime.fromtimestamp(ts)
 
-def file_date_a(fullpath:str):
+def file_date_a(fullpath):
 	' Returns file access date in datetime '
+	fullpath = _fix_fullpath(fullpath)
 	ts = os.path.getatime(fullpath)
 	return datetime.datetime.fromtimestamp(ts)
 
-def file_attr_set(fullpath:str
+def file_attr_set(fullpath
 , attribute:int=win32con.FILE_ATTRIBUTE_NORMAL):
 	'''	Sets file attribute.
 		Type 'win32con.FILE_' to get syntax hints for
 		constants.
 	'''
-	win32api.SetFileAttributes(fullpath, attribute)
+	win32api.SetFileAttributes(_fix_fullpath(fullpath), attribute)
 
-def shortcut_create(fullpath:str, dest:str=None, descr:str=None
+def shortcut_create(fullpath, dest:str=None, descr:str=None
 , icon_fullpath:str=None, icon_index:int=None
 , win_style:int=win32con.SW_SHOWNORMAL, cwd:str=None):
 	''' Creates shortcut to the file.
@@ -638,6 +676,7 @@ def shortcut_create(fullpath:str, dest:str=None, descr:str=None
 		icon_index - if specified and icon_fullpath is None
 			then fullpath is used as icon_fullpath.
 	'''
+	fullpath = _fix_fullpath(fullpath)
 	if not descr: descr = file_name(fullpath)
 	if not dest:
 		dest = os.path.join(
@@ -666,6 +705,29 @@ def shortcut_create(fullpath:str, dest:str=None, descr:str=None
 	persist_file.Save(dest, 0)
 	pythoncom.CoUninitialize()
 	return dest
+
+def file_print(fullpath, printer:str=None)->bool:
+	''' Prints file on specified printer.
+		Non-blocking.
+		Returns True on success.
+		If no printer is specified - print on 
+		system default printer.
+	'''
+	fullpath = _fix_fullpath(fullpath)
+	if not printer:
+		try:
+			printer = win32print.GetDefaultPrinter()
+		except RuntimeError:
+			return False
+	win32api.ShellExecute (
+		0
+		, 'print'
+		, fullpath
+		, f'/d:"{printer}"'
+		, "."
+		, 0
+	)
+	return True
 
 def dir_user_desktop()->str:
 	' Returns full path to the desktop directory of current user '

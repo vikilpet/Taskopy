@@ -308,6 +308,7 @@ def process_close(process, timeout:int=10
 		nonlocal windows
 		windows.append(hwnd)
 		return True
+	
 	pid = process_get(process, cmd_filter)
 	if not pid: return False
 	windows = []

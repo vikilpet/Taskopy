@@ -11,6 +11,7 @@ import winsound
 import locale
 import contextlib
 import glob
+import getpass
 import traceback
 import inspect
 import ctypes
@@ -27,7 +28,7 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-01-10'
+APP_VERSION = 'v2021-01-15'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -213,7 +214,7 @@ def con_log(*msgs, **kwargs):
 def time_now_str(template:str='%Y-%m-%d_%H-%M-%S', use_locale:str='C'):
 	'String with time'
 	with locale_set(use_locale):
-		return time.strftime(template)
+		return datetime.datetime.now().strftime(template)
 
 def time_now():
 	'Returns datetime object'
@@ -278,11 +279,11 @@ def date_weekday(tdate=None, template:str='%A')->str:
 	return tdate.strftime(template)
 
 def date_weekday_num(tdate=None, template:str='%A')->str:
-	''' Weekday number (Monday is 0).
-		tdate may be datetime.date(2019, 6, 12)
+	''' Weekday number (Monday is 1).
+		tdate - None (today) or datetime.date(2019, 6, 12)
 	'''
 	if not tdate: tdate = datetime.date.today()
-	return tdate.weekday()
+	return tdate.weekday() + 1
 
 def time_sleep(interval):
 	''' Pauses for specified amount of time.
@@ -584,7 +585,11 @@ def inputbox(message:str, title:str=None
 		Problem: don't use default or you will get this value
 		whatever button user will press.
 	'''
-	if tdebug(): return input(f'inputbox ({message}): ')
+	if tdebug():
+		if is_pwd:
+			return getpass.getpass(f'inputbox ({message}): ')
+		else:
+			return input(f'inputbox ({message}): ')
 	title = _get_parent_func_name(title)
 	if is_pwd:
 		box_func = wx.PasswordEntryDialog
@@ -621,6 +626,10 @@ def file_dialog(title:str=None, multiple:bool=False
 		if multiple == True.
 		Will not work in console.
 	'''
+
+	def decap(s:str):
+		return s[:1].lower() + s[1:] if s else ''
+
 	title = _get_parent_func_name(title)
 	style = wx.FD_OPEN | wx.FD_FILE_MUST_EXIST
 	if multiple: style = style | wx.FD_MULTIPLE
@@ -630,8 +639,9 @@ def file_dialog(title:str=None, multiple:bool=False
 	if dialog.ShowModal() == wx.ID_OK:
 		if multiple:
 			fullpath = dialog.GetPaths()
+			fullpath = [decap(f) for f in fullpath]
 		else:
-			fullpath = dialog.GetPath()
+			fullpath = decap(dialog.GetPath())
 	else:
 		fullpath = None
 	dialog.Destroy()
@@ -651,6 +661,7 @@ def random_str(string_len:int=10, string_source:str=None)->str:
 def app_icon_text_set(text:str=APP_FULLNAME):
 	''' Set hint text for taskbar icon.
 	'''
+	global app
 	app.taskbaricon.set_icon(text=text)
 
 def create_default_ini_file():
@@ -659,7 +670,7 @@ def create_default_ini_file():
 	with open('settings.ini', 'xt', encoding='utf-8-sig') as ini:
 		ini.write(_DEFAULT_INI)
 
-def job_pool(jobs:list, pool_size:int=None):
+def job_pool(jobs:list, pool_size:int=None)->list:
 	'''	Launches 'pool_size' jobs at a time.
 		Returns the same jobs list.
 		See Job class for job properties.
@@ -774,7 +785,7 @@ def tdebug(*msgs, **kwargs)->bool:
 		if isinstance(msgs, dict):
 			msg += '\n'.join(f'{k}\t{v}' for k, v in msgs.items())
 		else:
-			msg += ' '.join(map(str, msgs)) + '\n'
+			msg += ' '.join(map(str, msgs))
 		print(msg, **kwargs)
 	return True
 
@@ -851,6 +862,22 @@ def decor_except_status(func):
 		else:
 			return func
 decor_except_status.homemade = True
+
+def safe(func):
+	''' Evaluate function inside 'try... except'
+		and return (True, func result)
+		or (False, Exception)
+	'''
+	@functools.wraps(func)
+	def wrapper(*args, **kwargs):
+		try:
+			return True, func(*args, **kwargs)
+		except Exception as e:
+			trace_li = traceback.format_exc().splitlines()
+			trace_str = '\n'.join(trace_li[-3:])
+			tdebug(f'safe: \n{trace_str}')
+			return False, e
+	return wrapper
 
 _TaskDialogIndirect = ctypes.WinDLL('comctl32.dll').TaskDialogIndirect
 
@@ -1081,6 +1108,16 @@ def table_print(table, use_headers=False, row_sep:str=None
 , repeat_headers:int=None
 , empty_str:str='-', consider_empty:list=[None, '']):
 	'''	Print list of lists as a table.
+
+		use_headers - if it's True - takes first row as
+			a headers. If list, then use this list as
+			a headers.
+		sorting - list of column numbers to sort by.
+			Example:
+				sorting=[0, 1] - sort table by first
+				and second column
+		sorting_func - sort with this function.
+		sorting_rev - sort in reverse order.
 		row_sep - string to repeat as a row separator.
 		headers_sep - same for header(s).
 	'''
@@ -1114,7 +1151,11 @@ def table_print(table, use_headers=False, row_sep:str=None
 	if isinstance(use_headers, list):
 		headers = use_headers
 	elif use_headers == True:
-		headers = rows.pop(0)
+		try:
+			headers = rows.pop(0)
+		except UnboundLocalError:
+			raise Exception(
+				'table_print: the first row must be list of headers')
 	for row in rows:
 		row[:] = [empty_str if i in consider_empty else str(i) for i in row]
 	if sorting: sort_key = itemgetter(*sorting)

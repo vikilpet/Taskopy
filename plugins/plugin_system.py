@@ -103,18 +103,27 @@ def window_title_set(window=None, new_title:str='')->int:
 		return hwnd
 
 def window_list(title_filter:str=None
+, class_filter:str=None
 , case_sensitive:bool=False)->list:
 	''' List titles of all the windows.
-		title_filter - optional filter
+		title_filter and title_filter - optional filter
+		class_filter - 
 	'''
+	
 	def get_title(hwnd, _):
 		title = win32gui.GetWindowText(hwnd)
 		if not title: return
 		titles.append(title)
+	
+	def get_class_name(hwnd, _):
+		class_name = win32gui.GetClassName(hwnd)
+		if class_name != class_filter: return
+		titles.append(win32gui.GetWindowText(hwnd))
 		
 	titles = []
+	func = get_class_name if class_filter else get_title
 	win32gui.EnumWindows(
-		get_title
+		func
 		, None
 	)
 	if title_filter:
@@ -132,7 +141,7 @@ def window_list(title_filter:str=None
 	return titles
 
 def window_find(title:str, exact:bool=True)->list:
-	''' Find window handle by Title.
+	''' Find window handle by title.
 		Returns list of found window handles.
 	'''
 	def check_title(hwnd, title:str):
