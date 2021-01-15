@@ -163,7 +163,7 @@ def load_modules():
 				continue
 			if not isinstance(obj, types.FunctionType):
 				setattr(crontab, obj_name, obj)
-				dev_print('non func', obj_name)
+				dev_print('non-func', obj_name)
 				continue
 			
 

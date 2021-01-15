@@ -178,12 +178,8 @@ def sound_play(fullpath, wait=False):
 		winsound.PlaySound(fi, winsound.SND_FILENAME + winsound.SND_ASYNC)
 
 def dev_print(*msg, **kwargs):
-	d = False
-	if getattr(__builtins__, 'sett', None):
-		d = sett.dev
-	else:
-		d = True
-	if d: tprint(*msg, **kwargs)
+	if ( '--developer' in sys.argv ) or tdebug():
+		tprint(*msg, **kwargs)
 
 def con_log(*msgs, **kwargs):
 	''' Log to console and logfile
@@ -198,11 +194,12 @@ def con_log(*msgs, **kwargs):
 			+ ' ' + str(m) + '\n'
 		)
 	try:
-		with open(
-			f'log\\{time.strftime(sett.log_file_name)}.log'
-			, 'ta+', encoding='utf-8'
-		) as f:
-			f.write(log_str)
+		if (sett := getattr(__builtins__, 'sett', None) ):
+			with open(
+				f'log\\{time.strftime(sett.log_file_name)}.log'
+				, 'ta+', encoding='utf-8'
+			) as f:
+				f.write(log_str)
 	except FileNotFoundError:
 		os.makedirs('log')
 		with open(
@@ -322,7 +319,10 @@ def var_set(var_name:str, value:str):
 					''')
 		conn.commit()
 	except sqlite3.OperationalError:
-		if sett.dev: raise
+		dev = False
+		if (sett := getattr(__builtins__, 'sett', None) ):
+			dev = sett.dev
+		if dev: raise
 		_create_table_var()
 		cur.execute(f'''
 			INSERT INTO variables (vname, vvalue)

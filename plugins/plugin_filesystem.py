@@ -706,7 +706,8 @@ def shortcut_create(fullpath, dest:str=None, descr:str=None
 	pythoncom.CoUninitialize()
 	return dest
 
-def file_print(fullpath, printer:str=None)->bool:
+def file_print(fullpath, printer:str=None
+, use_alternative:bool=False)->bool:
 	''' Prints file on specified printer.
 		Non-blocking.
 		Returns True on success.
@@ -714,17 +715,23 @@ def file_print(fullpath, printer:str=None)->bool:
 		system default printer.
 	'''
 	fullpath = _fix_fullpath(fullpath)
+	if ' ' in fullpath: fullpath = f'"{fullpath}"'
 	if not printer:
 		try:
 			printer = win32print.GetDefaultPrinter()
 		except RuntimeError:
 			return False
+	verb = 'print'
+	printer_str = f'"/d:{printer}"'
+	if use_alternative:
+		verb = 'printto'
+		printer_str = f'"{printer}"'
 	win32api.ShellExecute (
 		0
-		, 'print'
+		, verb
 		, fullpath
-		, f'/d:"{printer}"'
-		, "."
+		, printer_str
+		, '.'
 		, 0
 	)
 	return True
