@@ -317,8 +317,7 @@ def dir_purge(fullpath, days:int=0, recursive:bool=False
 			if file should be deleted.
 			Example: rule=lambda f: file_size(f) == 0
 	'''
-	fullpath = _fix_fullpath(fullpath)
-	counter = 0
+	
 	def robust_remove_file(fullpath):
 		nonlocal counter
 		if rule:
@@ -327,7 +326,9 @@ def dir_purge(fullpath, days:int=0, recursive:bool=False
 			file_delete(fullpath)
 			counter += 1
 		except:
+
 			pass
+		
 	def robust_remove_dir(fullpath):
 		nonlocal counter
 		if rule:
@@ -337,10 +338,14 @@ def dir_purge(fullpath, days:int=0, recursive:bool=False
 			counter += 1
 		except:
 			pass
+		
 	def file_print(fullpath):
 		nonlocal counter
 		counter += 1
 		print(os.path.basename(fullpath))
+
+	fullpath = _fix_fullpath(fullpath)
+	counter = 0
 	if days: delta = 24 * 3600 * days
 	if creation:
 		date_func = os.path.getctime

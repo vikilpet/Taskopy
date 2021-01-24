@@ -1,5 +1,6 @@
 import subprocess
 import os
+import sys
 import ctypes
 import psutil
 import time
@@ -77,6 +78,7 @@ def app_start(
 	, env:dict=None
 	, window:str=None
 	, priority:str=None
+	, its_script:bool=False
 ):
 	''' Starts application.
 		Returns:
@@ -94,6 +96,8 @@ def app_start(
 			or hidden('hid').
 		priority - 'above', 'below', 'high', 'idle', 'normal'
 			or 'realtime'.
+		its_script - it's a script from python Scripts\ directory
+			Examples: 'youtube-dl.exe', 'pipreqs.exe'.
 
 		https://docs.python.org/3/library/subprocess.html
 	'''
@@ -107,20 +111,33 @@ def app_start(
 		, 'realtime': subprocess.REALTIME_PRIORITY_CLASS
 	}
 	if isinstance(app_path, str):
-		app_path = [app_path]
-	elif not isinstance(app_path, list):
-		raise 'Unknown type of app_path'
+		if its_script:
+			if not app_path.endswith('.exe'): app_path += '.exe'
+			app_path = [
+				sys.executable
+				, os.path.join(
+					os.path.dirname(sys.executable)
+					, 'Scripts', app_path
+				)
+			]
+		else:
+			app_path = [app_path]
+	elif not isinstance(app_path, (list, tuple)):
+		raise Exception('Unknown type of app_path')
 	if app_args:
 		if isinstance(app_args, str):
 			app_path += app_args.split()
-		elif isinstance(app_args, list):
+		elif isinstance(app_args, (list, tuple)):
 			app_path += app_args
 		else:
-			raise 'Unknown type of app_args'
+			raise Exception('Unknown type of app_args')
 	app_path = list( map(str, app_path) )
 	if not cwd:
 		if ':\\' in app_path[0]:
-			cwd = os.path.dirname(app_path[0])
+			if its_script:
+				cwd = os.getcwd()
+			else:
+				cwd = os.path.dirname(app_path[0])
 	startupinfo = subprocess.STARTUPINFO()
 	creationflags = win32con.DETACHED_PROCESS
 	startupinfo.dwFlags = subprocess.STARTF_USESHOWWINDOW

@@ -90,25 +90,28 @@ def load_crontab(event=None)->bool:
 	global crontab
 	con_log(f'{lang.load_crontab} {os.getcwd()}')
 	try:
-		run_bef_reload = {}
+		run_bef_reload = []
 		if sys.modules.get('crontab') is None:
 			crontab = importlib.import_module('crontab')
 		else:
 			for task in tasks.task_list:
-				if not task['thread']: continue
-				run_bef_reload[task['task_function_name']] = task['thread']
+				if not task.get('thread'): continue
+				run_bef_reload.append(task)
 			tasks.close()
 			del sys.modules['crontab']
 			del crontab
 			crontab = importlib.import_module('crontab')
 		load_modules()
 		tasks = Tasks()
-		for key, value in run_bef_reload.items():
-			dev_print('still running', key)
+
+		for rtask in run_bef_reload:
+			dev_print('still running:', rtask['task_function_name'])
 			for task in tasks.task_list:
-				if task['task_function_name'] == key:
-					task['thread'] = value
-					task['running'] = True
+				if task['task_function_name'] != \
+				rtask['task_function_name']: continue
+				task['thread'] = rtask['thread']
+				task['last_start'] = rtask['last_start']
+				task['running'] = rtask['running']
 		tasks.run_at_crontab_load()
 		tasks.enabled = app.enabled
 		return True
@@ -163,7 +166,8 @@ def load_modules():
 				continue
 			if not isinstance(obj, types.FunctionType):
 				setattr(crontab, obj_name, obj)
-				dev_print('non-func', obj_name)
+				if not 'constants' in mdl_name:
+					dev_print('non-func', obj_name)
 				continue
 			
 
@@ -199,6 +203,7 @@ class Tasks:
 		s.task_list_http = []
 		s.task_list_idle = []
 		s.task_list_crontab_load = []
+		s.task_list_exit = []
 		s.event_handlers = []
 		s.idle_min = 0
 		s.http_server = None
@@ -246,6 +251,8 @@ class Tasks:
 				s.task_list_sys_startup.append(task_opts)
 			if task_opts['on_load']:
 				s.task_list_crontab_load.append(task_opts)
+			if task_opts['on_exit']:
+				s.task_list_exit.append(task_opts)
 			s.task_list.append(task_opts)
 			if task_opts['menu']:
 				if task_opts['submenu']:
@@ -659,10 +666,10 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			, lang.menu_disable if tasks.enabled else lang.menu_enable
 			, s.on_disable
 		)
+		create_menu_item(menu, lang.menu_list_run_tasks, s.running_tasks)
 		if sett.dev:
 			create_menu_item(menu, lang.menu_restart, s.on_restart)
 			create_menu_item(menu, lang.menu_edit_settings, s.on_edit_settings)
-			create_menu_item(menu, lang.menu_list_run_tasks, s.running_tasks)
 		if sett.dev or keyboard.is_pressed('shift'):
 			create_menu_item(menu, lang.menu_command, s.run_command)
 		create_menu_item(menu, lang.menu_exit, s.on_exit)
@@ -720,13 +727,15 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 				, return_button=True
 			)[1] != lang.button_close:
 				return False
+		for task in tasks.task_list_exit:
+			tasks.run_task(task, caller='exit')
 		con_log(lang.menu_exit)
 		tasks.close()
 		wx.CallAfter(s.Destroy)
 		s.frame.Close()
 		return True
 
-	def running_tasks(s, show_msg: bool = True
+	def running_tasks(s, show_msg:bool= True
 	, event=None)->list:
 		''' Prints running tasks and shows dialog
 			(if show_msg == True).
@@ -757,12 +766,10 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			duration = None
 			if t['last_start']:
 				last_start = t['last_start'].strftime(
-					'%y.%m.%d %H:%M:%S')
-				duration = time_diff_str(
-					t['last_start']
-					, time_now()
-					, '%H:%M:%S'
-				)
+					'%Y.%m.%d %H:%M:%S')
+				duration = str(
+					time_now() - t['last_start']
+				).split('.')[0]
 			table.append([
 				t['task_function_name']
 				, thread

@@ -15,7 +15,7 @@ from .tools import dev_print, time_sleep, tdebug \
 , locale_set
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.141 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.104 Safari/537.36'}
 
 def page_get(url:str, encoding:str='utf-8', session:bool=False
 , cookies:dict=None, headers:dict=None
@@ -86,20 +86,34 @@ def html_whitespace(text:str)->str:
 
 def file_download(url:str, destination:str=None
 , attempts:int=3, timeout:int=1
-, del_bad_file: bool = False, headers: dict = {}
-, safe=False
+, del_bad_file:bool=False, headers:dict={}
+, safe=False, size_limit:int=None
+, stop_event:threading.Event=None
 , **kwargs)->str:
 	''' Download file from url to destination and return fullpath.
-		Returns the full path to the downloaded file.
+		Returns a full path to the downloaded file.
 		attempts - how many times to retry download if failed.
 		If destination is a folder, then get filename from url.
 		If destination is None then download to temporary file.
+
+		stop_event - threading event to stop download.
+
+		Use 'Range' header to download first n bytes (server should
+		support this header):
+			headers = {'Range': 'bytes=0-1024'} 
 	'''
+	CHUNK_SIZE = 1_048_576
+	if isinstance(destination, (list, tuple)):
+		destination = os.path.join(*destination)
+		try:
+			os.makedirs(os.path.dirname(destination))
+		except FileExistsError:
+			pass
 	if destination is None:
 		dest = tempfile.TemporaryFile()
 	elif os.path.isdir(destination):
 		dest = open(
-			destination + '\\' + url.split('/')[-1]
+			os.path.join(destination, url.split('/')[-1])
 			, 'bw+'
 		)
 	else:
@@ -114,9 +128,13 @@ def file_download(url:str, destination:str=None
 				, **kwargs
 			)
 			with open(dest_file, 'wb+') as fd:
-				for chunk in req.iter_content(
-				chunk_size=1_048_576):
+				cur_size = 0
+				for chunk in req.iter_content(chunk_size=CHUNK_SIZE):
 					fd.write(chunk)
+					if stop_event and stop_event.is_set(): break
+					if not size_limit: continue
+					cur_size += len(chunk)
+					if size_limit <= cur_size: break
 			break
 		except Exception as e:
 			tdebug(f'dl attempt {attempt} failed'
@@ -375,10 +393,13 @@ def json_to_html(json_data, **kwargs)->str:
 		json=json_data, **kwargs)
 
 def http_header(url:str, header:str, **kwargs)->str:
-	'Get HTTP header of url'
-	headers={**_USER_AGENT}
-	if kwargs.get('headers'): headers.update(kwargs['headers'])
+	'''
+	Get HTTP header of URL or get them all (as a dictionary)
+	if header=='all'.
+	'''
+	headers={**_USER_AGENT, **kwargs.get('headers', {}) }
 	req = requests.head(url, headers=headers, **kwargs)
+	if header == 'all': return req.headers
 	return req.headers.get(header)
 
 def http_h_last_modified(url:str, **kwargs):

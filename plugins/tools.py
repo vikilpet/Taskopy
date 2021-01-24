@@ -2,6 +2,7 @@ import sys
 import os
 import time
 import datetime
+import pytz
 import threading
 import subprocess
 from multiprocessing.dummy import Pool as ThreadPool
@@ -28,10 +29,11 @@ import wx
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-01-15'
+APP_VERSION = 'v2021-01-24'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
+
 
 TASK_OPTIONS = [
 	['task_name', None]
@@ -62,6 +64,7 @@ TASK_OPTIONS = [
 	, ['date', None]
 	, ['event_log', None]
 	, ['event_xpath', '*']
+	, ['on_exit', False]
 ]
 
 APP_SETTINGS=[
@@ -96,9 +99,13 @@ else:
 	_APP_PATH = os.getcwd()
 
 _DB_FILE = _APP_PATH + r'\resources\db.sqlite3'
-_TIME_UNITS = {'msec':1, 'ms':1, 'sec':1000, 's':1000, 'min':60000
-	, 'm':60_000, 'hour':3_600_000, 'h':3_600_000, 'day': 86_400_000
-	, 'd': 86_400_000}
+_TIME_UNITS = {
+	'millisecond': 1, 'milliseconds': 1, 'msec': 1, 'ms': 1
+	, 'second': 1000, 'seconds': 1000, 'sec': 1000, 's': 1000
+	, 'minute': 60_000, 'minutes': 60_000, 'min': 60_000, 'm':60_000
+	, 'hour': 3_600_000, 'hours': 3_600_000, 'h': 3_600_000
+	, 'day': 86_400_000, 'days': 86_400_000, 'd': 86_400_000
+}
 
 _LOCALE_LOCK = threading.Lock()
 
@@ -194,12 +201,12 @@ def con_log(*msgs, **kwargs):
 			+ ' ' + str(m) + '\n'
 		)
 	try:
-		if (sett := getattr(__builtins__, 'sett', None) ):
-			with open(
-				f'log\\{time.strftime(sett.log_file_name)}.log'
-				, 'ta+', encoding='utf-8'
-			) as f:
-				f.write(log_str)
+		if not (sett := __builtins__.get('sett', None)): return
+		with open(
+			f'log\\{time.strftime(sett.log_file_name)}.log'
+			, 'ta+', encoding='utf-8'
+		) as f:
+			f.write(log_str)
 	except FileNotFoundError:
 		os.makedirs('log')
 		with open(
@@ -208,10 +215,15 @@ def con_log(*msgs, **kwargs):
 		) as f:
 			f.write(log_str)
 
-def time_now_str(template:str='%Y-%m-%d_%H-%M-%S', use_locale:str='C'):
+def time_now_str(template:str='%Y-%m-%d_%H-%M-%S'
+, use_locale:str='C', timezone=None):
 	'String with time'
+	if timezone == 'utc':
+		timezone = pytz.utc
+	elif isinstance(timezone, str):
+		timezone = pytz.timezone(timezone)
 	with locale_set(use_locale):
-		return datetime.datetime.now().strftime(template)
+		return datetime.datetime.now(tz=timezone).strftime(template)
 
 def time_now():
 	'Returns datetime object'
@@ -245,12 +257,14 @@ def time_diff(start, end, unit:str='sec')->int:
 	coef = _TIME_UNITS.get(unit, 1000) / 1000
 	return int(seconds // coef)
 
-def time_diff_str(start, end, str_format:str=None)->str:
-	'''	Returns time difference in string like that:
-		'3:01:35'
-		start and end should be in _datetime_ format.
-		str_format - standard time formating like '%y.%m.%d %H:%M:%S'
+def time_diff_str(start, end=None, str_format:str=None)->str:
+	'''	Returns time difference as a string like that:
+		'5 days, 3:01:35.837127'
+		*start* and *end* should be in _datetime_ format.
+		*str_format* - standard time formating like '%y.%m.%d %H:%M:%S'
+			(see tcon.DATE_FORMAT)
 	'''
+	if not end: end = datetime.datetime.now()
 	if not str_format: return str(end - start)
 	delta_as_time = time.gmtime( (end - start).total_seconds() )
 	return time.strftime(str_format, delta_as_time)
@@ -265,7 +279,7 @@ def date_month()->int:
 	return datetime.datetime.now().month
 
 def date_day(delta:dict=None )->int:
-	'''Returns current day'''
+	''' Returns current day of months (1-31) '''
 	if not delta: return datetime.datetime.now().day
 	return ( datetime.datetime.now() + datetime.timedelta(**delta) ).day
 
@@ -312,15 +326,16 @@ def var_set(var_name:str, value:str):
 	try:
 		conn = sqlite3.connect(_DB_FILE)
 		cur = conn.cursor()
-		cur.execute(f'''INSERT INTO variables (vname, vvalue)
-						VALUES('{var_name}', '{value}')
-						ON CONFLICT(vname)
-						DO UPDATE SET vvalue=excluded.vvalue;
-					''')
+		cur.execute(f'''
+			INSERT INTO variables (vname, vvalue)
+			VALUES('{var_name}', '{value}')
+			ON CONFLICT(vname)
+			DO UPDATE SET vvalue=excluded.vvalue;
+		''')
 		conn.commit()
 	except sqlite3.OperationalError:
 		dev = False
-		if (sett := getattr(__builtins__, 'sett', None) ):
+		if (sett := __builtins__.get('sett', None) ):
 			dev = sett.dev
 		if dev: raise
 		_create_table_var()
@@ -333,7 +348,7 @@ def var_set(var_name:str, value:str):
 		conn.commit()
 	conn.close()
 
-def var_get(var_name:str, table:str='variables')->str:
+def var_get(var_name:str, default=None, table:str='variables')->str:
 	''' Retrieves value from db.sqlite3 and returns '' if 
 		there is none.
 	'''
@@ -354,6 +369,7 @@ def var_get(var_name:str, table:str='variables')->str:
 	except sqlite3.OperationalError:
 		_create_table_var()
 		r = ''
+	if not r and default: r = default
 	conn.close()
 	return r
 
@@ -781,12 +797,15 @@ def tdebug(*msgs, **kwargs)->bool:
 	''' Is function launched from console? '''
 	if not hasattr(sys, 'ps1'): return False
 	if msgs:
-		msg = _get_parent_func_name(repl_undrsc=None) + ': '
+		if kwargs.get('par', True):
+			msg = _get_parent_func_name(repl_undrsc=None) + ': '
+		else:
+			msg = ''
 		if isinstance(msgs, dict):
-			msg += '\n'.join(f'{k}\t{v}' for k, v in msgs.items())
+			msg += '\n'.join(f'{k}:{v}' for k, v in msgs.items())
 		else:
 			msg += ' '.join(map(str, msgs))
-		print(msg, **kwargs)
+		print(msg)
 	return True
 
 def balloon(msg:str, title:str=APP_NAME, timeout:int=None, icon:str=None):
@@ -1261,7 +1280,7 @@ class HTTPReqData:
 		return f'HTTPReqData: unknown property «{name}»'
 
 class ExtensionReqData(HTTPReqData):
-	''' HTTP request data from 'SendToTaskopy'
+	''' HTTP request data helper for 'SendToTaskopy'
 		browser extension.
 	'''
 	def __init__(s):
