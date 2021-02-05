@@ -16,7 +16,9 @@ import win32gui
 import win32con
 import win32evtlog
 import uptime
+
 from plugins.tools import *
+from plugins.constants import *
 from plugins.plugin_filesystem import *
 from plugins.plugin_system import *
 from plugins.plugin_process import *
@@ -243,7 +245,7 @@ class Tasks:
 				app.taskbaricon.Bind(
 					wx.adv.EVT_TASKBAR_LEFT_DOWN
 					, lambda evt, temp=task_opts:
-						s.run_task(task=temp, caller='left_click')
+						s.run_task(task=temp, caller=CALLER_LEFT_CLICK)
 				)
 			if task_opts['startup']:
 				s.task_list_startup.append(task_opts)
@@ -270,6 +272,11 @@ class Tasks:
 				if not task_opts['http_dir']:
 					task_opts['http_dir'] = temp_dir()
 				s.task_list_http.append(task_opts)
+				if (wl := task_opts['http_white_list']):
+					if isinstance(wl, str):
+						task_opts['http_white_list'] = []
+						for ip in wl.split(','):
+							task_opts['http_white_list'].append(ip.strip())
 			if task_opts['idle']: s.add_idle_task(task_opts)
 			if task_opts['event_log']: s.add_event_handler(task_opts)
 		s.task_list_menu.sort( key=lambda k: k['task_name'].lower() )
@@ -346,7 +353,7 @@ class Tasks:
 			try:
 				sched_rule = (
 					'schedule.' + inter
-					+ f'.do(s.run_task, task=task, caller="scheduler")'
+					+ f'.do(s.run_task, task=task, caller="{CALLER_SCHEDULER}")'
 				)
 				eval(sched_rule)
 			except Exception as e:
@@ -383,7 +390,7 @@ class Tasks:
 					, unit='min'
 				) < 1:
 					return
-			s.run_task(task=task, caller='scheduler')
+			s.run_task(task=task, caller=CALLER_SCHEDULER)
 
 		dates = task['date']
 		if isinstance(dates, str): dates = [dates]
@@ -403,16 +410,16 @@ class Tasks:
 		if sett.hide_console:
 			window_hide(app.app_hwnd)
 		for task in s.task_list_startup:
-			s.run_task(task, caller='startup')
+			s.run_task(task, caller=CALLER_STARTUP)
 			
 	def run_at_sys_startup(s):
 		if uptime.uptime() < 120:
 			for task in s.task_list_sys_startup:
-				s.run_task(task, caller='sys_startup')
+				s.run_task(task, caller=CALLER_SYS_STARTUP)
 	
 	def run_at_crontab_load(s):
 		for task in s.task_list_crontab_load:
-			s.run_task(task, caller='load')
+			s.run_task(task, caller=CALLER_LOAD)
 	
 	def task_opt_set(s, task_function_name:str, option:str, value):
 		''' Set option from task dict in tasks.task_list
@@ -433,7 +440,7 @@ class Tasks:
 			return 'task_opt_get error: task not found'
 
 	def run_task(s, task:dict, caller:str=None, data=None
-				, result:list=None):
+	, result:list=None):
 		''' Logging, threading, error catching and other stuff.
 			task - dict with task options
 			caller - who actually launched the task.
@@ -551,14 +558,20 @@ class Tasks:
 		s.task_list_idle.append(task)
 	
 	def add_event_handler(s, task):
+
+		def run_task_with_data(reason, context, event):
+			di = xml_to_dict(
+				win32evtlog.EvtRender( event, win32evtlog.EvtRenderEventXml )
+			)
+			s.run_task(task=task, caller=CALLER_EVENT, data=DataEvent(di))
+
 		try:
 			s.event_handlers.append(
 				win32evtlog.EvtSubscribe(
 					task['event_log']
 					, win32evtlog.EvtSubscribeToFutureEvents
 					, None
-					, lambda *a, task=task: s.run_task(task=task
-						, caller='event')
+					, run_task_with_data
 					, None
 					, task['event_xpath']
 					, None
@@ -567,7 +580,8 @@ class Tasks:
 			)
 		except:
 			msgbox_warning(
-				lang.warn_event_format.format(task['task_name_full']) )
+				lang.warn_event_format.format( task['task_name_full'] )
+			)
 
 	def run_scheduler(s):
 		time.sleep(0.01)
@@ -590,7 +604,7 @@ class Tasks:
 					for task in s.task_list_idle:
 						if task['idle_done']: continue
 						if ms >= task['idle_dur']:
-							s.run_task(task, caller='idle')
+							s.run_task(task, caller=CALLER_IDLE)
 							task['idle_done'] = True
 			time.sleep(1)
 
@@ -600,6 +614,7 @@ class Tasks:
 			, close event handlers.
 		'''
 		if s.http_server:
+			dev_print('http stop')
 			s.http_server.shutdown()
 			s.http_server.socket.close()
 		try:
@@ -611,10 +626,11 @@ class Tasks:
 			s.global_hk.stop_listener()
 			s.global_hk = None
 		schedule.clear()
-		try:
-			for eh in s.event_handlers: eh.close()
-		except Exception as e:
-			dev_print(f'event close error: {e}')
+		for eh in s.event_handlers:
+			try:
+				eh.close()
+			except Exception as e:
+				dev_print(f'event close error: {e}')
 
 def create_menu_item(menu, task, func=None, parent_menu=None):
 	''' Task - task dict or menu item label
@@ -625,8 +641,7 @@ def create_menu_item(menu, task, func=None, parent_menu=None):
 		tn = task['task_name']
 		if task['hotkey']:
 			tn = f"{tn}\t{task['hotkey'].title()}"
-		func = lambda evt, temp=task: tasks.run_task(task=temp
-													, caller='menu')
+		func = lambda evt, temp=task: tasks.run_task(task=temp, caller=CALLER_MENU)
 	else:
 		tn = task
 	item = wx.MenuItem(menu, -1, tn)
@@ -728,7 +743,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			)[1] != lang.button_close:
 				return False
 		for task in tasks.task_list_exit:
-			tasks.run_task(task, caller='exit')
+			tasks.run_task(task, caller=CALLER_EXIT)
 		con_log(lang.menu_exit)
 		tasks.close()
 		wx.CallAfter(s.Destroy)
@@ -807,10 +822,18 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 	
 	def on_restart(s, event=None):
 		if not s.on_exit(): return
+		dev = None
+		if '--developer' in sys.argv: dev = '--developer'
 		if getattr(sys, 'frozen', False):
-			os.startfile(os.getcwd() + '\\' + APP_NAME)
+			file_open(
+				os.path.join(APP_PATH, APP_NAME + '.exe')
+				, parameters=dev
+			)
 		else:
-			file_open(f'{APP_PATH}\\{APP_NAME}.py')
+			file_open(
+				os.path.join(APP_PATH, APP_NAME + '.py')
+				, parameters=dev
+			)
 
 	def popup_menu_hk(s):
 		app.frame.SetFocus()

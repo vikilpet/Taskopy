@@ -1,12 +1,13 @@
 import time
 import os
 import re
+import fnmatch
 import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import cgi
 import urllib
 import tempfile
-from .tools import dev_print, app_log_get, tprint, HTTPReqData
+from .tools import dev_print, app_log_get, tprint, DataHTTPReq
 
 
 _TASK_TIMEOUT = 60
@@ -49,14 +50,18 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 					+ f' exception: {repr(e)[:150]}'
 				)
 				
-	def white_list_check(s):
+	def white_list_check(s, task=None)->bool:
 		if not sett.white_list: return True
 		if isinstance(sett.white_list, str):
 			sett.white_list = [
 				ip.strip() for ip in sett.white_list.split(',')
 			]
-		if s.address_string() in sett.white_list:
-			return True
+		white_list = sett.white_list.copy()
+		if task and task.get('http_white_list', None):
+			white_list.extend(task['http_white_list'])
+		for ip in white_list:
+			if fnmatch.fnmatch(s.address_string(), ip):
+				return True
 		if sett.dev:
 			s.log_message(
 				f'Request from unknown IP ({s.address_string()}): {s.path[:20]}'
@@ -75,6 +80,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 		s.wfile.write(bytes(page, 'utf-8'))
 
 	def launch_task(s, request_type:str):
+		
 		def start_data_processing(http_dir:str=None)->tuple:
 			''' Launch data_processing and calculate hash.
 				Returns (status:bool, data:dict, fullpath:str) or
@@ -98,9 +104,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 					)
 			else:
 				return False, data, None
-		if not s.white_list_check():
-			s.headers_and_page('403')
-			return
+		
 		try:
 			(
 				_, _
@@ -116,6 +120,9 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			s.headers_and_page('unknown request')
 			return
 		if s.url_path == '/log':
+			if not s.white_list_check():
+				s.headers_and_page('403')
+				return
 			s.headers_and_page(app_log_get())
 			return
 		try:
@@ -137,8 +144,11 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 				task = t
 				break
 		else:
-			s.s_print('task not found')
+			s.s_print('task not found:', task_name[:30])
 			s.headers_and_page('task not found')
+			return
+		if not s.white_list_check(task=task):
+			s.headers_and_page('403')
 			return
 		post_file = None
 		form_data = {}
@@ -151,7 +161,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 				return
 			form_data = data
 		try:
-			req_data = HTTPReqData(
+			req_data = DataHTTPReq(
 				client_ip=s.client_address[0]
 				, path=s.path, headers=dict(s.headers)
 				, params=params, form_data=form_data
@@ -239,7 +249,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 
 def http_server_start(tasks):
 	''' Starts HTTP server that will run 'tasks'.
-		tasks - instance of Tasks class.
+		tasks - instance of 'Tasks' class.
 	'''
 	try:
 		httpd = ThreadingHTTPServer(
@@ -259,7 +269,7 @@ def http_server_start(tasks):
 def _file_hash(fullpath:str)->str:
 	hash_md5 = hashlib.md5()
 	with open(fullpath, 'rb') as fi:
-		for chunk in iter(lambda: fi.read(4096), b''):
+		for chunk in iter(lambda: fi.read(104_857_600), b''):
 			hash_md5.update(chunk)
 	return hash_md5.hexdigest()
  

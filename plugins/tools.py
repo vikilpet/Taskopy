@@ -26,10 +26,11 @@ import win32api
 import win32gui
 import win32con
 import wx
+from lxml import objectify as _xml_objectify
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-01-24'
+APP_VERSION = 'v2021-02-05'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -53,6 +54,7 @@ TASK_OPTIONS = [
 	, ['result', False]
 	, ['http', False]
 	, ['http_dir', None]
+	, ['http_white_list', None]
 	, ['err_threshold', 0]
 	, ['err_counter', False]
 	, ['no_print', False]
@@ -173,9 +175,13 @@ def task(**kwargs):
 	return with_attrs
 
 def sound_play(fullpath, wait=False):
-	''' Play .wav sound. If fullpath is a folder then pick random file.
 	'''
-	if os.path.isdir(fullpath):
+	Play .wav sound. If fullpath is a folder then pick random file.
+	If fullpath is a list then pick random file from this list.
+	'''
+	if isinstance(fullpath, (list, tuple)):
+		fi = random.choice(fullpath)
+	elif os.path.isdir(fullpath):
 		fi = random.choice(glob.glob(fullpath + '\\*'))
 	else:
 		fi = fullpath
@@ -1100,14 +1106,14 @@ def hint(text:str, position:tuple=None)->int:
 		, hint_file
 		, '--text', str(text)
 	]
-	if position:
-		args += '--position', '{}_{}'.format(*position)
+	if position: args += '--position', '{}_{}'.format(*position)
 	if getattr(sys, 'frozen', False):
-		tprint('hint from .exe:')
-		mdl = importlib.util.spec_from_file_location(
-			'hint', location=hint_file)
-		mdl.main()
-		tprint('hint exit')
+		mdl = importlib.import_module('resources.hint')
+		threading.Thread(
+			target=mdl.main
+			, kwargs={'text': text, 'position': position}
+			, daemon=False
+		).start()
 	else:
 		return subprocess.Popen(args=args
 		, creationflags=win32con.DETACHED_PROCESS).pid
@@ -1244,7 +1250,7 @@ def screen_height()->int:
 	' Returns screen height in pixels '
 	return win32api.GetSystemMetrics(1)
 
-class HTTPReqData:
+class DataHTTPReq:
 	''' To keep HTTP request data in
 		object instead of dictionary.
 		{'User-Agent' : ... } ->
@@ -1277,9 +1283,9 @@ class HTTPReqData:
 		s.__dict__.update(form_data)
 
 	def __getattr__(s, name):
-		return f'HTTPReqData: unknown property «{name}»'
+		return f'DataHTTPReq: unknown property «{name}»'
 
-class ExtensionReqData(HTTPReqData):
+class DataBrowserExt(DataHTTPReq):
 	''' HTTP request data helper for 'SendToTaskopy'
 		browser extension.
 	'''
@@ -1291,9 +1297,63 @@ class ExtensionReqData(HTTPReqData):
 		s.src_url = ''
 		s.selection = ''
 
-
 	def __getattr__(s, name):
-		return f'ExtensionReqData: unknown property «{name}»'
+		return f'DataBrowserExt: unknown property «{name}»'
 
+def xml_to_dict(xml_str:str)->dict:
+	'''
+	Convert xml to dict, using lxml.
+	https://stackoverflow.com/a/31438789
+	'''
+
+	def xml_to_dict_recursion(xml_object):
+		dict_object = xml_object.__dict__
+		if not dict_object:
+			return xml_object
+		for key, value in dict_object.items():
+			dict_object[key] = xml_to_dict_recursion(value)
+		return dict_object
+
+	xml_obj = _xml_objectify.fromstring(xml_str)
+	return { xml_obj.tag: xml_to_dict_recursion(xml_obj) }
+
+class DataEvent:
+	'''
+	Windows event as object
+	'''
+
+	'''
+	{
+		'{http://schemas.microsoft.com/win/2004/08/events/event}Event': {
+			'System': {
+				'Provider': '',
+				'EventID': 174,
+				'Level': 4,
+				'Task': 0,
+				'Keywords': '0x80000000000000',
+				'TimeCreated': '',
+				'EventRecordID': 248380,
+				'Channel': 'Application',
+				'Computer': 'mz',
+				'Security': ''
+			},
+			'EventData': {'Data': 'Test'}
+		}
+	}
+	'''
+	def __init__(self, event_dict:dict):
+		di = list( event_dict.values() )[0]
+		di_sys = di.get('System', {})
+		self.provider = di_sys.get('Provider', None)
+		self.event_id = di_sys.get('EventID', None)
+		self.level = di_sys.get('Level', None)
+		self.task = di_sys.get('Task', None)
+		self.keywords = di_sys.get('Keywords', None)
+		self.time_created = di_sys.get('TimeCreated', None)
+		self.event_record_id = di_sys.get('EventRecordID', None)
+		self.channel = di_sys.get('Channel', None)
+		self.computer = di_sys.get('Computer', None)
+		self.security = di_sys.get('Security', None)
+		self.event_data = di.get('EventData', {}).get('Data', None)
 
 if __name__ != '__main__': patch_import()

@@ -78,13 +78,14 @@ def _parse_args():
 		, type=str, default='210_210_0')
 	return parser.parse_args()
 
-def main():
-	args = _parse_args()
-	position = None
-	if args.position:
-		position = tuple( map(int, args.position.split('_')) )
+def main(text:str=None, position:tuple=None):
+	if not text:
+		args = _parse_args()
+		text = args.text
+		if args.position:
+			position = tuple( map(int, args.position.split('_')) )
 	app = wx.App(False)
-	HintFrame(None, text=args.text, position=position)
+	HintFrame(None, text=text, position=position)
 	app.MainLoop()
 
 if __name__ == '__main__': main()

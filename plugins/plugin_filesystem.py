@@ -24,7 +24,7 @@ import shutil
 from .tools import random_str, tdebug
 
 
-_SIZE_UNITS = {'gb':1073741824, 'mb':1048576, 'kb':1024, 'b':1}
+_SIZE_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 
 def _dir_slash(dirpath:str)->str:
 	''' Adds a trailing slash if it's not there. '''
@@ -254,6 +254,21 @@ def file_size(fullpath, unit:str='b')->int:
 	fullpath = _fix_fullpath(fullpath)
 	e = _SIZE_UNITS.get(unit.lower(), 1)
 	return os.stat(fullpath).st_size // e
+
+def file_size_str(fullpath)->str:
+	'''
+	Size of file _for humans_. Example: '5.5 MB'
+	'''
+	if isinstance(fullpath, int):
+		size = fullpath
+	else:
+		fullpath = _fix_fullpath(fullpath)
+		size = os.stat(fullpath).st_size
+	for unit in list(_SIZE_UNITS.keys())[::-1]:
+		if abs(size) < 1024.0:
+			return f'{size:.1f} {unit.upper()}'
+		size /= 1024.0
+	return "%.1f%s" % (size, 'Yi')
 
 def file_ext(fullpath)->str:
 	''' Returns file extension in lower case
@@ -624,10 +639,16 @@ def file_hash(fullpath, algorithm:str='crc32'
 				hash_obj.update(chunk)
 		return hash_obj.hexdigest()
 	
-def drive_list()->list:
-	''' Returns a list of local drive letters '''
-	drives = win32api.GetLogicalDriveStrings().split('\000')[:-1]
-	return [d[0].lower() for d in drives]
+def drive_list(exclude:str='')->str:
+	'''
+	Returns a string of local drive letters in lower case.
+	Exclude - drives to exclude.
+	'''
+	drives = win32api.GetLogicalDriveStrings() \
+		.replace(':\\\000', '').lower()
+	for ch in exclude:
+		drives = drives.replace(ch, '')
+	return drives
 
 @contextmanager
 def working_directory(directory:str):

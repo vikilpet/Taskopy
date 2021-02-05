@@ -229,9 +229,8 @@ def idle_duration(unit:str='sec')->int:
 	return millis // unit_den
 
 def monitor_off():
-	''' Turn off the monitor
-	'''
-	win32gui.SendMessage(
+	''' Turn off the monitor '''
+	return win32gui.SendMessage(
 		win32con.HWND_BROADCAST
 		, win32con.WM_SYSCOMMAND
 		, win32con.SC_MONITORPOWER
