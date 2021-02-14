@@ -12,17 +12,17 @@ import warnings
 import threading
 import json2html
 from .tools import dev_print, time_sleep, tdebug \
-, locale_set
+, locale_set, safe
 
 
 _USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36'}
 
-def page_get(url:str, encoding:str='utf-8', session:bool=False
+def http_req(url:str, encoding:str='utf-8', session:bool=False
 , cookies:dict=None, headers:dict=None
 , http_method:str='get', json_data:str=None
 , post_file:str=None, post_hash:bool=False
 , post_form_data:dict=None, timeout:int=3
-, attempts:int=3, safe=False, **kwargs)->str:
+, attempts:int=3, **kwargs)->str:
 	''' Gets content of the specified URL '''
 	if (post_file or post_form_data): http_method = 'POST'
 	if http_method: http_method = http_method.lower()
@@ -87,7 +87,7 @@ def html_whitespace(text:str)->str:
 def file_download(url:str, destination:str=None
 , attempts:int=3, timeout:int=1
 , del_bad_file:bool=False, headers:dict={}
-, safe=False, size_limit:int=None
+, size_limit:int=None
 , stop_event:threading.Event=None
 , **kwargs)->str:
 	''' Download file from url to destination and return fullpath.
@@ -155,11 +155,12 @@ def html_clean(html_str:str, separator=' ')->str:
 	return soup.get_text(separator=separator)
 
 def html_element(url:str, element
-, clean: bool = True, element_num: int = 0
-, safe=False, **kwargs)->str:
+, clean:bool=True, element_num:int=0
+, attrib:str=None, **kwargs)->str:
 	''' Get text of specified page element (div).
 		Returns str or list of str.
 		url - URL or string with HTML.
+		attrib - get specific attribute from element (TODO: not only for 'all').
 		element - dict (list of dictionaries)
 			, or str (list of strings). If 'element' is a list
 			then 'html_element' returns list of found elements.
@@ -174,12 +175,12 @@ def html_element(url:str, element
 			Example for xpath:
 				element='/html/body/div[1]/div/div'
 		clean - remove html tags and spaces (Soup).
-		kwargs - additional arguments for page_get.
+		kwargs - additional arguments for http_req.
 	'''
 	if not url[:4].lower().startswith('http'):
 		html = url
 	else:
-		status, html = page_get(url=url, safe=True, **kwargs)
+		status, html = safe(http_req)(url=url, **kwargs)
 		if not status: raise html
 	if isinstance(element, list):
 		element_li = element
@@ -193,6 +194,26 @@ def html_element(url:str, element
 			, parser=lxml.html.HTMLParser(recover=True))
 	else:
 		parser = parser = BeautifulSoup(html, 'html.parser')
+	if element_num == 'all':
+		found_elem = parser.find_all(**element)
+		if found_elem:
+			if clean:
+				if attrib:
+					return [ e.get(attrib, None) for e in found_elem ]
+				else:
+					return [ 
+						html_whitespace(e.get_text())
+							for e in found_elem
+					]
+			else:
+				if attrib:
+					return [ e.get(attrib, None) for e in found_elem ]
+				else:
+					return list(map(str, found_elem))
+		else:
+			raise Exception('html_element: element not found')
+
+		return
 	for elem in element_li:
 		if isinstance(parser, BeautifulSoup):
 			if len(element_li) == 1:
@@ -238,7 +259,7 @@ def html_element(url:str, element
 		return result
 
 def json_element(source:str, element:list=None
-, safe=False, **kwargs):
+, **kwargs):
 	''' Download JSON by url and get its nested element by
 			map of keys like ['list', 0, 'someitem', 1]
 		source - URL to download or string with JSON.
@@ -257,10 +278,10 @@ def json_element(source:str, element:list=None
 				]
 					result = [71.99, 63.69, 83.0]
 		If nothing found then return exception.
-		kwargs - additional arguments for page_get.
+		kwargs - additional arguments for http_req.
 	'''
 	if source.lower().startswith('http'):
-		status, j = page_get(url=source, safe=True, **kwargs)
+		status, j = safe(http_req)(url=source, **kwargs)
 		if not status: raise j
 	else:
 		j = source
@@ -286,17 +307,17 @@ def json_element(source:str, element:list=None
 
 def xml_element(url:str, element:str
 , element_num:int=0, encoding:str='utf-8'
-, safe=False, **kwargs):
+, **kwargs):
 	'''	Download the XML document from the specified URL and get the value
 		by the list with 'map' of parent elements like ['foo', 'bar']
 		
 		element - XPath or list of XPath's.
 		Example: element='/result/array/msgContact[1]/msgCtnt'
 
-		kwargs - additional arguments for page_get.
+		kwargs - additional arguments for http_req.
 	'''
 	if url.startswith('http'):
-		status, content = page_get(url=url, **kwargs)
+		status, content = http_req(url=url, **kwargs)
 		if not status: raise content
 	else:
 		status = True
@@ -318,7 +339,7 @@ def xml_element(url:str, element:str
 	else:
 		return result[0]
 
-def tracking_status_rp(track_number:str, safe=False)->str:
+def tracking_status_rp(track_number:str)->str:
 	''' Get last status of Russian post parcel 
 	'''
 	url = r'https://www.pochta.ru/tracking?p_p_id=trackingPortlet_WAR_portalportlet&p_p_lifecycle=2&p_p_state=normal&p_p_mode=view&p_p_resource_id=getList&p_p_cacheability=cacheLevelPage&p_p_col_id=column-1&p_p_col_pos=1&p_p_col_count=2&barcodeList={}&pos'

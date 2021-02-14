@@ -128,8 +128,6 @@ def load_crontab(event=None)->bool:
 def load_modules():
 	''' (Re)Loads all application plugins and additional
 		crontab modules if any.
-		Adds safe execution (decor_except_status) for
-		functions in this modules.
 	'''
 	
 
@@ -180,8 +178,6 @@ def load_modules():
 			if hasattr(crontab, obj_name):
 				setattr(crontab, obj_name, decor_except_status(obj))
 		sys.modules[mdl_name] = mdl
-
-
 
 class SuppressPrint:
 	def __enter__(self):
@@ -560,10 +556,32 @@ class Tasks:
 	def add_event_handler(s, task):
 
 		def run_task_with_data(reason, context, event):
-			di = xml_to_dict(
-				win32evtlog.EvtRender( event, win32evtlog.EvtRenderEventXml )
-			)
-			s.run_task(task=task, caller=CALLER_EVENT, data=DataEvent(di))
+			' Converts event XML to dictionary '
+			r'''
+			<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+				<System>
+					<Provider Name="Microsoft-Windows-DistributedCOM" Guid="{1B562E86-B7AA-4131-BADC-B6F3A001407E}" EventSourceName="DCOM" /> 
+					<EventID Qualifiers="0">10010</EventID> 
+					<Version>0</Version> 
+					<Level>2</Level> 
+					<Task>0</Task> 
+					<Opcode>0</Opcode> 
+					<Keywords>0x8080000000000000</Keywords> 
+					<TimeCreated SystemTime="2021-02-10T12:24:20.581005200Z" /> 
+					<EventRecordID>729301</EventRecordID> 
+					<Correlation /> 
+					<Execution ProcessID="952" ThreadID="41804" /> 
+					<Channel>System</Channel> 
+					<Computer>DB</Computer> 
+					<Security UserID="S-1-5-20" /> 
+				</System>
+				<EventData>
+					<Data Name="param1">{AAC1009F-AB33-48F9-9A21-7F5B88426A2E}</Data> 
+				</EventData>
+			</Event>
+			'''
+			xml_str = win32evtlog.EvtRender( event, win32evtlog.EvtRenderEventXml )
+			s.run_task( task=task, caller=CALLER_EVENT, data=DataEvent(xml_str) )
 
 		try:
 			s.event_handlers.append(

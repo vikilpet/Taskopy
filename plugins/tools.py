@@ -26,11 +26,12 @@ import win32api
 import win32gui
 import win32con
 import wx
-from lxml import objectify as _xml_objectify
+from collections import defaultdict
+from xml.etree import ElementTree as _ElementTree
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-02-05'
+APP_VERSION = 'v2021-02-14'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -302,10 +303,19 @@ def date_weekday_num(tdate=None, template:str='%A')->str:
 	if not tdate: tdate = datetime.date.today()
 	return tdate.weekday() + 1
 
-def time_sleep(interval):
+def time_sleep(interval, unit:str=None):
 	''' Pauses for specified amount of time.
-		interval - int of seconds or str with unit like '5 min'
+		interval - number of seconds or str with unit like '5 min'
+		or tuple with (start, stop) for random interval (you should
+		provide unit in this case). Example:
+
+			time_sleep( (2,10), 'sec' )
+
 	'''
+	if isinstance(interval, (list, tuple)):
+		interval = str( random_num(*interval) ) + ' ' + unit
+	elif unit:
+		interval = str(interval) + ' ' + unit
 	val, coef = value_unit(interval, _TIME_UNITS, 1000)
 	time.sleep(val * coef / 1000)
 pause = time_sleep
@@ -642,20 +652,20 @@ def inputbox(message:str, title:str=None
 
 def file_dialog(title:str=None, multiple:bool=False
 , default_dir:str='', default_file:str=''
-, wildcard:str='', on_top:bool=True):
+, wildcard:str='', on_top:bool=True)->str:
 	''' Shows standard file dialog
 		and returns fullpath or list of fullpaths
 		if multiple == True.
 		Will not work in console.
 	'''
 
-	def decap(s:str):
-		return s[:1].lower() + s[1:] if s else ''
+	def decap(s:str): return s[:1].lower() + s[1:] if s else ''
 
 	title = _get_parent_func_name(title)
+	if tdebug(): return input(f'File dialog ({title}): ')
 	style = wx.FD_OPEN | wx.FD_FILE_MUST_EXIST
-	if multiple: style = style | wx.FD_MULTIPLE
-	if on_top: style = style | wx.STAY_ON_TOP
+	if multiple: style |= wx.FD_MULTIPLE
+	if on_top: style |= wx.STAY_ON_TOP
 	dialog = wx.FileDialog(None, title, wildcard=wildcard
 		, defaultDir=default_dir, defaultFile=default_file, style=style)
 	if dialog.ShowModal() == wx.ID_OK:
@@ -664,6 +674,29 @@ def file_dialog(title:str=None, multiple:bool=False
 			fullpath = [decap(f) for f in fullpath]
 		else:
 			fullpath = decap(dialog.GetPath())
+	else:
+		fullpath = None
+	dialog.Destroy()
+	return fullpath
+
+def dir_dialog(title:str=None, default_dir:str='', on_top:bool=True
+, must_exist:bool=True)->str:
+	''' Shows standard directory dialog
+		and returns fullpath.
+		Will not work in console.
+	'''
+
+	def decap(s:str): return s[:1].lower() + s[1:] if s else ''
+
+	title = _get_parent_func_name(title)
+	if tdebug(): return input(f'Dir dialog ({title}): ')
+	style = wx.DD_DEFAULT_STYLE
+	if must_exist: style |= wx.DD_DIR_MUST_EXIST
+	if on_top: style |= wx.STAY_ON_TOP
+	dialog = wx.DirDialog(None, message=title, defaultPath=default_dir
+		, style=style)
+	if dialog.ShowModal() == wx.ID_OK:
+		fullpath = decap(dialog.GetPath())
 	else:
 		fullpath = None
 	dialog.Destroy()
@@ -896,7 +929,11 @@ def safe(func):
 	@functools.wraps(func)
 	def wrapper(*args, **kwargs):
 		try:
-			return True, func(*args, **kwargs)
+			res = func(*args, **kwargs)
+			if isinstance(res, Exception):
+				return False, res
+			else:
+				return True, res
 		except Exception as e:
 			trace_li = traceback.format_exc().splitlines()
 			trace_str = '\n'.join(trace_li[-3:])
@@ -1300,60 +1337,153 @@ class DataBrowserExt(DataHTTPReq):
 	def __getattr__(s, name):
 		return f'DataBrowserExt: unknown property «{name}»'
 
-def xml_to_dict(xml_str:str)->dict:
-	'''
-	Convert xml to dict, using lxml.
-	https://stackoverflow.com/a/31438789
-	'''
+def _etree_to_dict(tree: _ElementTree):
+	di = {tree.tag: {} if tree.attrib else None}
+	children = list(tree)
+	if children:
+		dd = defaultdict(list)
+		for dc in map(_etree_to_dict, children):
+			for k, v in dc.items():
+				dd[k].append(v)
+		di = {tree.tag: {k: v[0] if len(v) == 1 else v
+					 for k, v in dd.items()}}
+	if tree.attrib:
+		di[tree.tag].update(('@' + k, v)
+						for k, v in tree.attrib.items())
+	if tree.text:
+		text = tree.text.strip()
+		if children or tree.attrib:
+			if text:
+			  di[tree.tag]['#text'] = text
+		else:
+			di[tree.tag] = text
+	return di
 
-	def xml_to_dict_recursion(xml_object):
-		dict_object = xml_object.__dict__
-		if not dict_object:
-			return xml_object
-		for key, value in dict_object.items():
-			dict_object[key] = xml_to_dict_recursion(value)
-		return dict_object
+def xml_to_dict(xml_str:str, remove_str:str=None)->dict:
+	'''
+	Converts a XML to dictionary using xml.etree
+	'''
+	if remove_str:
+		xml_str = xml_str.replace(remove_str, '')
+	tree = _ElementTree.XML(xml_str)
+	return _etree_to_dict(tree)
 
-	xml_obj = _xml_objectify.fromstring(xml_str)
-	return { xml_obj.tag: xml_to_dict_recursion(xml_obj) }
+_event_xmlns = ''
+def _xml_to_dict_event(event_xml:str)->dict:
+	global _event_xmlns
+	if not _event_xmlns:
+		_event_xmlns = re_find(event_xml, r'''(xmlns=('|").+?('|"))''')[0][0]
+	return xml_to_dict(event_xml, remove_str=_event_xmlns)
 
 class DataEvent:
 	'''
-	Windows event as object
-	'''
-
+	Windows event as an object.
 	'''
 	{
-		'{http://schemas.microsoft.com/win/2004/08/events/event}Event': {
+		'{http: //schemas.microsoft.com/win/2004/08/events/event}Event': {
 			'System': {
-				'Provider': '',
-				'EventID': 174,
-				'Level': 4,
-				'Task': 0,
-				'Keywords': '0x80000000000000',
-				'TimeCreated': '',
-				'EventRecordID': 248380,
-				'Channel': 'Application',
-				'Computer': 'mz',
-				'Security': ''
-			},
-			'EventData': {'Data': 'Test'}
+				'Provider': {
+					'value': ''
+					, 'attrib': {
+						'Name': 'Microsoft-Windows-DistributedCOM'
+						, 'Guid': '{1B562E86-B7AA-4131-BADC-B6F3A001407E}'
+						, 'EventSourceName': 'DCOM'
+					}
+				}
+				, 'EventID': {
+					'value': 10010
+					, 'attrib': {'Qualifiers': '0'}
+				}
+				, 'Version': {'value': 0, 'attrib': {} }
+				, 'Level': {'value': 2, 'attrib': {} }
+				, 'Task': {'value': 0, 'attrib': {} }
+				, 'Opcode': {'value': 0, 'attrib': {} }
+				, 'Keywords': {'value': '0x8080000000000000', 'attrib': {} }
+				, 'TimeCreated': {
+					'value': ''
+					, 'attrib': {'SystemTime': '2021-02-10T12:24:20.581005200Z'}
+				}
+				, 'EventRecordID': {'value': 729301, 'attrib': {} }
+				, 'Correlation': {'value': '', 'attrib': {} }
+				, 'Execution': {
+					'value': ''
+					, 'attrib': {'ProcessID': '952', 'ThreadID': '41804'}
+				}
+				, 'Channel': {'value': 'System', 'attrib': {} }
+				, 'Computer': {'value': 'DB', 'attrib': {} }
+				, 'Security': {'value': '', 'attrib': {'UserID': 'S-1-5-20'} }
+			}
+			, 'EventData': {
+				'Data': {
+					'value': '{AAC1009F-AB33-48F9-9A21-7F5B88426A2E}'
+					, 'attrib': {'Name': 'param1'}
+				}
+			}
 		}
 	}
-	'''
-	def __init__(self, event_dict:dict):
-		di = list( event_dict.values() )[0]
-		di_sys = di.get('System', {})
-		self.provider = di_sys.get('Provider', None)
-		self.event_id = di_sys.get('EventID', None)
-		self.level = di_sys.get('Level', None)
-		self.task = di_sys.get('Task', None)
-		self.keywords = di_sys.get('Keywords', None)
-		self.time_created = di_sys.get('TimeCreated', None)
-		self.event_record_id = di_sys.get('EventRecordID', None)
-		self.channel = di_sys.get('Channel', None)
-		self.computer = di_sys.get('Computer', None)
-		self.security = di_sys.get('Security', None)
-		self.event_data = di.get('EventData', {}).get('Data', None)
+
+	def __init__(self, xml_str:str):
+		r'''
+		di_sys:
+		{'Provider': {'@Name': 'LsaSrv',
+			'@Guid': '{199fe037-2b82-40a9-82ac-e1d46c792b99}',
+			'@EventSourceName': 'LsaSrv'},
+			'EventID': {'@Qualifiers': '0', '#text': '6041'},
+			'Version': '0',
+			'Level': '2',
+			'Task': '0',
+			'Opcode': '0',
+			'Keywords': '0x80000000000000',
+			'TimeCreated': {'@SystemTime': '2021-02-09T10:42:57.000000000Z'},
+			'EventRecordID': '89369733',
+			'Correlation': None,
+			'Execution': {'@ProcessID': '0', '@ThreadID': '0'},
+			'Channel': 'System',
+			'Computer': 'mz',
+			'Security': None}
+		'''
+		ATTRS = ['Provider', 'EventID', 'Level', 'Task'
+		, 'TimeCreated', 'EventRecordID', 'Channel'
+		, 'Computer', 'Security']
+		
+		full_dict = _xml_to_dict_event(xml_str)
+		di_sys = full_dict.get('Event', {}).get('System')
+		self.dict = full_dict
+		self.xml_str = xml_str
+
+		self.Provider = di_sys.get('Provider', {}).get('@Name')
+		self.EventID = 0
+		self.Level = ''
+		self.Task = 0
+		self.TimeCreated = di_sys.get('TimeCreated', {})
+		self.EventRecordID = 0
+		self.Channel = ''
+		self.Computer = ''
+		self.Security = None
+		self.EventData = {}
+		self.EventDataDict = \
+			full_dict.get('Event', {}).get('EventData', {})
+
+		for attr in ATTRS:
+			if ( e := di_sys.get(attr, None) ):
+				if isinstance(e, dict):
+					setattr(
+						self
+						, attr
+						, e.get('#text', getattr(self, attr, None) )
+					)
+				else:
+					setattr(self, attr, e)
+		if self.TimeCreated:
+			ts = self.TimeCreated.get('@SystemTime', '').split('.')[0]
+			self.TimeCreated = datetime.datetime.fromisoformat(ts)
+		for attr in ATTRS:
+			if isinstance(v := getattr(self, attr, ''), str) \
+			and v.isdigit():
+				setattr(self, attr, int(v))
+		if self.Channel == 'Security' and self.EventDataDict:
+			for di in self.EventDataDict.get('Data', {}):
+				self.EventData[di.get('@Name', '')] = di.get('#text', '')
+			return
 
 if __name__ != '__main__': patch_import()
