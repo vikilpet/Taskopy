@@ -19,7 +19,7 @@ def demo_task_1(startup=True):
 	# Show message
 	# «+» is for strings concatenation.
 	# «\n» is for a new line.
-	msgbox(
+	dialog(
 		'Welkome to Taskopy!'
 		+ '\nI am demo_task_1.'
 		+ '\nWhen you press OK I will open the crontab in notepad'
@@ -32,7 +32,7 @@ def demo_task_1(startup=True):
 # launching it manually:
 def demo_task_2(schedule='every().day.at("10:30")', menu=False):
 	# Show message box with exclamation point icon:
-	msgbox('Take your pills!', ui=MB_ICONEXCLAMATION)
+	dialog('Take your pills!')
 
 # Example of an HTTP task. «result» option means that the task should
 # return some value.
@@ -83,7 +83,7 @@ def taskopy_update(schedule='every().sunday.at("15:30")', submenu='Rare'):
 	if cur_ver == '':
 		# The task has been launched for the first time, 
 		# do not disturb the user:
-		print('First check for updates')
+		tprint('First check for updates')
 		# Just save the current version and exit:
 		var_set('taskopy_version', new_ver)
 		return
@@ -92,12 +92,17 @@ def taskopy_update(schedule='every().sunday.at("15:30")', submenu='Rare'):
 			'https://github.com/vikilpet/Taskopy/releases'
 			, {'name':'div', 'class':'markdown-body'}
 		)
-		print(f'New version of the Taskopy: {new_ver}')
-		if msgbox(
-			f'New version of the Taskopy: {new_ver}\n\n' + news[:200]
-			+ '\n\nOpen GitHub page?'
-			, dis_timeout=1
-			, ui=MB_YESNO + MB_ICONINFORMATION
-		) == IDYES:
+		tprint(f'New version of the Taskopy: {new_ver}')
+		choice = dialog(
+			f'New version of the Taskopy: {new_ver}'
+			, content=news[:200]
+			, buttons=['Open GitHub page', 'OK']
+		)
+		if choice == 1000:
+			# Save the new version:
 			var_set('taskopy_version', new_ver)
+			# Open page in default browser:
 			file_open('https://github.com/vikilpet/Taskopy/releases')
+		elif choice == 1001:
+			# Just save and do nothing
+			var_set('taskopy_version', new_ver)

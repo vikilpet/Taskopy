@@ -248,7 +248,8 @@ def window_is_visible(window=None)->bool:
 		return False
 
 def window_close(window=None, wait:bool=True)->bool:
-	'''	Closes window and returns True on success.
+	'''
+	Closes window and returns True on success.
 	'''
 	hwnd = window_get(window)
 	if not hwnd: return False

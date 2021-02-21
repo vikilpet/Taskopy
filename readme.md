@@ -72,6 +72,25 @@ This is what you need to put in round brackets in task (function). It is not act
 
 Format: **option name** (default value) — description.
 
+- **date** (None) - date and time for the task, e.g. '2020.09.01 22:53'. You can use '*' as a placeholder.
+- **event_log** (None) - the name of the Windows log (System, Application, Security, Setup), i.e. run the task on new events in this log. To test you can create a new event with this command in elevated cmd:
+
+	eventcreate /ID 174 /L Application /T Information /D "Test"
+
+	If a task has a *data* argument, then it will be assigned information about the event in the *DataEvent* format. Task example:
+
+		def windows_errors(
+			event_log = 'System'
+			, event_xpath = '*[System[Level < 4]]'
+			, data:DataEvent = None
+			, menu=False, log=False
+		):
+			balloon(f'Event (ID {data.EventID}): {data.Provider}\n{data.TimeCreated}')
+
+- **event_xpath** (*) - XPath to filter events. Example:
+
+	event_xpath='*[System[Level < 4]]' - only for new events with level less than 4.
+
 - **task_name** (None) — name for humans.
 - **menu** (True) — show in tray menu.
 - **hotkey** (None) — assign to global hotkey. Example: *hotkey='alt+ctrl+m'*
@@ -116,27 +135,12 @@ Format: **option name** (default value) — description.
 		settings.ini
 		taskopy.exe
 
+	If a task has a *data* argument, it will be assigned query information in *DataHTTPReq* format.
+
 	See also [settings](#settings) section for IP and port bindings.
 - **http_dir** - folder where to save files sent via HTTP POST request. If not set then use system temporary folder.
 - **caller** - place this option before other options and in task body you will know who actually launched task this time. Possible values: http, menu, scheduler, hotkey. See *def check_free_space* in [Task Examples](#task-examples).
-- **data** - use together with **http** and place this option before other options and it will filled with HTTP request data and you will able to work with them in task body.
-	*data.client_ip* — IP-address of request.
-	*data.path* — full relative path of request including */task?*
-	*data.post_file* - full path to the received file, which was sent to the task via POST request (see **page_get**).
-	*data* will contain all HTTP-request headers such as *User-Agent*, 	*Accept-Language* etc.
-	If you will construst request URL with common scheme *&param1=value1&param2=value2* they will be processed and added to data and you can access them in task body as data.param1, data.param2. Example:
-
-		def alert(data, http=True, single=False, menu=False):
-			msgbox(
-				data.text
-				# Use data.title if possible otherwise just use 'Alert' as message title.
-				, title=data.title if data.title else 'Alert'
-				, dis_timeout=1
-			)
-
-	Type in address bar of browser something like this:
-	http://127.0.0.1:8275/task?alert&text=MyMsg&title=MyTitle
-	and you will see messagebox with title and text from URL.
+- **data** - to pass any data to the task, e.g. *DataEvent* or *DataHTTPReq*.
 - **idle** - Perform the task when the user is idle for the specified time. For example, *idle='5 min'* - run when the user is idle for 5 minutes. The task is executed only once during the inactivity.
 - **err_threshold** - do not report any errors in the task until this threshold is exceeded.
 
@@ -156,7 +160,7 @@ Format: **setting** (default value) — description.
 ## Keywords
 ### Miscelanneous
 - **balloon(msg:str, title:str=APP_NAME,timeout:int=None, icon:str=None)** - shows *baloon* message from tray icon. `title` - 63 symbols max, `msg` - 255 symbols. `icon` - 'info', 'warning' or 'error'.
-- **dialog(msg:str=None, buttons:list=None, title:str=None, content:str=None, default_button:int=0, timeout:int=None)->int** - shows a dialog with many buttons. Returns ID of selected buttons starting with 1000.
+- **dialog(msg:str=None, buttons:list=None, title:str=None, content:str=None, default_button:int=0, timeout:int=None, return_button:bool=False)->int** - shows a dialog with many buttons. Returns ID of selected buttons starting with 1000.
 	*buttons* - a list with text on the buttons. Number of strings = number of buttons.
 	*title* - dialog title.
 	*content* - supplementary text.
@@ -169,7 +173,7 @@ Format: **setting** (default value) — description.
 	![Dialog EN](https://user-images.githubusercontent.com/43970835/79643653-13d4d380-81b5-11ea-9548-eb28fc515d7b.png)
 
 - **hint(text:str, position:tuple=None)->int** - shows a small window with the specified text. Only for the *Python* version. *position* - a tuple with coordinates. If no coordinates are specified, it appears in the center of the screen. Returns the PID of the hint process.
-- **Job(func, args, kwargs)** - class for concurrent function execution in *job_batch* and *job_pool*. Properties:
+- **Job(func, args, job_name:str='', kwargs)** - class for concurrent function execution in *job_batch* and *job_pool*. Properties:
 	- *result* - functional result
 	- *time* - time in seconds
 	- *error* - there was an error
@@ -226,6 +230,17 @@ Format: **setting** (default value) — description.
 	
 	If you need a message with many buttons see **dialog**.
 
+- **safe** - function wrapper for safe execution.
+	Example:
+
+		func(arg) -> result
+
+	With *safe*:
+
+		safe(func)(arg) -> True, result
+		OR
+		safe(func)(arg) -> False, Exception
+
 - **sound_play (fullpath:str, wait:bool)->str** - play .wav file. *wait* — do not pause task execution. If fullpath is a folder then pick random file.
 - **time_diff(start, end, unit:str='sec')->int** - returns difference between dates in units. *start* and *end* should be in datetime format.
 - **time_diff_str(start, end)->str** - returns difference between dates in string like that: '3:01:35'.	*start* and *end* should be in datetime format.
@@ -268,6 +283,7 @@ Format: **setting** (default value) — description.
 		]
 - **dir_copy(fullpath:str, destination:str)->int** - copy the folder and all its contents. Returns the number of errors.
 - **dir_delete(fullpath:str)** - delete directory.
+- **dir_dialog(title:str=None, default_dir:str='', on_top:bool=True, must_exist:bool=True)->str** - directory selection dialog.
 - **dir_exists(fullpath:str)->bool** - directory exists?
 - **dir_list(fullpath:str)->list:** - get list of files in directory.
 	Examples:
@@ -281,13 +297,19 @@ Format: **setting** (default value) — description.
 
 - **dir_size(fullpath:str, unit:str='b')->int** - folder size in specified units.
 - **dir_zip(source:str, destination:str)->str** - zip the folder return the path to the archive.
-- **drive_list()->list** - list of logical drives.
+- **dir_user_desktop()->str** - current user's *desktop* folder.
+- **dir_user_startup()->str** - *startup* folder of the current user*.
+- **drive_list(exclude:str='')->str** - string of logical drives letters.
 - **file_append(fullpath:str, content:str)->str** - appends *content* to a file. Creates fullpath if not specified. Returns fullpath.
-- **file_backup(fullpath:str, dest_dir:str='', now_format:str='_%y-%m-%d_%H-%M-%S')->str** - copy 'somefile.txt' to 'somefile_2019-05-19_21-23-02.txt'. *dest_dir* - destination directory. If not specified - current folder. Returns full path of new file.
+- **file_attr_set(fullpath, attribute:int=win32con.FILE_ATTRIBUTE_NORMAL)** - sets file attribute.
+- **file_backup(fullpath:str, dest_dir:str='', suffix_format:str='_%y-%m-%d_%H-%M-%S')->str** - copy 'somefile.txt' to 'somefile_2019-05-19_21-23-02.txt'. *dest_dir* - destination directory. If not specified - current folder. Returns full path of new file.
 - **file_basename(fullpath:str)->str** - returns basename: file name without parent folder and extension.
 - **file_backup(fullpath, folder:str=None)** - make copy of file with added timestamp.
 	*folder* — place copy to this folder. If omitted — place in original folder.
-- **file_copy(fullpath:str, destination:str)** - copy file to destination (fullpath or just folder).
+- **file_copy(fullpath, destination:str, copy_metadata:bool=False)** - copy file to destination (fullpath or just folder).
+- **file_date_a(fullpath)** - file access date .
+- **file_date_c(fullpath)** - file creation date.
+- **file_date_m(fullpath)** - file modification date.
 - **file_delete(fullpath:str)** - delete file. See also *file_recycle*.
 - **file_dialog(title:str=None, multiple:bool=False, default_dir:str='', default_file:str='', wildcard:str='', on_top:bool=True)** - Shows standard file dialog and returns fullpath or list of fullpaths if _multiple_ == True.
 - **file_dir(fullpath:str)->str:** - get parent directory name of file.
@@ -297,12 +319,13 @@ Format: **setting** (default value) — description.
 - **file_log(fullpath:str, message:str, encoding:str='utf-8', time_format:str='%Y.%m.%d %H:%M:%S')** - log *message* to *fullpath* file.
 - **file_move(fullpath:str, destination:str)** - move file to destination folder or file.
 - **file_name(fullpath:str)->str** - get file name without directory.
-- **file_name_add(fullpath:str, suffix:str='')->str** - adds a line (suffix) to the file name before the extension. If no suffix is specified, adds a line of random characters. Example:
+- **file_name_add(fullpath, suffix:str='', prefix:str='')->str** - adds a string (prefix or suffix) to the file name before the extension (or from beginning). Example:
 	
-	>>> file_name_add('my_file.txt', '_1')
+	>>> file_name_add('my_file.txt', suffix='_1')
 	'my_file_1.txt'
 
-- **file_name_fix(fullpath:str, repl_char:str='\_')->str** - replaces forbidden characters with _repl_char_. Removes leading and trailing spaces. Adds '\\\\?\\' for long paths.
+- **file_name_fix(filename:str, repl_char:str='\_')->str** - replaces forbidden characters with _repl_char_. Removes leading and trailing spaces. Adds '\\\\?\\' for long paths.
+- **file_print(fullpath, printer:str=None, use_alternative:bool=False)->bool** - prints the file on the specified printer.
 - **file_read(fullpath:str)->str:** - get content of file.
 - **file_recycle(fullpath:str, silent:bool=True)->bool** - move file to the recycle bin. *silent* - do not show standard windows dialog to confirm deletion. Returns True on successful operation.
 - **file_rename(fullpath:str, dest:str)->str** - rename the file. *dest* is the full path or just a new file name without a folder.
@@ -320,6 +343,12 @@ Format: **setting** (default value) — description.
 	*recursive* — delete from subfolders too.
 	*test* — do not actually delete files, only print them.
 	*rule* - function that gets the full file name and returns True if the file is to be deleted.
+- **shortcut_create(fullpath, dest:str=None, descr:str=None, icon_fullpath:str=None, icon_index:int=None, win_style:int=win32con.SW_SHOWNORMAL, cwd:str=None)->str** - creates a shortcut for a file. Returns full path of shortcut.
+	- dest - full name of the shortcut file. If not specified, the desktop folder of the current user is used.
+	- descr - shortcut description.
+	- icon_fullpath - source file for icon.
+	- icon_index - icon index. If *icon_fullpath* not specified then uses *fullpath* as source.
+
 - **temp_dir(new_dir:str=None)->str** - returns the path to the temporary folder. If *new_dir* is specified, it creates a subfolder in the temporary folder and returns its path.
 - **temp_file(suffix:str='')->str** - returns the name for the temporary file.
 
@@ -345,9 +374,13 @@ Format: **setting** (default value) — description.
 - **json_element(url:str, element:list)** - same as **html_element** but for JSON.
 	*element* — a list with a map to desired item.
 	Example: *element=['usd', 2, 'value']*
-- **page_get(url:str, encoding:str='utf-8', post_file:str=None, post_hash:bool=False)->str:** - download page by url and return it's html as a string. *post_file* - send this file with POST request. *post_hash* - add the checksum of the file to request headers to check the integrity (see [Task Options](#task-options)).
+- **http_req(url:str, encoding:str='utf-8', post_file:str=None, post_hash:bool=False)->str:** - download page by url and return it's html as a string. *post_file* - send this file with POST request. *post_hash* - add the checksum of the file to request headers to check the integrity (see [Task Options](#task-options)).
 - **pc_name()->str** - computer name.
 - **url_hostname(url:str)->str** - extract the domain name from the URL.
+- **xml_element(url:str, element:str, element_num:int=0, encoding:str='utf-8', \*\*kwargs)** - downloads the document from URL and returns the value by the specified XPath e.g:
+
+	element='/result/array/msgContact[1]/msgCtnt'
+
 
 ### System
 In the functions for working with windows, the *window* argument can be either a string with the window title or a number representing the window handle.
@@ -358,9 +391,10 @@ In the functions for working with windows, the *window* argument can be either a
 - **registry_get(fullpath:str)** - get value from Windows Registry.
 	*fullpath* — string like 'HKEY_CURRENT_USER\\Software\\Microsoft\\Calc\\layout'
 - **window_activate(window=None)->int** - bring window to front. *window* may be a string with title or integer with window handle.
+- **window_close(window=None, wait:bool=True)->bool** - closes window and returns True on success.
 - **window_find(title:str)->list** - find window by title. Returns list of all found windows.
 - **window_hide(window=None)->int** - hide window.
-- **window_list(title_filter:str=None)->list** - list of titles of all windows. *title_filter* - optional filter for titles.
+- **window_list(title_filter:str=None, class_filter:str=None, case_sensitive:bool=False)->list** - list of titles of all windows. *title_filter* - optional filter for titles.
 **- window_on_top(window=None, on_top:bool=True)->int** - makes the window to stay always on top.
 - **window_show(window=None)->int** - show window.
 - **window_title_set(window=None, new_title:str='')->int** - change window title from *cur_title* to *new_title*
@@ -377,7 +411,7 @@ In the functions for working with windows, the *window* argument can be either a
 	*wait* — wait until application will be closed.
 - **file_open(fullpath:str)** - open file or URL in default application.
 - **process_close(process, timeout:int=10, cmd_filter:str=None)** - soft completion of the process: first all windows belonging to the specified process are closed, and after the timeout (in seconds) the process itself is killed, if still exists. *cmd_filter* - kill only processes with that string in command line.
-- **process_exist(process, cmd:str=None)->bool** - checks whether the process exists and returns a PID or False. *cmd* is an optional command line search. This way you can distinguish between processes with the same executable but different command lines.
+- **process_exist(process, cmd_filter:str=None, user_filter:str=None)->bool** - checks whether the process exists and returns a PID or False. *cmd* is an optional command line search. This way you can distinguish between processes with the same executable but different command lines.
 - **process_list(name:str='', cmd_filter:str=None)->list** - get list of processes with that name. Item in list is a *DictToObj* object with this attributes:
 	*pid* — PID of found process.
 	*name* — short name of executable.
@@ -394,6 +428,8 @@ In the functions for working with windows, the *window* argument can be either a
 
 - **process_cpu(pid:int, interval:int=1)->float** - CPU usage of process with specified PID. *interval* in seconds - how long to measure.
 - **process_kill(process, cmd_filter:str=None)** - kill process or processes. *process* may be an integer so only process with this PID will be terminated. If *process* is a string then kill every process with that name. *cmd_filter* - kill only processes with that string in command line.
+- **screen_width()->int** - width of screen.
+- **screen_height()->int** - height of screen.
 - **service_start(service:str, args:tuple=None)** - starts the service.
 - **service_stop(service:str)->tuple** - stops the service.
 - **service_running(service:str)->bool** - the service is up and running?
@@ -524,25 +560,17 @@ In the functions for working with windows, the *window* argument can be either a
 ## Firefox extension
 https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/
 
-Extension adds item to context menu. With it you can run task in Taskopy. In object _data_ of this task will be passed this (if any):
-	- data.page_url - URL of current page
-	- data.link_url - URL of link that was clicked
-	- data.editable - it is editable field?
-	- data.selection - selectioin text
-	- data.media_type - type of object (image, video etc)
-	- data.src_url - link to object source.
+Extension adds item to context menu. With it you can run task in Taskopy.
 
-_editable_ property is boolean, the rest are strings.
-
-In the extension settings specify the URL of your task that will process data, for example:
+In extension settings specify the URL of your task that will process data, for example:
 
 	http://127.0.0.1:8275/task?get_data_from_browser
 
-This task should have _data_ and _http=True_ properties.
+This task should have _data_ and _http=True_ properties. The *data* argument will be passed information about the request in *DataBrowserExt* format.
 
 Example - play Youtube video in PotPlayer:
 
-	def get_data_from_browser(data, http=True, menu=False, log=False):
+	def get_data_from_browser(data:DataBrowserExt, http=True, menu=False, log=False):
 		if ('youtube.com' in data.link_url
 		or 'youtu.be' in data.link_url):
 			app_start(

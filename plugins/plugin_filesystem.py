@@ -287,20 +287,17 @@ def file_basename(fullpath)->str:
 	fname = os.path.basename(fullpath)
 	return os.path.splitext(fname)[0]
 
-def file_name_add(fullpath, suffix:str='')->str:
-	''' Adds suffix to a file name before extension:
-		file_name_add('my_file.txt', '_1') ->
-		my_file_1.txt
-		If suffix if not specified then add
-		random string.
+def file_name_add(fullpath, suffix:str='', prefix:str='')->str:
+	''' Adds suffix or prefix to a file name.
+		Example:
+			file_name_add('my_file.txt', suffix='_1') -> my_file_1.txt
 	'''
 	fullpath = _fix_fullpath(fullpath)
-	if suffix:
-		suffix = str(suffix)
-	else:
-		suffix = '_' + random_str(5)
-	name, ext = os.path.splitext(fullpath)
-	return name + suffix + ext
+	if suffix: suffix = str(suffix)
+	if prefix: prefix == str(prefix)
+	par_dir, name = os.path.split(fullpath)
+	basename, ext = os.path.splitext(name)
+	return os.path.join(par_dir, prefix + basename + suffix + ext)
 
 def file_name_fix(filename:str, repl_char:str='_')->str:
 	''' Replaces forbidden characters with repl_char.
@@ -354,7 +351,7 @@ def dir_purge(fullpath, days:int=0, recursive:bool=False
 		except:
 			pass
 		
-	def file_print(fullpath):
+	def fn_print(fullpath):
 		nonlocal counter
 		counter += 1
 		print(os.path.basename(fullpath))
@@ -377,8 +374,8 @@ def dir_purge(fullpath, days:int=0, recursive:bool=False
 	files = glob.glob(fullpath, recursive=recursive)
 	current_time = time.time()
 	if test:
-		file_func = file_print
-		dir_func = file_print
+		file_func = fn_print
+		dir_func = fn_print
 	else:
 		file_func = robust_remove_file
 		dir_func = robust_remove_dir
@@ -691,7 +688,7 @@ def file_attr_set(fullpath
 
 def shortcut_create(fullpath, dest:str=None, descr:str=None
 , icon_fullpath:str=None, icon_index:int=None
-, win_style:int=win32con.SW_SHOWNORMAL, cwd:str=None):
+, win_style:int=win32con.SW_SHOWNORMAL, cwd:str=None)->str:
 	''' Creates shortcut to the file.
 		Returns full path of shortcut.
 

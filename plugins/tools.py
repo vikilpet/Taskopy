@@ -31,11 +31,16 @@ from xml.etree import ElementTree as _ElementTree
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-02-14'
+APP_VERSION = 'v2021-02-21'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
 
+
+
+if not __builtins__.get('uglobals', None):
+	uglobals = {}
+	__builtins__['uglobals'] = uglobals
 
 TASK_OPTIONS = [
 	['task_name', None]
@@ -92,7 +97,7 @@ hide_console=False
 
 [HTTP]
 server_ip=127.0.0.1
-server_port=80
+server_port=8275
 white_list=127.0.0.1
 '''
 
@@ -1002,7 +1007,7 @@ class _TaskDialogConfig(ctypes.Structure):
 def dialog(msg:str=None, buttons:list=None
 , title:str=None, content:str=None, flags:int=None
 , common_buttons:int=None, default_button:int=0
-, timeout:int=None, icon=None, return_button:bool= False
+, timeout:int=None, icon=None, return_button:bool=False
 , wait:bool=True)->int:
 	''' Shows dialog with multiple optional buttons.
 		Returns ID of selected button starting with 1000

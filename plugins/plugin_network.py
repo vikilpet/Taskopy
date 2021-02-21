@@ -15,7 +15,7 @@ from .tools import dev_print, time_sleep, tdebug \
 , locale_set, safe
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.182 Safari/537.36'}
 
 def http_req(url:str, encoding:str='utf-8', session:bool=False
 , cookies:dict=None, headers:dict=None
@@ -308,7 +308,7 @@ def json_element(source:str, element:list=None
 def xml_element(url:str, element:str
 , element_num:int=0, encoding:str='utf-8'
 , **kwargs):
-	'''	Download the XML document from the specified URL and get the value
+	'''	Downloads a XML document from the specified URL and gets the value
 		by the list with 'map' of parent elements like ['foo', 'bar']
 		
 		element - XPath or list of XPath's.

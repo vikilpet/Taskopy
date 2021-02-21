@@ -72,6 +72,25 @@
 
 Формат: **название опции** (значение по умолчанию) — описание.
 
+- **date** (None) - дата и время для выполнения задачи, например '2020.09.01 22:53'. Можно использовать '*' вместо числа.
+- **event_log** (None) - название журнала Windows (System, Application, Security, Setup), т.е. выполнять задачу при новых событиях в этом журнале. Для тестирования можно создать новое событие в журнале Application в консоли от админа:
+
+	eventcreate /ID 174 /L Application /T Information /D "Test"
+
+	Если у задачи есть аргумент *data* то ему будет назначена информация о событии в формате *DataEvent*. Пример задачи:
+
+		def windows_errors(
+			event_log = 'System'
+			, event_xpath = '*[System[Level < 4]]'
+			, data:DataEvent = None
+			, menu=False, log=False
+		):
+			balloon(f'Event (ID {data.EventID}): {data.Provider}\n{data.TimeCreated}')
+
+- **event_xpath** (*) - XPath для отфильтровывания нужных событий. Например:
+
+	event_xpath='*[System[Level < 4]]' - только для событий журнала Система с уровнем меньше четырёх.
+
 - **task_name** (None) — имя задачи. Можно использовать пробелы, русский язык и т.д.
 - **menu** (True) — показывать в меню у иконки в трее.
 - **hotkey** (None) — привязать к глобальной горячей клавише. Например: _hotkey='alt+ctrl+m'_
@@ -116,27 +135,12 @@
 		settings.ini
 		taskopy.exe
 
+	Если у задачи есть *data* аргумент, то в него будет передана информация о запросе в формате *DataHTTPReq*.
+
 	Смотрите в разделе [Настройки](#settings) про привязывание HTTP-сервера к IP и порту.
 - **http_dir** - папка, куда сохранять файлы, отправленные через HTTP POST запрос. Если не указано - временная папка.
 - **caller** - при указании в свойствах, в эту переменную будет записано, кто именно запустил задачу. Возможные варианты: http, menu, scheduler, hotkey. caller следует указывать перед другими свойствами задачи.
-- **data** - для использования совместо с опцией **http**. Должен идти перед другими свойствами задачи. В эту переменную будут переданы данные из HTTP-запроса, так что с ними можно будет работать в тексте задачи, обращаясь как к свойству. Как минимум там будут содержаться:
-	*data.client_ip* — IP-адрес того, кто выполнил запрос.
-	*data.path* — весь относительный путь из URL, начиная с *task?*.
-	*data.post_file* - путь к полученному файлу, который был отправлен задаче через POST запрос (смотрите **page_get**).
-	Также в data будут содержаться стандартные HTTP-заголовки, такие как *User-Agent*, *Accept-Language* и т.д.
-	Если в URL добавить какие-либо параметры согласно общепринятой схеме *param1=value1&param2=value2*, то они будут обработаны и также добавлены в data, таким образом вы можете обращаться к ним в теле задаче как *data.param1* и *data.param2*. Пример:
-
-		def alert(data, http=True, single=False, menu=False):
-			msgbox(
-				data.text
-				# Если есть, испльзовать data.title, иначе 'Alert'
-				, title=data.title if data.title else 'Alert'
-				, dis_timeout=1
-			)
-		
-	После этого набираем в браузере такой запрос:
-	http://127.0.0.1:8275/task?alert&text=MyMsg&title=MyTitle
-	В результате чего будет выведено сообщение с заголовком *MyTitle* и текстом *MyMsg*.
+- **data** - для того, чтобы передать в задачу какие-либо данные, например *DataEvent* или *DataHTTPReq*.
 - **idle** - выполнить задачу, когда пользователь бездействует указанное время. Например *idle='5 min'* — выполнить при бездействии в 5 минут. Задача выполняется только один раз в течении бездействия.
 - **err_threshold** - не сообщать об ошибках в задаче, пока данный порог не будет превышен.
 
@@ -156,7 +160,7 @@
 ## Ключевые слова
 ### Общие
 - **balloon(msg:str, title:str=APP_NAME,timeout:int=None, icon:str=None)** - показывает сообщение у иконки в трее. `title` - 63 символа максимум, `msg` - 255 символов. `icon` - 'info', 'warning' или 'error'.
-- **dialog(msg:str=None, buttons:list=None, title:str=None, content:str=None, default_button:int=0, timeout:int=None)->int** - показывает сообщение с несколькими кнопками. Возвращает ID нажатой кнопки, начиная с 1000.
+- **dialog(msg:str=None, buttons:list=None, title:str=None, content:str=None, default_button:int=0, timeout:int=None, return_button:bool=False)->int** - показывает сообщение с несколькими кнопками. Возвращает ID нажатой кнопки, начиная с 1000.
 	*buttons* - список строк с текстом на кнопках. Сколько строк, столько и кнопок.
 	*title* - заголовок.
 	*content* - дополнительный текст.
@@ -169,7 +173,7 @@
 	![Dialog RU](https://user-images.githubusercontent.com/43970835/79643801-bc833300-81b5-11ea-8a2e-ea6baa045480.png)
 
 - **hint(text:str, position:tuple=None)->int** - показывает небольшое окошко с указанным текстом. Только для *Python* версии. *position* - кортеж с координатами. Если координаты не указаны - появится в центре экрана. Возвращает PID процесса с окошком.
-- **Job(func, args, kwargs)** - класс для параллельного запуска функций в *job_batch* и *job_pool*. Свойства:
+- **Job(func, args, job_name:str='', kwargs)** - класс для параллельного запуска функций в *job_batch* и *job_pool*. Свойства:
 	- *result* - результат выполнения функции
 	- *time* - время в секундах
 	- *error* - произошла ошибка
@@ -226,6 +230,17 @@
 
 	Если вам нужно сообщение с несколькими кнопками, смотрите **dialog**.
 
+- **safe** - function wrapper for safe execution.
+	Пример:
+
+		func(arg) -> result
+
+	С использованием *safe*:
+
+		safe(func)(arg) -> True, result
+		OR
+		safe(func)(arg) -> False, Exception
+
 - **sound_play (fullpath:str, wait:bool)->str** - воспроизвести .wav файл. *wait* — ждать конца воспроизведения. Если *fullpath* это папка, значит проиграть случайный файл из неё.
 - **time_diff(start, end, unit:str='sec')->int** - возвращает разницу между датами в выбранных единицах. *start* и *end* должны быть в формате datetime.
 - **time_diff_str(start, end)->str** - возвращает разницу между датами в виде строки типа: '3:01:35'. *start* и *end* должны быть в формате datetime.
@@ -267,7 +282,8 @@
 			...	
 		]
 - **dir_copy(fullpath:str, destination:str)->int** - копировать папку и всё её содержимое. Возвращает количество ошибок при копировании.
-- **dir_delete(fullpath:str):** - удалить папку.
+- **dir_delete(fullpath:str)** - удалить папку.
+- **dir_dialog(title:str=None, default_dir:str='', on_top:bool=True, must_exist:bool=True)->str** - диалог выбора папки.
 - **dir_exists(fullpath:str)->bool** - папка существует?
 - **dir_list(fullpath:str)->list:** - получить список файлов в папке.
 	Примеры:
@@ -281,28 +297,35 @@
 
 - **dir_size(fullpath:str, unit:str='b')->int** - размер папки в указанных единицах.
 - **dir_zip(source:str, destination:str)->str** - упаковать папку в архив и вернуть путь к архиву.
-- **drive_list()->list** - список логических дисков.
+- **dir_user_desktop()->str** - папка *рабочего стола* текущего пользователя.
+- **dir_user_startup()->str** - папка *автозагрузки* текущего пользователя.
+- **drive_list(exclude:str='')->str** - строка с буквами логических дисков.
 - **file_append(fullpath:str, content:str)->str** - дописывает *content* к файлу. Создаёт файл, если он не существует. Возвращает полное имя файла.
-- **file_backup(fullpath:str, dest_dir:str='', now_format:str='_%y-%m-%d_%H-%M-%S')->str** - копировать 'somefile.txt' в 'somefile_2019-05-19_21-23-02.txt'. *dest_dir* - папка назначения. Если не указана - текущая папка файла. Возвращает полное имя нового файла.
+- **file_attr_set(fullpath, attribute:int=win32con.FILE_ATTRIBUTE_NORMAL)** - изменение атрибутов файла.
+- **file_backup(fullpath:str, dest_dir:str='', suffix_format:str='_%y-%m-%d_%H-%M-%S')->str** - копировать 'somefile.txt' в 'somefile_2019-05-19_21-23-02.txt'. *dest_dir* - папка назначения. Если не указана - текущая папка файла. Возвращает полное имя нового файла.
 - **file_basename(fullpath:str)->str** - возвращает *базовое* имя файла - без папки и расширения.
-- **file_backup(fullpath, folder:str=None):** - сделать копию файла, дописав в имя текущую дату и время.
+- **file_backup(fullpath, folder:str=None)** - сделать копию файла, дописав в имя текущую дату и время.
 	*folder* — папка, куда следует поместить копию. Если не указано — поместить в папке оригинального файла.
-- **file_copy(fullpath:str, destination:str):** - копировать файл. *destination* может быть папкой или полным путём к копии файла.
-- **file_delete(fullpath:str):** - удалить файл. Смотрите так же *file_recycle*.
+- **file_copy(fullpath, destination:str, copy_metadata:bool=False)** - копировать файл. *destination* может быть папкой или полным путём к копии файла.
+- **file_date_a(fullpath)** - дата открытия файла.
+- **file_date_c(fullpath)** - дата создания файла.
+- **file_date_m(fullpath)** - дата изменения файла.
+- **file_delete(fullpath:str)** - удалить файл. Смотрите так же *file_recycle*.
 - **file_dialog(title:str=None, multiple:bool=False, default_dir:str='', default_file:str='', wildcard:str='', on_top:bool=True)** - открывает стандартный диалог выбора файла. Возвращает полный путь или список полных путей, если _multiple_ == True.
 - **file_dir(fullpath:str)->str:** - получить полное имя папки, в которой файл лежит.
 - **file_exists(fullpath:str)->bool** - файл существует?
 - **file_ext(fullpath:str)->str** - расширение файла без точки.
 - **file_hash(fullpath:str, algorithm:str='crc32')->str**: - возвращает хэш файла. *algorithm* - 'crc32' или любой алгоритм из hashlib ('md5', 'sha512' и т.д.)
 - **file_log(fullpath:str, message:str, encoding:str='utf-8', time_format:str='%Y.%m.%d %H:%M:%S')** - записать *message* в файл *fullpath*.
-- **file_move(fullpath:str, destination:str):** - переместить файл.
+- **file_move(fullpath:str, destination:str)** - переместить файл.
 - **file_name(fullpath:str)->str** - получить имя файла без папки.
-- **file_name_add(fullpath:str, suffix:str='')->str** - добавляет строку (суффикс) к файлу перед расширением. Если суффикс не указан, добавляет строку из случайных символов. Пример: 
+- **file_name_add(fullpath, suffix:str='', prefix:str='')->str** - добавляет строку (префикс или суффикс) к файлу перед расширением. Пример: 
 	
-	>>> file_name_add('my_file.txt', '_1')
+	>>> file_name_add('my_file.txt', suffix='_1')
 	'my_file_1.txt'
 
-- **file_name_fix(fullpath:str, repl_char:str='\_')->str** - заменяет запрещённые символы на _repl_char_. Удаляет пробелы в начале и в конце. Добавляет '\\\\?\\' к длинным путям.
+- **file_name_fix(filename:str, repl_char:str='\_')->str** - заменяет запрещённые символы на _repl_char_. Удаляет пробелы в начале и в конце. Добавляет '\\\\?\\' к длинным путям.
+- **file_print(fullpath, printer:str=None, use_alternative:bool=False)->bool** - распечатывает файл на указанном принтере.
 - **file_read(fullpath:str)->str:** - получить содержимое файла.
 - **file_recycle(fullpath:str, silent:bool=True)->bool** - переместить файл в корзину. *silent* - не показывать стандартный системный диалог подтверждения удаления в корзину. Возвращает True в случае успешного удаления.
 - **file_rename(fullpath:str, dest:str)->str** - переименовать файл. *dest* — полный путь или просто новое имя файла без папки.
@@ -314,12 +337,18 @@
 - **drive_free(letter:str, unit:str='GB')->int:** - размер свободного места на диске (gb, mb, kb, b).
 - **is_directory(fullpath:str)->bool:** - указанный путь является папкой?
 - **path_exists(fullpath:str)->bool:** - указанный путь существует (не важно файл это или папка)?
-- **dir_purge(fullpath:str, days:int=0, recursive=False, creation:bool=False, test:bool=False, rule=None):** - удалить файлы из папки старше указанного числа дней.
+- **dir_purge(fullpath:str, days:int=0, recursive=False, creation:bool=False, test:bool=False, rule=None)** - удалить файлы из папки старше указанного числа дней.
 	Если *days* == 0 значит удалить вообще все файлы в папке.
 	*creation* — использовать дату создания, иначе использовать дату последнего изменения.
 	*recursive* — включая подпапки.
 	*test* — не удалять на самом деле, а просто вывести в консоль список файлов, которые должны быть удалены.
 	*rule* - функция, получающая полное имя файла и возвращающая True, если файл должен быть удалён.
+- **shortcut_create(fullpath, dest:str=None, descr:str=None, icon_fullpath:str=None, icon_index:int=None, win_style:int=win32con.SW_SHOWNORMAL, cwd:str=None)->str** - создаёт ярлык для файла. Возвращает полный путь к файлу ярлыка.
+	- dest - полное имя файла ярлыка. Если не указано, используется папка рабочего стола текущего пользователя.
+	- descr - описание
+	- icon_fullpath - файл-источник для иконки.
+	- icon_index - номер иконки в файле. Если *icon_fullpath* не указан, используется *fullpath*.
+
 - **temp_dir(new_dir:str=None)->str** - возвращает путь ко временной папке. Если указана *new_dir* - создаёт подпапку во временной папке и возвращает её путь.
 - **temp_file(suffix:str='')->str** - возвращает имя для временного файла.
 
@@ -342,12 +371,16 @@
 	Посмотрите на задачу *get_current_ip* в [Примеры задач](#task-examples)
 - **html_clean(html_str:str, separator=' ')->str** - очищает строку от HTML тэгов.
 - **is_online(*sites, timeout:int=2)->int:** - проверяет, есть ли доступ в Интернет, используя HEAD запросы к указанным сайтам. Если сайты не указаны, то использует google и yandex.
-- **json_element(url:str, element:list):** - аналог **html_element** для JSON.
+- **json_element(url:str, element:list)** - аналог **html_element** для JSON.
 	*element* — список с картой для нахождения нужного элемента в структуре json.
 	Пример: *element=['usd', 2, 'value']*
-- **page_get(url:str, encoding:str='utf-8', post_file:str=None, post_hash:bool=False)->str:** - скачать указанную страницу и вернуть её содержимое. *post_file* - отправить указанный файл POST запросом. *post_hash* - в запросе указать хэш файла для проверки целостности (смотрите [Свойства задачи](#свойства-задачи)).
+- **http_req(url:str, encoding:str='utf-8', post_file:str=None, post_hash:bool=False)->str:** - скачать указанную страницу и вернуть её содержимое. *post_file* - отправить указанный файл POST запросом. *post_hash* - в запросе указать хэш файла для проверки целостности (смотрите [Свойства задачи](#свойства-задачи)).
 - **pc_name()->str** - имя компьютера.
 - **url_hostname(url:str)->str** - извлечь имя домена из URL.
+- **xml_element(url:str, element:str, element_num:int=0, encoding:str='utf-8', \*\*kwargs)** - скачивает документ по ссылке и возвращает значение по указанному XPath. Например:
+
+	element='/result/array/msgContact[1]/msgCtnt'
+
 
 ### Система
 В функциях для работы с окнами аргумент *window* может быть или строкой с заголовком окна или числом, представляющим handle окна.
@@ -358,9 +391,10 @@
 - **registry_get(fullpath:str)** - получить значение ключа из реестра Windows.
 	*fullpath* — строка вида 'HKEY_CURRENT_USER\\\Software\\\Microsoft\\\Calc\\\layout'
 - **window_activate(window=None)->int** - вывести указанное окно на передний план. *window* может строкой с заголовком или числовым хэндлом нужного окна.
+- **window_close(window=None, wait:bool=True)->bool** - закрывает окно и возвращает True при успехе.
 - **window_find(title:str)->list** - вернуть список хэндлов окон, с указанным заголовком.
 - **window_hide(window=None)->int** - скрыть окно.
-- **window_list(title_filter:str=None)->list** - список заголовков всех окон. *title_filter* - вернуть только заголовки с этой подстрокой.
+- **window_list(title_filter:str=None, class_filter:str=None, case_sensitive:bool=False)->list** - список заголовков всех окон. *title_filter* - вернуть только заголовки с этой подстрокой.
 **- window_on_top(window=None, on_top:bool=True)->int** - делает указанное окно поверх других окон.
 - **window_show(window=None)->int** - показать окно.
 - **window_title_set(window=None, new_title:str='')->int** -  найти окно по заголовку *cur_title* и поменять на *new_title*.
@@ -371,13 +405,13 @@
 - **mail_send(recipient:str, subject:str, message:str, smtp_server:str, smtp_port:int, smtp_user:str, smtp_password:str)** - отправить письмо. Поддерживает отправку с русским заголовком и русским текстом.
 
 ### Процессы
-- **app_start(app_path:str, app_args:str, wait:bool=False):** - запустить приложение. Если *wait=True* — возвращает код возврата, а если *False*, то возвращает PID созданного процесса.
+- **app_start(app_path:str, app_args:str, wait:bool=False)** - запустить приложение. Если *wait=True* — возвращает код возврата, а если *False*, то возвращает PID созданного процесса.
 	*app_path* — полный путь к исполняемому файлу.
 	*app_args* — аргументы командной строки.
 	*wait* — приостановить выполнение задачи, пока не завершится запущенный процесс.
-- **file_open(fullpath:str):** - открыть файл или URL в приложении по умолчанию.
+- **file_open(fullpath:str)** - открыть файл или URL в приложении по умолчанию.
 - **process_close(process, timeout:int=10, cmd_filter:str=None)** - мягкое завершение процесса: сначала закрываются все окна, принадлежащие указанному процессу, а по истечении таймаута (в секундах) убивается сам процесс, если ещё существует. *cmd_filter* - убивать только процессы, содержащие эту строку в командной строке.
-- **process_exist(process, cmd:str=None)->bool** - проверяет, существует ли процесс и возвращает PID или False. *cmd* - необязательная строка для поиска в командной строке. Таким образом можно различать процессы с одинаковым исполняемым файлом но разной командной строкой.
+- **process_exist(process, cmd_filter:str=None, user_filter:str=None)->bool** - проверяет, существует ли процесс и возвращает PID или False. *cmd* - необязательная строка для поиска в командной строке. Таким образом можно различать процессы с одинаковым исполняемым файлом но разной командной строкой.
 - **process_list(name:str='', cmd_filter:str=None)->list —** получить список процессов. Список содержит объекты *DictToObj*, у которых есть следующие свойства:
 	*pid* — числовой идентификатор.
 	*name* — имя файла.
@@ -394,6 +428,8 @@
 
 - **process_cpu(pid:int, interval:int=1)->float** - процент загрузки процессора указанным PID. *interval* — время замера в секундах.
 - **process_kill(process, cmd_filter:str=None)** - убить указанный процесс. *process* может быть строкой с именем исполняемого файла, тогда будут завершены все процессы с таким названием, либо это может быть числовой PID, и тогда будет завершён только указанный процесс. *cmd_filter* - убивать только процессы, содержащие эту строку в командной строке.
+- **screen_width()->int** - ширина экрана.
+- **screen_height()->int** - высота экрана.
 - **service_start(service:str, args:tuple=None)** - запускает службу.
 - **service_stop(service:str)->tuple** - останавливает службу.
 - **service_running(service:str)->bool** - служба запущена?
@@ -509,11 +545,11 @@
 - **winamp_close** - закрыть Винамп.
 - **winamp_fast_forward** - перемотка на 5 секунд вперёд.
 - **winamp_fast_rewind** - перемотка на 5 секунд назад.
-- **winamp_notification():** - показать уведомление (только для скина «Modern»).
-- **winamp_pause():** - пауза.
-- **winamp_play():** - воспроизведение.
+- **winamp_notification()** - показать уведомление (только для скина «Modern»).
+- **winamp_pause()** - пауза.
+- **winamp_play()** - воспроизведение.
 - **winamp_status()->str:** - статус воспроизведения ('playing', 'paused' или 'stopped').
-- **winamp_stop():** - остановить.
+- **winamp_stop()** - остановить.
 - **winamp_toggle_always_on_top** - установить/снять окно поверх всех окон.
 - **winamp_toggle_main_window** - показать/скрыть окно Винампа.
 - **winamp_toggle_media_library** - показать/скрыть окно библиотеки.
@@ -524,21 +560,13 @@
 ## Расширение для Firefox
 https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/
 
-Расширение просто добавляет пункт в контекстное меню. С помощью него можно запустить задачу из Taskopy. В переменную _data_ задачи передаётся (если есть):
-	- data.page_url - URL текущей страницы
-	- data.link_url - URL ссылки, на которой кликнули
-	- data.editable - элемент редактируемый?
-	- data.selection - текст выделения
-	- data.media_type - вид объекта (изображение, видео)
-	- data.src_url - ссылка источник объекта.
-
-Свойство _editable_ логическое, остальные строковые.
+Расширение просто добавляет пункт в контекстное меню. С помощью него можно запустить задачу из Taskopy.
 
 В настройках расширения указываете URL вашей задачи, которая будет обрабатывать данные, например:
 
 	http://127.0.0.1:8275/task?get_data_from_browser
 
-У этой задачи должны быть указаны _data_ и _http=True_
+У этой задачи должны быть указаны атрибуты _data_ и _http=True_. В атрибут *data* будут передана информация в формате *DataBrowserExt*.
 
 Пример задачи для проигрывания Youtube видео в PotPlayer:
 
