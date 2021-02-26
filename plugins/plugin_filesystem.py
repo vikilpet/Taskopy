@@ -315,8 +315,22 @@ def file_name_fix(filename:str, repl_char:str='_')->str:
 			new_fn += char
 	return new_fn
 
+def dir_files(fullpath)->list:
+	'''
+	Returns list of full filenames of all files
+	in the given directory and its subdirectories.
+	'''
+	fullpath = _fix_fullpath(fullpath)
+	fl = []
+	for parent_dir, _, fnames in os.walk(fullpath):
+		fl.extend(
+			[ os.path.join(parent_dir, fn) for fn in fnames ]
+		)
+	return fl
+
 def dir_purge(fullpath, days:int=0, recursive:bool=False
-, creation:bool=False, test:bool=False, rule=None):
+, creation:bool=False, test:bool=False, rule=None
+, print_del:bool=False):
 	''' Deletes files older than x days.
 		Returns number of deleted files and folders. 
 		days=0 - delete everything
@@ -325,36 +339,41 @@ def dir_purge(fullpath, days:int=0, recursive:bool=False
 		recursive - delete in subfolders too. Empty subfolders 
 			will be deleted.
 		test - only print files and folders that should be removed.
-		rule - function that receivs file name and returns True
-			if file should be deleted.
-			Example: rule=lambda f: file_size(f) == 0
+		print_del - print path when deleting.
+		rule - function that gets a file name and returns True
+			if the file is to be deleted. Example:
+			 
+				rule=lambda f: file_size(f) == 0
 	'''
-	
-	def robust_remove_file(fullpath):
-		nonlocal counter
-		if rule:
-			if not rule(fullpath): return
-		try:
-			file_delete(fullpath)
-			counter += 1
-		except:
+	def print_d(fn:str, reason:str):
+		if print_del: print(reason, os.path.relpath(fn, fullpath))
 
-			pass
-		
-	def robust_remove_dir(fullpath):
+	def robust_remove_file(fn):
 		nonlocal counter
 		if rule:
-			if not rule(fullpath): return
+			if not rule(fn): return
 		try:
-			shutil.rmtree(fullpath)
+			print_d(fn, 'file')
+			file_delete(fn)
 			counter += 1
 		except:
 			pass
 		
-	def fn_print(fullpath):
+	def robust_remove_dir(fn):
+		nonlocal counter
+		if rule:
+			if not rule(fn): return
+		try:
+			print_d(fn, 'dir')
+			shutil.rmtree(fn)
+			counter += 1
+		except:
+			pass
+		
+	def fn_print(fn):
 		nonlocal counter
 		counter += 1
-		print(os.path.basename(fullpath))
+		print(os.path.relpath(fn, fullpath))
 
 	fullpath = _fix_fullpath(fullpath)
 	counter = 0
@@ -381,11 +400,8 @@ def dir_purge(fullpath, days:int=0, recursive:bool=False
 		dir_func = robust_remove_dir
 	for fi in files:
 		if os.path.isdir(fi):
-			folders = glob.glob(f'{fi}\\*')
-			files_count = sum(
-				[1 for sub in folders if not os.path.isdir(sub)]
-			)
-			if files_count == 0: dir_func(fi)
+			if not any( len(t[2]) for t in os.walk(fi) ):
+				dir_func(fi)
 		else:
 			if days:
 				try:
@@ -398,9 +414,8 @@ def dir_purge(fullpath, days:int=0, recursive:bool=False
 	return counter
 
 def file_name(fullpath)->str:
-	''' Returns only name from fullpath
-	'''
-	return os.path.basename(_fix_fullpath(fullpath))
+	''' Returns only name from fullpath '''
+	return os.path.basename( _fix_fullpath(fullpath) )
 
 def file_name_wo_ext(fullpath)->str:
 	return os.path.splitext(_fix_fullpath(fullpath))[0]
@@ -454,6 +469,7 @@ def dir_list(fullpath, only_files:bool=False)->list:
 				dir_list('d:\\folder\\**\\*.jpg')
 	'''
 	fullpath = _fix_fullpath(fullpath)
+	if not '*' in fullpath: fullpath = os.path.join(fullpath, '*')
 	recursive = ('**' in fullpath)
 	paths = glob.glob(fullpath, recursive=recursive)
 	if fullpath.endswith('\\**'):

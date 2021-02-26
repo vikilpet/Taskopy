@@ -3,6 +3,7 @@ import socket
 import requests
 import urllib
 import lxml.html
+import html
 import tempfile
 from hashlib import md5
 from bs4 import BeautifulSoup
@@ -15,7 +16,7 @@ from .tools import dev_print, time_sleep, tdebug \
 , locale_set, safe
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.182 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.190 Safari/537.36'}
 
 def http_req(url:str, encoding:str='utf-8', session:bool=False
 , cookies:dict=None, headers:dict=None
@@ -98,6 +99,19 @@ def file_download(url:str, destination:str=None
 
 		stop_event - threading event to stop download.
 
+		In case of an exception, the exception object has a *fullpath* attribute
+		, so it is possible to do something with it. Example:
+
+			status, data = safe(file_download)('https://...')
+			if status:
+				tprint('successfull download:', data)
+			else:
+				tprint(
+					'all that we got:', data.fullpath
+					, 'due to error:', repr(data)
+				)
+			
+
 		Use 'Range' header to download first n bytes (server should
 		support this header):
 			headers = {'Range': 'bytes=0-1024'} 
@@ -120,6 +134,7 @@ def file_download(url:str, destination:str=None
 		dest = open(destination, 'bw+')
 	dest_file = dest.name
 	dest.close()
+	last_exc = None
 	for attempt in range(attempts):
 		try:
 			req = requests.get(
@@ -137,6 +152,7 @@ def file_download(url:str, destination:str=None
 					if size_limit <= cur_size: break
 			break
 		except Exception as e:
+			last_exc = e
 			tdebug(f'dl attempt {attempt} failed'
 				+ f', err="{repr(e)[:50]}...", url={url[-30:]}')
 	else:
@@ -145,7 +161,8 @@ def file_download(url:str, destination:str=None
 				os.remove(dest_file)
 			except Exception as e:
 				dev_print('Couldn not delete a bad file: ' + str(e))
-		raise Exception(f'No more attempts ({attempt}), url={url[:100]}')
+		last_exc.fullpath = dest_file
+		raise last_exc
 	return dest_file
 
 def html_clean(html_str:str, separator=' ')->str:
@@ -280,7 +297,7 @@ def json_element(source:str, element:list=None
 		If nothing found then return exception.
 		kwargs - additional arguments for http_req.
 	'''
-	if source.lower().startswith('http'):
+	if source[:4].lower().startswith('http'):
 		status, j = safe(http_req)(url=source, **kwargs)
 		if not status: raise j
 	else:
@@ -378,6 +395,19 @@ def url_hostname(url:str, second_lvl:bool=True)->str:
 		suf_len = -2
 	domain = '.'.join(domain.split('.')[suf_len:])
 	return domain
+
+def net_url_decode(url:str, encoding:str='utf-8')->str:
+	' Decode URL '
+	return urllib.parse.unquote(url, encoding=encoding)
+
+def net_html_unescape(html_str:str)->str:
+	'''
+	Decodes HTML escaped symbols:
+		
+		"That&#039;s an example" -> "That's an example"
+
+	'''
+	return html.unescape(html_str)
 
 
 

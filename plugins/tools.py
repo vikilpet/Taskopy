@@ -31,7 +31,7 @@ from xml.etree import ElementTree as _ElementTree
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-02-21'
+APP_VERSION = 'v2021-02-26'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
