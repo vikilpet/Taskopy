@@ -1,7 +1,7 @@
 import win32api
 import win32gui
 import win32con
-from .tools import dialog
+from .tools import dialog, patch_import
 from .plugin_process import app_start
 import plugins.constants as tcon
 
@@ -73,8 +73,4 @@ def winamp_track_info(sep:str='   ')->str:
 	channels = win32api.SendMessage(h, win32con.WM_USER, 2, 126)
 	return f'{samplerate}kHz{sep}{bitrate}kbps{sep}{channels}ch'
 
-
-
-
-
-
+if __name__ != '__main__': patch_import()

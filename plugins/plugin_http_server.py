@@ -7,7 +7,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import cgi
 import urllib
 import tempfile
-from .tools import dev_print, app_log_get, tprint, DataHTTPReq
+from .tools import dev_print, app_log_get, tprint, DataHTTPReq \
+, patch_import
 
 
 _TASK_TIMEOUT = 60
@@ -58,7 +59,11 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			]
 		white_list = sett.white_list.copy()
 		if task and task.get('http_white_list', None):
-			white_list.extend(task['http_white_list'])
+			if isinstance(task['http_white_list'], str):
+				wl = [ ip.strip() for ip in task['http_white_list'].split(',') ]
+			else:
+				wl = task['http_white_list']
+			white_list.extend(wl)
 		for ip in white_list:
 			if fnmatch.fnmatch(s.address_string(), ip):
 				return True
@@ -83,8 +88,8 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 		
 		def start_data_processing(http_dir:str=None)->tuple:
 			''' Launch data_processing and calculate hash.
-				Returns (status:bool, data:dict, fullpath:str) or
-				(status, error:str, None)
+				Returns (True, data:dict, fullpath:str) or
+				(False, error:str, None)
 			'''
 			status, data, fullpath, file_hash_header = \
 				s.data_processing(http_dir)
@@ -110,7 +115,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 				_, _
 				, s.url_path, s.url_query, s.url_fragment
 			) = (
-				u.lower() for u in urllib.parse.urlsplit(s.path)
+				u for u in urllib.parse.urlsplit(s.path)
 			)
 		except Exception as e:
 			dev_print('wrong url:', s.path[:70], 'exception:', str(e))
@@ -288,4 +293,5 @@ if __name__ == '__main__':
 		print('\nTerminated by keyboard')
 	except Exception as e:
 		print(f'General error: {repr(e)[:100]}')
-
+else:
+	patch_import()

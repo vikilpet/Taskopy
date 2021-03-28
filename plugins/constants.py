@@ -49,5 +49,9 @@ WINDOW_MINIMIZED = win32con.SW_SHOWMINNOACTIVE
 WINDOW_MAXIMIZED = win32con.SW_SHOWMAXIMIZED
 WINDOW_HIDDEN = win32con.SW_HIDE
 DATE_FORMAT = '%A, %d %B %Y %H:%M:%S.%f'
+DATE_STR_FILE = '%Y-%m-%d_%H-%M-%S'
+DATE_STR_FILE_SHORT = '%Y-%m-%d'
+DATE_STR_HUMAN = '%Y.%m.%d %H:%M:%S'
+DATE_STR_HUMAN_SHORT = '%Y.%m.%d'
 
 if __name__ != '__main__': patch_import()

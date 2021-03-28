@@ -6,6 +6,7 @@ import binascii
 import socket
 import select
 import hashlib
+from .tools import patch_import
 
 class _ApiRos:
 	"Routeros api"
@@ -368,3 +369,5 @@ def routeros_query(
 		if info: print(f'routeros_query exception:\n{repr(e)}')
 		return False, repr(e)[:200]
 	return False, 'something went wrong'
+
+if __name__ != '__main__': patch_import()

@@ -11,7 +11,8 @@ import imaplib
 from email import message_from_bytes
 from email.header import Header, decode_header, make_header
 import mimetypes
-from .tools import Job, job_batch, var_get, var_set, tprint
+from .tools import Job, job_batch, var_get, var_set, tprint \
+, patch_import
 
 _CC_LIMIT = 35
 _errors = []
@@ -395,3 +396,5 @@ if __name__ == '__main__':
 	else:
 		print(f'Not enough arguments!')
 		sys.exit(1)
+else:		
+	patch_import()

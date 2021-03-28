@@ -21,7 +21,7 @@ import win32api
 from win32com.shell import shell, shellcon
 from pathlib import Path
 import shutil
-from .tools import random_str, tdebug
+from .tools import random_str, tdebug, patch_import
 
 
 _SIZE_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
@@ -145,12 +145,14 @@ def file_append(fullpath, content:str)->str:
 		fd.write(content)
 	return fullpath
 
-def file_move(fullpath, destination:str):
+def file_move(fullpath, destination:str)->str:
 	''' Move file to destination.
+		Returns full path of destination file.
 		Destination may be fullpath or folder name.
 		If destination path exist it will be overwritten.
 	'''
 	fullpath = _fix_fullpath(fullpath)
+	destination = _fix_fullpath(destination)
 	if os.path.isdir(destination):
 		new_fullpath = _dir_slash(destination) \
 			+ os.path.basename(fullpath)
@@ -294,7 +296,7 @@ def file_name_add(fullpath, suffix:str='', prefix:str='')->str:
 	'''
 	fullpath = _fix_fullpath(fullpath)
 	if suffix: suffix = str(suffix)
-	if prefix: prefix == str(prefix)
+	if prefix: prefix = str(prefix)
 	par_dir, name = os.path.split(fullpath)
 	basename, ext = os.path.splitext(name)
 	return os.path.join(par_dir, prefix + basename + suffix + ext)
@@ -627,10 +629,10 @@ def temp_dir(new_dir:str=None)->str:
 	except FileExistsError: pass
 	return new_dir
 
-def temp_file(suffix:str='')->str:
+def temp_file(prefix:str='', suffix:str='')->str:
 	''' Returns temporary file name. '''
 	return os.path.join(tempfile.gettempdir()
-		, time.strftime('%m%d%H%M%S') + random_str(5) + suffix)
+		, prefix + time.strftime('%m%d%H%M%S') + random_str(5) + suffix)
 
 def file_hash(fullpath, algorithm:str='crc32'
 , buf_size:int=65536)->str:
@@ -784,3 +786,5 @@ def dir_user_startup()->str:
 	' Returns full path to the startup directory of current user '
 	return win32com.shell.shell.SHGetFolderPath(
 		0, win32com.shell.shellcon.CSIDL_STARTUP, 0, 0)
+
+if __name__ != '__main__': patch_import()

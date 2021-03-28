@@ -3,7 +3,7 @@ import ctypes.wintypes
 import win32con
 import keyboard
 try:
-	from .tools import msgbox_warning
+	from .tools import msgbox_warning, patch_import
 except ImportError:
 	msgbox_warning = print
 
@@ -135,4 +135,5 @@ if __name__ == '__main__':
 	ghk.register('ctrl+shift+t', func=ghk.stop_listener)
 	print('Hotkey test: press ctrl+t')
 	threading.Thread(target=ghk.listen).start()
-	
+else:
+	patch_import()

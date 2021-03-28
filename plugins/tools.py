@@ -28,10 +28,14 @@ import win32con
 import wx
 from collections import defaultdict
 from xml.etree import ElementTree as _ElementTree
+try:
+	import constants as tcon
+except:
+	import plugins.constants as tcon
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-02-26'
+APP_VERSION = 'v2021-03-28'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -87,7 +91,7 @@ APP_SETTINGS=[
 	, ['hide_console', False]
 	, ['kiosk', False]
 	, ['kiosk_key', 'shift']
-	, ['log_file_name', '%Y.%m.%d']
+	, ['log_file_name', tcon.DATE_STR_FILE_SHORT]
 ]
 
 _DEFAULT_INI = '''[General]
@@ -227,22 +231,37 @@ def con_log(*msgs, **kwargs):
 		) as f:
 			f.write(log_str)
 
-def time_now_str(template:str='%Y-%m-%d_%H-%M-%S'
-, use_locale:str='C', timezone=None):
-	'String with time'
+def time_now_str(template:str=tcon.DATE_STR_FILE
+, use_locale:str='C', timezone=None)->str:
+	'''
+	Returns a string with current time.
+	'''
+	return time_str(template=template, use_locale=use_locale)
+
+def time_str(template:str=tcon.DATE_STR_FILE
+, time_val:datetime.datetime=None
+, use_locale:str='C', timezone=None)->str:
+	'''
+	Returns time in the form of a string in specified locale.
+	
+	Use datetime in `time_val`. How to get yesterday's date:
+
+		time_val = datetime.date.today() - datetime.timedelta(days=1)
+	'''
 	if timezone == 'utc':
 		timezone = pytz.utc
 	elif isinstance(timezone, str):
 		timezone = pytz.timezone(timezone)
+	if not time_val: time_val = datetime.datetime.now(tz=timezone)
 	with locale_set(use_locale):
-		return datetime.datetime.now(tz=timezone).strftime(template)
+		return time_val.strftime(template)
 
 def time_now():
 	'Returns datetime object'
 	return datetime.datetime.now()
 
-def time_from_str(date_string:str, template:str='%Y-%m-%d_%H-%M-%S'
-, use_locale:str='C'):
+def time_from_str(date_string:str, template:str=tcon.DATE_STR_FILE
+, use_locale:str='C')->datetime.datetime:
 	'''	Returns datetime object from string and
 		specified locale.
 	'''
@@ -261,7 +280,8 @@ def time_second()->int:
 	'''Returns current second'''
 	return datetime.datetime.now().second
 
-def time_diff(start, end, unit:str='sec')->int:
+def time_diff(start:datetime.datetime, end:datetime.datetime
+, unit:str='sec')->int:
 	'''	Returns difference in units.
 		start and end should be in datetime format.
 	'''
@@ -269,7 +289,8 @@ def time_diff(start, end, unit:str='sec')->int:
 	coef = _TIME_UNITS.get(unit, 1000) / 1000
 	return int(seconds // coef)
 
-def time_diff_str(start, end=None, str_format:str=None)->str:
+def time_diff_str(start:datetime.datetime
+, end:datetime.datetime=None, str_format:str=None)->str:
 	'''	Returns time difference as a string like that:
 		'5 days, 3:01:35.837127'
 		*start* and *end* should be in _datetime_ format.
@@ -280,33 +301,40 @@ def time_diff_str(start, end=None, str_format:str=None)->str:
 	if not str_format: return str(end - start)
 	delta_as_time = time.gmtime( (end - start).total_seconds() )
 	return time.strftime(str_format, delta_as_time)
-	
 
-def date_year()->int:
-	'''Returns current year'''
-	return datetime.datetime.now().year
+def _date_part(date_val:datetime.datetime=None, part:str=''):
+	if not date_val: date_val = datetime.datetime.now()
+	return getattr(date_val, part)
 
-def date_month()->int:
-	'''Returns current month'''
-	return datetime.datetime.now().month
+def date_year(date_val:datetime.datetime=None)->int:
+	'''Returns year'''
+	return _date_part(part='year')
 
-def date_day(delta:dict=None )->int:
+def date_month(date_val:datetime.datetime=None)->int:
+	'''Returns month number'''
+	return _date_part(part='month')
+
+def date_day(date_val:datetime.datetime=None, delta:dict=None)->int:
 	''' Returns current day of months (1-31) '''
-	if not delta: return datetime.datetime.now().day
-	return ( datetime.datetime.now() + datetime.timedelta(**delta) ).day
+	if not delta: return _date_part(part='day')
+	if not date_val: date_val = datetime.datetime.now()
+	return ( date_val + datetime.timedelta(**delta) ).day
 
-def date_weekday(tdate=None, template:str='%A')->str:
-	''' tdate may be datetime.date(2019, 6, 12)
+def date_weekday(date_val:datetime.datetime=None
+, template:str='%A')->str:
 	'''
-	if not tdate: tdate = datetime.date.today()
-	return tdate.strftime(template)
+	Returns weekday as a string.
+	'''
+	if not date_val: date_val = datetime.date.today()
+	return date_val.strftime(template)
 
-def date_weekday_num(tdate=None, template:str='%A')->str:
+def date_weekday_num(date_val:datetime.datetime=None
+, template:str='%A')->str:
 	''' Weekday number (Monday is 1).
 		tdate - None (today) or datetime.date(2019, 6, 12)
 	'''
-	if not tdate: tdate = datetime.date.today()
-	return tdate.weekday() + 1
+	if not date_val: date_val = datetime.date.today()
+	return date_val.weekday() + 1
 
 def time_sleep(interval, unit:str=None):
 	''' Pauses for specified amount of time.
@@ -1316,16 +1344,11 @@ class DataHTTPReq:
 		s.accept_encoding = ''
 		s.accept_language = ''
 		s.referer = ''
-		headers = {
-			k.lower().replace('-', '_'): v
-			for k, v in headers.items()
-		}
-		s.__dict__.update(headers)
-		s.__dict__.update(params)
+		s.headers = headers
+		s.params = params
+		s.form = form_data 
 		s.__dict__.update(form_data)
 
-	def __getattr__(s, name):
-		return f'DataHTTPReq: unknown property «{name}»'
 
 class DataBrowserExt(DataHTTPReq):
 	''' HTTP request data helper for 'SendToTaskopy'
@@ -1339,8 +1362,6 @@ class DataBrowserExt(DataHTTPReq):
 		s.src_url = ''
 		s.selection = ''
 
-	def __getattr__(s, name):
-		return f'DataBrowserExt: unknown property «{name}»'
 
 def _etree_to_dict(tree: _ElementTree):
 	di = {tree.tag: {} if tree.attrib else None}

@@ -20,7 +20,7 @@ import pywintypes
 import ctypes
 from ctypes import wintypes
 
-from .tools import DictToObj, dev_print, msgbox, tprint
+from .tools import DictToObj, dev_print, msgbox, tprint, patch_import
 from .plugin_filesystem import path_exists
 
 # https://psutil.readthedocs.io/en/latest/
@@ -687,3 +687,4 @@ startupinfo=None, timeout:int=-1)->int:
 	return win32process.GetExitCodeProcess(proc_handle)
 
 
+if __name__ != '__main__': patch_import()

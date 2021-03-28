@@ -5,6 +5,7 @@ import win32con
 import winreg
 import uptime
 from time import sleep
+from .tools import patch_import
 
 
 _TIME_UNITS = {'msec':1, 'ms':1, 'sec':1000, 's':1000, 'min':60000
@@ -273,4 +274,7 @@ def _test():
 		+ '\n\nPress enter to exit'
 	)
 
-if __name__ == '__main__': _test()
+if __name__ == '__main__':
+	_test()
+else:
+	patch_import()

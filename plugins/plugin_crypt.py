@@ -8,6 +8,7 @@ import glob
 from cryptography.hazmat.backends import default_backend
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
+from .tools import patch_import
 
 
 _DEF_SCRYPT_ARGS = {
@@ -230,3 +231,5 @@ if __name__ == '__main__':
 	same = ( crypt.str_dec(d[0], d[1])[1] == orig_str )
 	print(f'Strings are the same: {same}')
 	input('Press Enter')
+else:
+	patch_import()

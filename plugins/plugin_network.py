@@ -13,10 +13,10 @@ import warnings
 import threading
 import json2html
 from .tools import dev_print, time_sleep, tdebug \
-, locale_set, safe
+, locale_set, safe, patch_import
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.190 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36'}
 
 def http_req(url:str, encoding:str='utf-8', session:bool=False
 , cookies:dict=None, headers:dict=None
@@ -294,7 +294,7 @@ def json_element(source:str, element:list=None
 					, ['banks', 0, 'gbp', 'sale']
 				]
 					result = [71.99, 63.69, 83.0]
-		If nothing found then return exception.
+		If nothing found then returns exception.
 		kwargs - additional arguments for http_req.
 	'''
 	if source[:4].lower().startswith('http'):
@@ -471,3 +471,4 @@ def port_scan(host:str, port:int
 	sock.close()
 	return connected
 
+if __name__ != '__main__': patch_import()
