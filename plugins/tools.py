@@ -35,7 +35,7 @@ except:
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-03-28'
+APP_VERSION = 'v2021-03-29'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []

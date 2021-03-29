@@ -1,5 +1,4 @@
 import win32con
-from .tools import patch_import
 WA_PLAYING = 'playing'
 WA_PAUSED = 'paused'
 WA_STOPPED = 'stopped'
@@ -54,4 +53,4 @@ DATE_STR_FILE_SHORT = '%Y-%m-%d'
 DATE_STR_HUMAN = '%Y.%m.%d %H:%M:%S'
 DATE_STR_HUMAN_SHORT = '%Y.%m.%d'
 
-if __name__ != '__main__': patch_import()
+#if __name__ != '__main__': patch_import()

@@ -462,12 +462,14 @@ def dir_list(fullpath, only_files:bool=False)->list:
 		only_files - return only files and not
 		files and directories.
 
-		Example:
+		Examples:
 			
 			only files in folder:
+				
 				dir_list('d:\\folder\\*.jpg')
 
 			with subfolders:
+				
 				dir_list('d:\\folder\\**\\*.jpg')
 	'''
 	fullpath = _fix_fullpath(fullpath)
