@@ -35,6 +35,7 @@ def _fix_fullpath(fullpath):
 	''' Join list of paths and optionally
 		fix long path.
 	'''
+	if not fullpath: return fullpath
 	if isinstance(fullpath, (list, tuple)):
 		fullpath = os.path.join(*map(str, fullpath))
 	if (
@@ -121,6 +122,7 @@ def file_copy(fullpath, destination:str
 		be created if they don't exist.
 	'''
 	fullpath = _fix_fullpath(fullpath)
+	destination = _fix_fullpath(destination)
 	func = shutil.copy2 if copy_metadata else shutil.copy
 	try:
 		return func(fullpath, destination)
@@ -208,6 +210,7 @@ def dir_copy(fullpath, destination:str
 		Returns number of errors.
 	'''
 	fullpath = _fix_fullpath(fullpath)
+	destination = _fix_fullpath(destination)
 	err = 0
 	try:
 		shutil.copytree(fullpath, destination, symlinks=symlinks)
@@ -545,18 +548,29 @@ def dir_size(fullpath, unit:str='b')->int:
 				total_size += os.path.getsize(fp)
 	return total_size // e
 
-def dir_zip(fullpath, destination:str
+def dir_zip(fullpath, destination:str=None
 , do_cwd:bool=False)->str:
 	''' Compresses folder and returns the full
 		path to archive.
 		If destination is a folder then take
 		archive name from fullpath directory name.
 		Replaces destination if it exists.
+		If destination is not specified then create
+		archive in same directory.
 		Returns destination.
 	'''
 	fullpath = _fix_fullpath(fullpath)
+	fullpath = fullpath.strip('\\')
+	destination = _fix_fullpath(destination)
 	EXT = 'zip'
-	if os.path.isdir(destination):
+	if not destination:
+		new_fullpath = os.path.join(
+			os.path.dirname(fullpath)
+			, os.path.basename(fullpath)
+		)
+		base_name = os.path.basename(fullpath)
+		new_fullpath += '.zip'
+	elif os.path.isdir(destination):
 		new_fullpath = _dir_slash(destination) \
 			+ os.path.basename(fullpath)
 		base_name = os.path.basename(fullpath)
@@ -581,13 +595,16 @@ def dir_zip(fullpath, destination:str
 		shutil.move(result, new_fullpath)
 	return new_fullpath
 
-def file_zip(fullpath, destination:str)->str:
+def file_zip(fullpath, destination=None)->str:
 	''' Compresses a file or files to archive.
 		fullpath - string with fullpath or list with fullpaths.
 		destination - full path to the archive or destination
 		directory.
 	'''
 	fullpath = _fix_fullpath(fullpath)
+	destination = _fix_fullpath(destination)
+	if not destination:
+		destination = file_ext_replace(fullpath, 'zip')
 	if isinstance(fullpath, str):
 		if file_ext(destination) != 'zip':
 			dir_create(destination)

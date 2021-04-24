@@ -44,8 +44,9 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 					+ f' ({len(my_req)}): {my_req[:20]}'
 				)
 		except Exception as e:
-			if sett.dev: raise
-			if not s.silent:
+			if sett.dev:
+				raise
+			elif not s.silent:
 				s.s_print(
 					f'{s.address_string()} handle_one_request'
 					+ f' exception: {repr(e)[:150]}'

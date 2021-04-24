@@ -208,6 +208,7 @@ class Tasks:
 		s.global_hk = None
 		s.global_hk_thread_id = None
 		for item in dir(crontab):
+			if item.startswith('_'): continue
 			task_obj = getattr(crontab, item)
 			if not isinstance(task_obj, types.FunctionType): continue
 			if task_obj.__module__ != 'crontab': continue
@@ -774,7 +775,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			(if show_msg == True).
 			Returns list of running task names.
 		'''
-		TASKS_MSG_MAX = 5
+		TASKS_MSG_MAX = 10
 		running_tasks = [t for t in tasks.task_list
 			if t['running'] ]
 		if not running_tasks:

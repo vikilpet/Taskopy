@@ -35,7 +35,7 @@ except:
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-03-29'
+APP_VERSION = 'v2021-04-24'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -232,11 +232,16 @@ def con_log(*msgs, **kwargs):
 			f.write(log_str)
 
 def time_now_str(template:str=tcon.DATE_STR_FILE
-, use_locale:str='C', timezone=None)->str:
+, use_locale:str='C', timezone=None, **delta)->str:
 	'''
 	Returns a string with current time.
 	'''
-	return time_str(template=template, use_locale=use_locale)
+	if not delta: return time_str(template=template, use_locale=use_locale)
+	return time_str(
+		time_val=time_now(**delta)
+		, template=template
+		, use_locale=use_locale
+	)
 
 def time_str(template:str=tcon.DATE_STR_FILE
 , time_val:datetime.datetime=None
@@ -256,9 +261,17 @@ def time_str(template:str=tcon.DATE_STR_FILE
 	with locale_set(use_locale):
 		return time_val.strftime(template)
 
-def time_now():
-	'Returns datetime object'
-	return datetime.datetime.now()
+def time_now(**delta):
+	'''
+	Returns datetime object
+	Use datetime timedelta keywords to get different time.
+	Yesterday:
+
+		time_now(days=-1)
+
+	'''
+	if not delta: return datetime.datetime.now()
+	return ( datetime.datetime.now() + datetime.timedelta(**delta) )
 
 def time_from_str(date_string:str, template:str=tcon.DATE_STR_FILE
 , use_locale:str='C')->datetime.datetime:
@@ -1511,5 +1524,17 @@ class DataEvent:
 			for di in self.EventDataDict.get('Data', {}):
 				self.EventData[di.get('@Name', '')] = di.get('#text', '')
 			return
+
+def task_run(task_func, *args, **kwargs):
+	'''
+	Runs task in a thread.
+	TODO: use global tasks object?
+	'''
+	threading.Thread(
+		target=task_func
+		, args=args
+		, kwargs=kwargs
+		, daemon=True
+	).start()
 
 if __name__ != '__main__': patch_import()
