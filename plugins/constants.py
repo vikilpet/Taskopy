@@ -1,4 +1,5 @@
 import win32con
+
 WA_PLAYING = 'playing'
 WA_PAUSED = 'paused'
 WA_STOPPED = 'stopped'
@@ -52,5 +53,8 @@ DATE_STR_FILE = '%Y-%m-%d_%H-%M-%S'
 DATE_STR_FILE_SHORT = '%Y-%m-%d'
 DATE_STR_HUMAN = '%Y.%m.%d %H:%M:%S'
 DATE_STR_HUMAN_SHORT = '%Y.%m.%d'
+_APP_FAVICON = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAktJREFUeNqUU0toE1EUPW+SNJlJrUlrqiFGaIOfmhSCoFVEodRaFxUEoQrizo0IXSi4LgXFVUEXLjQRPxt3IipSUGlFg0X7QzDG0jZqbBqTGGoy5p/xvqEJMW0VL3Nn5t13z5l775zHkv5TqDF3JCX167XFHlFbaOKBfElIlxQ2a6zLD2uYcpdCgXIyqyIwpHK625R0gtFCzumwkDRCKygwGTIwi1k1SeGXwgYYUwarCcRsQTNCX90zGbbg3lQbAjHzH2VtbkjhyNYgju6YRzDREPaMO7dcOfy6oFVZFXaVgx98cMAz7sJqFvpZr+69+mxDRJasibR+iML9vIJ2Kmt6Jm5iF54eBPWKtcyoy0OqKyAqi8vdYL9AtzMEYY8/tlbA1N8KsNsaxbXeUZpJqTI/XgEn6OGrqUWLGt0gpeE99gzO5ngF3O34goHON7jx1oUwDbbKujhBK80A1JMaif0S8TJow+VuH3bbIuhsCeFcxzSGfLswFtpUW5hFq86wJnpncicEauPigXdcAxgc6cDEQvOqc+EEs5TcZjJk8SNtKP9r3Jpw4lGgBbmiBksZ/VpzjfEWnvM318b4it2oLP0NzG2YE1zn6urdPg+G/7Ic+SVO4C+WhJt86sedM/9EORqX0CRl+Ov5J6cf+qul7CM1ul/M2XH//TZ8I+VVW6OYwSHHV5xsDyjfZWnMvj65r/Yw1RdKgpeE0scXiykjIilRPUxmAlvXyeUW8+Rnyb21BGXby9VJ2ugCU+zLsQSBP9FzlNxDPldO/i3AAPuE3dwUbVLNAAAAAElFTkSuQmCC'
 
-#if __name__ != '__main__': patch_import()
+if __name__ != '__main__':
+	from .tools import patch_import
+	patch_import()

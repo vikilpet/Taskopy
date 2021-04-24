@@ -1308,7 +1308,6 @@ def table_print(table, use_headers=False, row_sep:str=None
 
 
 
-
 def patch_import():
 	' Import patch for current module if any '
 	try:
@@ -1536,5 +1535,7 @@ def task_run(task_func, *args, **kwargs):
 		, kwargs=kwargs
 		, daemon=True
 	).start()
+
+
 
 if __name__ != '__main__': patch_import()

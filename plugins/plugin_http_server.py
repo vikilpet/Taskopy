@@ -7,11 +7,13 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import cgi
 import urllib
 import tempfile
-from .tools import dev_print, app_log_get, tprint, DataHTTPReq \
-, patch_import
+from .tools import *
+from .plugin_filesystem import file_b64_dec
+from .constants import _APP_FAVICON
 
 
 _TASK_TIMEOUT = 60
+_FAVICON = None
 
 if __name__ == '__main__':
 	from tools import msgbox_warning, random_str
@@ -201,9 +203,14 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 		s.headers_and_page(page)
 
 	def do_GET(s):
+		global _FAVICON
 		if 'favicon.' in s.path:
-			dev_print(f'favicon request: {s.path}')
-			s.wfile.write(b'<link rel="icon" href="data:,">')
+			if s.white_list_check():
+				if not _FAVICON: _FAVICON = file_b64_dec(_APP_FAVICON)
+				s.wfile.write(_FAVICON)
+			else:
+				dev_print(f'unknown favicon request: {s.path}')
+				s.wfile.write(b'<link rel="icon" href="data:,">')
 			return
 		s.launch_task('GET')
 		

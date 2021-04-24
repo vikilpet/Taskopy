@@ -16,6 +16,7 @@ import win32com
 import win32print
 import hashlib
 import pythoncom
+import base64
 
 import win32api
 from win32com.shell import shell, shellcon
@@ -805,5 +806,20 @@ def dir_user_startup()->str:
 	' Returns full path to the startup directory of current user '
 	return win32com.shell.shell.SHGetFolderPath(
 		0, win32com.shell.shellcon.CSIDL_STARTUP, 0, 0)
+
+def file_b64_enc(fullpath:str)->str:
+	'''
+	Encodes a file to the base64 string.
+	'''
+	fullpath = _fix_fullpath(fullpath)
+	with open(fullpath, 'rb') as fd:
+		return base64.b64encode(fd.read()).decode('utf-8')
+
+def file_b64_dec(b64_str:str)->bytes:
+	'''
+	Decodes a file (to bytes) from the base64 string.
+	'''
+	return base64.b64decode(b64_str)
+
 
 if __name__ != '__main__': patch_import()

@@ -17,8 +17,8 @@ import win32con
 import win32evtlog
 import uptime
 
-from plugins.tools import *
 from plugins.constants import *
+from plugins.tools import *
 from plugins.plugin_filesystem import *
 from plugins.plugin_system import *
 from plugins.plugin_process import *
