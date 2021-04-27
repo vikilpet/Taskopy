@@ -59,8 +59,6 @@ def demo_task_4(left_click=True):
 	# Теперь меняем заголовок калькулятора на USD={найденное значение}
 	window_title_set('Калькулятор', f'USD={usd}')
 
-# Useful task for backuping crontab and cleaning up log and backup folders.
-# It is better to not remove this task :-)
 def backup_and_purge(
 	# Task name «for humans»:
 	task_name='Backup and purge'

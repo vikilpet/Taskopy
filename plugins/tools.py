@@ -30,12 +30,12 @@ from collections import defaultdict
 from xml.etree import ElementTree as _ElementTree
 try:
 	import constants as tcon
-except:
+except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-04-24'
+APP_VERSION = 'v2021-04-27'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -156,7 +156,8 @@ def _get_parent_func_name(parent=None, repl_undrsc:bool=' ')->str:
 	''' Get name of parent function if any '''
 	EXCLUDE = ('wrapper', 'run_task', 'run', 'dev_print', 'tprint'
 		, 'main', 'run_task_inner', 'popup_menu_hk'
-		, 'MainLoop', 'catcher', 'run_code', 'mapstar')
+		, 'MainLoop', 'catcher', 'run_code', 'mapstar'
+		, 'run_ast_nodes')
 	if parent: return str(parent)
 	for i in range(2, 10):
 		try:

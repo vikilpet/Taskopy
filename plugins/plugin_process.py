@@ -22,6 +22,7 @@ from ctypes import wintypes
 
 from .tools import DictToObj, dev_print, msgbox, tprint, patch_import
 from .plugin_filesystem import path_exists
+from .plugin_system import window_list_top
 
 # https://psutil.readthedocs.io/en/latest/
 
@@ -686,5 +687,15 @@ startupinfo=None, timeout:int=-1)->int:
 	)
 	return win32process.GetExitCodeProcess(proc_handle)
 
+
+def window_by_pid(process)->tuple:
+	'''
+	Returns top window of process as a tuple (hwnd:int, title:str).
+	'''
+	pid = process_get(process)
+	win_lst = window_list_top()
+	for hwnd, title in win_lst:
+		if win32process.GetWindowThreadProcessId(hwnd)[1] == pid:
+			return (hwnd, title)
 
 if __name__ != '__main__': patch_import()

@@ -39,11 +39,15 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 	def handle_one_request(s):
 		try:
 			super().handle_one_request()
-			my_req = str(s.raw_requestline, 'iso-8859-1').split()[0].upper()
-			if not my_req in ('GET', 'POST'):
+			req_str = str(s.raw_requestline, 'iso-8859-1')
+			if len(req_str) < 4:
+				dev_print(f'empty request: {req_str}')
+				return
+			req_type = req_str.split()[0].upper()
+			if not req_type in ('GET', 'POST'):
 				s.s_print(
 					f'{s.address_string()[:20]} wrong HTTP request'
-					+ f' ({len(my_req)}): {my_req[:20]}'
+					+ f' (total length {len(req_str)}): {req_str[:20]}'
 				)
 		except Exception as e:
 			if sett.dev:

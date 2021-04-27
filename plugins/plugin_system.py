@@ -2,14 +2,24 @@ import ctypes
 import win32api
 import win32gui
 import win32con
+import win32process
 import winreg
 import uptime
 from time import sleep
-from .tools import patch_import
+import ctypes
+from .tools import patch_import, tdebug
+try:
+	import constants as tcon
+except ModuleNotFoundError:
+	import plugins.constants as tcon
 
 
 _TIME_UNITS = {'msec':1, 'ms':1, 'sec':1000, 's':1000, 'min':60000
 				,'m':60000, 'hour':3600000, 'h':3600000}
+
+LockWorkStation = ctypes.windll.user32.LockWorkStation
+_GetAncestor = ctypes.windll.user32.GetAncestor
+_SendNotifyMessage = ctypes.windll.user32.SendNotifyMessageA
 
 def window_get(window=None, class_name:str=None)->int:
 	''' Returns hwnd. If window is not specified then
@@ -107,7 +117,7 @@ def window_list(title_filter:str=None
 , class_filter:str=None
 , case_sensitive:bool=False)->list:
 	''' List titles of all the windows.
-		title_filter and title_filter - optional filter
+		title_filter and class_filter - optional filter
 		class_filter - 
 	'''
 	
@@ -229,14 +239,22 @@ def idle_duration(unit:str='sec')->int:
 	millis = (int(uptime.uptime() * 1000) - win32api.GetLastInputInfo())
 	return millis // unit_den
 
-def monitor_off():
-	''' Turn off the monitor '''
-	return win32gui.SendMessage(
+def _monitor(state:int=tcon.MONITOR_ON):
+	_SendNotifyMessage(
 		win32con.HWND_BROADCAST
 		, win32con.WM_SYSCOMMAND
 		, win32con.SC_MONITORPOWER
-		, 2
+		, state
 	)
+
+def monitor_off():
+	''' Turns off the monitor '''
+	_monitor(state=tcon.MONITOR_OFF)
+
+def monitor_on():
+	''' Turns off the monitor '''
+	_monitor(state=tcon.MONITOR_ON)
+	
 
 
 def window_is_visible(window=None)->bool:
@@ -267,7 +285,25 @@ def window_coor_get(window=None)->tuple:
 
 
 
-def _test():
+def window_list_top()->list:
+	'''
+	Gets a list of the top-level visible windows only.
+	Returns list of tuples: (hwnd, 'title')
+	'''
+
+	def w_reaper(hwnd:int, lst:list):
+		top_win = _GetAncestor(hwnd, win32con.GA_ROOTOWNER)
+		if top_win == win32con.NULL: return
+		if not win32gui.IsWindowVisible(top_win): return
+		if any( [c < 0 for c in win32gui.GetWindowRect(top_win)] ): return
+		if ( title := win32gui.GetWindowText(top_win) ):
+			lst.append((top_win, title))
+
+	win_lst = []
+	win32gui.EnumWindows(w_reaper, win_lst)
+	return win_lst
+
+def _test_reg_key():
 	reg_key = 'HKEY_CURRENT_USER\\Software\\Microsoft\\Calc\\layout'
 	input(
 		reg_key + ' = ' + str(registry_get(reg_key))
@@ -275,6 +311,6 @@ def _test():
 	)
 
 if __name__ == '__main__':
-	_test()
+	_test_reg_key()
 else:
 	patch_import()
