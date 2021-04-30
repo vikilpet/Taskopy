@@ -241,8 +241,9 @@ def dir_delete(fullpath):
 	try:
 		shutil.rmtree(fullpath
 		, onerror=lambda func, path, exc: file_delete(path))
+		return fullpath
 	except FileNotFoundError:
-		pass
+		return fullpath
 
 def dir_exists(fullpath)->bool:
 	return os.path.isdir( _fix_fullpath(fullpath) )

@@ -33,7 +33,6 @@ from resources.languages import Language
 
 
 tasks = None
-app = None
 crontab = None
 sett = None
 lang = None
@@ -47,8 +46,6 @@ else:
 
 APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
-_TIME_UNITS = {'msec':1, 'ms':1, 'sec':1000, 's':1000, 'min':60000
-	,'m':60000, 'hour':3600000, 'h':3600000}
 TASK_DATE_FORMAT = \
 	r'^(\d\d\d\d|\*)\.(\d\d|\*)\.(\d\d|\*) (\d\d|\*):(\d\d|\*)$'
 PLUGIN_SOURCE = 'plugins\\*.py'
@@ -549,8 +546,8 @@ class Tasks:
 			run_task_inner()
 
 	def add_idle_task(s, task):
-		value, coef = value_unit(task['idle'], _TIME_UNITS, 1000)
-		task['idle_dur'] = value * coef
+		dur = value_to_unit(task['idle'], 'ms')
+		task['idle_dur'] = int(dur)
 		task['idle_done'] = False
 		s.task_list_idle.append(task)
 	
@@ -910,6 +907,8 @@ def main():
 	print(lang.load_donate + '\n\n')
 	try:
 		app = App(False)
+		app.load_crontab = load_crontab
+		app.show_window = app.taskbaricon.on_left_down
 		__builtins__.app = app
 		if load_crontab():
 			tasks.run_at_startup()

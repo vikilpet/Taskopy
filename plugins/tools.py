@@ -35,16 +35,16 @@ except ModuleNotFoundError:
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-04-27'
+APP_VERSION = 'v2021-04-30'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
 
-
-
 if not __builtins__.get('uglobals', None):
 	uglobals = {}
 	__builtins__['uglobals'] = uglobals
+	app:wx.App = None
+	__builtins__['app'] = app
 
 TASK_OPTIONS = [
 	['task_name', None]
@@ -131,26 +131,43 @@ class DictToObj:
 	def __getattr__(s, name):
 		return 'DictToObj - unknown key'
 
-def value_unit(value, unit_dict:dict, default:int)->tuple:
-	''' Returns (int, int) - value and coefficient
-		found in unit_dict.
-		If no unit is found, it returns the 'default' value.
+
+
+
+def value_to_unit(value, unit:str='sec', unit_dict:dict=None
+, def_src_unit:str='sec')->float:
+	'''
+	Converts a string with a number and unit of measure
+	to the desired unit of measure.
+	Usage:
+
+		> value_to_unit('2 min', 'sec')
+		> 120
 	'''
 
 
-	if isinstance(value, int):
-		return value, default
+	if not unit_dict: unit_dict = _TIME_UNITS
+	dst_coef = unit_dict[unit]
+	if isinstance(value, (int, float)):
+		value = [value, def_src_unit]
+	if isinstance(value, (list, tuple)):
+		v, u = value
+		src_coef = unit_dict[u.lower()]
+		return (int(v) * src_coef) / dst_coef
 	elif value.isdigit():
-		return int(value), default
+		return int(value)
 	elif ' ' in value:
 		v, u = value.split()
-		return int(v), unit_dict.get(u, default)
+		src_coef = unit_dict[u.lower()]
+		return (int(v) * src_coef) / dst_coef
 	elif any(i.isdigit() for i in value):
 		v = ''.join(filter(str.isdigit, value))
-		return int(v), unit_dict.get(value.replace(v, ''), default)
+		u = ''.join(filter(lambda v: not v.isdigit(), value))
+		src_coef = unit_dict[u.lower()]
+		return (int(v) * src_coef) / dst_coef
 	else:
-		dev_print(f'value_unit wrong value: {value}')
-		return value, default
+		raise('Wrong value')
+
 
 def _get_parent_func_name(parent=None, repl_undrsc:bool=' ')->str:
 	''' Get name of parent function if any '''
@@ -363,8 +380,7 @@ def time_sleep(interval, unit:str=None):
 		interval = str( random_num(*interval) ) + ' ' + unit
 	elif unit:
 		interval = str(interval) + ' ' + unit
-	val, coef = value_unit(interval, _TIME_UNITS, 1000)
-	time.sleep(val * coef / 1000)
+	time.sleep( value_to_unit(interval, 'sec') )
 pause = time_sleep
 wait = time_sleep
 
@@ -502,7 +518,7 @@ def msgbox(msg:str, title:str=None
 		return hwnd
 	
 	def title_countdown(hwnd:int, timeout:int, title:str):
-		for sec in reversed(range(100 * timeout ) ):
+		for sec in reversed(range(100 * (timeout // 1000) ) ):
 			try:
 				win32gui.SetWindowText(
 					hwnd
@@ -533,9 +549,8 @@ def msgbox(msg:str, title:str=None
 	if timeout:
 		mb_func = _MessageBoxTimeout
 		title_tmp = title + '          rand' + str(random.randint(100000, 1000000))
-		value, coef = value_unit(timeout, _TIME_UNITS, 1000)
-		timeout = int(value * coef / 1000)
-		mb_args = (None, msg, title_tmp, ui, 0, timeout * 1000)
+		timeout = int( value_to_unit(timeout, 'ms') )
+		mb_args = (None, msg, title_tmp, ui, 0, timeout)
 	else:
 		if dis_timeout:
 			mb_func = _MessageBox
@@ -1155,8 +1170,7 @@ def dialog(msg:str=None, buttons:list=None
 	if timeout:
 		tdc.dwFlags |= TDF_EXPAND_FOOTER_AREA
 		tdc.pszFooter = ctypes.c_wchar_p(f'{timeout}')
-		value, coef = value_unit(timeout, _TIME_UNITS, 1000)
-		timeout = int(value * coef)
+		timeout = int( value_to_unit(timeout, 'ms') )
 		tdc.lpCallbackData = ctypes.pointer(ctypes.c_long(timeout))
 	tdc.pszMainInstruction = ctypes.c_wchar_p(msg)
 	tdc.pszWindowTitle = ctypes.c_wchar_p(title)
@@ -1538,5 +1552,13 @@ def task_run(task_func, *args, **kwargs):
 	).start()
 
 
+
+def crontab_reload():
+	' Reloads crontab '
+	app.load_crontab()
+
+def app_window_show():
+	' Shows the application console window '
+	app.show_window()
 
 if __name__ != '__main__': patch_import()

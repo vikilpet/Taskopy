@@ -7,15 +7,12 @@ import winreg
 import uptime
 from time import sleep
 import ctypes
-from .tools import patch_import, tdebug
+from .tools import *
 try:
 	import constants as tcon
 except ModuleNotFoundError:
 	import plugins.constants as tcon
 
-
-_TIME_UNITS = {'msec':1, 'ms':1, 'sec':1000, 's':1000, 'min':60000
-				,'m':60000, 'hour':3600000, 'h':3600000}
 
 LockWorkStation = ctypes.windll.user32.LockWorkStation
 _GetAncestor = ctypes.windll.user32.GetAncestor
@@ -235,9 +232,21 @@ def window_on_top(window=None, on_top:bool=True)->int:
 def idle_duration(unit:str='sec')->int:
 	''' Returns idle time in specified units ('msec', 'sec', 'min', 'hour').
 	'''
-	unit_den = _TIME_UNITS.get(unit.lower(), 1000)
 	millis = (int(uptime.uptime() * 1000) - win32api.GetLastInputInfo())
-	return millis // unit_den
+	return int( value_to_unit([millis, 'ms'], unit) )
+
+def idle_wait(interval:int='1 sec')->int:
+	' Suspends execution until user becomes active. '
+	interval = value_to_unit(interval, 'ms')
+	millis = interval
+	prev_millis = millis
+	while millis >= interval:
+		time_sleep(interval / 1000)
+		prev_millis = millis
+		millis = (int(uptime.uptime() * 1000) - win32api.GetLastInputInfo())
+		tdebug(interval, millis)
+	return prev_millis
+
 
 def _monitor(state:int=tcon.MONITOR_ON):
 	_SendNotifyMessage(

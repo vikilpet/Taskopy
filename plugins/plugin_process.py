@@ -80,27 +80,43 @@ def app_start(
 	, window:str=None
 	, priority:str=None
 	, its_script:bool=False
+	, app_args_as_str:bool=False
 ):
-	''' Starts application.
-		Returns:
-			if capture_output - returncode, stdout, stderr
-			if wait - returncode
-			otherwise - PID of new process.
-		app_path - path to file or path to executable. Do not add
-		double quotes.
-		app_args (list or str) - command-line parameters.
-		cwd - working directory.
-		wait - wait for execution.
-		capture_output - capture stdout and stderr.
-		env - add this environments to the process
-		window - maximized(short - 'max'), minimized('min')
-			or hidden('hid').
-		priority - 'above', 'below', 'high', 'idle', 'normal'
-			or 'realtime'.
-		its_script - it's a script from python Scripts\ directory
-			Examples: 'youtube-dl.exe', 'pipreqs.exe'.
+	'''
+	Starts application.
+	
+	Returns:
+		if capture_output - (returncode, stdout, stderr)
+		if wait - returncode
+		otherwise - PID of new process.
+	
+	app_path - path to file or path to executable. Do not add
+	double quotes.
+	
+	app_args (list or str) - command-line parameters.
 
-		https://docs.python.org/3/library/subprocess.html
+	app_args_as_str - do not split app_args into list. Useful
+	if application command line contains quotes. It will
+	strip white space characters so you can use multiline string.
+
+	cwd - change working directory.
+	
+	wait - wait for the program to complete.
+
+	capture_output - capture stdout and stderr.
+
+	env - add this environments to the process
+
+	window - maximized(short - 'max'), minimized('min')
+		or hidden('hid').
+
+	priority - one of 'above', 'below', 'high', 'idle', 'normal'
+		or 'realtime'.
+
+	its_script - it's a script from python Scripts directory.
+	Examples: 'youtube-dl.exe', 'pipreqs.exe'.
+
+	https://docs.python.org/3/library/subprocess.html
 	'''
 
 	PRIORITIES = {
@@ -127,13 +143,16 @@ def app_start(
 		raise Exception('Unknown type of app_path')
 	if app_args:
 		if isinstance(app_args, str):
-			app_path += app_args.split()
+			if app_args_as_str:
+				app_path = app_path[0] + ' ' + app_args.strip()
+			else:
+				app_path += app_args.split()
 		elif isinstance(app_args, (list, tuple)):
 			app_path += app_args
 		else:
 			raise Exception('Unknown type of app_args')
-	app_path = list( map(str, app_path) )
-	if not cwd:
+	if not app_args_as_str: app_path = list( map(str, app_path) )
+	if not cwd and not app_args_as_str:
 		if ':\\' in app_path[0]:
 			if its_script:
 				cwd = os.getcwd()

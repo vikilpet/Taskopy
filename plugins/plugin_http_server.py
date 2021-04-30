@@ -44,8 +44,8 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 				dev_print(f'empty request: {req_str}')
 				return
 			req_type = req_str.split()[0].upper()
-			if not req_type in ('GET', 'POST'):
-				s.s_print(
+			if not req_type in ('GET', 'POST', 'HEAD'):
+				dev_print(
 					f'{s.address_string()[:20]} wrong HTTP request'
 					+ f' (total length {len(req_str)}): {req_str[:20]}'
 				)
