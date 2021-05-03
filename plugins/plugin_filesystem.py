@@ -116,11 +116,13 @@ def file_log(fullpath, message:str, encoding:str='utf-8'
 
 def file_copy(fullpath, destination:str
 , copy_metadata:bool=False):
-	''' Copies file to destination.
-		Destination may be fullpath or folder name.
-		If destination file exists it will be overwritten.
-		If destination is a folder, subfolders will
-		be created if they don't exist.
+	'''
+	Copies file to destination.
+	Returns destination.
+	Destination may be fullpath or folder name.
+	If destination file exists it will be overwritten.
+	If destination is a folder, subfolders will
+	be created if they don't exist.
 	'''
 	fullpath = _fix_fullpath(fullpath)
 	destination = _fix_fullpath(destination)
@@ -630,6 +632,16 @@ def file_zip(fullpath, destination=None)->str:
 		return destination
 	else:
 		return Exception('file_zip: unknown type of fullpath')
+
+def file_zip_cont(fullpath, only_files:bool=False)->list:
+	' Returns list of paths in zip file'
+	fullpath = _fix_fullpath(fullpath)
+	with zipfile.ZipFile(fullpath) as z:
+		if only_files:
+			return [f.filename for f in z.filelist
+				if getattr(f, 'compress_type', None)]
+		else:
+			return [f.filename for f in z.filelist]
 
 def temp_dir(new_dir:str=None)->str:
 	''' Returns full path of temp dir (without trailing slash).

@@ -27,8 +27,8 @@ def http_req(url:str, encoding:str='utf-8', session:bool=False
 	''' Gets content of the specified URL '''
 	if (post_file or post_form_data): http_method = 'POST'
 	if http_method: http_method = http_method.lower()
-	args = {'url': url, 'json': json_data, 'timeout': timeout
-		, 'data': post_form_data}
+	args = {'url': url, 'json': json_data, 'timeout': timeout}
+	if post_form_data: args['data'] = post_form_data
 	file_obj = None
 	post_file_hash = None
 	if post_file:
@@ -54,6 +54,7 @@ def http_req(url:str, encoding:str='utf-8', session:bool=False
 		args['headers'] = {**_USER_AGENT}
 		if post_file_hash:
 			args['headers']['Content-MD5'] = post_file_hash
+		if headers: args['headers'].update(headers)
 	for attempt in range(attempts):
 		try:
 			time_sleep(attempt)
@@ -67,6 +68,8 @@ def http_req(url:str, encoding:str='utf-8', session:bool=False
 		except Exception as e:
 			if isinstance(e, requests.exceptions.SSLError):
 				return e
+			if isinstance(e, TypeError):
+				return e
 			tdebug(f'failed again ({attempt}).'
 				,  f'Error: {repr(e)}\nurl={url}')
 			pass
@@ -75,7 +78,7 @@ def http_req(url:str, encoding:str='utf-8', session:bool=False
 			f'no more attempts ({attempts}) {url[:100]}')
 	if file_obj: file_obj.close()
 	content = str(req.content
-	, encoding=encoding, errors='ignore')
+		, encoding=encoding, errors='ignore')
 	return content
 
 def html_whitespace(text:str)->str:

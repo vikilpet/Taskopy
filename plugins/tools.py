@@ -35,7 +35,7 @@ except ModuleNotFoundError:
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-04-30'
+APP_VERSION = 'v2021-05-03'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
