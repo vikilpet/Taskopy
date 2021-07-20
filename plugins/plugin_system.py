@@ -19,8 +19,9 @@ _GetAncestor = ctypes.windll.user32.GetAncestor
 _SendNotifyMessage = ctypes.windll.user32.SendNotifyMessageA
 
 def window_get(window=None, class_name:str=None)->int:
-	''' Returns hwnd. If window is not specified then
+	''' Returns window handle. If window is not specified then
 		finds foreground window.
+		Returns 0 if nothing is found.
 	'''
 	if isinstance(window, str):
 		return win32gui.FindWindow(class_name, window)
@@ -33,7 +34,7 @@ def window_get(window=None, class_name:str=None)->int:
 	
 def registry_get(fullpath:str):
 	''' Get value by fullpath to registry key.
-		fullpath  - string like
+		fullpath - string like
 		'HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Internet Explorer\\Build'
 	'''
 	if fullpath[:5] != 'HKEY_': return 'wrong path'

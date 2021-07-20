@@ -57,7 +57,9 @@ _APP_FAVICON = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2Fy
 MONITOR_ON = -1
 MONITOR_OFF = 2
 MONITOR_STANDBY = 1
-
+MIME_TEXT = 'text/plain; charset=utf-8'
+MIME_HTML = 'text/html; charset=utf-8'
+MIME_BINARY = 'application/octet-stream'
 
 if __name__ != '__main__':
 	try:

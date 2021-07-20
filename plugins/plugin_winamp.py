@@ -42,6 +42,12 @@ def winamp_status()->str:
 	elif status == 0:
 		return tcon.WA_STOPPED
 
+def winamp_playlist_pos()->int:
+	'Playlist position'
+	title = win32gui.GetWindowText( \
+		win32gui.FindWindow('Winamp v1.x', None) )
+	return int(title.split('.')[0])
+
 def winamp_track_title(clean:bool=True)->str:
 	t = win32gui.GetWindowText( win32gui.FindWindow('Winamp v1.x', None) )
 	if clean:

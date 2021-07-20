@@ -35,7 +35,7 @@ except ModuleNotFoundError:
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-05-03'
+APP_VERSION = 'v2021-07-20'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -43,8 +43,8 @@ app_log = []
 if not __builtins__.get('uglobals', None):
 	uglobals = {}
 	__builtins__['uglobals'] = uglobals
-	app:wx.App = None
-	__builtins__['app'] = app
+	_app:wx.App = None
+	__builtins__['_app'] = _app
 
 TASK_OPTIONS = [
 	['task_name', None]
@@ -77,6 +77,7 @@ TASK_OPTIONS = [
 	, ['event_log', None]
 	, ['event_xpath', '*']
 	, ['on_exit', False]
+	, ['hyperactive', False]
 ]
 
 APP_SETTINGS=[
@@ -254,7 +255,9 @@ def time_now_str(template:str=tcon.DATE_STR_FILE
 	'''
 	Returns a string with current time.
 	'''
-	if not delta: return time_str(template=template, use_locale=use_locale)
+	if not delta:
+		return time_str(template=template
+			, use_locale=use_locale)
 	return time_str(
 		time_val=time_now(**delta)
 		, template=template
@@ -478,13 +481,12 @@ def re_find(source:str, re_pattern:str, sort:bool=False
 def re_replace(source:str, re_pattern:str, repl:str=''
 , re_flags:int=re.IGNORECASE)->str:
 	''' Regexp replace substring'''
-	r = re.sub(
+	return re.sub(
 		pattern=re_pattern
 		, repl=repl
 		, string=source
 		, flags=re_flags
 	)
-	return r
 
 def re_match(source:str, re_pattern:str
 , re_flags:int=re.IGNORECASE)->bool:
@@ -1264,13 +1266,17 @@ def table_print(table, use_headers=False, row_sep:str=None
 	if use_headers and not headers_sep: headers_sep = DEF_SEP
 	if row_sep_step and not row_sep: row_sep = DEF_SEP
 	if row_sep and not headers_sep: headers_sep = row_sep
-	if isinstance(table[0], list):
-		rows = [l[:] for l in table]
-	elif isinstance(table[0], tuple):
-		rows = [list(t) for t in table]
+	if isinstance(table, dict):
+		rows = [list( di.values() ) for di in table.values()]
+		if use_headers == True: headers = list(
+			list( table.values() )[0].keys() )
 	elif isinstance(table[0], dict):
 		rows = [list( di.values() ) for di in table]
 		if use_headers == True: headers = list( table[0].keys() )
+	elif isinstance(table[0], list):
+		rows = [l[:] for l in table]
+	elif isinstance(table[0], tuple):
+		rows = [list(t) for t in table]
 	if isinstance(use_headers, list):
 		headers = use_headers
 	elif use_headers == True:
@@ -1279,8 +1285,6 @@ def table_print(table, use_headers=False, row_sep:str=None
 		except UnboundLocalError:
 			raise Exception(
 				'table_print: the first row must be list of headers')
-	for row in rows:
-		row[:] = [empty_str if i in consider_empty else str(i) for i in row]
 	if sorting: sort_key = itemgetter(*sorting)
 	if sorting_func:
 		if isinstance(sorting_func, (tuple, list)):
@@ -1297,6 +1301,20 @@ def table_print(table, use_headers=False, row_sep:str=None
 			rows.sort(key=sort_key, reverse=sorting_rev)
 	else:
 		if headers: rows.insert(0, headers)
+	new_rows = []
+	for row in rows:
+		new_row = []
+		for cell in row:
+			if cell in consider_empty:
+				new_row.append(empty_str)
+				continue
+			if isinstance(cell, (int, float)):
+				cell = '{:,}'.format(cell).replace(',', ' ')
+			else:
+				cell = str(cell)
+			new_row.append(cell)
+		new_rows.append(new_row)
+	rows = new_rows
 	col_sizes = [ max( map(len, col) ) for col in zip(*rows) ]
 	max_row_len = sum(col_sizes) + len(col_pad) * (len(col_sizes) - 1)
 	template = col_pad.join(
@@ -1320,8 +1338,7 @@ def table_print(table, use_headers=False, row_sep:str=None
 					print_headers(True)
 		print(template.format(*row))
 	print()
-
-
+	return rows
 
 def patch_import():
 	' Import patch for current module if any '
@@ -1560,5 +1577,6 @@ def crontab_reload():
 def app_window_show():
 	' Shows the application console window '
 	app.show_window()
+
 
 if __name__ != '__main__': patch_import()

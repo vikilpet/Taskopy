@@ -8,8 +8,11 @@ import cgi
 import urllib
 import tempfile
 from .tools import *
-from .plugin_filesystem import file_b64_dec
-from .constants import _APP_FAVICON
+from .plugin_filesystem import file_b64_dec, HTTPFile
+try:
+	import constants as tcon
+except ModuleNotFoundError:
+	import plugins.constants as tcon
 
 
 _TASK_TIMEOUT = 60
@@ -80,16 +83,27 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			)
 		return False
 
-	def headers_and_page(s, page:str, status:int=200):
+	def headers_and_page(s, page, status:int=200):
 		''' Write headers and page.
+			page - text or HTML or HTTPFile instance.
 		'''
 		s.send_response(status)
-		if '<!doctype html>' in page[:30].lower():
-			s.send_header('Content-Type', 'text/html; charset=utf-8')
+		if not isinstance(page, str):
+			s.send_header('Content-Type', page.mime_type)
+			param = 'attachment' if page.use_save_to else 'inline'
+			name = urllib.parse.quote(page.name, encoding='utf-8')
+			s.send_header('Content-Disposition'
+				, f"{param}; filename*=UTF-8''{name}")
+		elif '<!doctype html>' in page[:30].lower():
+			s.send_header('Content-Type', tcon.MIME_HTML)
 		else:
-			s.send_header('Content-Type', 'text/plain; charset=utf-8')
+			s.send_header('Content-Type', tcon.MIME_TEXT)
 		s.end_headers()
-		s.wfile.write(bytes(page, 'utf-8'))
+		if not isinstance(page, str):
+			with open(page.fullpath, 'rb') as fd:
+				s.wfile.write( fd.read() )
+		else:
+			s.wfile.write(bytes(page, 'utf-8'))
 
 	def launch_task(s, request_type:str):
 		
@@ -193,7 +207,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 				while (not result) and (i < (_TASK_TIMEOUT / timeout)):
 					i += 1
 					time.sleep(timeout)
-				if result: page = str(result[0])
+				if result: page = result[0]
 			else:
 				s.tasks.run_task(
 					task
@@ -210,7 +224,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 		global _FAVICON
 		if 'favicon.' in s.path:
 			if s.white_list_check():
-				if not _FAVICON: _FAVICON = file_b64_dec(_APP_FAVICON)
+				if not _FAVICON: _FAVICON = file_b64_dec(tcon._APP_FAVICON)
 				s.wfile.write(_FAVICON)
 			else:
 				dev_print(f'unknown favicon request: {s.path}')

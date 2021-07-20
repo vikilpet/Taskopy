@@ -144,7 +144,9 @@ def app_start(
 	if app_args:
 		if isinstance(app_args, str):
 			if app_args_as_str:
-				app_path = app_path[0] + ' ' + app_args.strip()
+				app_path = app_path[0] + ' ' \
+					+ app_args.strip().replace('\r\n', ' ') \
+						.replace('\n', ' ').replace('\t', ' ')
 			else:
 				app_path += app_args.split()
 		elif isinstance(app_args, (list, tuple)):

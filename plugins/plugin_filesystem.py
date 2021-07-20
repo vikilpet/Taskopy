@@ -6,6 +6,7 @@ import glob
 from contextlib import contextmanager
 import csv
 import pyodbc
+import mimetypes
 import zipfile
 from distutils import dir_util
 from zlib import crc32
@@ -23,6 +24,10 @@ from win32com.shell import shell, shellcon
 from pathlib import Path
 import shutil
 from .tools import random_str, tdebug, patch_import
+try:
+	import constants as tcon
+except ModuleNotFoundError:
+	import plugins.constants as tcon
 
 
 _SIZE_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
@@ -299,7 +304,9 @@ def file_basename(fullpath)->str:
 def file_name_add(fullpath, suffix:str='', prefix:str='')->str:
 	''' Adds suffix or prefix to a file name.
 		Example:
-			file_name_add('my_file.txt', suffix='_1') -> my_file_1.txt
+
+			file_name_add('my_file.txt', suffix='_1')
+			> my_file_1.txt
 	'''
 	fullpath = _fix_fullpath(fullpath)
 	if suffix: suffix = str(suffix)
@@ -833,6 +840,26 @@ def file_b64_dec(b64_str:str)->bytes:
 	Decodes a file (to bytes) from the base64 string.
 	'''
 	return base64.b64decode(b64_str)
+
+class HTTPFile:
+
+	def __init__(
+		self
+		, fullpath
+		, use_save_to:bool=False
+		, mime_type:str=None
+		, name:str=None
+	):
+		self.fullpath = _fix_fullpath(fullpath)
+		self.use_save_to = use_save_to
+		if not mime_type:
+			mime_type = mimetypes.MimeTypes() \
+				.guess_type(self.fullpath)[0]
+			if not mime_type: mime_type = tcon.MIME_HTML
+		self.mime_type = mime_type
+		if not name: name = file_name(fullpath)
+		self.name = name
+
 
 
 if __name__ != '__main__': patch_import()

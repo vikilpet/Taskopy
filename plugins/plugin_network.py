@@ -3,6 +3,7 @@ import socket
 import requests
 import urllib
 import lxml.html
+import re
 import html
 import tempfile
 from hashlib import md5
@@ -16,7 +17,8 @@ from .tools import dev_print, time_sleep, tdebug \
 , locale_set, safe, patch_import
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36'}
+
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36'}
 
 def http_req(url:str, encoding:str='utf-8', session:bool=False
 , cookies:dict=None, headers:dict=None
@@ -82,11 +84,35 @@ def http_req(url:str, encoding:str='utf-8', session:bool=False
 	return content
 
 def html_whitespace(text:str)->str:
-	''' Removes whitespace characters from string.
 	'''
-	if text is None:
-		return text
+	Removes an excessive white space from the string.
+	'''
+	if not text: return text
 	return ' '.join(text.split())
+
+_js_regex = re.compile(r"(\".*?\"|\'.*?\')|(/\*.*?\*/|//[^\r\n]*$)"
+, re.MULTILINE|re.DOTALL)
+def _js_remove_comments(string):
+	def _replacer(match):
+		if match.group(2) is not None:
+			return "" # so we will return empty to remove the comment
+		else: # otherwise, we will return the 1st group
+			return match.group(1) # captured quoted-string
+	return _js_regex.sub(_replacer, string)
+
+_re_html = re.compile(r'(<!--.*?-->)', flags=re.DOTALL)
+_re_css = re.compile(r'!/\*[^*]*\*+([^/][^*]*\*+)*/!')
+_re_white_space = re.compile(r">\s*<")
+def html_minify(html:str)->str:
+	'''
+	Removes HTML, javascript and CSS comments and whitespace.
+	'''
+	html = _re_html.sub('', html)
+	html = _js_remove_comments(html)
+	html = _re_css.sub('', html)
+	html = _re_white_space.sub('><', html)
+	return html_whitespace(html)
+
 
 def file_download(url:str, destination:str=None
 , attempts:int=3, timeout:int=1
@@ -474,4 +500,32 @@ def port_scan(host:str, port:int
 	sock.close()
 	return connected
 
-if __name__ != '__main__': patch_import()
+if __name__ == '__main__':
+	html = r'''
+	<!doctype html>
+	<script>
+		function count(elem) {
+			// elem.classList.remove('flash')
+			score_sound.play()
+		}
+	</script>
+	<style>
+		.score {
+			display: flex;
+			/* background-color: #333; */
+		}
+
+		/* @media (orientation: landscape) {
+			.controls { grid-template-columns: 1fr 1fr; }
+		} */
+	</style>
+	<body>
+		<div class='controls'>
+			<div class='score left' onclick='count(this)'>25</div>
+			<div class='score right' onclick='count(this)'>25</div>
+		</div>
+	</body>
+	'''
+	print(html_minify(html))
+else:
+	patch_import()

@@ -514,7 +514,8 @@ class Tasks:
 						s.task_opt_set(task['task_function_name']
 										, 'err_counter', err_counter)
 						
-			if not s.enabled: return
+			if (not s.enabled) \
+			and ( not task['hyperactive'] ): return
 			if task['single']:
 				if task['running']: return
 			if callable(task['rule']):
