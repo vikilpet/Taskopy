@@ -88,7 +88,9 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			page - text or HTML or HTTPFile instance.
 		'''
 		s.send_response(status)
-		if not isinstance(page, str):
+		if not isinstance(page, str) and not hasattr(page, 'HTTPFile'):
+			page = str(page)
+		if hasattr(page, 'HTTPFile'):
 			s.send_header('Content-Type', page.mime_type)
 			param = 'attachment' if page.use_save_to else 'inline'
 			name = urllib.parse.quote(page.name, encoding='utf-8')
@@ -99,7 +101,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 		else:
 			s.send_header('Content-Type', tcon.MIME_TEXT)
 		s.end_headers()
-		if not isinstance(page, str):
+		if hasattr(page, 'HTTPFile'):
 			with open(page.fullpath, 'rb') as fd:
 				s.wfile.write( fd.read() )
 		else:

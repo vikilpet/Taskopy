@@ -18,7 +18,7 @@ from .tools import dev_print, time_sleep, tdebug \
 
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36'}
 
 def http_req(url:str, encoding:str='utf-8', session:bool=False
 , cookies:dict=None, headers:dict=None
@@ -119,6 +119,7 @@ def file_download(url:str, destination:str=None
 , del_bad_file:bool=False, headers:dict={}
 , size_limit:int=None
 , stop_event:threading.Event=None
+, chunk_size:int=1_048_576
 , **kwargs)->str:
 	''' Download file from url to destination and return fullpath.
 		Returns a full path to the downloaded file.
@@ -145,7 +146,6 @@ def file_download(url:str, destination:str=None
 		support this header):
 			headers = {'Range': 'bytes=0-1024'} 
 	'''
-	CHUNK_SIZE = 1_048_576
 	if isinstance(destination, (list, tuple)):
 		destination = os.path.join(*destination)
 		try:
@@ -173,7 +173,7 @@ def file_download(url:str, destination:str=None
 			)
 			with open(dest_file, 'wb+') as fd:
 				cur_size = 0
-				for chunk in req.iter_content(chunk_size=CHUNK_SIZE):
+				for chunk in req.iter_content(chunk_size=chunk_size):
 					fd.write(chunk)
 					if stop_event and stop_event.is_set(): break
 					if not size_limit: continue
@@ -428,6 +428,10 @@ def url_hostname(url:str, second_lvl:bool=True)->str:
 def net_url_decode(url:str, encoding:str='utf-8')->str:
 	' Decode URL '
 	return urllib.parse.unquote(url, encoding=encoding)
+
+def net_url_encode(url:str, encoding:str='utf-8')->str:
+	' Encode URL '
+	return urllib.parse.quote(url, encoding=encoding)
 
 def net_html_unescape(html_str:str)->str:
 	'''

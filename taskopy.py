@@ -910,6 +910,7 @@ def main():
 		app = App(False)
 		app.load_crontab = load_crontab
 		app.show_window = app.taskbaricon.on_left_down
+		app.dir = APP_PATH
 		__builtins__.app = app
 		if load_crontab():
 			tasks.run_at_startup()

@@ -271,7 +271,12 @@ def file_size(fullpath, unit:str='b')->int:
 
 def file_size_str(fullpath)->str:
 	'''
-	Size of file _for humans_. Example: '5.5 MB'
+	Size of file _for humans_. Example:
+
+		>file_size_str(r'c:\\my_file.bin')
+		>'5 MB'
+		>file_size_str(336013)
+		>'328.1 KB'
 	'''
 	if isinstance(fullpath, int):
 		size = fullpath
@@ -306,7 +311,7 @@ def file_name_add(fullpath, suffix:str='', prefix:str='')->str:
 		Example:
 
 			file_name_add('my_file.txt', suffix='_1')
-			> my_file_1.txt
+			> 'my_file_1.txt'
 	'''
 	fullpath = _fix_fullpath(fullpath)
 	if suffix: suffix = str(suffix)
@@ -314,6 +319,24 @@ def file_name_add(fullpath, suffix:str='', prefix:str='')->str:
 	par_dir, name = os.path.split(fullpath)
 	basename, ext = os.path.splitext(name)
 	return os.path.join(par_dir, prefix + basename + suffix + ext)
+
+def file_name_rem(fullpath, suffix:str='', prefix:str='')->str:
+	''' Removes a suffix or prefix from a filename.
+		Example:
+
+			file_name_rem('my_file_1.txt', suffix='_1')
+			> 'my_file.txt'
+	'''
+	fullpath = _fix_fullpath(fullpath)
+	if suffix: suffix = str(suffix)
+	if prefix: prefix = str(prefix)
+	par_dir, name = os.path.split(fullpath)
+	basename, ext = os.path.splitext(name)
+	if prefix and basename.startswith(prefix):
+		basename = basename[ len(prefix) : ]
+	if suffix and basename.endswith(suffix):
+		basename = basename[ : - len(suffix) ]
+	return os.path.join(par_dir, basename + ext)
 
 def file_name_fix(filename:str, repl_char:str='_')->str:
 	''' Replaces forbidden characters with repl_char.
@@ -843,6 +866,8 @@ def file_b64_dec(b64_str:str)->bytes:
 
 class HTTPFile:
 
+	HTTPFile = True
+	
 	def __init__(
 		self
 		, fullpath
@@ -859,7 +884,6 @@ class HTTPFile:
 		self.mime_type = mime_type
 		if not name: name = file_name(fullpath)
 		self.name = name
-
 
 
 if __name__ != '__main__': patch_import()

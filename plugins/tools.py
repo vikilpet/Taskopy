@@ -35,7 +35,7 @@ except ModuleNotFoundError:
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-07-20'
+APP_VERSION = 'v2021-08-29'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -256,12 +256,16 @@ def time_now_str(template:str=tcon.DATE_STR_FILE
 	Returns a string with current time.
 	'''
 	if not delta:
-		return time_str(template=template
-			, use_locale=use_locale)
+		return time_str(
+			template=template
+			, use_locale=use_locale
+			, timezone=timezone
+		)
 	return time_str(
 		time_val=time_now(**delta)
 		, template=template
 		, use_locale=use_locale
+		, timezone=timezone
 	)
 
 def time_str(template:str=tcon.DATE_STR_FILE
@@ -1071,7 +1075,7 @@ def dialog(msg:str=None, buttons:list=None
 	''' Shows dialog with multiple optional buttons.
 		Returns ID of selected button starting with 1000
 		or 0 if timeout is over.
-		return_button - return (status, selected button value).
+		return_button - returns (status, selected button value).
 			Status == True if some of button was selected and
 			False if no button was selected (timeout or escape).
 
@@ -1578,5 +1582,8 @@ def app_window_show():
 	' Shows the application console window '
 	app.show_window()
 
+def app_dir()->str:
+	' Returns current working directory '
+	return app.dir
 
 if __name__ != '__main__': patch_import()

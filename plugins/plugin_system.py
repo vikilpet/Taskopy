@@ -34,24 +34,28 @@ def window_get(window=None, class_name:str=None)->int:
 	
 def registry_get(fullpath:str):
 	''' Get value by fullpath to registry key.
-		fullpath - string like
-		'HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Internet Explorer\\Build'
+		fullpath - full path to key.
+		Example:
+		
+			>registry_get('HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Internet Explorer\\Build')
+			'99600'
 	'''
-	if fullpath[:5] != 'HKEY_': return 'wrong path'
+	if fullpath[:5] != 'HKEY_': return Exception('wrong path')
 	hive = fullpath.split('\\')[0]
 	key_path = '\\'.join(fullpath.split('\\')[1:-1])
 	key_name = fullpath.split('\\')[-1]
 	if hive in [w for w in winreg.__dict__ if w[:5] == 'HKEY_']:
 		hive = getattr(winreg, hive)
 	else:
-		return 'unknown hive'
+		return Exception('unknown hive')
 	try:
 		with winreg.OpenKey(hive, key_path, 0
-							, winreg.KEY_READ) as reg_key:
+		, winreg.KEY_READ) as reg_key:
 			value, value_type = winreg.QueryValueEx(reg_key, key_name)
-			return value
+		return value
 	except WindowsError as e:
-		return f'error: {e}'
+		tdebug(e)
+		return e
 
 def registry_set(fullpath:str, value, value_type:str=None):
 	''' Set value by fullpath to registry key.
