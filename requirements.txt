@@ -6,7 +6,7 @@ pytz==2019.3
 pyodbc==4.0.30
 keyboard==0.13.4
 pyperclip==1.7.0
-pywin32==227
+pywin32==301
 cryptography==3.4.6
 schedule==0.6.0
 lxml==4.6.3
