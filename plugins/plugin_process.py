@@ -711,7 +711,7 @@ startupinfo=None, timeout:int=-1)->int:
 
 def window_by_pid(process)->tuple:
 	'''
-	Returns top window of process as a tuple (hwnd:int, title:str).
+	Returns top window of a process as a tuple (hwnd:int, title:str).
 	'''
 	pid = process_get(process)
 	win_lst = window_list_top()

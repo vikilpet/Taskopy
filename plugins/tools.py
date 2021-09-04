@@ -35,7 +35,7 @@ except ModuleNotFoundError:
 
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-08-29'
+APP_VERSION = 'v2021-09-04'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 
 app_log = []
@@ -78,6 +78,7 @@ TASK_OPTIONS = [
 	, ['event_xpath', '*']
 	, ['on_exit', False]
 	, ['hyperactive', False]
+	, ['on_file_change', None]
 ]
 
 APP_SETTINGS=[
@@ -286,10 +287,10 @@ def time_str(template:str=tcon.DATE_STR_FILE
 	with locale_set(use_locale):
 		return time_val.strftime(template)
 
-def time_now(**delta):
+def time_now(**delta)->datetime.datetime:
 	'''
-	Returns datetime object
-	Use datetime timedelta keywords to get different time.
+	Returns datetime object.
+	Use `datetime.timedelta` keywords to get different time.
 	Yesterday:
 
 		time_now(days=-1)
@@ -1575,7 +1576,7 @@ def task_run(task_func, *args, **kwargs):
 
 
 def crontab_reload():
-	' Reloads crontab '
+	' Reloads the crontab '
 	app.load_crontab()
 
 def app_window_show():

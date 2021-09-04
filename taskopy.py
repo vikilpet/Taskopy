@@ -14,6 +14,7 @@ import keyboard
 import win32api
 import win32gui
 import win32con
+import win32file
 import win32evtlog
 import uptime
 
@@ -199,6 +200,7 @@ class Tasks:
 		s.task_list_idle = []
 		s.task_list_crontab_load = []
 		s.task_list_exit = []
+		s.file_change_stop = []
 		s.event_handlers = []
 		s.idle_min = 0
 		s.http_server = None
@@ -249,6 +251,8 @@ class Tasks:
 				s.task_list_crontab_load.append(task_opts)
 			if task_opts['on_exit']:
 				s.task_list_exit.append(task_opts)
+			if task_opts['on_file_change']:
+				s.add_file_change_watch(task_opts, 3)
 			s.task_list.append(task_opts)
 			if task_opts['menu']:
 				if task_opts['submenu']:
@@ -338,6 +342,65 @@ class Tasks:
 			except Exception as e:
 				hk_error(repr(e))
 	
+	def add_file_change_watch(s, task:dict, on_action:int):
+		'Watch for changes in directory'
+		ACTIONS = {
+			1: 'created'
+			, 2: 'deleted'
+			, 3: 'updated'
+			, 4: 'renamed from something'
+			, 5: 'renamed to something'
+		}
+		WAIT_INTERVAL = '100 msec'
+		FILE_LIST_DIRECTORY = 0x0001
+		BUFFER_LENGTH = 1024
+
+		def file_watch(task:dict, on_action:int
+		, stop_event:threading.Event):
+			hDir = win32file.CreateFile (
+				file_dir(task['on_file_change'])
+				, FILE_LIST_DIRECTORY
+				, win32con.FILE_SHARE_READ | win32con.FILE_SHARE_WRITE | win32con.FILE_SHARE_DELETE
+				, None
+				, win32con.OPEN_EXISTING
+				, win32con.FILE_FLAG_BACKUP_SEMANTICS
+				, None
+			)
+			fullpath = task['on_file_change']
+			filename = file_name(fullpath)
+			prev_results = [(0, None)]
+			while not stop_event.is_set():
+				results = win32file.ReadDirectoryChangesW(
+					hDir,
+					BUFFER_LENGTH,
+					False, 
+					win32con.FILE_NOTIFY_CHANGE_SIZE,
+					None,
+					None
+				)
+				if stop_event.is_set(): return
+				if results[0][1] == prev_results[0][1] \
+				and len(results) > 1:
+					prev_results = results
+					continue
+				prev_results = results
+				for action, fname in results[:1]:
+					if filename != fname:
+						continue
+					if action != on_action:
+						continue
+					if action in (1, 3):
+						file_lock_wait(fullpath, wait_interval=WAIT_INTERVAL)
+					s.run_task(task, caller=CALLER_FILE_CHANGE)
+
+		stop_event = threading.Event()
+		s.file_change_stop.append(stop_event)
+		threading.Thread(
+			target=file_watch
+			, args=(task, on_action, stop_event)
+			, daemon=True
+		).start()
+
 	def add_schedule(s, task):
 		''' task - dict with task options
 		'''
@@ -648,6 +711,7 @@ class Tasks:
 				eh.close()
 			except Exception as e:
 				dev_print(f'event close error: {e}')
+		for es in s.file_change_stop: es.set()
 
 def create_menu_item(menu, task, func=None, parent_menu=None):
 	''' Task - task dict or menu item label
@@ -708,8 +772,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		return menu
 
 	def run_command(s, event=None):
-		win32gui.ShowWindow(app.app_hwnd, win32con.SW_RESTORE)
-		win32gui.SetForegroundWindow(app.app_hwnd)
+		show_app_window()
 		cmd = input(f'{lang.menu_command_con}: ')
 		if cmd:	print(eval(cmd))
 
@@ -734,11 +797,9 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 				if window_is_visible(app.app_hwnd):
 					window_hide(app.app_hwnd)
 				else:
-					win32gui.ShowWindow(app.app_hwnd, win32con.SW_RESTORE)
-					win32gui.SetForegroundWindow(app.app_hwnd)
+					show_app_window()
 			else:
-				win32gui.ShowWindow(app.app_hwnd, win32con.SW_RESTORE)
-				win32gui.SetForegroundWindow(app.app_hwnd)
+				show_app_window()
 			
 
 	def on_exit(s, event=None)->bool:
@@ -884,6 +945,13 @@ class App(wx.App):
 		time.sleep(0.1)
 		s.frame.PopupMenu(s.taskbaricon.CreatePopupMenu())
 		
+
+def show_app_window():
+	try:
+		win32gui.ShowWindow(app.app_hwnd, win32con.SW_RESTORE)
+		win32gui.SetForegroundWindow(app.app_hwnd)
+	except Exception as e:
+		dev_print(f'show window exception: {e}')
 
 def main():
 	global app

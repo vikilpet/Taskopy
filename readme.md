@@ -17,7 +17,7 @@ Then press Ctrl+Shift+T or open in browser URL http://127.0.0.1:8275/task?my_tas
 Another example: show message box every day at 10:30 and hide this task from menu:
 
 	def my_another_task(schedule='every().day.at("10:30")', menu=False):
-		msgbox('Take the pills', ui=MB_ICONEXCLAMATION)
+		dialog('Take the pills')
 
 ## Contents
 - [Installation](#installation)
@@ -95,6 +95,7 @@ Format: **option name** (default value) — description.
 - **menu** (True) — show in tray menu.
 - **hotkey** (None) — assign to global hotkey. Example: *hotkey='alt+ctrl+m'*
 - **hotkey_suppress** (True) — if set to False hotkey will not supressed so active window ill still receive it.
+- **hyperactive** - run task even if the Taskopy is disabled.
 - **schedule** (None) — add to schedule. Functionality provided by [schedule project](https://github.com/dbader/schedule) so you better refer to their [documentation](https://schedule.readthedocs.io/en/stable/).
 	Run task every hour:
 
@@ -139,6 +140,11 @@ Format: **option name** (default value) — description.
 
 	See also [settings](#settings) section for IP and port bindings.
 - **http_dir** - folder where to save files sent via HTTP POST request. If not set then use system temporary folder.
+- **http_white_list** - white list of IP addresses for this task only. Example:
+	
+	http_white_list=['127.0.0.1', '192.168.0.*']
+
+- **on_file_change** - run task when the file changes.
 - **caller** - place this option before other options and in task body you will know who actually launched task this time. Possible values: http, menu, scheduler, hotkey. See *def check_free_space* in [Task Examples](#task-examples).
 - **data** - to pass any data to the task, e.g. *DataEvent* or *DataHTTPReq*.
 - **idle** - Perform the task when the user is idle for the specified time. For example, *idle='5 min'* - run when the user is idle for 5 minutes. The task is executed only once during the inactivity.
@@ -149,7 +155,7 @@ Global settings are stored in *settiings.ini* file.
 
 Format: **setting** (default value) — description.
 
-- **language** (en) — menu and msgbox language. Variants: en, ru.
+- **language** (en) — language for menus and messages. Variants: en, ru.
 - **editor** (notepad) — text editor for «Edit crontab» menu command.
 - **hide_console** - hide the console window.
 - **server_ip** (127.0.0.1) — bind HTTP server to this local IP. For access from any address set to *0.0.0.0*.
@@ -160,6 +166,7 @@ Format: **setting** (default value) — description.
 ## Keywords
 ### Miscelanneous
 - **balloon(msg:str, title:str=APP_NAME,timeout:int=None, icon:str=None)** - shows *baloon* message from tray icon. `title` - 63 symbols max, `msg` - 255 symbols. `icon` - 'info', 'warning' or 'error'.
+- **crontab_reload()** - reloads the crontab.
 - **dialog(msg:str=None, buttons:list=None, title:str=None, content:str=None, default_button:int=0, timeout:int=None, return_button:bool=False)->int** - shows a dialog with many buttons. Returns ID of selected buttons starting with 1000.
 	*buttons* - a list with text on the buttons. Number of strings = number of buttons.
 	*title* - dialog title.
@@ -173,6 +180,16 @@ Format: **setting** (default value) — description.
 	![Dialog EN](https://user-images.githubusercontent.com/43970835/79643653-13d4d380-81b5-11ea-9548-eb28fc515d7b.png)
 
 - **hint(text:str, position:tuple=None)->int** - shows a small window with the specified text. Only for the *Python* version. *position* - a tuple with coordinates. If no coordinates are specified, it appears in the center of the screen. Returns the PID of the hint process.
+- **HTTPFile** - Use this class if your HTTP task returns a file:
+
+	def http_file_demo(http=True, result=True
+	, submenu='demo'):
+		# http://127.0.0.1:8275/task?http_file_demo
+		return HTTPFile(
+			fullpath=r'resources\icon.png'
+			, use_save_to=True
+		)
+
 - **Job(func, args, job_name:str='', kwargs)** - class for concurrent function execution in *job_batch* and *job_pool*. Properties:
 	- *result* - functional result
 	- *time* - time in seconds
@@ -244,7 +261,10 @@ Format: **setting** (default value) — description.
 - **sound_play (fullpath:str, wait:bool)->str** - play .wav file. *wait* — do not pause task execution. If fullpath is a folder then pick random file.
 - **time_diff(start, end, unit:str='sec')->int** - returns difference between dates in units. *start* and *end* should be in datetime format.
 - **time_diff_str(start, end)->str** - returns difference between dates in string like that: '3:01:35'.	*start* and *end* should be in datetime format.
-- **time_now()** - returns the current time in datetime format.
+- **time_now(\*\*delta)->datetime.datetime** - returns datetime object. Use `datetime.timedelta` keywords to get different time. Yesterday:
+
+		time_now(days=-1)
+
 - **time_now_str(template:str='%Y-%m-%d_%H-%M-%S')->str** - string with current time.
 - **pause(sec:float)** - pause the execution of the task for the specified number of seconds. *interval* - time in seconds or a string specifying a unit like '5 ms' or '6 sec' or '7 min'.
 - **var_set(var_name:str, value:str)** - save *value* of variable *var_name* to disk so it will persist between program starts.
@@ -285,6 +305,7 @@ Format: **setting** (default value) — description.
 - **dir_delete(fullpath:str)** - delete directory.
 - **dir_dialog(title:str=None, default_dir:str='', on_top:bool=True, must_exist:bool=True)->str** - directory selection dialog.
 - **dir_exists(fullpath:str)->bool** - directory exists?
+- **dir_files(fullpath)->list** - Returns list of full filenames of all files in the given directory and its subdirectories.
 - **dir_list(fullpath:str)->list:** - get list of files in directory.
 	Examples:
 	- Get a list of all log files in 'c:\\\Windows' **without** subfolders:
@@ -316,6 +337,7 @@ Format: **setting** (default value) — description.
 - **file_exists(fullpath:str)->bool** - file exists?
 - **file_ext(fullpath:str)->str** - file extension in lower case without dot.
 - **file_hash(fullpath:str, algorithm:str='crc32')->str** - returns hash of file. *algorithm* - 'crc32' or any algorithm from hashlib ('md5', 'sha512' etc)
+- **file_lock_wait(fullpath, wait_interval:str='100 ms')->bool** - blocks execution until the file is available. Usage - wait for another process to stop writing to the file.
 - **file_log(fullpath:str, message:str, encoding:str='utf-8', time_format:str='%Y.%m.%d %H:%M:%S')** - log *message* to *fullpath* file.
 - **file_move(fullpath:str, destination:str)** - move file to destination folder or file.
 - **file_name(fullpath:str)->str** - get file name without directory.
@@ -325,6 +347,7 @@ Format: **setting** (default value) — description.
 	'my_file_1.txt'
 
 - **file_name_fix(filename:str, repl_char:str='\_')->str** - replaces forbidden characters with _repl_char_. Removes leading and trailing spaces. Adds '\\\\?\\' for long paths.
+- **file_name_rem(fullpath, suffix:str='', prefix:str='')->str** - removes a suffix or prefix from a filename.
 - **file_print(fullpath, printer:str=None, use_alternative:bool=False)->bool** - prints the file on the specified printer.
 - **file_read(fullpath:str)->str:** - get content of file.
 - **file_recycle(fullpath:str, silent:bool=True)->bool** - move file to the recycle bin. *silent* - do not show standard windows dialog to confirm deletion. Returns True on successful operation.
@@ -350,7 +373,7 @@ Format: **setting** (default value) — description.
 	- icon_index - icon index. If *icon_fullpath* not specified then uses *fullpath* as source.
 
 - **temp_dir(new_dir:str=None)->str** - returns the path to the temporary folder. If *new_dir* is specified, it creates a subfolder in the temporary folder and returns its path.
-- **temp_file(suffix:str='')->str** - returns the name for the temporary file.
+- **temp_file(prefix:str='', suffix:str='')->str** - returns the name for the temporary file.
 
 ### Network
 - **domain_ip(domain:str)->list** - get a list of IP-addresses by domain name.
@@ -375,6 +398,12 @@ Format: **setting** (default value) — description.
 	*element* — a list with a map to desired item.
 	Example: *element=['usd', 2, 'value']*
 - **http_req(url:str, encoding:str='utf-8', post_file:str=None, post_hash:bool=False)->str:** - download page by url and return it's html as a string. *post_file* - send this file with POST request. *post_hash* - add the checksum of the file to request headers to check the integrity (see [Task Options](#task-options)).
+- **net_html_unescape(html_str:str)->str** - decodes HTML escaped symbols:
+		
+		"That&#039;s an example" -> "That's an example"
+
+- **net_url_decode(url:str, encoding:str='utf-8')->str** - decodes URL.
+- **net_url_encode(url:str, encoding:str='utf-8')->str** - encodes URL.
 - **pc_name()->str** - computer name.
 - **url_hostname(url:str)->str** - extract the domain name from the URL.
 - **xml_element(url:str, element:str, element_num:int=0, encoding:str='utf-8', \*\*kwargs)** - downloads the document from URL and returns the value by the specified XPath e.g:
@@ -388,9 +417,11 @@ In the functions for working with windows, the *window* argument can be either a
 - **free_ram(unit:str='percent')** - amount of free memory. *unit* — 'kb', 'mb'... or 'percent'.
 - **idle_duration(unit:str='msec')->int** - how much time has passed since user's last activity.
 - **monitor_off()** - turn off the monitor.
+- **monitor_on()** - turns on the monitor.
 - **registry_get(fullpath:str)** - get value from Windows Registry.
 	*fullpath* — string like 'HKEY_CURRENT_USER\\Software\\Microsoft\\Calc\\layout'
 - **window_activate(window=None)->int** - bring window to front. *window* may be a string with title or integer with window handle.
+- **window_by_pid(process)->tuple** - returns top window of a process as a tuple `(hwnd:int, title:str)`.
 - **window_close(window=None, wait:bool=True)->bool** - closes window and returns True on success.
 - **window_find(title:str)->list** - find window by title. Returns list of all found windows.
 - **window_hide(window=None)->int** - hide window.
@@ -400,8 +431,13 @@ In the functions for working with windows, the *window* argument can be either a
 - **window_title_set(window=None, new_title:str='')->int** - change window title from *cur_title* to *new_title*
 
 ### Mail
-- **mail_check(server:str, login:str, password:str, folders:list=['inbox'], msg_status:str='UNSEEN')->tuple** - returns the number of new emails and a list of errors.
-- **mail_download(server:str, login:str, password:str, output_dir:str, folders:list=['inbox'], trash_folder:str='Trash')->tuple** - downloads all messages to the specified folder. Successfully downloaded messages are moved to the IMAP *trash_folder* folder on the server. Returns the list with decoded message subjects and the list of errors.
+- **mail_check(server:str, login:str, password:str, folders:list=['inbox'], msg_status:str='UNSEEN')->tuple** - counts the number of messages with *msg_status* on the server. Returns (msg_num:int, errors:list). 
+
+		>(5, [])
+		or
+		>(0, ['login failed'])
+
+- **mail_download(server:str, login:str, password:str, output_dir:str, folders:list=['inbox'], trash_folder:str='Trash')->tuple** - downloads all messages to the specified folder. Successfully downloaded messages are moved to the IMAP *trash_folder* folder on the server. Returns a tuple of two lists: a list with decoded mail subjects and a list with errors.
 - **mail_send(recipient:str, subject:str, message:str, smtp_server:str, smtp_port:int, smtp_user:str, smtp_password:str)** - send email.
 
 ### Process
@@ -637,7 +673,7 @@ Launch iPython (Jupyter) animport crontab for quick access to all keywords from 
 	, schedule='every(30).to(45).minutes'):
 		for d in drive_list():
 			if drive_free(d) < 10:
-				msgbox(f'low disk space: {d}')
+				dialog(f'low disk space: {d}')
 
 Show message with current IP-address using dyndns.org:
 
@@ -649,7 +685,7 @@ Show message with current IP-address using dyndns.org:
 			, {'name':'body'}
 		).split(': ')[1]
 		tprint(f'Current IP: {ip}')
-		msgbox(f'Current IP: {ip}', timeout=10)
+		dialog(f'Current IP: {ip}', timeout=10)
 
 Add the IP-address from the clipboard to the address-list of Mikrotik router:
 
@@ -664,7 +700,7 @@ Add the IP-address from the clipboard to the address-list of Mikrotik router:
 			, device_user='admin'
 			, device_pwd='PaSsWoRd'
 		)
-		msgbox('Done!', timeout=3)
+		dialog('Done!', timeout=3)
 
 Check MD5 hash of file in the Virustotal. You need to register to obtain free API key:
 
@@ -678,16 +714,16 @@ Check MD5 hash of file in the Virustotal. You need to register to obtain free AP
 		scan_result = json_element(f'https://www.virustotal.com/vtapi/v2/file/report?apikey={APIKEY}&resource={md5}')
 		if isinstance(scan_result, Exception):
 			tprint(scan_result)
-			msgbox('HTTP request exception')
+			dialog('HTTP request exception')
 			return
 		if scan_result['response_code'] == 0:
-			msgbox('Unknown file', timeout=3)
+			dialog('Unknown file', timeout=3)
 			return
 		res = DictToObj(scan_result)
 		for av in res.scans.keys():
 			if res.scans[av]['detected']:
 				print(f'{av}: ' + res.scans[av]['result'])
-		msgbox(f'Result: {res.positives} of {res.total}', timeout=5)
+		dialog(f'Result: {res.positives} of {res.total}', timeout=5)
 
 Receive a file via HTTP POST request and show a message with a comment and the full name of the file:
 

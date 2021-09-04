@@ -23,7 +23,8 @@ import win32api
 from win32com.shell import shell, shellcon
 from pathlib import Path
 import shutil
-from .tools import random_str, tdebug, patch_import
+from .tools import random_str, tdebug, patch_import \
+, time_sleep, dev_print
 try:
 	import constants as tcon
 except ModuleNotFoundError:
@@ -588,7 +589,7 @@ def dir_zip(fullpath, destination:str=None
 		path to archive.
 		If destination is a folder then take
 		archive name from fullpath directory name.
-		Replaces destination if it exists.
+		Overwrites the destination if it exists.
 		If destination is not specified then create
 		archive in same directory.
 		Returns destination.
@@ -611,9 +612,9 @@ def dir_zip(fullpath, destination:str=None
 		new_fullpath += '.zip'
 	else:
 		new_fullpath = destination
-		base_name = os.path.basename(
-			destination
-		)
+		if not new_fullpath.endswith('.zip'):
+			new_fullpath += '.zip'
+		base_name = os.path.basename(new_fullpath)
 		if base_name.lower().endswith('.zip'):
 			base_name = base_name[:-4]
 	root_dir = os.path.dirname(fullpath)
@@ -693,7 +694,7 @@ def temp_dir(new_dir:str=None)->str:
 	return new_dir
 
 def temp_file(prefix:str='', suffix:str='')->str:
-	''' Returns temporary file name. '''
+	''' Returns the name for the temporary file. '''
 	return os.path.join(tempfile.gettempdir()
 		, prefix + time.strftime('%m%d%H%M%S') + random_str(5) + suffix)
 
@@ -885,5 +886,21 @@ class HTTPFile:
 		if not name: name = file_name(fullpath)
 		self.name = name
 
+def file_lock_wait(fullpath, wait_interval:str='100 ms')->bool:
+	'''
+	Blocks execution until the file is available.
+	Usage - wait for another process to stop writing to the file.
+	'''
+	fullpath = _fix_fullpath(fullpath)
+	while True:
+		try:
+			os.rename(fullpath, fullpath)
+			return True
+		except PermissionError:
+			dev_print('File is locked:', file_name(fullpath))
+			time_sleep(wait_interval)
+		except Exception as e:
+			dev_print('Wrong exception', file_name(fullpath), repr(e))
+			return False
 
 if __name__ != '__main__': patch_import()

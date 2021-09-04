@@ -17,7 +17,7 @@
 Другой пример: показываем сообщение каждый день в 10:30 и скрываем из меню:
 
 	def my_another_task(schedule='every().day.at("10:30")', menu=False):
-		msgbox('Прими таблетки', ui=MB_ICONEXCLAMATION)
+		dialog('Прими таблетки')
 
 ## Содержание
 - [Установка](#установка)
@@ -95,6 +95,7 @@
 - **menu** (True) — показывать в меню у иконки в трее.
 - **hotkey** (None) — привязать к глобальной горячей клавише. Например: _hotkey='alt+ctrl+m'_
 - **hotkey_suppress** (True) — не _съедать_ горячую клавишу, т.е. активное окно всё равно её получит.
+- **hyperactive** - запуск задачи, даже если Taskopy отключен.
 - **schedule** (None) — запланированное задание. Функциональность обеспечивается модулем [schedule](https://github.com/dbader/schedule) так что лучше почитать их [документацию](https://schedule.readthedocs.io/en/stable/).
 	Выполнять задачу каждый час:
 
@@ -139,6 +140,11 @@
 
 	Смотрите в разделе [Настройки](#settings) про привязывание HTTP-сервера к IP и порту.
 - **http_dir** - папка, куда сохранять файлы, отправленные через HTTP POST запрос. Если не указано - временная папка.
+- **http_white_list** - белый список IP адресов только для этой задачи. Пример:
+	
+	http_white_list=['127.0.0.1', '192.168.0.*']
+
+- **on_file_change** - запускать задачу при изменении файла.
 - **caller** - при указании в свойствах, в эту переменную будет записано, кто именно запустил задачу. Возможные варианты: http, menu, scheduler, hotkey. caller следует указывать перед другими свойствами задачи.
 - **data** - для того, чтобы передать в задачу какие-либо данные, например *DataEvent* или *DataHTTPReq*.
 - **idle** - выполнить задачу, когда пользователь бездействует указанное время. Например *idle='5 min'* — выполнить при бездействии в 5 минут. Задача выполняется только один раз в течении бездействия.
@@ -160,6 +166,7 @@
 ## Ключевые слова
 ### Общие
 - **balloon(msg:str, title:str=APP_NAME,timeout:int=None, icon:str=None)** - показывает сообщение у иконки в трее. `title` - 63 символа максимум, `msg` - 255 символов. `icon` - 'info', 'warning' или 'error'.
+- **crontab_reload()** - перезагружает кронтаб.
 - **dialog(msg:str=None, buttons:list=None, title:str=None, content:str=None, default_button:int=0, timeout:int=None, return_button:bool=False)->int** - показывает сообщение с несколькими кнопками. Возвращает ID нажатой кнопки, начиная с 1000.
 	*buttons* - список строк с текстом на кнопках. Сколько строк, столько и кнопок.
 	*title* - заголовок.
@@ -173,6 +180,16 @@
 	![Dialog RU](https://user-images.githubusercontent.com/43970835/79643801-bc833300-81b5-11ea-8a2e-ea6baa045480.png)
 
 - **hint(text:str, position:tuple=None)->int** - показывает небольшое окошко с указанным текстом. Только для *Python* версии. *position* - кортеж с координатами. Если координаты не указаны - появится в центре экрана. Возвращает PID процесса с окошком.
+- **HTTPFile** - Используйте этот класс, если ваша HTTP задача возвращает файл:
+
+	def http_file_demo(http=True, result=True
+	, submenu='demo'):
+		# http://127.0.0.1:8275/task?http_file_demo
+		return HTTPFile(
+			fullpath=r'resources\icon.png'
+			, use_save_to=True
+		)
+
 - **Job(func, args, job_name:str='', kwargs)** - класс для параллельного запуска функций в *job_batch* и *job_pool*. Свойства:
 	- *result* - результат выполнения функции
 	- *time* - время в секундах
@@ -244,7 +261,10 @@
 - **sound_play (fullpath:str, wait:bool)->str** - воспроизвести .wav файл. *wait* — ждать конца воспроизведения. Если *fullpath* это папка, значит проиграть случайный файл из неё.
 - **time_diff(start, end, unit:str='sec')->int** - возвращает разницу между датами в выбранных единицах. *start* и *end* должны быть в формате datetime.
 - **time_diff_str(start, end)->str** - возвращает разницу между датами в виде строки типа: '3:01:35'. *start* и *end* должны быть в формате datetime.
-- **time_now()** - возвращает текущее время в формате datetime.
+- **time_now(\*\*delta)->datetime.datetime** - возвращает объект datetime. Используйте ключевые слова `datetime.timedelta` для получения другого времени. Вчера:
+
+		time_now(days=-1)
+		
 - **time_now_str(template:str='%Y-%m-%d\_%H-%M-%S')->str** - строка с текущей датой и временем.
 - **pause(interval)** - приостановить выполнение задачи на указанное кол-во секунд. *interval* — время в секундах или строка с указанием единицы вроде '5 ms' или '6 sec' или '7 min'.
 - **var_set(var_name:str, value:str)** - сохранить _значение_ переменной на диск. Таким образом можно хранить данные между запусками Taskopy.
@@ -285,6 +305,7 @@
 - **dir_delete(fullpath:str)** - удалить папку.
 - **dir_dialog(title:str=None, default_dir:str='', on_top:bool=True, must_exist:bool=True)->str** - диалог выбора папки.
 - **dir_exists(fullpath:str)->bool** - папка существует?
+- **dir_files(fullpath)->list** - возвращает список полных путей всех файлов в указанной папке и её подпапках.
 - **dir_list(fullpath:str)->list:** - получить список файлов в папке.
 	Примеры:
 	- Получить список всех .log файлов в 'c:\\\Windows' **не учитывая** подпапки:
@@ -317,6 +338,7 @@
 - **file_ext(fullpath:str)->str** - расширение файла без точки.
 - **file_hash(fullpath:str, algorithm:str='crc32')->str**: - возвращает хэш файла. *algorithm* - 'crc32' или любой алгоритм из hashlib ('md5', 'sha512' и т.д.)
 - **file_log(fullpath:str, message:str, encoding:str='utf-8', time_format:str='%Y.%m.%d %H:%M:%S')** - записать *message* в файл *fullpath*.
+**file_lock_wait(fullpath, wait_interval:str='100 ms')->bool** - блокирует выполнение до тех пор, пока файл не станет доступен. Использование - подождать, пока другой процесс не прекратит запись в файл.
 - **file_move(fullpath:str, destination:str)** - переместить файл.
 - **file_name(fullpath:str)->str** - получить имя файла без папки.
 - **file_name_add(fullpath, suffix:str='', prefix:str='')->str** - добавляет строку (префикс или суффикс) к файлу перед расширением. Пример: 
@@ -325,6 +347,7 @@
 	'my_file_1.txt'
 
 - **file_name_fix(filename:str, repl_char:str='\_')->str** - заменяет запрещённые символы на _repl_char_. Удаляет пробелы в начале и в конце. Добавляет '\\\\?\\' к длинным путям.
+- **file_name_rem(fullpath, suffix:str='', prefix:str='')->str** - удаляет суффикс или префикс из имени файла.
 - **file_print(fullpath, printer:str=None, use_alternative:bool=False)->bool** - распечатывает файл на указанном принтере.
 - **file_read(fullpath:str)->str:** - получить содержимое файла.
 - **file_recycle(fullpath:str, silent:bool=True)->bool** - переместить файл в корзину. *silent* - не показывать стандартный системный диалог подтверждения удаления в корзину. Возвращает True в случае успешного удаления.
@@ -350,7 +373,7 @@
 	- icon_index - номер иконки в файле. Если *icon_fullpath* не указан, используется *fullpath*.
 
 - **temp_dir(new_dir:str=None)->str** - возвращает путь ко временной папке. Если указана *new_dir* - создаёт подпапку во временной папке и возвращает её путь.
-- **temp_file(suffix:str='')->str** - возвращает имя для временного файла.
+- **temp_file(prefix:str='', suffix:str='')->str** - возвращает имя для временного файла.
 
 ### Сеть
 - **domain_ip(domain:str)->list** - получить список IP-адресов по имени домена.
@@ -375,6 +398,12 @@
 	*element* — список с картой для нахождения нужного элемента в структуре json.
 	Пример: *element=['usd', 2, 'value']*
 - **http_req(url:str, encoding:str='utf-8', post_file:str=None, post_hash:bool=False)->str:** - скачать указанную страницу и вернуть её содержимое. *post_file* - отправить указанный файл POST запросом. *post_hash* - в запросе указать хэш файла для проверки целостности (смотрите [Свойства задачи](#свойства-задачи)).
+- **net_html_unescape(html_str:str)->str** - декодирует экранированные символы (HTML):
+		
+		"That&#039;s an example" -> "That's an example"
+
+- **net_url_decode(url:str, encoding:str='utf-8')->str** - декодирует URL.
+- **net_url_encode(url:str, encoding:str='utf-8')->str** - кодирует URL.
 - **pc_name()->str** - имя компьютера.
 - **url_hostname(url:str)->str** - извлечь имя домена из URL.
 - **xml_element(url:str, element:str, element_num:int=0, encoding:str='utf-8', \*\*kwargs)** - скачивает документ по ссылке и возвращает значение по указанному XPath. Например:
@@ -387,10 +416,12 @@
 
 - **free_ram(unit:str='percent')** - количество свободной памяти. *unit* — 'kb', 'mb'... или 'percent'.
 - **idle_duration(unit:str='msec')->int** - сколько прошло времени с последней активности пользователя.
-- **monitor_off()** - выключить монитор.
+- **monitor_off()** - выключает монитор.
+- **monitor_on()** - включает монитор.
 - **registry_get(fullpath:str)** - получить значение ключа из реестра Windows.
 	*fullpath* — строка вида 'HKEY_CURRENT_USER\\\Software\\\Microsoft\\\Calc\\\layout'
 - **window_activate(window=None)->int** - вывести указанное окно на передний план. *window* может строкой с заголовком или числовым хэндлом нужного окна.
+- **window_by_pid(process)->tuple** - возвращает главное окно процесса в виде кортежа `(hwnd:int, title:str)`.
 - **window_close(window=None, wait:bool=True)->bool** - закрывает окно и возвращает True при успехе.
 - **window_find(title:str)->list** - вернуть список хэндлов окон, с указанным заголовком.
 - **window_hide(window=None)->int** - скрыть окно.
@@ -400,8 +431,13 @@
 - **window_title_set(window=None, new_title:str='')->int** -  найти окно по заголовку *cur_title* и поменять на *new_title*.
 
 ### Почта
-- **mail_check(server:str, login:str, password:str, folders:list=['inbox'], msg_status:str='UNSEEN')->tuple** - возвращает количество новых писем и список ошибок.
-- **mail_download(server:str, login:str, password:str, output_dir:str, folders:list=['inbox'], trash_folder:str='Trash')->tuple** - скачивает все письма в указанную папку. Успешно скачанные письма перемещаются в IMAP *trash_folder* папку на сервере. Возвращает список с декодированными заголовками писем и список с ошибками.
+- **mail_check(server:str, login:str, password:str, folders:list=['inbox'], msg_status:str='UNSEEN')->tuple** - подсчитывает количество сообщений со статусом *msg_status* на сервере. Returns (msg_num:int, errors:list). 
+
+		>(5, [])
+		or
+		>(0, ['login failed'])
+
+- **mail_download(server:str, login:str, password:str, output_dir:str, folders:list=['inbox'], trash_folder:str='Trash')->tuple** - скачивает все письма в указанную папку. Успешно скачанные письма перемещаются в IMAP *trash_folder* папку на сервере. Возвращает кортеж из двух списков: список с декодированными заголовками писем и список с ошибками.
 - **mail_send(recipient:str, subject:str, message:str, smtp_server:str, smtp_port:int, smtp_user:str, smtp_password:str)** - отправить письмо. Поддерживает отправку с русским заголовком и русским текстом.
 
 ### Процессы
@@ -638,7 +674,7 @@ https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/
 	, schedule='every(30).to(45).minutes'):
 		for d in drive_list():
 			if drive_free(d) < 10:
-				msgbox(f'Осталось мало места: {d}')
+				dialog(f'Осталось мало места: {d}')
 
 Показываем сообщение с текущим внешним IP-адресом с помощью сервиса dyndns.org:
 
@@ -650,7 +686,7 @@ https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/
 			, {'name': 'body'}
 		).split(': ')[1]
 		tprint(f'Текущий IP: {ip}')
-		msgbox(f'Текущий IP: {ip}', timeout=10)
+		dialog(f'Текущий IP: {ip}', timeout=10)
 
 Добавить IP-адрес из буфера обмена в список адресов маршрутизатора MikroTik:
 
@@ -665,7 +701,7 @@ https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/
 			, device_user='admin'
 			, device_pwd='PaSsWoRd'
 		)
-		msgbox('Готово!', timeout=5)
+		dialog('Готово!', timeout=5)
 
 Запускаем калькулятор и меняем его заголовок на курс продажи доллара в Сбербанке. Назначаем выполнение задачи на клик левой клавишей мыши по иконке:
 
@@ -693,16 +729,16 @@ https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/
 		scan_result = json_element(f'https://www.virustotal.com/vtapi/v2/file/report?apikey={APIKEY}&resource={md5}')
 		if isinstance(scan_result, Exception):
 			tprint(scan_result)
-			msgbox('Ошибка HTTP-запроса')
+			dialog('Ошибка HTTP-запроса')
 			return
 		if scan_result['response_code'] == 0:
-			msgbox('Неизвестный файл', timeout=3)
+			dialog('Неизвестный файл', timeout=3)
 			return
 		res = DictToObj(scan_result)
 		for av in res.scans.keys():
 			if res.scans[av]['detected']:
 				print(f'{av}: ' + res.scans[av]['result'])
-		msgbox(f'Результат: {res.positives} из {res.total}', timeout=5)
+		dialog(f'Результат: {res.positives} из {res.total}', timeout=5)
 
 Получаем файл через HTTP POST запрос и выводим сообщение с комментарием и полным именем файла:
 

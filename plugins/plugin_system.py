@@ -21,10 +21,17 @@ _SendNotifyMessage = ctypes.windll.user32.SendNotifyMessageA
 def window_get(window=None, class_name:str=None)->int:
 	''' Returns window handle. If window is not specified then
 		finds foreground window.
-		Returns 0 if nothing is found.
+		You can use atherisk for an imprecise search:
+
+			>window_get('Total Commander*')
+			132940
+
 	'''
 	if isinstance(window, str):
-		return win32gui.FindWindow(class_name, window)
+		if window.endswith('*'):
+			return window_find(title=window[:-1], exact=False)[0]
+		else:
+			return win32gui.FindWindow(class_name, window)
 	elif isinstance(window, int):
 		return window
 	elif not window and class_name:
@@ -120,7 +127,7 @@ def window_list(title_filter:str=None
 , case_sensitive:bool=False)->list:
 	''' List titles of all the windows.
 		title_filter and class_filter - optional filter
-		class_filter - 
+		class_filter - filter by window class name.
 	'''
 	
 	def get_title(hwnd, _):
@@ -176,8 +183,6 @@ def window_activate(window=None)->int:
 		win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
 		win32gui.SetForegroundWindow(hwnd)
 		return hwnd
-	else:
-		print(f'Window {window} not found')
 
 def window_minimize(window=None)->int:
 	''' Minimize window. Returns hwnd.
@@ -266,7 +271,7 @@ def monitor_off():
 	_monitor(state=tcon.MONITOR_OFF)
 
 def monitor_on():
-	''' Turns off the monitor '''
+	''' Turns on the monitor '''
 	_monitor(state=tcon.MONITOR_ON)
 	
 

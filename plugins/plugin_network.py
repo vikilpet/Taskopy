@@ -18,7 +18,7 @@ from .tools import dev_print, time_sleep, tdebug \
 
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36'}
 
 def http_req(url:str, encoding:str='utf-8', session:bool=False
 , cookies:dict=None, headers:dict=None
@@ -426,11 +426,11 @@ def url_hostname(url:str, second_lvl:bool=True)->str:
 	return domain
 
 def net_url_decode(url:str, encoding:str='utf-8')->str:
-	' Decode URL '
+	' Decodes URL '
 	return urllib.parse.unquote(url, encoding=encoding)
 
 def net_url_encode(url:str, encoding:str='utf-8')->str:
-	' Encode URL '
+	' Encodes URL '
 	return urllib.parse.quote(url, encoding=encoding)
 
 def net_html_unescape(html_str:str)->str:

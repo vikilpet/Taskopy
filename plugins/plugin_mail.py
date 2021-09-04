@@ -128,8 +128,8 @@ def mail_check(server:str, login:str, password:str
 , folders:list=['inbox'], msg_status:str='UNSEEN'
 , silent:bool=True)->tuple:
 	'''
-	Checks server counts number of messages with
-	status *msg_status*.
+	Counts the number of messages with *msg_status*
+	on the server.
 	Returns (msg_num:int, errors:list)
 
 		>>>(5, [])
@@ -188,8 +188,8 @@ def _get_last_index(folder:str)->int:
 	return num
 	
 def mail_download(server:str, login:str, password:str
-	, output_dir:str, folders:list=['inbox']
-	, trash_folder:str='Trash', silent:bool=True)->tuple:
+, output_dir:str, folders:list=['inbox']
+, trash_folder:str='Trash', silent:bool=True)->tuple:
 	'''
 	Downloads all messages from the server to the
 	specified directory (*output_dir*).
