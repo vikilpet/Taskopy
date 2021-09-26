@@ -14,7 +14,6 @@ try:
 except ModuleNotFoundError:
 	import plugins.constants as tcon
 
-
 _TASK_TIMEOUT = 60
 _FAVICON = None
 
@@ -132,7 +131,6 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 					)
 			else:
 				return False, data, None
-		
 		try:
 			(
 				_, _
@@ -298,7 +296,6 @@ def http_server_start(tasks):
 	except Exception as e:
 		print(f'HTTP Server error:\n{repr(e)}')
 		msgbox_warning(f'HTTP Server error:\n{repr(e)}')
-
 def _file_hash(fullpath:str)->str:
 	hash_md5 = hashlib.md5()
 	with open(fullpath, 'rb') as fi:

@@ -13,7 +13,6 @@ import win32process
 import win32security
 import win32ts
 import win32serviceutil
-
 import contextlib
 import winerror
 import pywintypes
@@ -448,11 +447,6 @@ def service_start(service:str, args:tuple=None):
 def service_stop(service:str)->tuple:
 	''' Stops windows service.'''
 	return win32serviceutil.StopService(service)
-
-
-
-
-
 # https://stackoverflow.com/questions/48051283/call-binary-without-elevated-privilege
 ntdll = ctypes.WinDLL('ntdll')
 kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
@@ -504,7 +498,6 @@ class PROCESS_INFORMATION(ctypes.Structure):
 LPPROCESS_INFORMATION = ctypes.POINTER(PROCESS_INFORMATION)
 
 kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
-
 advapi32.CreateProcessWithTokenW.argtypes = (
 	wintypes.HANDLE,
 	wintypes.DWORD,
@@ -515,7 +508,6 @@ advapi32.CreateProcessWithTokenW.argtypes = (
 	wintypes.LPCWSTR,
 	LPSTARTUPINFO,
 	LPPROCESS_INFORMATION)
-
 user32.GetShellWindow.restype = wintypes.HWND
 
 def adjust_token_privileges(htoken, state):
@@ -707,7 +699,6 @@ startupinfo=None, timeout:int=-1)->int:
 		, timeout
 	)
 	return win32process.GetExitCodeProcess(proc_handle)
-
 
 def window_by_pid(process)->tuple:
 	'''

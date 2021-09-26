@@ -347,9 +347,6 @@ def routeros_query(
 		for q in queries:
 			data = apiros.talk(q)
 
-			
-
-
 			if len(data) > 1:
 				if data[0][0] == '!trap':
 					if info: print(f'routeros_query: bad query')

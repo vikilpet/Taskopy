@@ -12,28 +12,28 @@ try:
 	import constants as tcon
 except ModuleNotFoundError:
 	import plugins.constants as tcon
-
-
 LockWorkStation = ctypes.windll.user32.LockWorkStation
 _GetAncestor = ctypes.windll.user32.GetAncestor
 _SendNotifyMessage = ctypes.windll.user32.SendNotifyMessageA
 
 def window_get(window=None, class_name:str=None)->int:
-	''' Returns window handle. If window is not specified then
-		finds foreground window.
-		You can use atherisk for an imprecise search:
+	'''
+	Returns window handle. If window is not specified then
+	finds foreground window.
+	You can use atherisk for an imprecise search:
 
-			>window_get('Total Commander*')
-			132940
+		>window_get('Total Commander*')
+		132940
 
 	'''
-	if isinstance(window, str):
+	if isinstance(window, int):
+		return window
+	elif isinstance(window, str):
 		if window.endswith('*'):
-			return window_find(title=window[:-1], exact=False)[0]
+			if not (li := window_find(title=window[:-1], exact=False) ): return
+			return li[0]
 		else:
 			return win32gui.FindWindow(class_name, window)
-	elif isinstance(window, int):
-		return window
 	elif not window and class_name:
 		return win32gui.FindWindow(class_name, window)
 	else:
@@ -164,6 +164,7 @@ def window_find(title:str, exact:bool=True)->list:
 	''' Find window handle by title.
 		Returns list of found window handles.
 	'''
+
 	def check_title(hwnd, title:str):
 		if exact:
 			if win32gui.GetWindowText(hwnd) == title:
@@ -171,6 +172,7 @@ def window_find(title:str, exact:bool=True)->list:
 		else:
 			if title.lower() in win32gui.GetWindowText(hwnd).lower():
 				result.append(hwnd)
+
 	result = []
 	win32gui.EnumWindows(check_title, title)
 	return result
@@ -180,9 +182,17 @@ def window_activate(window=None)->int:
 	'''
 	hwnd = window_get(window)
 	if hwnd:
-		win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
 		win32gui.SetForegroundWindow(hwnd)
 		return hwnd
+
+def window_act_rest(window=None)->int:
+	'''
+	Activates the window and restores it if it is minimized.
+	'''
+	if not (hwnd := window_get(window) ): return
+	win32gui.SetForegroundWindow(hwnd)
+	if win32gui.IsIconic(hwnd): win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+	return hwnd
 
 def window_minimize(window=None)->int:
 	''' Minimize window. Returns hwnd.
@@ -205,7 +215,7 @@ def window_restore(window=None)->int:
 	'''
 	hwnd = window_get(window)
 	if hwnd:
-		win32gui.ShowWindow(hwnd, win32con.SW_SHOWNORMAL)
+		win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
 		return hwnd
 
 def window_show(window=None)->int:

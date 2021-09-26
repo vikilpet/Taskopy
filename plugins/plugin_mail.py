@@ -15,11 +15,8 @@ import mimetypes
 from .tools import Job, job_batch, var_get, var_set, tprint \
 , patch_import
 from .plugin_filesystem import file_name_fix, file_size_str
-
-
 _CC_LIMIT = 35
 _errors = []
-
 _MAX_FILE_LEN = 200
 _MAX_ERR_STR_LEN = 200
 _MAX_TITLE_LEN = 80
@@ -92,7 +89,6 @@ def mail_send(
 					, subtype=subtype
 					, filename=attachment[attachment.rfind('\\') + 1:]
 				)
-	
 	try:
 		with smtplib.SMTP_SSL(smtp_server, smtp_port
 								, context=context) as server:
@@ -171,7 +167,6 @@ def mail_check(server:str, login:str, password:str
 
 def _get_last_index(folder:str)->int:
 	''' Get the last used message number '''
-	
 	num = var_get(_LAST_NUM_VAR + folder)
 	if num: return int(num)
 	try:

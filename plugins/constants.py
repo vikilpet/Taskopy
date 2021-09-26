@@ -1,5 +1,4 @@
 import win32con
-
 WA_PLAYING = 'playing'
 WA_PAUSED = 'paused'
 WA_STOPPED = 'stopped'

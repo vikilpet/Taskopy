@@ -5,6 +5,7 @@ import time
 import glob
 from contextlib import contextmanager
 import csv
+import random
 import pyodbc
 import mimetypes
 import zipfile
@@ -29,7 +30,6 @@ try:
 	import constants as tcon
 except ModuleNotFoundError:
 	import plugins.constants as tcon
-
 
 _SIZE_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 
@@ -97,6 +97,10 @@ def file_rename(fullpath, dest:str
 		overwrite - overwrite destination file
 		if exists.
 		Returns destination.
+		Example:
+
+			file_rename(r'd:\\IMG_123.jpg', 'my cat.jpg')
+			>'d:\\my cat.jpg'
 	'''
 	fullpath = _fix_fullpath(fullpath)
 	if not ':' in dest:
@@ -223,7 +227,6 @@ def dir_copy(fullpath, destination:str
 	err = 0
 	try:
 		shutil.copytree(fullpath, destination, symlinks=symlinks)
-		
 	except FileExistsError:
 		pass
 	except Exception as e:
@@ -279,7 +282,7 @@ def file_size_str(fullpath)->str:
 		>file_size_str(336013)
 		>'328.1 KB'
 	'''
-	if isinstance(fullpath, int):
+	if isinstance(fullpath, (int, float)):
 		size = fullpath
 	else:
 		fullpath = _fix_fullpath(fullpath)
@@ -345,7 +348,6 @@ def file_name_fix(filename:str, repl_char:str='_')->str:
 		all backslashes.
 		Removes leading and trailing spaces and dots.
 	'''
-
 	new_fn = ''
 	for char in filename.strip(' .'):
 		if (char in '<>:"\\/|?*'
@@ -367,6 +369,46 @@ def dir_files(fullpath)->list:
 			[ os.path.join(parent_dir, fn) for fn in fnames ]
 		)
 	return fl
+
+def dir_rnd_file(fullpath, attempts:int=5
+, filter_func=None)->str:
+	'''
+	Gets a random file from a directory or None
+	if nothing is found.
+	`filter_func` - a function that takes a full path and
+	returns True if the file fits.
+	Designed for large directories that take a significant
+	amount of time to list.
+	Example:
+
+		dir_rnd_file('.')
+		dir_rnd_file('.', filter_func=lambda f: file_ext(f) == 'py')
+	
+	Compared to `dir_list` with `random.choice`:
+
+		benchmark(lambda: random.choice(dir_files(temp_dir() )), b_iter=100)
+		> datetime.timedelta(seconds=18, microseconds=920000)
+
+		benchmark(dir_rnd_file, fullpath=temp_dir(), b_iter=100)
+		> datetime.timedelta(microseconds=77500)
+
+		len( dir_list( temp_dir() ) ):
+		> 494
+	'''
+	fullpath = _fix_fullpath(fullpath)
+	for _ in range(attempts):
+		path = fullpath
+		for _ in range(attempts):
+			dlist = os.listdir(path)
+			if not dlist: break
+			path = os.path.join(path, random.choice(dlist) )
+			if os.path.isfile(path):
+				if not filter_func: return path
+				if filter_func(path):
+					return path
+				else:
+					break
+	return None
 
 def dir_purge(fullpath, days:int=0, recursive:bool=False
 , creation:bool=False, test:bool=False, rule=None
@@ -513,6 +555,7 @@ def dir_list(fullpath, only_files:bool=False)->list:
 	fullpath = _fix_fullpath(fullpath)
 	if not '*' in fullpath: fullpath = os.path.join(fullpath, '*')
 	recursive = ('**' in fullpath)
+	fullpath = fullpath.replace('[', '[[]')
 	paths = glob.glob(fullpath, recursive=recursive)
 	if fullpath.endswith('\\**'):
 		try:
@@ -902,5 +945,11 @@ def file_lock_wait(fullpath, wait_interval:str='100 ms')->bool:
 		except Exception as e:
 			dev_print('Wrong exception', file_name(fullpath), repr(e))
 			return False
+
+def file_relpath(fullpath, start)->str:
+	''' Returns a relative path '''
+	fullpath = _fix_fullpath(fullpath)
+	start = _fix_fullpath(start)
+	return os.path.relpath(fullpath, start=start)
 
 if __name__ != '__main__': patch_import()

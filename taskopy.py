@@ -17,7 +17,6 @@ import win32con
 import win32file
 import win32evtlog
 import uptime
-
 from plugins.constants import *
 from plugins.tools import *
 from plugins.plugin_filesystem import *
@@ -31,13 +30,10 @@ from resources.languages import Language
 # https://docs.python.org/3/library/threading.html
 # https://github.com/boppreh/keyboard
 # https://schedule.readthedocs.io/en/stable/
-
-
 tasks = None
 crontab = None
 sett = None
 lang = None
-
 if getattr(sys, 'frozen', False):
 	APP_PATH = os.path.dirname(sys.executable)
 	os.chdir(APP_PATH)
@@ -127,9 +123,6 @@ def load_modules():
 	''' (Re)Loads all application plugins and additional
 		crontab modules if any.
 	'''
-	
-
-
 	global crontab
 	if not hasattr(sett, 'own_modules'):
 		sett.own_modules = {'plugins.constants'}
@@ -167,8 +160,6 @@ def load_modules():
 				if not 'constants' in mdl_name:
 					dev_print('non-func', obj_name)
 				continue
-			
-
 			for mdl_name_2 in sett.own_modules:
 				if hasattr(sys.modules[mdl_name_2], obj_name):
 					setattr(sys.modules[mdl_name_2]
@@ -576,7 +567,6 @@ class Tasks:
 					else:
 						s.task_opt_set(task['task_function_name']
 										, 'err_counter', err_counter)
-						
 			if (not s.enabled) \
 			and ( not task['hyperactive'] ): return
 			if task['single']:
@@ -694,7 +684,6 @@ class Tasks:
 			, close event handlers.
 		'''
 		if s.http_server:
-			dev_print('http stop')
 			s.http_server.shutdown()
 			s.http_server.socket.close()
 		try:
@@ -783,7 +772,6 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		print('show_menu 3 sec')
 		s.frame.Raise()
 		s.frame.SetFocus()
-		
 		menu = s.CreatePopupMenu()
 		print(s.frame.PopupMenu(menu, pos=(0, 0)))
 		menu.Destroy()
@@ -800,7 +788,6 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 					show_app_window()
 			else:
 				show_app_window()
-			
 
 	def on_exit(s, event=None)->bool:
 		TASKS_MSG_MAX = 5
@@ -944,7 +931,6 @@ class App(wx.App):
 		s.frame.SetFocus()
 		time.sleep(0.1)
 		s.frame.PopupMenu(s.taskbaricon.CreatePopupMenu())
-		
 
 def show_app_window():
 	try:

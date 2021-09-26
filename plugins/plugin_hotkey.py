@@ -3,7 +3,7 @@ import ctypes.wintypes
 import win32con
 import keyboard
 try:
-	from .tools import msgbox_warning, patch_import
+	from .tools import msgbox_warning, patch_import, time_sleep, tdebug
 except ImportError:
 	msgbox_warning = print
 
@@ -110,15 +110,26 @@ class GlobalHotKeys():
 				_user32.DispatchMessageA(ctypes.byref(msg))
 		finally:
 			s.unregister()
-
 keys_pressed = keyboard.is_pressed
-
 keys_send = keyboard.send
-
 keys_write = keyboard.write
 
 keys_press = keyboard.press
 keys_release = keyboard.release
+
+def keys_depressed_wait(keys:str, timeout='10 ms'):
+	'''
+	Wait until all the keys are depressed.
+	*keys* - a string with hotkey for a task like 'ctrl+shift+m'
+	Use this if you want to send keystrokes by hotkey.
+	'''
+	while True:
+		if any( map( keyboard.is_pressed, keys.split('+') ) ):
+			time_sleep(timeout)
+		else:
+			break
+		
+
 
 if __name__ == '__main__':
 	''' Test this module: bind test_func to 'ctrl+t'

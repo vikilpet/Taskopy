@@ -2,6 +2,7 @@ import sys
 import os
 import time
 import datetime
+import statistics
 import pytz
 import threading
 import subprocess
@@ -33,11 +34,9 @@ try:
 except ModuleNotFoundError:
 	import plugins.constants as tcon
 
-
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-09-04'
+APP_VERSION = 'v2021-09-26'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
-
 app_log = []
 
 if not __builtins__.get('uglobals', None):
@@ -45,7 +44,6 @@ if not __builtins__.get('uglobals', None):
 	__builtins__['uglobals'] = uglobals
 	_app:wx.App = None
 	__builtins__['_app'] = _app
-
 TASK_OPTIONS = [
 	['task_name', None]
 	, ['task', True]
@@ -80,7 +78,6 @@ TASK_OPTIONS = [
 	, ['hyperactive', False]
 	, ['on_file_change', None]
 ]
-
 APP_SETTINGS=[
 	['dev', False]
 	, ['language', 'en']
@@ -106,12 +103,10 @@ server_ip=127.0.0.1
 server_port=8275
 white_list=127.0.0.1
 '''
-
 if getattr(sys, 'frozen', False):
 	_APP_PATH = os.path.dirname(sys.executable)
 else:
 	_APP_PATH = os.getcwd()
-
 _DB_FILE = _APP_PATH + r'\resources\db.sqlite3'
 _TIME_UNITS = {
 	'millisecond': 1, 'milliseconds': 1, 'msec': 1, 'ms': 1
@@ -133,9 +128,6 @@ class DictToObj:
 	def __getattr__(s, name):
 		return 'DictToObj - unknown key'
 
-
-
-
 def value_to_unit(value, unit:str='sec', unit_dict:dict=None
 , def_src_unit:str='sec')->float:
 	'''
@@ -146,8 +138,6 @@ def value_to_unit(value, unit:str='sec', unit_dict:dict=None
 		> value_to_unit('2 min', 'sec')
 		> 120
 	'''
-
-
 	if not unit_dict: unit_dict = _TIME_UNITS
 	dst_coef = unit_dict[unit]
 	if isinstance(value, (int, float)):
@@ -319,11 +309,13 @@ def time_second()->int:
 	'''Returns current second'''
 	return datetime.datetime.now().second
 
-def time_diff(start:datetime.datetime, end:datetime.datetime
+def time_diff(start:datetime.datetime, end:datetime.datetime=None
 , unit:str='sec')->int:
-	'''	Returns difference in units.
-		start and end should be in datetime format.
 	'''
+	Returns difference in units.
+	start and end should be in datetime format.
+	'''
+	if not end: end = datetime.datetime.now()
 	seconds = (end - start).total_seconds()
 	coef = _TIME_UNITS.get(unit, 1000) / 1000
 	return int(seconds // coef)
@@ -476,7 +468,9 @@ def re_find(source:str, re_pattern:str, sort:bool=False
 			re.UNICODE	make {\w, \W, \b, \B} follow Unicode rules.
 			re.LOCALE	make {\w, \W, \b, \B} follow locale.
 			re.VERBOSE	allow comment in regex.
+
 		Non-capturing group: (?:aaa)
+		Positive lookbehind: (?<=abc)
 	'''
 	matches = re.findall(re_pattern, source, flags=re_flags)
 	if unique: matches = list(set(matches))
@@ -500,11 +494,6 @@ def re_match(source:str, re_pattern:str
 
 _MessageBox = ctypes.windll.user32.MessageBoxW
 _MessageBoxTimeout = ctypes.windll.user32.MessageBoxTimeoutW
-
-
-
-
-
 
 def msgbox(msg:str, title:str=None
 , ui:int=None, wait:bool=True, timeout=None
@@ -537,11 +526,9 @@ def msgbox(msg:str, title:str=None
 	
 	def dis_buttons(hwnd:int, dis_timeout:float):
 		def dis_butt(hchild, state):
-			
 			if win32gui.GetWindowLong(hchild, -12) < 12:
 				win32gui.ShowWindow(hchild, state)
 			return True
-		
 		time.sleep(0.01)
 		try:
 			win32gui.EnumChildWindows(hwnd, dis_butt, False)
@@ -770,7 +757,6 @@ def dir_dialog(title:str=None, default_dir:str='', on_top:bool=True
 		fullpath = None
 	dialog.Destroy()
 	return fullpath
-
 random_num = random.randint
 
 def random_str(string_len:int=10, string_source:str=None)->str:
@@ -902,7 +888,7 @@ def tprint(*msgs, **kwargs):
 	print(time.strftime('%y.%m.%d %H:%M:%S'), *msgs, **kwargs)
 
 def tdebug(*msgs, **kwargs)->bool:
-	''' Is function launched from console? '''
+	''' Is the code running from the console? '''
 	if not hasattr(sys, 'ps1'): return False
 	if msgs:
 		if kwargs.get('par', True):
@@ -990,10 +976,11 @@ def decor_except_status(func):
 			return func
 decor_except_status.homemade = True
 
-def safe(func):
-	''' Evaluate function inside 'try... except'
-		and return (True, func result)
-		or (False, Exception)
+def safe(func)->tuple:
+	'''
+	Evaluate function inside 'try... except'
+	and return (True, func result)
+	or (False, Exception)
 	'''
 	@functools.wraps(func)
 	def wrapper(*args, **kwargs):
@@ -1009,7 +996,6 @@ def safe(func):
 			tdebug(f'safe: \n{trace_str}')
 			return False, e
 	return wrapper
-
 _TaskDialogIndirect = ctypes.WinDLL('comctl32.dll').TaskDialogIndirect
 
 _callback_type = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.wintypes.HWND, ctypes.wintypes.UINT
@@ -1073,19 +1059,20 @@ def dialog(msg:str=None, buttons:list=None
 , common_buttons:int=None, default_button:int=0
 , timeout:int=None, icon=None, return_button:bool=False
 , wait:bool=True)->int:
-	''' Shows dialog with multiple optional buttons.
-		Returns ID of selected button starting with 1000
-		or 0 if timeout is over.
-		return_button - returns (status, selected button value).
-			Status == True if some of button was selected and
-			False if no button was selected (timeout or escape).
+	'''
+	Shows dialog with multiple optional buttons.
+	Returns ID of selected button starting with 1000
+	or 0 if timeout is over.
+	return_button - returns (status, selected button value).
+		Status == True if some of button was selected and
+		False if no button was selected (timeout or escape).
 
-		wait - non-blocking mode. It returns c_long object
-		so it is possible to get user responce later with
-		'.value' property (=2 before user makes any choice)
-		
-		Note: do not start button text with new line (\\n) or dialog
-		will fail silently.
+	wait - non-blocking mode. It returns c_long object
+	so it is possible to get user responce later with
+	'.value' property (=2 before user makes any choice)
+	
+	Note: do not start button text with new line (\\n) or dialog
+	will fail silently.
 	'''
 	TDN_TIMER = 4
 	S_OK = 0
@@ -1130,9 +1117,7 @@ def dialog(msg:str=None, buttons:list=None
 					on_top_flag = True
 				except Exception as e:
 					dev_print(f'SetWindowPos exception {hwnd=}: {e}')
-		
 		return S_OK
-
 	if content: content = str(content)
 	if title: title = str(title)
 	if isinstance(msg, (list, tuple)):
@@ -1199,7 +1184,6 @@ def dialog(msg:str=None, buttons:list=None
 			return False, result.value
 	else:
 		return result.value
-
 
 def hint(text:str, position:tuple=None)->int:
 	'''	Shows hint.
@@ -1398,7 +1382,6 @@ class DataHTTPReq:
 		s.form = form_data 
 		s.__dict__.update(form_data)
 
-
 class DataBrowserExt(DataHTTPReq):
 	''' HTTP request data helper for 'SendToTaskopy'
 		browser extension.
@@ -1410,7 +1393,6 @@ class DataBrowserExt(DataHTTPReq):
 		s.media_type = ''
 		s.src_url = ''
 		s.selection = ''
-
 
 def _etree_to_dict(tree: _ElementTree):
 	di = {tree.tag: {} if tree.attrib else None}
@@ -1586,5 +1568,25 @@ def app_window_show():
 def app_dir()->str:
 	' Returns current working directory '
 	return app.dir
+
+def benchmark(func, b_iter:int=1
+, *args, **kwargs)->datetime.timedelta:
+	'''
+	Run function `func` `b_iter` times and print time.
+	Returns the total time as a datetime.timedelta object.
+	Example:
+
+		benchmark(dir_size, b_iter=100, fullpath='logs')
+	'''
+	start = time_now()
+	for _ in range(b_iter):
+		func(*args, **kwargs)
+	dur = time_now() - start
+	tdebug(f'{dur}, iterations: {b_iter}')
+	return dur
+
+def median(source):
+	return statistics.median(source)
+
 
 if __name__ != '__main__': patch_import()

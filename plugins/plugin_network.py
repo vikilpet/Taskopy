@@ -14,11 +14,9 @@ import warnings
 import threading
 import json2html
 from .tools import dev_print, time_sleep, tdebug \
-, locale_set, safe, patch_import
+, locale_set, safe, patch_import, value_to_unit
 
-
-
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.61 Safari/537.36'}
 
 def http_req(url:str, encoding:str='utf-8', session:bool=False
 , cookies:dict=None, headers:dict=None
@@ -26,7 +24,11 @@ def http_req(url:str, encoding:str='utf-8', session:bool=False
 , post_file:str=None, post_hash:bool=False
 , post_form_data:dict=None, timeout:int=3
 , attempts:int=3, **kwargs)->str:
-	''' Gets content of the specified URL '''
+	'''
+	Gets content of the specified URL
+	
+	Skip SSL verification: `verify=False`
+	'''
 	if (post_file or post_form_data): http_method = 'POST'
 	if http_method: http_method = http_method.lower()
 	args = {'url': url, 'json': json_data, 'timeout': timeout}
@@ -89,7 +91,6 @@ def html_whitespace(text:str)->str:
 	'''
 	if not text: return text
 	return ' '.join(text.split())
-
 _js_regex = re.compile(r"(\".*?\"|\'.*?\')|(/\*.*?\*/|//[^\r\n]*$)"
 , re.MULTILINE|re.DOTALL)
 def _js_remove_comments(string):
@@ -458,7 +459,6 @@ def is_online(*sites, timeout:int=2)->int:
 			r += 1
 		except: pass
 	return r
-
 def _file_hash(fullpath:str)->str:
 	hash_md5 = md5()
 	with open(fullpath, 'rb') as fi:
@@ -494,15 +494,21 @@ def http_h_last_modified(url:str, **kwargs):
 			, '%a, %d %b %Y %H:%M:%S GMT')
 
 def port_scan(host:str, port:int
-, timeout:float=0.5)->bool:
-	' Scan TCP port '
+, timeout:int=500)->bool:
+	'''
+	Scan TCP port.
+	*timeout* - timeout in milliseconds.
+	'''
 	SUCCESS = 0
 	sock = socket.socket()
-	sock.settimeout(timeout)
+	sock.settimeout(timeout/1000)
 	sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 	connected = sock.connect_ex((host, port)) is SUCCESS
 	sock.close()
 	return connected
+
+def http_req_status(url:str, method='HEAD')->int:
+	return getattr(requests, method.lower())(url).status_code
 
 if __name__ == '__main__':
 	html = r'''
