@@ -35,7 +35,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-09-26'
+APP_VERSION = 'v2021-10-02'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 app_log = []
 
@@ -1559,7 +1559,7 @@ def task_run(task_func, *args, **kwargs):
 
 def crontab_reload():
 	' Reloads the crontab '
-	app.load_crontab()
+	return app.load_crontab()
 
 def app_window_show():
 	' Shows the application console window '
@@ -1587,6 +1587,5 @@ def benchmark(func, b_iter:int=1
 
 def median(source):
 	return statistics.median(source)
-
 
 if __name__ != '__main__': patch_import()

@@ -31,7 +31,13 @@ try:
 except ModuleNotFoundError:
 	import plugins.constants as tcon
 
+
 _SIZE_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
+_FORBIDDEN_CHARS = '<>:"\\/|?*'
+_FORBIDDEN_DICT = dict(
+	**{chr(d) : '%' + hex(d)[2:] for d in range(32)}
+	, **{ c : '%' + hex(ord(c))[2:].upper() for c in _FORBIDDEN_CHARS}
+)
 
 def _dir_slash(dirpath:str)->str:
 	''' Adds a trailing slash if it's not there. '''
@@ -350,12 +356,21 @@ def file_name_fix(filename:str, repl_char:str='_')->str:
 	'''
 	new_fn = ''
 	for char in filename.strip(' .'):
-		if (char in '<>:"\\/|?*'
+		if (char in _FORBIDDEN_CHARS
 		or ord(char) < 32):
 			new_fn += repl_char
 		else:
 			new_fn += char
 	return new_fn
+
+def dir_dirs(fullpath)->list:
+	'''
+	Returns list of full paths of all directories
+	in this directory and its subdirectories.
+	'''
+	fullpath = _fix_fullpath(fullpath)
+	for dirpath, dirnames, _ in os.walk(fullpath):
+		for d in dirnames: yield os.path.join(dirpath, d)
 
 def dir_files(fullpath)->list:
 	'''
@@ -363,12 +378,8 @@ def dir_files(fullpath)->list:
 	in the given directory and its subdirectories.
 	'''
 	fullpath = _fix_fullpath(fullpath)
-	fl = []
-	for parent_dir, _, fnames in os.walk(fullpath):
-		fl.extend(
-			[ os.path.join(parent_dir, fn) for fn in fnames ]
-		)
-	return fl
+	for dirpath, _, filenames in os.walk(fullpath):
+		for f in filenames: yield os.path.join(dirpath, f)
 
 def dir_rnd_file(fullpath, attempts:int=5
 , filter_func=None)->str:
@@ -386,7 +397,7 @@ def dir_rnd_file(fullpath, attempts:int=5
 	
 	Compared to `dir_list` with `random.choice`:
 
-		benchmark(lambda: random.choice(dir_files(temp_dir() )), b_iter=100)
+		benchmark(lambda: random.choice( list(dir_files(temp_dir() ) ) ), b_iter=100)
 		> datetime.timedelta(seconds=18, microseconds=920000)
 
 		benchmark(dir_rnd_file, fullpath=temp_dir(), b_iter=100)
@@ -535,22 +546,34 @@ def drive_free(letter:str, unit:str='GB')->int:
 	except:
 		return -1
 
-def dir_list(fullpath, only_files:bool=False)->list:
-	''' Returns list of files in specified folder.
-		'fullpath' passed to glob.glob
+def dir_list(fullpath):
+	'''
+	Returns all directory content (dirs and files).
 
-		only_files - return only files and not
-		files and directories.
+		>list(dir_content(r'resources'))
+		['resources\\__pycache__',
+		'resources\\context_menu.reg',
+		'resources\\db.sqlite3',
+		'resources\\hint.py',
+		'resources\\icon.png']
+	'''
+	fullpath = _fix_fullpath(fullpath)
+	for dirpath, dirnames, filenames in os.walk(fullpath):
+		for d in dirnames: yield os.path.join(dirpath, d)
+		for f in filenames: yield os.path.join(dirpath, f)
 
-		Examples:
-			
-			only files in folder:
-				
-				dir_list('d:\\folder\\*.jpg')
+def dir_find(fullpath, only_files:bool=False)->list:
+	'''
+	Returns list of paths in specified folder.
+	'fullpath' passed to glob.glob
 
-			with subfolders:
-				
-				dir_list('d:\\folder\\**\\*.jpg')
+	only_files - return only files and not
+	files and directories.
+
+	Examples:
+		dir_list('d:\\folder\\*.jpg')
+		dir_list('d:\\folder\\**\\*.jpg')
+
 	'''
 	fullpath = _fix_fullpath(fullpath)
 	if not '*' in fullpath: fullpath = os.path.join(fullpath, '*')
@@ -951,5 +974,36 @@ def file_relpath(fullpath, start)->str:
 	fullpath = _fix_fullpath(fullpath)
 	start = _fix_fullpath(start)
 	return os.path.relpath(fullpath, start=start)
+
+def _file_name_pe(filename:str):
+	for char, repl in _FORBIDDEN_DICT.items():
+		filename = filename.replace(char, repl)
+	return filename
+
+def dvar_get(var:str, default=None, encoding='utf-8'):
+	'''
+	Gets the disk variable.
+	'''
+	var = _file_name_pe(var)
+	try:
+		with open(os.path.join('var', var), encoding=encoding) as fd:
+			return fd.read()
+	except:
+		return default
+
+def dvar_set(var:str, value, encoding='utf-8'):
+	'''
+	Sets the disk variable.
+	'''
+	var = _file_name_pe(var)
+	value = str(value)
+	fname = os.path.join('var', var)
+	try:
+		with open(fname, 'wt+', encoding=encoding) as fd:
+			fd.write(value)
+	except FileNotFoundError:
+		os.makedirs('var')
+		with open(fname, 'wt+', encoding=encoding) as fd:
+			fd.write(value)
 
 if __name__ != '__main__': patch_import()

@@ -90,16 +90,36 @@ def load_crontab(event=None)->bool:
 		if sys.modules.get('crontab') is None:
 			crontab = importlib.import_module('crontab')
 		else:
+			prev_crontab = sys.modules.pop('crontab')
+			for a in range(100):
+				try:
+					tmp_crontab = importlib.import_module('crontab')
+					break
+				except PermissionError:
+					dev_print(f'permission error {a}')
+					time.sleep(.01)
+				except:
+					trace_li = traceback.format_exc().splitlines()
+					trace_str = '\n'.join(trace_li[-3:])
+					con_log(traceback.format_exc())
+					msgbox_warning(
+						f'{lang.warn_crontab_reload}:\n\n{trace_str}'
+						, title=lang.menu_reload)
+					sys.modules['crontab'] = prev_crontab
+					return False
+			else:
+				raise Exception('No more attempts to reload crontab')
 			for task in tasks.task_list:
 				if not task.get('thread'): continue
 				run_bef_reload.append(task)
 			tasks.close()
+			del tmp_crontab
+			del prev_crontab
 			del sys.modules['crontab']
 			del crontab
 			crontab = importlib.import_module('crontab')
 		load_modules()
 		tasks = Tasks()
-
 		for rtask in run_bef_reload:
 			dev_print('still running:', rtask['task_function_name'])
 			for task in tasks.task_list:
@@ -111,11 +131,12 @@ def load_crontab(event=None)->bool:
 		tasks.run_at_crontab_load()
 		tasks.enabled = app.enabled
 		return True
-	except Exception as e:
+	except:
 		trace_li = traceback.format_exc().splitlines()
 		trace_str = '\n'.join(trace_li[-3:])
 		con_log(traceback.format_exc())
-		msgbox_warning(f'{lang.warn_crontab_reload}:\n\n{trace_str}'
+		msgbox_warning(
+			f'{lang.warn_crontab_reload}:\n\n{trace_str}'
 			, title=lang.menu_reload)
 		return False
 	
@@ -299,7 +320,7 @@ class Tasks:
 		t = threading.Thread(target=s.run_scheduler, daemon=True)
 		t.start()
 		s.sched_thread_id = t.ident
-		dev_print(f'Total tasks: {len(s.task_list)}')
+		dev_print(f'Total number of tasks: {len(s.task_list)}')
 	
 	def add_hotkey(s, task):
 		def hk_error(error):
