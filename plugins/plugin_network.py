@@ -16,7 +16,7 @@ import json2html
 from .tools import dev_print, time_sleep, tdebug \
 , locale_set, safe, patch_import, value_to_unit
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.71 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36'}
 
 def http_req(url:str, encoding:str='utf-8', session:bool=False
 , cookies:dict=None, headers:dict=None
@@ -71,6 +71,8 @@ def http_req(url:str, encoding:str='utf-8', session:bool=False
 			 	break
 		except Exception as e:
 			if isinstance(e, requests.exceptions.SSLError):
+				return e
+			if isinstance(e, requests.exceptions.InvalidHeader):
 				return e
 			if isinstance(e, TypeError):
 				return e

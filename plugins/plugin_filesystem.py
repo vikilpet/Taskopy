@@ -5,6 +5,7 @@ import time
 import glob
 from contextlib import contextmanager
 import csv
+import ast
 import random
 import pyodbc
 import mimetypes
@@ -372,14 +373,22 @@ def dir_dirs(fullpath)->list:
 	for dirpath, dirnames, _ in os.walk(fullpath):
 		for d in dirnames: yield os.path.join(dirpath, d)
 
-def dir_files(fullpath)->list:
+def dir_files(fullpath, ext:str=None, subdirs:bool=True):
 	'''
 	Returns list of full filenames of all files
 	in the given directory and its subdirectories.
+	*subdirs* - including files from subfolders.
+	*ext* - only files with this extension.
 	'''
 	fullpath = _fix_fullpath(fullpath)
-	for dirpath, _, filenames in os.walk(fullpath):
-		for f in filenames: yield os.path.join(dirpath, f)
+	filt_fun = lambda f: True
+	if ext:
+		ext = '.' + ext.lower()
+		filt_fun = lambda f: f.lower().endswith(ext)
+	for dirpath, dirs, filenames in os.walk(fullpath, topdown=True):
+		if not subdirs: dirs.clear()
+		for f in filenames:
+			if filt_fun(f):	yield os.path.join(dirpath, f)
 
 def dir_rnd_file(fullpath, attempts:int=5
 , filter_func=None)->str:
@@ -520,9 +529,11 @@ def file_dir(fullpath)->str:
 
 def file_backup(fullpath, dest_dir:str=''
 , suffix_format:str='_%y-%m-%d_%H-%M-%S')->str:
-	''' Copy somefile.txt to somefile_2019-05-19_21-23-02.txt
-		dest_dir - destination. If not specified - current folder.
-		Returns full path of new file.
+	r'''
+	Copy *somefile.txt* to *backup_dir\somefile_2019-05-19_21-23-02.txt*
+	*dest_dir* - destination. If not specified - current folder.
+	Returns full path of the new file.
+	It will preserve the date of the file.
 	'''
 	fullpath = _fix_fullpath(fullpath)
 	if not dest_dir: dest_dir = os.path.dirname(fullpath)
@@ -759,10 +770,16 @@ def temp_dir(new_dir:str=None)->str:
 	except FileExistsError: pass
 	return new_dir
 
-def temp_file(prefix:str='', suffix:str='')->str:
-	''' Returns the name for the temporary file. '''
-	return os.path.join(tempfile.gettempdir()
+def temp_file(prefix:str='', suffix:str=''
+, content=None, encoding='utf-8')->str:
+	'''
+	Returns the name for the temporary file.
+	If *content* is specified then writes content to the file.
+	'''
+	fname = os.path.join(tempfile.gettempdir()
 		, prefix + time.strftime('%m%d%H%M%S') + random_str(5) + suffix)
+	if content: file_write(fname, content=content, encoding=encoding)
+	return fname
 
 def file_hash(fullpath, algorithm:str='crc32'
 , buf_size:int=65536)->str:
@@ -980,16 +997,22 @@ def _file_name_pe(filename:str):
 		filename = filename.replace(char, repl)
 	return filename
 
-def dvar_get(var:str, default=None, encoding='utf-8'):
+def dvar_get(var:str, default=None, encoding='utf-8'
+, as_literal:bool=False):
 	'''
 	Gets the disk variable.
+	*as_literal* - converts to a literal (dict, list, tuple etc).
 	'''
 	var = _file_name_pe(var)
 	try:
-		with open(os.path.join('var', var), encoding=encoding) as fd:
-			return fd.read()
-	except:
+		content = file_read(['resources', 'var', var], encoding=encoding)
+	except FileNotFoundError:
 		return default
+	if not as_literal: return content
+	try:
+		return ast.literal_eval(content)
+	except ValueError:
+		return eval(content)
 
 def dvar_set(var:str, value, encoding='utf-8'):
 	'''
@@ -997,13 +1020,10 @@ def dvar_set(var:str, value, encoding='utf-8'):
 	'''
 	var = _file_name_pe(var)
 	value = str(value)
-	fname = os.path.join('var', var)
 	try:
-		with open(fname, 'wt+', encoding=encoding) as fd:
-			fd.write(value)
+		file_write(['resources', 'var', var], value, encoding=encoding)
 	except FileNotFoundError:
-		os.makedirs('var')
-		with open(fname, 'wt+', encoding=encoding) as fd:
-			fd.write(value)
+		os.makedirs(os.path.join('resources', 'var'))
+		file_write(['resources', 'var', var], value, encoding=encoding)
 
 if __name__ != '__main__': patch_import()

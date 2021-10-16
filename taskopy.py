@@ -53,7 +53,7 @@ class Settings:
 	''' Load global settings from settings.ini
 		Settings from all sections are collected.
 	'''
-	def __init__(s):
+	def __init__(self):
 		config = configparser.ConfigParser()
 		config.optionxform = str
 		try:
@@ -66,20 +66,20 @@ class Settings:
 		for section in config._sections.values():
 			for setting in section.items():
 				if setting[1].lower() in ('true', 'yes'):
-					s.__dict__[setting[0]] = True
+					self.__dict__[setting[0]] = True
 				elif setting[1].lower() in ('false', 'no'):
-					s.__dict__[setting[0]] = False
+					self.__dict__[setting[0]] = False
 				elif setting[1].isdigit():
-					s.__dict__[setting[0]] = int(setting[1])
+					self.__dict__[setting[0]] = int(setting[1])
 				elif setting[1].replace('.', '', 1).isdigit():
 					try:
-						s.__dict__[setting[0]] = float(setting[1])
+						self.__dict__[setting[0]] = float(setting[1])
 					except:
-						s.__dict__[setting[0]] = setting[1]
+						self.__dict__[setting[0]] = setting[1]
 				else:
-					s.__dict__[setting[0]] = setting[1]
+					self.__dict__[setting[0]] = setting[1]
 		for setting in APP_SETTINGS:
-			s.__dict__.setdefault(setting[0], setting[1])
+			self.__dict__.setdefault(setting[0], setting[1])
 
 def load_crontab(event=None)->bool:
 	global tasks
@@ -102,10 +102,10 @@ def load_crontab(event=None)->bool:
 					trace_li = traceback.format_exc().splitlines()
 					trace_str = '\n'.join(trace_li[-3:])
 					con_log(traceback.format_exc())
+					sys.modules['crontab'] = prev_crontab
 					msgbox_warning(
 						f'{lang.warn_crontab_reload}:\n\n{trace_str}'
 						, title=lang.menu_reload)
-					sys.modules['crontab'] = prev_crontab
 					return False
 			else:
 				raise Exception('No more attempts to reload crontab')
@@ -162,12 +162,27 @@ def load_modules():
 				except ValueError:
 					continue
 	for mdl_name in sett.own_modules:
-		dev_print(f'reload module: {mdl_name}')
+		prev_mdl = sys.modules.pop(mdl_name)
 		try:
-			del sys.modules[mdl_name]
-		except KeyError:
-			tprint('module not found:', mdl_name)
-			pass
+			tmp_mdl = importlib.import_module(mdl_name)
+		except PermissionError:
+			tprint(f'{mdl_name} permission error')
+		except:
+			trace_li = traceback.format_exc().splitlines()
+			trace_str = '\n'.join(trace_li[-3:])
+			con_log(traceback.format_exc())
+			sys.modules[mdl_name] = prev_mdl
+			msgbox_warning(
+				'{}:\n\n{}'.format(
+					lang.warn_mod_reload.format(mdl_name)
+					, trace_str
+				)
+				, title=lang.menu_reload
+			)
+			continue
+		del tmp_mdl
+		del prev_mdl
+		del sys.modules[mdl_name]
 		mdl = importlib.import_module(mdl_name)
 		for obj_name, obj in mdl.__dict__.items():
 			if (
@@ -178,8 +193,6 @@ def load_modules():
 				continue
 			if not isinstance(obj, types.FunctionType):
 				setattr(crontab, obj_name, obj)
-				if not 'constants' in mdl_name:
-					dev_print('non-func', obj_name)
 				continue
 			for mdl_name_2 in sett.own_modules:
 				if hasattr(sys.modules[mdl_name_2], obj_name):
@@ -200,24 +213,24 @@ class SuppressPrint:
 
 class Tasks:
 	''' Tasks from crontab and they properties '''
-	def __init__(s):
-		s.enabled = True
-		s.task_list = []
-		s.task_list_menu = []
-		s.task_list_submenus = []
-		s.task_list_startup = []
-		s.task_list_left_click = []
-		s.task_list_sys_startup = []
-		s.task_list_http = []
-		s.task_list_idle = []
-		s.task_list_crontab_load = []
-		s.task_list_exit = []
-		s.file_change_stop = []
-		s.event_handlers = []
-		s.idle_min = 0
-		s.http_server = None
-		s.global_hk = None
-		s.global_hk_thread_id = None
+	def __init__(self):
+		self.enabled = True
+		self.task_list = []
+		self.task_list_menu = []
+		self.task_list_submenus = []
+		self.task_list_startup = []
+		self.task_list_left_click = []
+		self.task_list_sys_startup = []
+		self.task_list_http = []
+		self.task_list_idle = []
+		self.task_list_crontab_load = []
+		self.task_list_exit = []
+		self.file_change_stop = []
+		self.event_handlers = []
+		self.idle_min = 0
+		self.http_server = None
+		self.global_hk = None
+		self.global_hk_thread_id = None
 		for item in dir(crontab):
 			if item.startswith('_'): continue
 			task_obj = getattr(crontab, item)
@@ -245,60 +258,60 @@ class Tasks:
 					task_opts['task_name'] = item.replace('_', ' ').capitalize()
 				task_opts['task_name_full'] = task_opts['task_name']
 			if task_opts['schedule']:
-				s.add_schedule(task_opts)
-			if task_opts['date']: s.add_schedule_date(task_opts)
-			if task_opts['hotkey']: s.add_hotkey(task_opts)
+				self.add_schedule(task_opts)
+			if task_opts['date']: self.add_schedule_date(task_opts)
+			if task_opts['hotkey']: self.add_hotkey(task_opts)
 			if task_opts['left_click']:
-				s.task_list_left_click.append(task_opts)
+				self.task_list_left_click.append(task_opts)
 				app.taskbaricon.Bind(
 					wx.adv.EVT_TASKBAR_LEFT_DOWN
 					, lambda evt, temp=task_opts:
-						s.run_task(task=temp, caller=CALLER_LEFT_CLICK)
+						self.run_task(task=temp, caller=CALLER_LEFT_CLICK)
 				)
 			if task_opts['startup']:
-				s.task_list_startup.append(task_opts)
+				self.task_list_startup.append(task_opts)
 			if task_opts['sys_startup']:
-				s.task_list_sys_startup.append(task_opts)
+				self.task_list_sys_startup.append(task_opts)
 			if task_opts['on_load']:
-				s.task_list_crontab_load.append(task_opts)
+				self.task_list_crontab_load.append(task_opts)
 			if task_opts['on_exit']:
-				s.task_list_exit.append(task_opts)
+				self.task_list_exit.append(task_opts)
 			if task_opts['on_file_change']:
-				s.add_file_change_watch(task_opts, 3)
-			s.task_list.append(task_opts)
+				self.add_file_change_watch(task_opts, 3)
+			self.task_list.append(task_opts)
 			if task_opts['menu']:
 				if task_opts['submenu']:
-					for m in s.task_list_submenus:
+					for m in self.task_list_submenus:
 						if m[0] == task_opts['submenu']:
 							m[1].append(task_opts)
 							break
 					else:
-						s.task_list_submenus.append(
+						self.task_list_submenus.append(
 							[task_opts['submenu'], [task_opts]]
 						)
 				else:
-					s.task_list_menu.append(task_opts)
+					self.task_list_menu.append(task_opts)
 			if task_opts['http']:
 				if not task_opts['http_dir']:
 					task_opts['http_dir'] = temp_dir()
-				s.task_list_http.append(task_opts)
+				self.task_list_http.append(task_opts)
 				if (wl := task_opts['http_white_list']):
 					if isinstance(wl, str):
 						task_opts['http_white_list'] = []
 						for ip in wl.split(','):
 							task_opts['http_white_list'].append(ip.strip())
-			if task_opts['idle']: s.add_idle_task(task_opts)
-			if task_opts['event_log']: s.add_event_handler(task_opts)
-		s.task_list_menu.sort( key=lambda k: k['task_name'].lower() )
-		s.task_list_submenus.sort( key=lambda k: k[0].lower() )
-		for subm in s.task_list_submenus:
+			if task_opts['idle']: self.add_idle_task(task_opts)
+			if task_opts['event_log']: self.add_event_handler(task_opts)
+		self.task_list_menu.sort( key=lambda k: k['task_name'].lower() )
+		self.task_list_submenus.sort( key=lambda k: k[0].lower() )
+		for subm in self.task_list_submenus:
 			subm[1].sort( key=lambda k: k['task_name'].lower() )
-		left_click_tasks_count = len(s.task_list_left_click)
+		left_click_tasks_count = len(self.task_list_left_click)
 		if left_click_tasks_count > 1:
 			msgbox_warning(
 				lang.warn_left_click.format(
 					', '.join(
-						[t['task_name'] for t in s.task_list_left_click]
+						[t['task_name'] for t in self.task_list_left_click]
 					)
 				)
 			)
@@ -307,22 +320,22 @@ class Tasks:
 				wx.adv.EVT_TASKBAR_LEFT_DOWN
 				, app.taskbaricon.on_left_down
 			)
-		if s.global_hk:
-			t = threading.Thread(target=s.global_hk.listen, daemon=True)
+		if self.global_hk:
+			t = threading.Thread(target=self.global_hk.listen, daemon=True)
 			t.start()
-			s.global_hk_thread_id = t.ident
-		if s.task_list_http:
+			self.global_hk_thread_id = t.ident
+		if self.task_list_http:
 			threading.Thread(
 				target=http_server_start
-				, args=(s, )
+				, args=(self, )
 				, daemon=True
 			).start()
-		t = threading.Thread(target=s.run_scheduler, daemon=True)
+		t = threading.Thread(target=self.run_scheduler, daemon=True)
 		t.start()
-		s.sched_thread_id = t.ident
-		dev_print(f'Total number of tasks: {len(s.task_list)}')
+		self.sched_thread_id = t.ident
+		dev_print(f'Total number of tasks: {len(self.task_list)}')
 	
-	def add_hotkey(s, task):
+	def add_hotkey(self, task):
 		def hk_error(error):
 			con_log(error)
 			msgbox_warning(
@@ -334,11 +347,11 @@ class Tasks:
 			
 		if task['hotkey_suppress']:
 			try:
-				if not s.global_hk:
-					s.global_hk = GlobalHotKeys()
-				s.global_hk.register(
+				if not self.global_hk:
+					self.global_hk = GlobalHotKeys()
+				self.global_hk.register(
 					task['hotkey']
-					, func=s.run_task
+					, func=self.run_task
 					, func_args=[task, 'hotkey']
 				)
 			except Exception as e:
@@ -347,14 +360,14 @@ class Tasks:
 			try:
 				keyboard.add_hotkey(
 					hotkey=str(task['hotkey']).lower()
-					, callback=s.run_task
+					, callback=self.run_task
 					, suppress=False
 					, args=[task, 'hotkey']
 				)
 			except Exception as e:
 				hk_error(repr(e))
 	
-	def add_file_change_watch(s, task:dict, on_action:int):
+	def add_file_change_watch(self, task:dict, on_action:int):
 		'Watch for changes in directory'
 		ACTIONS = {
 			1: 'created'
@@ -403,17 +416,17 @@ class Tasks:
 						continue
 					if action in (1, 3):
 						file_lock_wait(fullpath, wait_interval=WAIT_INTERVAL)
-					s.run_task(task, caller=CALLER_FILE_CHANGE)
+					self.run_task(task, caller=CALLER_FILE_CHANGE)
 
 		stop_event = threading.Event()
-		s.file_change_stop.append(stop_event)
+		self.file_change_stop.append(stop_event)
 		threading.Thread(
 			target=file_watch
 			, args=(task, on_action, stop_event)
 			, daemon=True
 		).start()
 
-	def add_schedule(s, task):
+	def add_schedule(self, task):
 		''' task - dict with task options
 		'''
 		intervals = task['schedule']
@@ -422,7 +435,7 @@ class Tasks:
 			try:
 				sched_rule = (
 					'schedule.' + inter
-					+ f'.do(s.run_task, task=task, caller="{CALLER_SCHEDULER}")'
+					+ f'.do(self.run_task, task=task, caller="{CALLER_SCHEDULER}")'
 				)
 				eval(sched_rule)
 			except Exception as e:
@@ -432,7 +445,7 @@ class Tasks:
 					+ ':\n' + inter
 				)
 
-	def add_schedule_date(s, task):
+	def add_schedule_date(self, task):
 		''' task - dict with task options '''
 
 		def date_replace_ast(date:str)->str:
@@ -459,7 +472,7 @@ class Tasks:
 					, unit='min'
 				) < 1:
 					return
-			s.run_task(task=task, caller=CALLER_SCHEDULER)
+			self.run_task(task=task, caller=CALLER_SCHEDULER)
 
 		dates = task['date']
 		if isinstance(dates, str): dates = [dates]
@@ -475,40 +488,40 @@ class Tasks:
 			schedule.every().second.do(
 				run_task_date, date=date, task=task)
 
-	def run_at_startup(s):
+	def run_at_startup(self):
 		if sett.hide_console:
 			window_hide(app.app_hwnd)
-		for task in s.task_list_startup:
-			s.run_task(task, caller=CALLER_STARTUP)
+		for task in self.task_list_startup:
+			self.run_task(task, caller=CALLER_STARTUP)
 			
-	def run_at_sys_startup(s):
+	def run_at_sys_startup(self):
 		if uptime.uptime() < 120:
-			for task in s.task_list_sys_startup:
-				s.run_task(task, caller=CALLER_SYS_STARTUP)
+			for task in self.task_list_sys_startup:
+				self.run_task(task, caller=CALLER_SYS_STARTUP)
 	
-	def run_at_crontab_load(s):
-		for task in s.task_list_crontab_load:
-			s.run_task(task, caller=CALLER_LOAD)
+	def run_at_crontab_load(self):
+		for task in self.task_list_crontab_load:
+			self.run_task(task, caller=CALLER_LOAD)
 	
-	def task_opt_set(s, task_function_name:str, option:str, value):
+	def task_opt_set(self, task_function_name:str, option:str, value):
 		''' Set option from task dict in tasks.task_list
 		'''
-		for task in s.task_list:
+		for task in self.task_list:
 			if task['task_function_name'] == task_function_name:
 				task[option] = value
 				break
 
-	def task_opt_get(s, task_function_name:str, option:str):
+	def task_opt_get(self, task_function_name:str, option:str):
 		''' Get option from task in tasks.task_list
 		'''
-		for task in s.task_list:
+		for task in self.task_list:
 			if task['task_function_name'] == task_function_name:
 				return task.get(option
 					, 'task_opt_get error: option not found')
 		else:
 			return 'task_opt_get error: task not found'
 
-	def run_task(s, task:dict, caller:str=None, data=None
+	def run_task(self, task:dict, caller:str=None, data=None
 	, result:list=None):
 		''' Logging, threading, error catching and other stuff.
 			task - dict with task options
@@ -524,9 +537,9 @@ class Tasks:
 		def run_task_inner(result:list=None):
 			def catcher(result:list=None):
 				try:
-					s.task_opt_set(task['task_function_name']
+					self.task_opt_set(task['task_function_name']
 						, 'running', True)
-					s.task_opt_set(task['task_function_name']
+					self.task_opt_set(task['task_function_name']
 						, 'thread', threading.current_thread().name)
 					task_kwargs = {}
 					func_args = [
@@ -554,7 +567,7 @@ class Tasks:
 							t['running'] = False
 							t['thread'] = None
 							break
-					s.task_opt_set(task['task_function_name']
+					self.task_opt_set(task['task_function_name']
 						, 'err_counter', 0)
 				except Exception:
 					for t in tasks.task_list:
@@ -562,7 +575,7 @@ class Tasks:
 							t['running'] = False
 							t['thread'] = None
 							break
-					err_counter = s.task_opt_get(
+					err_counter = self.task_opt_get(
 						task['task_function_name']
 						, 'err_counter'
 					) + 1
@@ -574,21 +587,21 @@ class Tasks:
 					)
 					if not result is None:
 						result.append('task error')
-					if err_counter > s.task_opt_get(
+					if err_counter > self.task_opt_get(
 						task['task_function_name']
 						, 'err_threshold'
 					):
 						dev_print(f'err_counter={err_counter}')
-						s.task_opt_set(task['task_function_name']
+						self.task_opt_set(task['task_function_name']
 										, 'err_counter', 0)
 						msgbox_warning(
 							lang.warn_task_error.format(task['task_name_full'])
 							+ f':\n{trace_str}'
 						)
 					else:
-						s.task_opt_set(task['task_function_name']
+						self.task_opt_set(task['task_function_name']
 										, 'err_counter', err_counter)
-			if (not s.enabled) \
+			if (not self.enabled) \
 			and ( not task['hyperactive'] ): return
 			if task['single']:
 				if task['running']: return
@@ -620,13 +633,13 @@ class Tasks:
 		else:
 			run_task_inner()
 
-	def add_idle_task(s, task):
+	def add_idle_task(self, task):
 		dur = value_to_unit(task['idle'], 'ms')
 		task['idle_dur'] = int(dur)
 		task['idle_done'] = False
-		s.task_list_idle.append(task)
+		self.task_list_idle.append(task)
 	
-	def add_event_handler(s, task):
+	def add_event_handler(self, task):
 
 		def run_task_with_data(reason, context, event):
 			' Converts event XML to dictionary '
@@ -653,11 +666,16 @@ class Tasks:
 				</EventData>
 			</Event>
 			'''
-			xml_str = win32evtlog.EvtRender( event, win32evtlog.EvtRenderEventXml )
-			s.run_task( task=task, caller=CALLER_EVENT, data=DataEvent(xml_str) )
+			xml_str = win32evtlog.EvtRender(
+				event, win32evtlog.EvtRenderEventXml )
+			self.run_task(
+				task=task
+				, caller=CALLER_EVENT
+				, data=DataEvent(xml_str)
+			)
 
 		try:
-			s.event_handlers.append(
+			self.event_handlers.append(
 				win32evtlog.EvtSubscribe(
 					task['event_log']
 					, win32evtlog.EvtSubscribeToFutureEvents
@@ -674,54 +692,54 @@ class Tasks:
 				lang.warn_event_format.format( task['task_name_full'] )
 			)
 
-	def run_scheduler(s):
+	def run_scheduler(self):
 		time.sleep(0.01)
 		local_id = tasks.sched_thread_id
 		afk = True
-		if s.task_list_idle:
+		if self.task_list_idle:
 			afk = False
-			s.idle_min = min([t['idle_dur'] for t in s.task_list_idle])
+			self.idle_min = min([t['idle_dur'] for t in self.task_list_idle])
 		while (tasks.sched_thread_id == local_id):
 			schedule.run_pending()
-			if s.task_list_idle:
+			if self.task_list_idle:
 				ms = int(uptime.uptime() * 1000) - win32api.GetLastInputInfo()
-				if ms < s.idle_min:
+				if ms < self.idle_min:
 					if afk:
 						dev_print('user is back')
 						afk = False
-						for task in s.task_list_idle: task['idle_done'] = False
+						for task in self.task_list_idle: task['idle_done'] = False
 				else:
 					afk = True
-					for task in s.task_list_idle:
+					for task in self.task_list_idle:
 						if task['idle_done']: continue
 						if ms >= task['idle_dur']:
-							s.run_task(task, caller=CALLER_IDLE)
+							self.run_task(task, caller=CALLER_IDLE)
 							task['idle_done'] = True
 			time.sleep(1)
 
-	def close(s):
+	def close(self):
 		''' Destructor.
 			Remove scheduler jobs, hotkey bindings, stop http server
 			, close event handlers.
 		'''
-		if s.http_server:
-			s.http_server.shutdown()
-			s.http_server.socket.close()
+		if self.http_server:
+			self.http_server.shutdown()
+			self.http_server.socket.close()
 		try:
 			keyboard.unhook_all()
 		except:
 			dev_print('no hotkeys with keyboard module')
-		if s.global_hk:
-			s.global_hk.unregister()
-			s.global_hk.stop_listener()
-			s.global_hk = None
+		if self.global_hk:
+			self.global_hk.unregister()
+			self.global_hk.stop_listener()
+			self.global_hk = None
 		schedule.clear()
-		for eh in s.event_handlers:
+		for eh in self.event_handlers:
 			try:
 				eh.close()
 			except Exception as e:
 				dev_print(f'event close error: {e}')
-		for es in s.file_change_stop: es.set()
+		for es in self.file_change_stop: es.set()
 
 def create_menu_item(menu, task, func=None, parent_menu=None):
 	''' Task - task dict or menu item label
@@ -743,15 +761,16 @@ def create_menu_item(menu, task, func=None, parent_menu=None):
 	menu.Append(item)
 
 class TaskBarIcon(wx.adv.TaskBarIcon):
-	def __init__(s, frame):
-		s.frame = frame
-		super(TaskBarIcon, s).__init__()
-		s.icon = wx.Icon(APP_ICON)
-		s.icon_dis = wx.Icon(APP_ICON_DIS)
-		s.set_icon()
-		s.Bind(wx.adv.EVT_TASKBAR_LEFT_DOWN, s.on_left_down)
+	def __init__(self, frame):
+		self.frame = frame
+		self.text_dic = {}
+		super(TaskBarIcon, self).__init__()
+		self.icon = wx.Icon(APP_ICON)
+		self.icon_dis = wx.Icon(APP_ICON_DIS)
+		self.set_icon()
+		self.Bind(wx.adv.EVT_TASKBAR_LEFT_DOWN, self.on_left_down)
 
-	def CreatePopupMenu(s):
+	def CreatePopupMenu(self):
 		menu = wx.Menu()
 		if not sys.modules.get('crontab') is None:
 			if keyboard.is_pressed('shift'):
@@ -766,38 +785,54 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 				menu.AppendSubMenu(submenu, subm[0])
 		if sett.kiosk and not keyboard.is_pressed(sett.kiosk_key): return menu
 		menu.AppendSeparator()
-		create_menu_item(menu, lang.menu_edit_crontab, s.on_edit_crontab)
+		create_menu_item(menu, lang.menu_edit_crontab, self.on_edit_crontab)
 		create_menu_item(menu, lang.menu_reload, load_crontab)
 		create_menu_item(menu
 			, lang.menu_disable if tasks.enabled else lang.menu_enable
-			, s.on_disable
+			, self.on_disable
 		)
-		create_menu_item(menu, lang.menu_list_run_tasks, s.running_tasks)
+		create_menu_item(menu, lang.menu_list_run_tasks, self.running_tasks)
 		if sett.dev:
-			create_menu_item(menu, lang.menu_restart, s.on_restart)
-			create_menu_item(menu, lang.menu_edit_settings, s.on_edit_settings)
+			create_menu_item(menu, lang.menu_restart, self.on_restart)
+			create_menu_item(menu, lang.menu_edit_settings, self.on_edit_settings)
 		if sett.dev or keyboard.is_pressed('shift'):
-			create_menu_item(menu, lang.menu_command, s.run_command)
-		create_menu_item(menu, lang.menu_exit, s.on_exit)
+			create_menu_item(menu, lang.menu_command, self.run_command)
+		create_menu_item(menu, lang.menu_exit, self.on_exit)
 		return menu
 
-	def run_command(s, event=None):
+	def run_command(self, event=None):
 		show_app_window()
 		cmd = input(f'{lang.menu_command_con}: ')
 		if cmd:	print(eval(cmd))
 
-	def set_icon(s, dis:bool=False, text:str=APP_FULLNAME):
-		s.SetIcon(s.icon_dis if dis else s.icon, text)
+	def set_icon(self, dis:bool=False, text=APP_FULLNAME
+	, del_text_key=None):
+		'''
+		Change icon text.
+		Provide a string to just replace icon text or provide
+		a dictionary to update line made of `self.text_dic_key`
+		items.
+		*del_text_key* - delete the specified key from
+		the `self.text_dic_key`
+		'''
+		if isinstance(text, str):
+			icon_text = text
+		elif isinstance(text, dict):
+			self.text_dic.update(text)
+			if del_text_key: self.text_dic.pop(del_text_key, None)
+			icon_text = '\n'.join(
+				[f'{k}{v}' for k, v in self.text_dic.items()])
+		self.SetIcon(self.icon_dis if dis else self.icon, icon_text)
 	
-	def show_menu_wait(s, event=None):
+	def show_menu_wait(self, event=None):
 		print('show_menu 3 sec')
-		s.frame.Raise()
-		s.frame.SetFocus()
-		menu = s.CreatePopupMenu()
-		print(s.frame.PopupMenu(menu, pos=(0, 0)))
+		self.frame.Raise()
+		self.frame.SetFocus()
+		menu = self.CreatePopupMenu()
+		print(self.frame.PopupMenu(menu, pos=(0, 0)))
 		menu.Destroy()
 
-	def on_left_down(s, event=None):
+	def on_left_down(self, event=None):
 		''' Default action on left click to tray icon
 		'''
 		if sett.kiosk and not keyboard.is_pressed(sett.kiosk_key): return
@@ -810,9 +845,9 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			else:
 				show_app_window()
 
-	def on_exit(s, event=None)->bool:
+	def on_exit(self, event=None)->bool:
 		TASKS_MSG_MAX = 5
-		running_tasks = s.running_tasks(show_msg=False)
+		running_tasks = self.running_tasks(show_msg=False)
 		if running_tasks:
 			tasks_str = '\r\n'.join(
 				[t['task_name'] for t in running_tasks]
@@ -832,11 +867,11 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			tasks.run_task(task, caller=CALLER_EXIT)
 		con_log(lang.menu_exit)
 		tasks.close()
-		wx.CallAfter(s.Destroy)
-		s.frame.Close()
+		wx.CallAfter(self.Destroy)
+		self.frame.Close()
 		return True
 
-	def running_tasks(s, show_msg:bool= True
+	def running_tasks(self, show_msg:bool= True
 	, event=None)->list:
 		''' Prints running tasks and shows dialog
 			(if show_msg == True).
@@ -889,13 +924,13 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			tasks_str += '\r\n...'
 		dialog(tasks_str, timeout=10, wait=False)
 
-	def on_edit_crontab(s, event=None):
+	def on_edit_crontab(self, event=None):
 		app_start(sett.editor, os.path.join(APP_PATH, 'crontab.py'))
 
-	def on_edit_settings(s, event=None):
+	def on_edit_settings(self, event=None):
 		app_start(sett.editor, os.path.join(APP_PATH, r'settings.ini'))
 
-	def on_disable(s, event=None):
+	def on_disable(self, event=None):
 		tasks.enabled = not tasks.enabled
 		app.enabled = tasks.enabled
 		if tasks.enabled:
@@ -904,10 +939,10 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		else:
 			set_title(f'Disabled {APP_NAME}')
 			con_log('Disabled')
-		s.set_icon(not tasks.enabled)
+		self.set_icon(not tasks.enabled)
 	
-	def on_restart(s, event=None):
-		if not s.on_exit(): return
+	def on_restart(self, event=None):
+		if not self.on_exit(): return
 		dev = None
 		if '--developer' in sys.argv: dev = '--developer'
 		if getattr(sys, 'frozen', False):
@@ -921,37 +956,37 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 				, parameters=dev
 			)
 
-	def popup_menu_hk(s):
+	def popup_menu_hk(self):
 		app.frame.SetFocus()
 		time.sleep(0.1)
-		app.frame.PopupMenu(s.CreatePopupMenu())
+		app.frame.PopupMenu(self.CreatePopupMenu())
 
 class App(wx.App):
-	def OnInit(s):
-		s.enabled = True
-		s.frame=wx.Frame(None, style=wx.DEFAULT_FRAME_STYLE | wx.STAY_ON_TOP)
-		s.taskbaricon = TaskBarIcon(s.frame)
+	def OnInit(self):
+		self.enabled = True
+		self.frame=wx.Frame(None, style=wx.DEFAULT_FRAME_STYLE | wx.STAY_ON_TOP)
+		self.taskbaricon = TaskBarIcon(self.frame)
 		hwnd_list = window_find(APP_NAME)
 		if len(hwnd_list) == 1:
-			s.app_hwnd = hwnd_list[0]
+			self.app_hwnd = hwnd_list[0]
 		elif len(hwnd_list) > 1:
-			s.app_hwnd = hwnd_list[0]
+			self.app_hwnd = hwnd_list[0]
 			if sett.dev:
 				msgbox_warning(
 					lang.warn_too_many_win.format(
 					APP_NAME, len(hwnd_list) )
 				)
 		else:
-			s.app_hwnd = 0
+			self.app_hwnd = 0
 			if sett.dev:
 				msgbox_warning(f'None of {APP_NAME} windows was found')
 		return True
 
-	def popup_menu_hk(s):
+	def popup_menu_hk(self):
 		tprint('app menu by hotkey')
-		s.frame.SetFocus()
+		self.frame.SetFocus()
 		time.sleep(0.1)
-		s.frame.PopupMenu(s.taskbaricon.CreatePopupMenu())
+		self.frame.PopupMenu(self.taskbaricon.CreatePopupMenu())
 
 def show_app_window():
 	try:

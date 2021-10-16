@@ -28,14 +28,16 @@ import win32gui
 import win32con
 import wx
 from collections import defaultdict
+import lxml
 from xml.etree import ElementTree as _ElementTree
+import xml
 try:
 	import constants as tcon
 except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-10-02'
+APP_VERSION = 'v2021-10-16'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 app_log = []
 
@@ -907,6 +909,9 @@ def balloon(msg:str, title:str=APP_NAME, timeout:int=None, icon:str=None):
 		icon - 'info', 'warning' or 'error'.
 	'''
 	kwargs = {'title': title, 'text': msg}
+	if tdebug():
+		tprint('balloon:', msg)
+		return
 	if timeout: kwargs['msec'] = timeout * 1000
 	if icon:
 		kwargs['flags'] = {
@@ -1354,32 +1359,29 @@ def screen_height()->int:
 	return win32api.GetSystemMetrics(1)
 
 class DataHTTPReq:
-	''' To keep HTTP request data in
-		object instead of dictionary.
-		{'User-Agent' : ... } ->
-		req_data.user_agent
+	'''
+	Browser request data as an object.
 	'''
 	def __init__(s, client_ip:str, path:str
 	, headers:dict={}, params:dict={}
 	, form_data:dict={}, post_file:str=None):
-		''' client_ip - str
-			path - '/task_name'
-			headers - HTTP request headers
-			params - 'par1':'123'
+		'''
+		client_ip - str
+		path - '/task_name'
+		headers - {"Accept-Encoding": "gzip, deflate", ...}
+		params - {'par1': '123', ...}
 		'''
 		s.client_ip = client_ip
 		s.path = path
 		s.post_file = post_file
-		s.cookie = ''
 		s.host = ''
-		s.user_agent = ''
 		s.accept = ''
 		s.accept_encoding = ''
 		s.accept_language = ''
 		s.referer = ''
 		s.headers = headers
 		s.params = params
-		s.form = form_data 
+		s.form = form_data
 		s.__dict__.update(form_data)
 
 class DataBrowserExt(DataHTTPReq):
@@ -1416,17 +1418,22 @@ def _etree_to_dict(tree: _ElementTree):
 			di[tree.tag] = text
 	return di
 
-def xml_to_dict(xml_str:str, remove_str:str=None)->dict:
+def xml_to_dict(xml_str:str, remove_str:str=None)->tuple:
 	'''
 	Converts a XML to dictionary using xml.etree
+	Returns (True, dict) or (False, 'exception text')
 	'''
-	if remove_str:
-		xml_str = xml_str.replace(remove_str, '')
-	tree = _ElementTree.XML(xml_str)
-	return _etree_to_dict(tree)
-
+	try:
+		if remove_str: xml_str = xml_str.replace(remove_str, '')
+		parser=lxml.etree.XMLParser(recover=True)
+		tree = lxml.etree.fromstring(xml_str, parser=parser)
+		return True, _etree_to_dict(tree)
+	except Exception as e:
+		dev_print(f'xml_str parsing error:\n\n{xml_str}\n\n')
+		return False, repr(e)
 _event_xmlns = ''
-def _xml_to_dict_event(event_xml:str)->dict:
+def _xml_to_dict_event(event_xml:str)->tuple:
+	''' Returns (True, dict) or (False, 'exception text') '''
 	global _event_xmlns
 	if not _event_xmlns:
 		_event_xmlns = re_find(event_xml, r'''(xmlns=('|").+?('|"))''')[0][0]
@@ -1435,6 +1442,8 @@ def _xml_to_dict_event(event_xml:str)->dict:
 class DataEvent:
 	'''
 	Windows event as an object.
+	*.EventData* is a user-friendly dictionary
+	and *._EventDataDict* is an ugly data converted from XML.
 	'''
 	{
 		'{http: //schemas.microsoft.com/win/2004/08/events/event}Event': {
@@ -1496,31 +1505,31 @@ class DataEvent:
 			'Correlation': None,
 			'Execution': {'@ProcessID': '0', '@ThreadID': '0'},
 			'Channel': 'System',
-			'Computer': 'mz',
+			'Computer': 'pc',
 			'Security': None}
 		'''
 		ATTRS = ['Provider', 'EventID', 'Level', 'Task'
 		, 'TimeCreated', 'EventRecordID', 'Channel'
 		, 'Computer', 'Security']
 		
-		full_dict = _xml_to_dict_event(xml_str)
+		status, full_dict = _xml_to_dict_event(xml_str)
+		if not status:
+			return
 		di_sys = full_dict.get('Event', {}).get('System')
 		self.dict = full_dict
-		self.xml_str = xml_str
-
 		self.Provider = di_sys.get('Provider', {}).get('@Name')
 		self.EventID = 0
 		self.Level = ''
 		self.Task = 0
-		self.TimeCreated = di_sys.get('TimeCreated', {})
+		self.TimeCreatedUTC = di_sys.get('TimeCreated', {})
+		self.TimeCreatedLocal = 0
 		self.EventRecordID = 0
 		self.Channel = ''
 		self.Computer = ''
 		self.Security = None
 		self.EventData = {}
-		self.EventDataDict = \
-			full_dict.get('Event', {}).get('EventData', {})
-
+		self._EventDataDict = full_dict.get('Event', {}) \
+			.get('EventData', {})
 		for attr in ATTRS:
 			if ( e := di_sys.get(attr, None) ):
 				if isinstance(e, dict):
@@ -1531,15 +1540,18 @@ class DataEvent:
 					)
 				else:
 					setattr(self, attr, e)
-		if self.TimeCreated:
-			ts = self.TimeCreated.get('@SystemTime', '').split('.')[0]
-			self.TimeCreated = datetime.datetime.fromisoformat(ts)
+		if self.TimeCreatedUTC:
+			ts = self.TimeCreatedUTC.get('@SystemTime', '.').split('.')[0]
+			if ts:
+				self.TimeCreatedUTC = datetime.datetime.fromisoformat(ts)
+				self.TimeCreatedLocal = self.TimeCreatedUTC \
+					+ datetime.timedelta(seconds= -time.timezone)
 		for attr in ATTRS:
 			if isinstance(v := getattr(self, attr, ''), str) \
 			and v.isdigit():
 				setattr(self, attr, int(v))
-		if self.Channel == 'Security' and self.EventDataDict:
-			for di in self.EventDataDict.get('Data', {}):
+		if self.Channel == 'Security' and self._EventDataDict:
+			for di in self._EventDataDict.get('Data', {}):
 				self.EventData[di.get('@Name', '')] = di.get('#text', '')
 			return
 

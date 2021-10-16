@@ -188,8 +188,9 @@ def mail_download(server:str, login:str, password:str
 	'''
 	Downloads all messages from the server to the
 	specified directory (*output_dir*).
-	Successfully downloaded messages are moved to
-	a IMAP trash folder (*trash_folder*) on the server.
+	*trash_folder* - IMAP folder where deleted messages
+	are moved. For GMail use None.
+	
 	Returns tuple: (messages:list, errors:list).
 	'''
 	msg_number = 0
@@ -276,11 +277,14 @@ def mail_download(server:str, login:str, password:str
 				msgs.append(msg)
 				if file_ok:
 					var_set(_LAST_NUM_VAR + output_dir, last_index)
-					status, data = imap.copy(msg_id, trash_folder)
-					if status == 'OK':
-						imap.store(msg_id, '+FLAGS', '\\Deleted')
+					if trash_folder:
+						status, data = imap.copy(msg_id, trash_folder)
+						if status == 'OK':
+							imap.store(msg_id, '+FLAGS', '\\Deleted')
+						else:
+							pr(f'message move error: {status} {data}', True)
 					else:
-						pr(f'message move error: {status} {data}', True)
+						imap.store(msg_id, '+FLAGS', '\\Deleted')
 			pr('expunge')
 			imap.expunge()
 			pr('close')
