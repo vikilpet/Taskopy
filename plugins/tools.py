@@ -37,7 +37,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-10-16'
+APP_VERSION = 'v2021-10-24'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 app_log = []
 

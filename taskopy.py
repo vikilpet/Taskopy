@@ -939,7 +939,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		else:
 			set_title(f'Disabled {APP_NAME}')
 			con_log('Disabled')
-		self.set_icon(not tasks.enabled)
+		self.set_icon(dis=not tasks.enabled)
 	
 	def on_restart(self, event=None):
 		if not self.on_exit(): return

@@ -16,7 +16,7 @@ import json2html
 from .tools import dev_print, time_sleep, tdebug \
 , locale_set, safe, patch_import, value_to_unit
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.54 Safari/537.36'}
 
 def http_req(url:str, encoding:str='utf-8', session:bool=False
 , cookies:dict=None, headers:dict=None
@@ -28,6 +28,7 @@ def http_req(url:str, encoding:str='utf-8', session:bool=False
 	Gets content of the specified URL
 	
 	Skip SSL verification: `verify=False`
+	Follow redirects: `allow_redirects=True`
 	'''
 	if (post_file or post_form_data): http_method = 'POST'
 	if http_method: http_method = http_method.lower()
@@ -122,15 +123,19 @@ def file_download(url:str, destination:str=None
 , del_bad_file:bool=False, headers:dict={}
 , size_limit:int=None
 , stop_event:threading.Event=None
+, overwrite:bool=False
 , chunk_size:int=1_048_576
 , **kwargs)->str:
 	''' Download file from url to destination and return fullpath.
 		Returns a full path to the downloaded file.
-		attempts - how many times to retry download if failed.
-		If destination is a folder, then get filename from url.
-		If destination is None then download to temporary file.
+		
+		*attempts* - how many times to retry download if failed.
+		*destination* - file, directory or None. If the latter,
+		download to a temporary folder.
 
-		stop_event - threading event to stop download.
+		*overwrite* - overwrite file if exists.
+
+		*stop_event* - `threading` event to stop download.
 
 		In case of an exception, the exception object has a *fullpath* attribute
 		, so it is possible to do something with it. Example:
@@ -147,7 +152,9 @@ def file_download(url:str, destination:str=None
 
 		Use 'Range' header to download first n bytes (server should
 		support this header):
-			headers = {'Range': 'bytes=0-1024'} 
+
+			headers = {'Range': 'bytes=0-1024'}
+
 	'''
 	if isinstance(destination, (list, tuple)):
 		destination = os.path.join(*destination)
@@ -155,17 +162,13 @@ def file_download(url:str, destination:str=None
 			os.makedirs(os.path.dirname(destination))
 		except FileExistsError:
 			pass
-	if destination is None:
-		dest = tempfile.TemporaryFile()
-	elif os.path.isdir(destination):
-		dest = open(
-			os.path.join(destination, url.split('/')[-1])
-			, 'bw+'
-		)
+	find_name = False
+	dst_file = destination
+	if dst_file:
+		find_name = os.path.isdir(dst_file)
 	else:
-		dest = open(destination, 'bw+')
-	dest_file = dest.name
-	dest.close()
+		find_name = True
+		dst_file = tempfile.gettempdir()
 	last_exc = None
 	for attempt in range(attempts):
 		try:
@@ -174,7 +177,22 @@ def file_download(url:str, destination:str=None
 				, headers={**_USER_AGENT, **headers}
 				, **kwargs
 			)
-			with open(dest_file, 'wb+') as fd:
+			if find_name:
+				fname = ''
+				try:
+					fname = req.headers.get('content-disposition', '') \
+						.split('filename=')[1]
+				except Exception as e:
+					tdebug(f'content-disposition error: {e}')
+					fname = req.url.split('/')[-1]
+				if fname:
+					dst_file = os.path.join(dst_file, fname)
+				else:
+					with tempfile.TemporaryFile() as f:
+						dst_file = f.name
+			if os.path.isfile(dst_file) and not overwrite:
+				return dst_file
+			with open(dst_file, 'wb+') as fd:
 				cur_size = 0
 				for chunk in req.iter_content(chunk_size=chunk_size):
 					fd.write(chunk)
@@ -190,12 +208,12 @@ def file_download(url:str, destination:str=None
 	else:
 		if del_bad_file:
 			try:
-				os.remove(dest_file)
+				os.remove(dst_file)
 			except Exception as e:
 				dev_print('Couldn not delete a bad file: ' + str(e))
-		last_exc.fullpath = dest_file
+		last_exc.fullpath = dst_file
 		raise last_exc
-	return dest_file
+	return dst_file
 
 def html_clean(html_str:str, separator=' ')->str:
 	''' Removes HTML tags from string '''

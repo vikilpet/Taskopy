@@ -433,19 +433,21 @@ def dir_rnd_file(fullpath, attempts:int=5
 def dir_purge(fullpath, days:int=0, recursive:bool=False
 , creation:bool=False, test:bool=False, rule=None
 , print_del:bool=False):
-	''' Deletes files older than x days.
-		Returns number of deleted files and folders. 
-		days=0 - delete everything
-		creation - use date of creation, otherwise use last
-			modification date.
-		recursive - delete in subfolders too. Empty subfolders 
-			will be deleted.
-		test - only print files and folders that should be removed.
-		print_del - print path when deleting.
-		rule - function that gets a file name and returns True
-			if the file is to be deleted. Example:
-			 
-				rule=lambda f: file_size(f) == 0
+	'''
+	Deletes files older than x days.
+	Returns number of deleted files and folders. 
+	days=0 - delete everything
+	creation - use date of creation, otherwise use last
+		modification date.
+	recursive - delete in subfolders too. Empty subfolders 
+		will be deleted.
+	test - only print files and folders that should be removed.
+	print_del - print path when deleting.
+	rule - function that gets a file name and returns True
+		if the file is to be deleted. Example:
+			rule=lambda f: file_size(f) == 0
+			rule=lambda f: file_ext(f) == 'log'
+			
 	'''
 	def print_d(fn:str, reason:str):
 		if print_del: print(reason, os.path.relpath(fn, fullpath))
@@ -1002,6 +1004,7 @@ def dvar_get(var:str, default=None, encoding='utf-8'
 	'''
 	Gets the disk variable.
 	*as_literal* - converts to a literal (dict, list, tuple etc).
+	Dangerous! - it's just `eval` and not `ast.literal_eval`
 	'''
 	var = _file_name_pe(var)
 	try:
@@ -1009,10 +1012,7 @@ def dvar_get(var:str, default=None, encoding='utf-8'
 	except FileNotFoundError:
 		return default
 	if not as_literal: return content
-	try:
-		return ast.literal_eval(content)
-	except ValueError:
-		return eval(content)
+	return eval(content)
 
 def dvar_set(var:str, value, encoding='utf-8'):
 	'''
