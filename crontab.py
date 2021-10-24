@@ -13,7 +13,7 @@ from plugins.plugin_crypt import *
 # You can deactivate it with the parameter «active=False» like that:
 # def demo_task_1(startup=True, active=False):
 # or just delete it :-)
-def demo_task_1(startup=True):
+def demo_task_1(startup=True, submenu='demo'):
 	# This is where we'll place the actions
 
 	# Show message
@@ -36,28 +36,12 @@ def demo_task_2(schedule='every().day.at("10:30")', menu=False):
 
 # Example of an HTTP task. «result» option means that the task should
 # return some value.
-# Open in your browser http://127.0.0.1/task?demo_task_3
-def demo_task_3(http=True, result=True):
+# Open in your browser http://127.0.0.1:8275/task?demo_task_3
+def demo_task_3(http=True, result=True, menu=False):
 	# Get a list of files and folders in application directory:
 	listing = dir_list(r'*')
 	# return this list as a br-tag separated string:
 	return '<br>'.join(listing)
-
-# Запускаем калькулятор и меняем его заголовок на курс продажи
-# доллара в Сбербанке. Назначаем выполнение задачи на клик
-# левой клавишей мыши по иконке:
-def demo_task_4(left_click=True):
-	# Запускаем калькулятор:
-	app_start(r'calc.exe')
-	# Скачиваем json по которому грузится список валют
-	# и получаем из него курс продажи доллара
-	usd = json_element(
-		'https://www.sberbank.ru/portalserver/proxy/?pipe=shortCachePipe&url=http://localhost/rates-web/rateService/rate/current%3FregionId%3D77%26currencyCode%3D840%26currencyCode%3D978%26rateCategory%3Dbeznal'
-		# Обратите внимание: в их данных числовые значения присутствуют в виде строк:
-		, ['beznal', '840', '0', 'sellValue']
-	)
-	# Теперь меняем заголовок калькулятора на USD={найденное значение}
-	window_title_set('Калькулятор', f'USD={usd}')
 
 def backup_and_purge(
 	# Task name «for humans»:
@@ -71,36 +55,55 @@ def backup_and_purge(
 	# Delete logs older than 10 days
 	dir_purge('log', days=10)
 
+# 2021.10.23
 # Check to see if there's a new version available
-def taskopy_update(schedule='every().sunday.at("15:30")', submenu='Rare'):
-	new_ver = html_element(
-		'https://github.com/vikilpet/Taskopy/releases'
-		, {'name':'div', 'class':'f1'}
-	)
-	cur_ver = var_get('taskopy_version')
-	if cur_ver == '':
+def taskopy_update(
+	schedule='every().sunday.at("15:30")'
+	, submenu='demo'
+):
+	VAR = 'taskopy version'
+	DOWNLOAD_DIR = temp_dir()
+	json_str = http_req('https://api.github.com/repos/vikilpet/Taskopy/releases')
+	new_ver = json_element(json_str, element=[0, 'name'])
+	cur_ver = dvar_get(VAR)
+	if cur_ver == None:
 		# The task has been launched for the first time, 
 		# do not disturb the user:
-		tprint('First check for updates')
+		tprint('First update check')
 		# Just save the current version and exit:
-		var_set('taskopy_version', new_ver)
+		dvar_set(VAR, new_ver)
 		return
-	if cur_ver != new_ver:
-		news = html_element(
-			'https://github.com/vikilpet/Taskopy/releases'
-			, {'name':'div', 'class':'markdown-body'}
-		)
-		tprint(f'New version of the Taskopy: {new_ver}')
-		choice = dialog(
-			f'New version of the Taskopy: {new_ver}'
-			, content=news[:200]
-			, buttons=['Open GitHub page', 'OK']
-		)
-		if choice == 1000:
-			# Save the new version:
-			var_set('taskopy_version', new_ver)
-			# Open page in default browser:
-			file_open('https://github.com/vikilpet/Taskopy/releases')
-		elif choice == 1001:
-			# Just save and do nothing
-			var_set('taskopy_version', new_ver)
+	if cur_ver == new_ver: return
+	news = json_element(json_str, [0, 'body'])
+	tprint(f'New version of the Taskopy: {new_ver}\n{news}')
+	choice = dialog(
+		f'New version of the Taskopy: {new_ver}'
+		, content=news.replace('**', '')
+		, buttons=[
+			'Open GitHub page'
+			, 'Download exe'
+			, 'Download source'
+			, 'Cancel'
+		]
+	)
+	# Escape or 'Cancel':
+	if choice in (tcon.DL_CANCEL, 1003): return
+	# Save the new version:
+	dvar_set(VAR, new_ver)
+	if choice == 1000:
+		# Open page in default browser:
+		file_open('https://github.com/vikilpet/Taskopy/releases')
+		return
+	if choice == 1001:
+		# Archive with exe
+		url = json_element(json_str, [0, 'assets', 0, 'browser_download_url'])
+	else:
+		# Archive with code
+		url = json_element(json_str, [0, 'zipball_url'])
+	status, data = safe(file_download)(url, destination=DOWNLOAD_DIR)
+	if not status:
+		dialog(f'Download error:\n{data}')
+		return
+	if dialog(f'Download finished ({file_size_str(data)})'
+	, ['OK','Open archive']) == 1001:
+		file_open(data)
