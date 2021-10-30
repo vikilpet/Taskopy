@@ -26,6 +26,8 @@ import string
 import win32api
 import win32gui
 import win32con
+import win32com.client
+import pythoncom
 import wx
 from collections import defaultdict
 import lxml
@@ -37,9 +39,9 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-10-24'
+APP_VERSION = 'v2021-10-30'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
-app_log = []
+_app_log = []
 
 if not __builtins__.get('uglobals', None):
 	uglobals = {}
@@ -117,8 +119,9 @@ _TIME_UNITS = {
 	, 'hour': 3_600_000, 'hours': 3_600_000, 'h': 3_600_000
 	, 'day': 86_400_000, 'days': 86_400_000, 'd': 86_400_000
 }
-
 _LOCALE_LOCK = threading.Lock()
+_speaker = None
+_LOG_TIME_FORMAT = '%Y.%m.%d %H:%M:%S'
 
 class DictToObj:
 	''' Converts dictionary to object.
@@ -219,26 +222,27 @@ def dev_print(*msg, **kwargs):
 def con_log(*msgs, **kwargs):
 	''' Log to console and logfile
 	'''
-	global app_log
+	global _app_log
 	log_str = ''
-	for m in msgs:
-		tprint(m, **kwargs)
-		app_log.append((datetime.datetime.now(), m))
+	ltime = datetime.datetime.now()
+	for msg in msgs:
+		tprint(msg, **kwargs)
+		_app_log.append((ltime, msg))
 		log_str += (
-			time.strftime('%Y.%m.%d %H:%M:%S')
-			+ ' ' + str(m) + '\n'
+			ltime.strftime(_LOG_TIME_FORMAT)
+			+ ' ' + str(msg) + '\n'
 		)
 	try:
 		if not (sett := __builtins__.get('sett', None)): return
 		with open(
-			f'log\\{time.strftime(sett.log_file_name)}.log'
+			f'log\\{ltime.strftime(sett.log_file_name)}.log'
 			, 'ta+', encoding='utf-8'
 		) as f:
 			f.write(log_str)
 	except FileNotFoundError:
 		os.makedirs('log')
 		with open(
-			f'log\\{time.strftime(sett.log_file_name)}.log'
+			f'log\\{ltime.strftime(sett.log_file_name)}.log'
 			, 'ta+', encoding='utf-8'
 		) as f:
 			f.write(log_str)
@@ -921,14 +925,13 @@ def balloon(msg:str, title:str=APP_NAME, timeout:int=None, icon:str=None):
 		}.get(icon.lower(), wx.ICON_INFORMATION)
 	app.taskbaricon.ShowBalloon(**kwargs)
 
-def app_log_get():
-	''' Returns current log file content.
-		Log can't be empty.
+def app_log_get()->str:
 	'''
-	log = ''
-	for t, m in app_log:
-		log += t.strftime('%Y.%m.%d %H:%M:%S') + f'\t{m}\n'
-	return log
+	Returns current log as a string.
+	Log can't be empty.
+	'''
+	log = [t.strftime(_LOG_TIME_FORMAT) + ' ' + m for t, m in _app_log]
+	return '\n'.join(log)
 
 def decor_except(func):
 	''' Add 'try... except' for function
@@ -1581,6 +1584,10 @@ def app_dir()->str:
 	' Returns current working directory '
 	return app.dir
 
+def app_tasks()->dict:
+	' Returns dictionary with tasks '
+	return app.tasks
+
 def benchmark(func, b_iter:int=1
 , *args, **kwargs)->datetime.timedelta:
 	'''
@@ -1600,4 +1607,13 @@ def benchmark(func, b_iter:int=1
 def median(source):
 	return statistics.median(source)
 
+def speak(text:str, wait:bool=False):
+	global _speaker
+	if not _speaker:
+		pythoncom.CoInitialize()
+		_speaker = win32com.client.Dispatch('SAPI.SpVoice')
+	_speaker.Speak(text, not wait)
+	
+		 
+	
 if __name__ != '__main__': patch_import()

@@ -364,14 +364,16 @@ def file_name_fix(filename:str, repl_char:str='_')->str:
 			new_fn += char
 	return new_fn
 
-def dir_dirs(fullpath)->list:
+def dir_dirs(fullpath, subdirs:bool=True)->list:
 	'''
 	Returns list of full paths of all directories
 	in this directory and its subdirectories.
 	'''
 	fullpath = _fix_fullpath(fullpath)
-	for dirpath, dirnames, _ in os.walk(fullpath):
-		for d in dirnames: yield os.path.join(dirpath, d)
+
+	for dirpath, dirs, _ in os.walk(fullpath, topdown=True):
+		for d in dirs: yield os.path.join(dirpath, d)
+		if not subdirs: return
 
 def dir_files(fullpath, ext:str=None, subdirs:bool=True):
 	'''
@@ -428,6 +430,28 @@ def dir_rnd_file(fullpath, attempts:int=5
 					return path
 				else:
 					break
+	return None
+
+def dir_rnd_dir(fullpath, attempts:int=5
+, filter_func=None)->str:
+	'''
+	Same as `dir_rnd_file` but returns a directory.
+	'''
+	fullpath = _fix_fullpath(fullpath)
+	for _ in range(attempts):
+		path = fullpath
+		for _ in range(attempts):
+			dlist = os.listdir(path)
+			if not dlist: break
+			path = os.path.join(path, random.choice(dlist) )
+			if os.path.isdir(path):
+				if not filter_func: return path
+				if filter_func(path):
+					return path
+				else:
+					break
+			else:
+				break
 	return None
 
 def dir_purge(fullpath, days:int=0, recursive:bool=False
@@ -1025,5 +1049,16 @@ def dvar_set(var:str, value, encoding='utf-8'):
 	except FileNotFoundError:
 		os.makedirs(os.path.join('resources', 'var'))
 		file_write(['resources', 'var', var], value, encoding=encoding)
+
+def file_drive(fullpath)->str:
+	'''
+	Returns a drive letter in lowercase from a file name:
+
+		file_disk(r'c:\\pagefile.sys')
+		> 'c'
+
+	'''
+	fullpath = _fix_fullpath(fullpath)
+	return os.path.splitdrive(fullpath)[0][:1].lower()
 
 if __name__ != '__main__': patch_import()

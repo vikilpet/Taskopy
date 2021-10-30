@@ -166,7 +166,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			s.url_query.split('&')[0] )
 		task = None
 		for t in s.tasks.task_list_http:
-			if task_name == t['task_function_name']:
+			if task_name == t['task_func_name']:
 				task = t
 				break
 		else:
