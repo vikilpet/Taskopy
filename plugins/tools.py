@@ -39,7 +39,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-10-30'
+APP_VERSION = 'v2021-11-21'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -166,7 +166,7 @@ def value_to_unit(value, unit:str='sec', unit_dict:dict=None
 		raise('Wrong value')
 
 
-def _get_parent_func_name(parent=None, repl_undrsc:bool=' ')->str:
+def _get_parent_func_name(parent=None, repl_undrsc:str=None)->str:
 	''' Get name of parent function if any '''
 	EXCLUDE = ('wrapper', 'run_task', 'run', 'dev_print', 'tprint'
 		, 'main', 'run_task_inner', 'popup_menu_hk'
@@ -188,7 +188,8 @@ def _get_parent_func_name(parent=None, repl_undrsc:bool=' ')->str:
 			break
 	else:
 		parent = ''
-	if repl_undrsc: parent.replace('_', repl_undrsc)
+	if repl_undrsc != None:
+		parent = parent.replace('_', repl_undrsc)
 	return parent
 
 def task(**kwargs):
@@ -888,7 +889,7 @@ def job_batch(jobs:list, timeout:int
 
 def tprint(*msgs, **kwargs):
 	''' Print with task name and time '''
-	parent = _get_parent_func_name(repl_undrsc=None)
+	parent = _get_parent_func_name()
 	msgs = list(msgs)
 	if parent: msgs.insert(0, parent + ':')
 	print(time.strftime('%y.%m.%d %H:%M:%S'), *msgs, **kwargs)
@@ -898,7 +899,7 @@ def tdebug(*msgs, **kwargs)->bool:
 	if not hasattr(sys, 'ps1'): return False
 	if msgs:
 		if kwargs.get('par', True):
-			msg = _get_parent_func_name(repl_undrsc=None) + ': '
+			msg = _get_parent_func_name() + ': '
 		else:
 			msg = ''
 		if isinstance(msgs, dict):
@@ -1127,7 +1128,10 @@ def dialog(msg:str=None, buttons:list=None
 					dev_print(f'SetWindowPos exception {hwnd=}: {e}')
 		return S_OK
 	if content: content = str(content)
-	if title: title = str(title)
+	if title == None:
+		title = _get_parent_func_name(repl_undrsc=' ').capitalize()
+	else:
+		title = str(title)
 	if isinstance(msg, (list, tuple)):
 		buttons = msg
 		msg = ''
@@ -1136,7 +1140,6 @@ def dialog(msg:str=None, buttons:list=None
 	if buttons:
 		orig_buttons = buttons
 		buttons = list(map(str, buttons))
-	title = _get_parent_func_name(title)
 	result = ctypes.c_int()
 	tdc = _TaskDialogConfig()
 	if common_buttons:

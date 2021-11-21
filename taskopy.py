@@ -148,19 +148,19 @@ def load_modules():
 	if not hasattr(sett, 'own_modules'):
 		sett.own_modules = {'plugins.constants'}
 		for obj_name, obj in crontab.__dict__.items():
-			if (
+			if not (
 				hasattr(obj, '__module__')
 				and obj.__module__ != 'crontab'
-				and obj.__module__ != '__main__'
+				and not obj.__module__.startswith('pyimod')
 				and hasattr(sys.modules[obj.__module__], '__file__')
-			):
-				try:
-					if not os.path.relpath(
-						inspect.getfile(sys.modules[obj.__module__])
-					).startswith('.'):
-						sett.own_modules.add(obj.__module__)
-				except ValueError:
-					continue
+			): continue
+			try:
+				if os.path.relpath(
+					inspect.getfile(sys.modules[obj.__module__])
+				).startswith('.'): continue
+				sett.own_modules.add(obj.__module__)
+			except ValueError:
+				continue
 	for mdl_name in sett.own_modules:
 		prev_mdl = sys.modules.pop(mdl_name)
 		try:

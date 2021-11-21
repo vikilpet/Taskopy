@@ -456,10 +456,11 @@ def dir_rnd_dir(fullpath, attempts:int=5
 
 def dir_purge(fullpath, days:int=0, recursive:bool=False
 , creation:bool=False, test:bool=False, rule=None
-, print_del:bool=False):
+, print_del:bool=False)->int:
 	'''
 	Deletes files older than x days.
 	Returns number of deleted files and folders. 
+	
 	days=0 - delete everything
 	creation - use date of creation, otherwise use last
 		modification date.

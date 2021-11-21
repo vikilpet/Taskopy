@@ -29,8 +29,9 @@ def window_get(window=None, class_name:str=None)->int:
 	if isinstance(window, int):
 		return window
 	elif isinstance(window, str):
-		if window.endswith('*'):
-			if not (li := window_find(title=window[:-1], exact=False) ): return
+		if '*' in window:
+			if not (li := window_find(title=window.strip('*'), exact=False) ):
+				return
 			return li[0]
 		else:
 			return win32gui.FindWindow(class_name, window)

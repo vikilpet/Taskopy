@@ -64,7 +64,7 @@ def mail_send(
 		, from_name:str=''
 		, attachment:str=''
 		, reply_to:str=''
-	):
+	)->tuple:
 	''' Send email.
 		recipient - emails separated with commas.
 		Returns (True, None) on success or
@@ -120,6 +120,7 @@ def mail_send_batch(recipients:str='', **mail_send_args):
 			recipient = ','.join(r)
 			, **mail_send_args
 		)
+
 def mail_check(server:str, login:str, password:str
 , folders:list=['inbox'], msg_status:str='UNSEEN'
 , silent:bool=True)->tuple:
