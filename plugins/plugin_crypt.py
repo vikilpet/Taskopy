@@ -4,7 +4,10 @@ import glob
 from cryptography.hazmat.backends import default_backend
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
-from .tools import patch_import
+try:
+	from .tools import patch_import
+except ImportError: 
+	from .tools import patch_import
 _DEF_SCRYPT_ARGS = {
 	'length': 32
 	, 'n': 2**19

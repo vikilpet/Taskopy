@@ -325,8 +325,8 @@ def file_name_add(fullpath, suffix:str='', prefix:str='')->str:
 			> 'my_file_1.txt'
 	'''
 	fullpath = _fix_fullpath(fullpath)
-	if suffix: suffix = str(suffix)
-	if prefix: prefix = str(prefix)
+	if not isinstance(suffix, str): suffix = str(suffix)
+	if not isinstance(prefix, str): prefix = str(prefix)
 	par_dir, name = os.path.split(fullpath)
 	basename, ext = os.path.splitext(name)
 	return os.path.join(par_dir, prefix + basename + suffix + ext)
@@ -553,6 +553,12 @@ def file_dir(fullpath)->str:
 	''' Returns directory from fullpath
 	'''
 	return os.path.dirname(_fix_fullpath(fullpath))
+
+def file_dir_repl(fullpath, new_dir:str)->str:
+	''' Changes the directory of the file (in full path)
+	'''
+	fullpath = _fix_fullpath(fullpath)
+	return os.path.join(new_dir, os.path.basename(fullpath) )
 
 def file_backup(fullpath, dest_dir:str=''
 , suffix_format:str='_%y-%m-%d_%H-%M-%S')->str:

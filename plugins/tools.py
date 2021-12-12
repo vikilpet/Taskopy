@@ -39,7 +39,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-11-21'
+APP_VERSION = 'v2021-12-12'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -111,7 +111,7 @@ if getattr(sys, 'frozen', False):
 	_APP_PATH = os.path.dirname(sys.executable)
 else:
 	_APP_PATH = os.getcwd()
-_DB_FILE = _APP_PATH + r'\resources\db.sqlite3'
+_DB_FILE = os.path.join(_APP_PATH, 'resources', 'db.sqlite3')
 _TIME_UNITS = {
 	'millisecond': 1, 'milliseconds': 1, 'msec': 1, 'ms': 1
 	, 'second': 1000, 'seconds': 1000, 'sec': 1000, 's': 1000
@@ -120,7 +120,6 @@ _TIME_UNITS = {
 	, 'day': 86_400_000, 'days': 86_400_000, 'd': 86_400_000
 }
 _LOCALE_LOCK = threading.Lock()
-_speaker = None
 _LOG_TIME_FORMAT = '%Y.%m.%d %H:%M:%S'
 
 class DictToObj:
@@ -298,8 +297,9 @@ def time_now(**delta)->datetime.datetime:
 
 def time_from_str(date_string:str, template:str=tcon.DATE_STR_FILE
 , use_locale:str='C')->datetime.datetime:
-	'''	Returns datetime object from string and
-		specified locale.
+	'''
+	Returns datetime object from string and
+	specified locale.
 	'''
 	with locale_set(use_locale):
 		return datetime.datetime.strptime(date_string, template)
@@ -1611,12 +1611,24 @@ def median(source):
 	return statistics.median(source)
 
 def speak(text:str, wait:bool=False):
-	global _speaker
-	if not _speaker:
+	'''
+	Pronouns text using the Windows built-in speech engine.
+	'''
+
+	def _speak():
+		nonlocal text
 		pythoncom.CoInitialize()
-		_speaker = win32com.client.Dispatch('SAPI.SpVoice')
-	_speaker.Speak(text, not wait)
+		speaker = win32com.client.Dispatch('SAPI.SpVoice')
+		speaker.Speak(text)
+		pythoncom.CoUninitialize()
 	
-		 
+	if wait:
+		_speak()
+		return
+	threading.Thread(
+		target=_speak
+		, daemon=True
+	).start()
+
 	
 if __name__ != '__main__': patch_import()

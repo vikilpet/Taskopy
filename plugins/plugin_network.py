@@ -16,7 +16,7 @@ import json2html
 from .tools import dev_print, time_sleep, tdebug \
 , locale_set, safe, patch_import, value_to_unit
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.93 Safari/537.36'}
 
 def http_req(url:str, encoding:str='utf-8', session:bool=False
 , cookies:dict=None, headers:dict=None
@@ -107,12 +107,15 @@ def _js_remove_comments(string):
 _re_html = re.compile(r'(<!--.*?-->)', flags=re.DOTALL)
 _re_css = re.compile(r'!/\*[^*]*\*+([^/][^*]*\*+)*/!')
 _re_white_space = re.compile(r">\s*<")
+_re_js = re.compile('<script>.+?</script>', flags=re.DOTALL)
 def html_minify(html:str)->str:
 	'''
 	Removes HTML, javascript and CSS comments and whitespace.
 	'''
 	html = _re_html.sub('', html)
-	html = _js_remove_comments(html)
+	js_blocks = _re_js.findall(html)
+	for block in js_blocks:
+		html = html.replace(block, _js_remove_comments(block))
 	html = _re_css.sub('', html)
 	html = _re_white_space.sub('><', html)
 	return html_whitespace(html)
@@ -224,25 +227,32 @@ def html_clean(html_str:str, separator=' ')->str:
 def html_element(url:str, element
 , clean:bool=True, element_num:int=0
 , attrib:str=None, **kwargs)->str:
-	''' Get text of specified page element (div).
-		Returns str or list of str.
-		url - URL or string with HTML.
-		attrib - get specific attribute from element (TODO: not only for 'all').
-		element - dict (list of dictionaries)
-			, or str (list of strings). If 'element' is a list
-			then 'html_element' returns list of found elements.
-			If it's a dict or list of dicts then method find_all
-			of Beautiful Soup will be used.
-			If it's a str or list of str then xpath will be used.
-			Example for Soup:
-				element={
-					'name': 'span'
-					, 'attrs': {'itemprop':'softwareVersion'}
-				}
-			Example for xpath:
-				element='/html/body/div[1]/div/div'
-		clean - remove html tags and spaces (Soup).
-		kwargs - additional arguments for http_req.
+	'''
+	Get text of specified page element (div).
+	Returns str or list of str.
+	url - URL or string with HTML.
+	attrib - get specific attribute from element (TODO: not only for 'all').
+	element - dict (list of dictionaries)
+		, or str (list of strings). If 'element' is a list
+		then 'html_element' returns list of found elements.
+		If it's a dict or list of dicts then method find_all
+		of Beautiful Soup will be used.
+		If it's a str or list of str then xpath will be used.
+		Example for Soup:
+			element={
+				'name': 'span'
+				, 'attrs': {'itemprop':'softwareVersion'}
+			}
+		Example for xpath:
+			element='/html/body/div[1]/div/div'
+	clean - remove html tags and spaces (Soup).
+	kwargs - additional arguments for http_req.
+
+	XPath cheatsheet: https://devhints.io/xpath
+	XPath examples:
+		'//div[@id="id"]/p'
+		'//div[contains(@class, "main")]/div/script'
+		'//table[2]/thead/tr/th[2]'
 	'''
 	if not url[:4].lower().startswith('http'):
 		html = url

@@ -83,10 +83,12 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 		return False
 
 	def headers_and_page(s, page, status:int=200):
-		''' Write headers and page.
-			page - text or HTML or HTTPFile instance.
 		'''
-		s.send_response(status)
+		Write headers and page.
+		*page* - text or HTML or HTTPFile instance.
+		'''
+		CHUNK_SIZE = 1024 * 100
+		s.send_response(status, 'Ok')
 		if not isinstance(page, str) and not hasattr(page, 'HTTPFile'):
 			page = str(page)
 		if hasattr(page, 'HTTPFile'):
@@ -95,6 +97,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			name = urllib.parse.quote(page.name, encoding='utf-8')
 			s.send_header('Content-Disposition'
 				, f"{param}; filename*=UTF-8''{name}")
+			s.send_header('Content-Length', os.path.getsize(page.fullpath))
 		elif '<!doctype html>' in page[:30].lower():
 			s.send_header('Content-Type', tcon.MIME_HTML)
 		else:
@@ -102,7 +105,15 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 		s.end_headers()
 		if hasattr(page, 'HTTPFile'):
 			with open(page.fullpath, 'rb') as fd:
-				s.wfile.write( fd.read() )
+				try:
+					while True:
+						chunk = fd.read(CHUNK_SIZE)
+						if not chunk: break
+						s.wfile.write(chunk)
+				except ConnectionResetError:
+					pass
+				except Exception as e:
+					dev_print(f'connection error: {e}')
 		else:
 			s.wfile.write(bytes(page, 'utf-8'))
 

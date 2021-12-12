@@ -157,7 +157,8 @@ def load_modules():
 			try:
 				if os.path.relpath(
 					inspect.getfile(sys.modules[obj.__module__])
-				).startswith('.'): continue
+				).startswith('.'):
+					continue
 				sett.own_modules.add(obj.__module__)
 			except ValueError:
 				continue
