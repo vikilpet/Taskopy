@@ -39,7 +39,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-12-12'
+APP_VERSION = 'v2021-12-18'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -163,7 +163,6 @@ def value_to_unit(value, unit:str='sec', unit_dict:dict=None
 		return (int(v) * src_coef) / dst_coef
 	else:
 		raise('Wrong value')
-
 
 def _get_parent_func_name(parent=None, repl_undrsc:str=None)->str:
 	''' Get name of parent function if any '''
@@ -543,7 +542,10 @@ def msgbox(msg:str, title:str=None
 			win32gui.EnumChildWindows(hwnd, dis_butt, True)
 		except:
 			pass
-	title = _get_parent_func_name(title)
+	if title == None:
+		title = func_name_human(_get_parent_func_name())
+	else:
+		title = str(title)
 	if ui: ui += win32con.MB_SYSTEMMODAL
 	else:
 		ui = win32con.MB_ICONINFORMATION + win32con.MB_SYSTEMMODAL
@@ -685,7 +687,10 @@ def inputbox(message:str, title:str=None
 			return getpass.getpass(f'inputbox ({message}): ')
 		else:
 			return input(f'inputbox ({message}): ')
-	title = _get_parent_func_name(title)
+	if title == None:
+		title = func_name_human(_get_parent_func_name())
+	else:
+		title = str(title)
 	if is_pwd:
 		box_func = wx.PasswordEntryDialog
 	else:
@@ -724,7 +729,10 @@ def file_dialog(title:str=None, multiple:bool=False
 
 	def decap(s:str): return s[:1].lower() + s[1:] if s else ''
 
-	title = _get_parent_func_name(title)
+	if title == None:
+		title = func_name_human(_get_parent_func_name())
+	else:
+		title = str(title)
 	if tdebug(): return input(f'File dialog ({title}): ')
 	style = wx.FD_OPEN | wx.FD_FILE_MUST_EXIST
 	if multiple: style |= wx.FD_MULTIPLE
@@ -751,7 +759,10 @@ def dir_dialog(title:str=None, default_dir:str='', on_top:bool=True
 
 	def decap(s:str): return s[:1].lower() + s[1:] if s else ''
 
-	title = _get_parent_func_name(title)
+	if title == None:
+		title = func_name_human(_get_parent_func_name())
+	else:
+		title = str(title)
 	if tdebug(): return input(f'Dir dialog ({title}): ')
 	style = wx.DD_DEFAULT_STYLE
 	if must_exist: style |= wx.DD_DIR_MUST_EXIST
@@ -1129,7 +1140,7 @@ def dialog(msg:str=None, buttons:list=None
 		return S_OK
 	if content: content = str(content)
 	if title == None:
-		title = _get_parent_func_name(repl_undrsc=' ').capitalize()
+		title = func_name_human(_get_parent_func_name())
 	else:
 		title = str(title)
 	if isinstance(msg, (list, tuple)):
@@ -1630,5 +1641,22 @@ def speak(text:str, wait:bool=False):
 		, daemon=True
 	).start()
 
-	
+def func_name_human(func_name:str)->str:
+	'''
+	Converts function name from crontab to a "human" name.
+
+	func_name_human('my_function')
+	>'My function'
+
+	func_name_human('My_Function')
+	>'My Function'
+
+	func_name_human('My__Function')
+	>'My Function'
+
+	'''
+	new_name = func_name.replace('__', '_').replace('_', ' ')
+	if new_name[0].isupper(): return new_name
+	return new_name.capitalize()
+
 if __name__ != '__main__': patch_import()

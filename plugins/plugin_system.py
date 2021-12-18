@@ -15,6 +15,10 @@ except ModuleNotFoundError:
 LockWorkStation = ctypes.windll.user32.LockWorkStation
 _GetAncestor = ctypes.windll.user32.GetAncestor
 _SendNotifyMessage = ctypes.windll.user32.SendNotifyMessageA
+_WM_APPCOMMAND = 0x319
+_APPCOMMAND_VOLUME_MUTE = 0x80000
+_APPCOMMAND_VOLUME_DOWN = 0x90000
+_APPCOMMAND_VOLUME_UP = 0xA0000
 
 def window_get(window=None, class_name:str=None)->int:
 	'''
@@ -339,6 +343,34 @@ def _test_reg_key():
 		reg_key + ' = ' + str(registry_get(reg_key))
 		+ '\n\nPress enter to exit'
 	)
+
+if tdebug():
+	_HWND = window_get()
+else:
+	_HWND = app.app_hwnd
+
+def sound_vol_set(volume:int):
+	'''
+	It needs to be redone someday. Probably.
+	'''
+	for _ in range(50):
+		win32gui.SendMessage(
+			_HWND, _WM_APPCOMMAND, None, _APPCOMMAND_VOLUME_DOWN)
+	for _ in range(volume // 2):
+		win32gui.SendMessage(
+			_HWND, _WM_APPCOMMAND, None, _APPCOMMAND_VOLUME_UP)
+
+def sound_vol_up():
+	win32gui.SendMessage(
+		_HWND, _WM_APPCOMMAND, None, _APPCOMMAND_VOLUME_UP)
+
+def sound_vol_down():
+	win32gui.SendMessage(
+		_HWND, _WM_APPCOMMAND, None, _APPCOMMAND_VOLUME_DOWN)
+
+def sound_vol_mute():
+	win32gui.SendMessage(
+		_HWND, _WM_APPCOMMAND, None, _APPCOMMAND_VOLUME_MUTE)
 
 if __name__ == '__main__':
 	_test_reg_key()

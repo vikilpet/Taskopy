@@ -16,7 +16,7 @@ import json2html
 from .tools import dev_print, time_sleep, tdebug \
 , locale_set, safe, patch_import, value_to_unit
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.93 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36'}
 
 def http_req(url:str, encoding:str='utf-8', session:bool=False
 , cookies:dict=None, headers:dict=None
@@ -569,3 +569,34 @@ if __name__ == '__main__':
 	print(html_minify(html))
 else:
 	patch_import()
+
+def table_html(table:list, headers:bool=True
+, table_class:str='')->str:
+	'''
+	Converts list of tuples/lists to a HTML table.
+	List example:
+
+		[
+			('Name', 'Age'),
+			('John', '27'),
+			('Jane', '24'),
+		]
+
+	'''
+	if table_class:
+		html = f'<table class="{table_class}">'
+	else:
+		html = '<table>'
+	if headers:
+		html += '<thead>'
+		for head in table.pop(0):
+			html += f'<th>{head}</th>'
+		html += '</thead>'
+	html += '<tbody>'
+	for row in table:
+		html += '<tr>'
+		for col in row: html += f'<td>{col}</td>'
+		html += '</tr>'
+	html += '</tbody>'
+	html += '</table>'
+	return html

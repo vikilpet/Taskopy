@@ -253,10 +253,7 @@ class Tasks:
 			if task_opts['task_name']:
 				task_opts['task_name_full'] = f'{item} ({task_opts["task_name"]})'
 			else:
-				if item[0].isupper():
-					task_opts['task_name'] = item.replace('_', ' ')
-				else:
-					task_opts['task_name'] = item.replace('_', ' ').capitalize()
+				task_opts['task_name'] = func_name_human(item)
 				task_opts['task_name_full'] = task_opts['task_name']
 			if task_opts['schedule']:
 				self.add_schedule(task_opts)
@@ -281,14 +278,20 @@ class Tasks:
 				self.add_file_change_watch(task_opts, 3)
 			self.task_dict[ task_opts['task_func_name'] ] = task_opts
 			if task_opts['menu']:
-				if task_opts['submenu']:
+				submenu = None
+				if '__' in task_opts['task_func_name']:
+					submenu = task_opts['task_func_name'].split('__')[0]
+					submenu = submenu.replace('_', ' ')
+					if not submenu[0].isupper(): submenu = submenu.capitalize()
+				if task_opts['submenu']: submenu = task_opts['submenu']
+				if submenu:
 					for m in self.task_list_submenus:
-						if m[0] == task_opts['submenu']:
+						if m[0] == submenu:
 							m[1].append(task_opts)
 							break
 					else:
 						self.task_list_submenus.append(
-							[task_opts['submenu'], [task_opts]]
+							[submenu, [task_opts]]
 						)
 				else:
 					self.task_list_menu.append(task_opts)
@@ -522,16 +525,17 @@ class Tasks:
 
 	def run_task(self, task:dict, caller:str=None, data=None
 	, result:list=None):
-		''' Logging, threading, error catching and other stuff.
-			task - dict with task options
-			caller - who actually launched the task.
-				It can be 'hotkey', 'menu', 'scheduler', 'http' etc.,
-				so you can find out inside the task function who
-				started function this time.
-			data - pass some data to task
-			result - list in which we will place result of task. It is
-				passed through all inner fuctions (run_task_inner and
-				catcher).
+		'''
+		Logging, threading, error catching and other stuff.
+		task - dict with task options
+		caller - who actually launched the task.
+			It can be 'hotkey', 'menu', 'scheduler', 'http' etc.,
+			so you can find out inside the task function who
+			started function this time.
+		data - pass some data to task
+		result - list in which we will place result of task. It is
+			passed through all inner fuctions (run_task_inner and
+			catcher).
 		'''
 		def run_task_inner(result:list=None):
 			def catcher(result:list=None):
@@ -612,16 +616,17 @@ class Tasks:
 				con_log(f'task{cs}: {task["task_name_full"]}')
 			if task['result']:
 				t = threading.Thread(target=catcher, args=(result,)
-				, daemon=True)
+				, daemon=daemon)
 				t.start()
 				t.join()
 			else:
-				threading.Thread(target=catcher, daemon=True).start()
+				threading.Thread(target=catcher, daemon=daemon).start()
+		daemon = (caller != CALLER_EXIT)
 		if task['result'] and not result is None:
 			threading.Thread(
 				target=run_task_inner
 				, args=(result,)
-				, daemon=True
+				, daemon=daemon
 			).start()
 		else:
 			run_task_inner()
@@ -839,7 +844,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 				show_app_window()
 
 	def on_exit(self, event=None)->bool:
-		TASKS_MSG_MAX = 5
+		TASKS_MSG_MAX = 10
 		running_tasks = self.running_tasks(show_msg=False)
 		if running_tasks:
 			tasks_str = '\r\n'.join(

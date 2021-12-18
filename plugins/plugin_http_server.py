@@ -110,7 +110,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 						chunk = fd.read(CHUNK_SIZE)
 						if not chunk: break
 						s.wfile.write(chunk)
-				except ConnectionResetError:
+				except (ConnectionResetError, ConnectionAbortedError):
 					pass
 				except Exception as e:
 					dev_print(f'connection error: {e}')
