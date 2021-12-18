@@ -344,33 +344,28 @@ def _test_reg_key():
 		+ '\n\nPress enter to exit'
 	)
 
-if tdebug():
-	_HWND = window_get()
-else:
-	_HWND = app.app_hwnd
+_HWND = None
+
+def _sound_cmd(cmd:int):
+	global _HWND
+	if not _HWND: _HWND = __builtins__['app'].app_hwnd
+	win32gui.SendMessage(_HWND, _WM_APPCOMMAND, None, cmd)
 
 def sound_vol_set(volume:int):
 	'''
 	It needs to be redone someday. Probably.
 	'''
-	for _ in range(50):
-		win32gui.SendMessage(
-			_HWND, _WM_APPCOMMAND, None, _APPCOMMAND_VOLUME_DOWN)
-	for _ in range(volume // 2):
-		win32gui.SendMessage(
-			_HWND, _WM_APPCOMMAND, None, _APPCOMMAND_VOLUME_UP)
+	for _ in range(50): _sound_cmd(_APPCOMMAND_VOLUME_DOWN)
+	for _ in range(volume // 2): _sound_cmd(_APPCOMMAND_VOLUME_UP)
 
 def sound_vol_up():
-	win32gui.SendMessage(
-		_HWND, _WM_APPCOMMAND, None, _APPCOMMAND_VOLUME_UP)
+	_sound_cmd(_APPCOMMAND_VOLUME_UP)
 
 def sound_vol_down():
-	win32gui.SendMessage(
-		_HWND, _WM_APPCOMMAND, None, _APPCOMMAND_VOLUME_DOWN)
+	_sound_cmd(_APPCOMMAND_VOLUME_DOWN)
 
 def sound_vol_mute():
-	win32gui.SendMessage(
-		_HWND, _WM_APPCOMMAND, None, _APPCOMMAND_VOLUME_MUTE)
+	_sound_cmd(_APPCOMMAND_VOLUME_MUTE)
 
 if __name__ == '__main__':
 	_test_reg_key()
