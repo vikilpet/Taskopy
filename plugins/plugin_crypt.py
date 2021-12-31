@@ -18,11 +18,12 @@ _DEF_SCRYPT_ARGS = {
 _DEF_SALT_BYTES_SIZE = 32
 
 class Crypt:
-	''' Get login and password from file.
-		All methods returns 'status, data':
-		status - boolean
-		data - ['list', 'of', 'values'] in case of success or ['error
-		description']
+	'''
+	Encodes and decodes files/strings with AES-128
+	using Scrypt algorythm.
+	All methods returns (status:bool, data) where
+	**data** is a ['list', 'of', 'values'] in case of
+	success or 'error description'.
 	'''
 
 	def __init__(s, password:str, pwd_encoding:str='utf-8'
@@ -44,9 +45,11 @@ class Crypt:
 			s.scrypt_args = _DEF_SCRYPT_ARGS
 		s.salt_size = salt_size
 
-	def scrypt_pwd(s, salt:str=None)->list:
-		''' Returns derived password and base64 encoded salt.
-			If no salt is provided then generates new salt.
+	def scrypt_pwd(s, salt:str=None)->tuple:
+		'''
+		Generates derived password and base64 encoded salt.
+		If no salt is provided then generates new salt.
+		Returns (True, None) on success.
 		'''
 		if salt: 
 			salt = base64.urlsafe_b64decode(salt)
@@ -66,11 +69,12 @@ class Crypt:
 		except Exception as e:
 			return False, repr(e)
 
-	def write_enc_file(s, fullpath:str, content:str):
-		''' Returns filename of encrypted file (fullpath + base64(salt)
-			as extension). Deletes old files with same name (without
-			salt extension).
-			If encoding='binary' writes content as is.
+	def write_enc_file(s, fullpath:str, content:str)->tuple:
+		'''
+		Returns filename of encrypted file (fullpath + base64(salt)
+		as extension). Deletes old files with same name (without
+		salt extension).
+		If encoding='binary' writes content as is.
 		'''
 		try:
 			li = glob.glob(fullpath + '.*')
@@ -94,9 +98,10 @@ class Crypt:
 			return False, f'file write error: {data}'
 		return True, newpath
 
-	def read_enc_file(s, fullpath:str)->list:
-		''' Returns content of encrypted file.
-			fullpath - encrypted file with salt in extension.
+	def read_enc_file(s, fullpath:str)->tuple:
+		'''
+		Returns content of encrypted file.
+		fullpath - encrypted file with salt in extension.
 		'''
 		if not fullpath.endswith('='):
 			status, data = s._find_enc_file(fullpath)
@@ -120,7 +125,7 @@ class Crypt:
 			content = content.decode(encoding=s.file_encoding)
 		return True, content
 	
-	def _find_enc_file(s, fullpath:str):
+	def _find_enc_file(s, fullpath:str)->tuple:
 		''' Finds encoded file (we don't know extension because
 			it's salt)
 		'''
@@ -130,14 +135,14 @@ class Crypt:
 		elif len(li) > 1:
 			return False, 'A lot of files'
 		elif len(li) == 0:
-			return False, 'No such file'
+			return False, 'File not found'
 		else:
 			return False, 'o_O'
 	
 	def str_enc(s, plain_text: str, encoding: str = 'utf-8'
-	, salt_size:int=None) -> tuple:
+	, salt_size:int=None)->tuple:
 		''' Encrypts string and returns
-			(True, [encrypted string, salt])
+			(True, (encrypted string, salt))
 			or (False, error).
 			Use 'salt_size = 0' if no salt is needed.
 		'''
@@ -148,12 +153,12 @@ class Crypt:
 		try:
 			fer = Fernet(s.key_b64)
 			token = fer.encrypt(bytes(plain_text, encoding))
-			return True, [token.decode(encoding), s.salt_b64_str]
+			return True, (token.decode(encoding), s.salt_b64_str)
 		except Exception as e:
 			return False, repr(e)
 
-	def str_dec(s, enc_string: str, salt: str = ''
-	, encoding: str = 'utf-8'):
+	def str_dec(s, enc_string:str, salt:str = ''
+	, encoding:str='utf-8')->tuple:
 		''' Decrypts string with salt and returns (True, plain_text)
 		'''
 		if not s.key:
@@ -217,6 +222,7 @@ def file_decrypt(fullpath: str, password: str
 	with open(destination, 'wb+') as fi:
 		fi.write(data)
 	return True, destination
+
 
 
 

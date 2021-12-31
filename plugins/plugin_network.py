@@ -571,6 +571,7 @@ else:
 	patch_import()
 
 def table_html(table:list, headers:bool=True
+, empty_str:str='-', consider_empty:tuple=(None, '')
 , table_class:str='')->str:
 	'''
 	Converts list of tuples/lists to a HTML table.
@@ -595,7 +596,11 @@ def table_html(table:list, headers:bool=True
 	html += '<tbody>'
 	for row in table:
 		html += '<tr>'
-		for col in row: html += f'<td>{col}</td>'
+		for cell in row:
+			if cell in consider_empty:
+				html += f'<td>{empty_str}</td>'
+			else:
+				html += f'<td>{cell}</td>'
 		html += '</tr>'
 	html += '</tbody>'
 	html += '</table>'

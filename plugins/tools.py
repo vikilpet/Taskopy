@@ -39,7 +39,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-12-18'
+APP_VERSION = 'v2021-12-31'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -1242,7 +1242,7 @@ def table_print(table, use_headers=False, row_sep:str=None
 , headers_sep:str='-', col_pad:str='  ', row_sep_step:int=0
 , sorting=None, sorting_func=None, sorting_rev:bool=False
 , repeat_headers:int=None
-, empty_str:str='-', consider_empty:list=[None, '']):
+, empty_str:str='-', consider_empty:tuple=(None, '')):
 	'''	Print list of lists as a table.
 
 		use_headers - if it's True - takes first row as
@@ -1570,6 +1570,11 @@ class DataEvent:
 		if self.Channel == 'Security' and self._EventDataDict:
 			for di in self._EventDataDict.get('Data', {}):
 				self.EventData[di.get('@Name', '')] = di.get('#text', '')
+			return
+		if self.Channel == 'System' and self._EventDataDict:
+			for di in self._EventDataDict.get('Data', {}):
+				data_name = di.get('attrib', {}).get('Name', '')
+				self.EventData[data_name] = di.get('value', '')
 			return
 
 def task_run(task_func, *args, **kwargs):

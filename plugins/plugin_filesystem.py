@@ -111,7 +111,8 @@ def file_rename(fullpath, dest:str
 	'''
 	fullpath = _fix_fullpath(fullpath)
 	if not ':' in dest:
-		dest = os.path.join(os.path.dirname(fullpath), dest)
+		dest = os.path.join( os.path.dirname(fullpath), dest )
+	dest = _fix_fullpath(dest)
 	try:
 		os.rename(fullpath, dest)
 	except FileExistsError as e:
@@ -122,7 +123,32 @@ def file_rename(fullpath, dest:str
 			raise e
 	return dest
 
-dir_rename = file_rename
+def dir_rename(fullpath, dest:str
+, overwrite:bool=False)->str:
+	''' Renames path.
+		dest - fullpath or just new file name
+		without parent directory.
+		overwrite - overwrite destination file
+		if exists.
+		Returns destination.
+		Example:
+
+			file_rename(r'd:\\IMG_123.jpg', 'my cat.jpg')
+			>'d:\\my cat.jpg'
+	'''
+	fullpath = _fix_fullpath(fullpath)
+	if not ':' in dest:
+		dest = os.path.join( os.path.dirname(fullpath), dest )
+	dest = _fix_fullpath(dest)
+	try:
+		os.rename(fullpath, dest)
+	except FileExistsError as e:
+		if overwrite:
+			file_delete(dest)
+			os.rename(fullpath, dest)
+		else:
+			raise e
+	return dest
 
 def file_log(fullpath, message:str, encoding:str='utf-8'
 , time_format:str='%Y.%m.%d %H:%M:%S'):
@@ -886,7 +912,8 @@ def file_attr_set(fullpath
 
 def shortcut_create(fullpath, dest:str=None, descr:str=None
 , icon_fullpath:str=None, icon_index:int=None
-, win_style:int=win32con.SW_SHOWNORMAL, cwd:str=None)->str:
+, win_style:int=win32con.SW_SHOWNORMAL, cwd:str=None
+, hotkey:int=None)->str:
 	''' Creates shortcut to the file.
 		Returns full path of shortcut.
 
@@ -920,6 +947,7 @@ def shortcut_create(fullpath, dest:str=None, descr:str=None
 	shortcut.SetPath( os.path.abspath(fullpath) )
 	shortcut.SetDescription(descr)
 	shortcut.SetShowCmd(win_style)
+	if hotkey: shortcut.SetHotKey(hotkey)
 	if cwd: shortcut.SetWorkingDirectory(cwd)
 	if icon_index != None: shortcut.SetIconLocation(fullpath, 0)
 	persist_file = shortcut.QueryInterface(pythoncom.IID_IPersistFile)

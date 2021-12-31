@@ -117,9 +117,9 @@ keys_write = keyboard.write
 keys_press = keyboard.press
 keys_release = keyboard.release
 
-def keys_depressed_wait(keys:str, timeout='10 ms'):
+def keys_release_wait(keys:str, timeout='10 ms'):
 	'''
-	Wait until all the keys are depressed.
+	Wait until all the keys are released.
 	*keys* - a string with hotkey for a task like 'ctrl+shift+m'
 	Use this if you want to send keystrokes by hotkey.
 	'''
