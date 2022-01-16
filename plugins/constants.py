@@ -16,6 +16,7 @@ CALLER_SYS_STARTUP = 'sys_startup'
 CALLER_EVENT = 'event'
 CALLER_EXIT = 'exit'
 CALLER_FILE_CHANGE = 'file_change'
+CALLER_DIR_CHANGE = 'dir_change'
 TDCBF_OK_BUTTON = 1
 TDCBF_YES_BUTTON = 2
 TDCBF_NO_BUTTON = 4
@@ -67,6 +68,18 @@ MONITOR_STANDBY = 1
 MIME_TEXT = 'text/plain; charset=utf-8'
 MIME_HTML = 'text/html; charset=utf-8'
 MIME_BINARY = 'application/octet-stream'
+FILE_CREATED = 'created'
+FILE_DELETED = 'deleted'
+FILE_UPDATED = 'updated'
+FILE_RENAMED_FROM = 'renamed_from'
+FILE_RENAMED_TO = 'renamed_to'
+FILE_ACTIONS = {
+	1 : FILE_CREATED
+	, 2 : FILE_DELETED
+	, 3 : FILE_UPDATED
+	, 4 : FILE_RENAMED_FROM
+	, 5 : FILE_RENAMED_TO
+}
 
 if __name__ != '__main__':
 	try:

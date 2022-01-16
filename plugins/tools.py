@@ -39,7 +39,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2021-12-31'
+APP_VERSION = 'v2022-01-16'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -81,6 +81,7 @@ TASK_OPTIONS = [
 	, ['on_exit', False]
 	, ['hyperactive', False]
 	, ['on_file_change', None]
+	, ['on_dir_change', None]
 ]
 APP_SETTINGS=[
 	['dev', False]
@@ -1661,7 +1662,7 @@ def func_name_human(func_name:str)->str:
 
 	'''
 	new_name = func_name.replace('__', '_').replace('_', ' ')
-	if new_name[0].isupper(): return new_name
+	if new_name and new_name[0].isupper(): return new_name
 	return new_name.capitalize()
 
 if __name__ != '__main__': patch_import()

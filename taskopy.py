@@ -226,7 +226,7 @@ class Tasks:
 		self.task_list_idle = []
 		self.task_list_crontab_load = []
 		self.task_list_exit = []
-		self.file_change_stop = []
+		self.dir_change_stop = []
 		self.event_handlers = []
 		self.idle_min = 0
 		self.http_server = None
@@ -275,7 +275,11 @@ class Tasks:
 			if task_opts['on_exit']:
 				self.task_list_exit.append(task_opts)
 			if task_opts['on_file_change']:
-				self.add_file_change_watch(task_opts, 3)
+				self.add_dir_change_watch(task_opts, its_file=True
+				, path=task_opts['on_file_change'])
+			if task_opts['on_dir_change']:
+				self.add_dir_change_watch(task_opts, its_file=False
+				, path=task_opts['on_dir_change'])
 			self.task_dict[ task_opts['task_func_name'] ] = task_opts
 			if task_opts['menu']:
 				submenu = None
@@ -370,24 +374,17 @@ class Tasks:
 				)
 			except Exception as e:
 				hk_error(repr(e))
-	
-	def add_file_change_watch(self, task:dict, on_action:int):
-		'Watch for changes in directory'
-		ACTIONS = {
-			1: 'created'
-			, 2: 'deleted'
-			, 3: 'updated'
-			, 4: 'renamed from something'
-			, 5: 'renamed to something'
-		}
-		WAIT_INTERVAL = '100 msec'
+
+	def add_dir_change_watch(self, task:dict, path:str, its_file:bool):
+		' Watch for changes in directory '
+		WAIT_SEC = .1
 		FILE_LIST_DIRECTORY = 0x0001
 		BUFFER_LENGTH = 1024
 
-		def file_watch(task:dict, on_action:int
-		, stop_event:threading.Event):
+		def dir_watch(task:dict, path:str, stop_event:threading.Event
+		, its_file:bool):
 			hDir = win32file.CreateFile (
-				file_dir(task['on_file_change'])
+				file_dir(path) if its_file else path
 				, FILE_LIST_DIRECTORY
 				, win32con.FILE_SHARE_READ | win32con.FILE_SHARE_WRITE | win32con.FILE_SHARE_DELETE
 				, None
@@ -395,38 +392,55 @@ class Tasks:
 				, win32con.FILE_FLAG_BACKUP_SEMANTICS
 				, None
 			)
-			fullpath = task['on_file_change']
-			filename = file_name(fullpath)
-			prev_results = [(0, None)]
+			filename = file_name(path)
+			prev_file = ('', time.time())
 			while not stop_event.is_set():
 				results = win32file.ReadDirectoryChangesW(
 					hDir,
 					BUFFER_LENGTH,
-					False, 
+					not its_file,
 					win32con.FILE_NOTIFY_CHANGE_SIZE,
 					None,
 					None
 				)
 				if stop_event.is_set(): return
-				if results[0][1] == prev_results[0][1] \
-				and len(results) > 1:
-					prev_results = results
-					continue
-				prev_results = results
-				for action, fname in results[:1]:
-					if filename != fname:
+				if prev_file[0]:
+					pfile, ptime = prev_file
+					cfile, ctime = results[-1][1], time.time()
+					if cfile == pfile \
+					and ( (ctime - ptime) < WAIT_SEC ):
+						prev_file = (cfile, ctime)
 						continue
-					if action != on_action:
+				prev_file = (results[-1][1], time.time())
+				for res_action, res_relname in results[:1]:
+					if its_file and (
+						res_relname != filename
+						or res_action != 3
+					):
 						continue
-					if action in (1, 3):
-						file_lock_wait(fullpath, wait_interval=WAIT_INTERVAL)
-					self.run_task(task, caller=CALLER_FILE_CHANGE)
+					if its_file:
+						fullpath = path
+					else:
+						fullpath = os.path.join(path, res_relname)
+					self.run_task(
+						task=task
+						, caller=CALLER_FILE_CHANGE if its_file else CALLER_DIR_CHANGE
+						, data=(
+							fullpath
+							, FILE_ACTIONS.get(res_action, 'unknown')
+						)
+					)
 
 		stop_event = threading.Event()
-		self.file_change_stop.append(stop_event)
+		self.dir_change_stop.append(stop_event)
 		threading.Thread(
-			target=file_watch
-			, args=(task, on_action, stop_event)
+			target=dir_watch
+			, kwargs={
+				'task': task
+				, 'path': path
+				, 'stop_event': stop_event
+				, 'its_file': its_file
+			}
 			, daemon=True
 		).start()
 
@@ -737,7 +751,7 @@ class Tasks:
 				eh.close()
 			except Exception as e:
 				dev_print(f'event close error: {e}')
-		for es in self.file_change_stop: es.set()
+		for es in self.dir_change_stop: es.set()
 
 def create_menu_item(menu, task, func=None, parent_menu=None):
 	''' Task - task dict or menu item label

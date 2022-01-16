@@ -181,7 +181,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 				task = t
 				break
 		else:
-			s.s_print('task not found:', task_name[:30])
+			s.s_print('task not found: {}'.format( task_name[:30]) )
 			s.headers_and_page('task not found')
 			return
 		if not s.white_list_check(task=task):

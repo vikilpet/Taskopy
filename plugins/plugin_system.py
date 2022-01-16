@@ -52,7 +52,8 @@ def registry_get(fullpath:str):
 			>registry_get('HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Internet Explorer\\Build')
 			'99600'
 	'''
-	if fullpath[:5] != 'HKEY_': return Exception('wrong path')
+	if fullpath[:5] != 'HKEY_':
+		return Exception('Path must begin with with «HKEY_»')
 	hive = fullpath.split('\\')[0]
 	key_path = '\\'.join(fullpath.split('\\')[1:-1])
 	key_name = fullpath.split('\\')[-1]
@@ -70,14 +71,15 @@ def registry_get(fullpath:str):
 		return e
 
 def registry_set(fullpath:str, value, value_type:str=None):
-	''' Set value by fullpath to registry key.
+	r''' Set value by fullpath to registry key.
 		If value_type not specified: if type of value is int
 		then store as REG_DWORD, otherwise store as REG_SZ.
 		If key doesn't exist it will be created.
 		fullpath  - string like
 		'HKEY_CURRENT_USER\Software\Microsoft\Calc\layout'
 	'''
-	if fullpath[:5] != 'HKEY_': return 'wrong path'
+	if fullpath[:5] != 'HKEY_':
+		return Exception('Path must begin with with «HKEY_»')
 	hive = fullpath.split('\\')[0]
 	key_path = '\\'.join(fullpath.split('\\')[1:-1])
 	key_name = fullpath.split('\\')[-1]
@@ -324,14 +326,13 @@ def window_list_top()->list:
 	Gets a list of the top-level visible windows only.
 	Returns list of tuples: (hwnd, 'title')
 	'''
-
 	def w_reaper(hwnd:int, lst:list):
-		top_win = _GetAncestor(hwnd, win32con.GA_ROOTOWNER)
-		if top_win == win32con.NULL: return
-		if not win32gui.IsWindowVisible(top_win): return
-		if any( [c < 0 for c in win32gui.GetWindowRect(top_win)] ): return
-		if ( title := win32gui.GetWindowText(top_win) ):
-			lst.append((top_win, title))
+		if not win32gui.IsWindowVisible(hwnd): return
+		if any( c < -10 for c in win32gui.GetWindowRect(hwnd) ):
+			return
+		if ( title := win32gui.GetWindowText(hwnd) ):
+			lst.append((hwnd, title))
+
 
 	win_lst = []
 	win32gui.EnumWindows(w_reaper, win_lst)
