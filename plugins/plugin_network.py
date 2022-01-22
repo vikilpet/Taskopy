@@ -16,14 +16,14 @@ import json2html
 from .tools import dev_print, time_sleep, tdebug \
 , locale_set, safe, patch_import, value_to_unit
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.99 Safari/537.36'}
 
 def http_req(url:str, encoding:str='utf-8', session:bool=False
 , cookies:dict=None, headers:dict=None
 , http_method:str='get', json_data:str=None
 , post_file:str=None, post_hash:bool=False
-, post_form_data:dict=None, timeout:int=3
-, attempts:int=3, **kwargs)->str:
+, post_form_data:dict=None, post_file_capt:str='file'
+, timeout:int=3, attempts:int=3, **kwargs)->str:
 	'''
 	Gets content of the specified URL
 	
@@ -42,7 +42,7 @@ def http_req(url:str, encoding:str='utf-8', session:bool=False
 		if post_hash:
 			post_file_hash = _file_hash(post_file)
 		file_obj = open(post_file, 'rb')
-		args['files'] = {'file': file_obj}
+		args['files'] = {post_file_capt: file_obj}
 	else:
 		post_file_hash = False
 	if session:

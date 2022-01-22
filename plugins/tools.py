@@ -39,7 +39,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2022-01-16'
+APP_VERSION = 'v2022-01-22'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -494,6 +494,16 @@ def re_replace(source:str, re_pattern:str, repl:str=''
 		, flags=re_flags
 	)
 
+def re_split(source:str, re_pattern:str, maxsplit:int=0
+, re_flags:int=re.IGNORECASE)->str:
+	''' Regexp split '''
+	return re.split(
+		pattern=re_pattern
+		, maxsplit=maxsplit
+		, string=source
+		, flags=re_flags
+	)
+
 def re_match(source:str, re_pattern:str
 , re_flags:int=re.IGNORECASE)->bool:
 	''' Regexp match '''
@@ -818,41 +828,61 @@ def job_pool(jobs:list, pool_size:int=None)->list:
 				print(job.error, job.result, job.time)
 	'''
 	pool = ThreadPool(pool_size)
-	pool.map(lambda f: f(), [j.run for j in jobs])
+	pool.map(lambda f: f(), (j.run for j in jobs))
 	pool.close()
 	pool.join()
 	return jobs
 
 class Job:
-	'To use with job_batch and job_pool'
+	'''
+	To use with job_batch and job_pool.
+	Example with type annotation:
+	
+		jobs = []
+		for i in range(4): jobs.append( Job(
+			dialog
+			, msg=f'Job {i}'
+			, buttons=('Yes', 'No')
+		) )
+		jobs.append( Job(lambda: 0/0) )
+		job: Job
+		for job in job_pool(jobs):
+			if job.error:
+				print('error:', job.result)
+			else:
+				print('result:', job.result)
+
+	'''
 	def __init__(
-		s
+		self
 		, func
 		, *args
 		, job_name:str=''
 		, **kwargs
 	):
-		s.func = func
-		s.args = args
-		s.kwargs = kwargs
-		s.finished = False
-		s.result = None
-		s.time = 0
-		s.error = False
-		s.job_name = job_name
+		self.func = func
+		self.args = args
+		self.kwargs = kwargs
+		self.finished = False
+		self.result = None
+		self.time = 0
+		self.error = False
+		self.job_name = job_name
 	
-	def run(s):
+	def run(self):
 		time_start = time.time()
 		try:
-			s.result = s.func(*s.args, **s.kwargs)
-			if isinstance(s.result, Exception):
-				s.error = True
-				s.result = repr(s.result)
+			self.result = self.func(*self.args, **self.kwargs)
+			if isinstance(self.result, Exception):
+				self.error = True
+				self.result = f'Exception: {repr(self.result)}' \
+				+ f'\nat line {self.result.__traceback__.tb_lineno}'
 		except Exception as e:
-			s.result = repr(e)
-			s.error = True
-		s.finished = True
-		s.time = datetime.timedelta(
+			self.result = f'Exception: {repr(e)}' \
+				+ f'\nat line {e.__traceback__.tb_lineno}'
+			self.error = True
+		self.finished = True
+		self.time = datetime.timedelta(
 			seconds=(time.time() - time_start)
 		)
 
@@ -1144,7 +1174,7 @@ def dialog(msg:str=None, buttons:list=None
 		title = func_name_human(_get_parent_func_name())
 	else:
 		title = str(title)
-	if isinstance(msg, (list, tuple)):
+	if isinstance(msg, (list, tuple, set)):
 		buttons = msg
 		msg = ''
 	else:
@@ -1161,7 +1191,7 @@ def dialog(msg:str=None, buttons:list=None
 	else:
 		tdc.dwFlags = TDCBF_CANCEL_BUTTON
 		if timeout: tdc.dwFlags |= TDF_CALLBACK_TIMER
-	if isinstance(buttons, (list, tuple)):
+	if isinstance(buttons, (list, tuple, set)):
 		tdc.dwFlags |= TDF_USE_COMMAND_LINKS
 		p_buttons = (tdc.TASKDIALOG_BUTTON * len(buttons))
 		buttons_li = []
@@ -1457,11 +1487,27 @@ def _xml_to_dict_event(event_xml:str)->tuple:
 		_event_xmlns = re_find(event_xml, r'''(xmlns=('|").+?('|"))''')[0][0]
 	return xml_to_dict(event_xml, remove_str=_event_xmlns)
 
+def value_to_str(value, sep:str='\n')->str:
+	'''
+		Convert simple data types (str, dict, list, tuple)
+		to a string.
+	'''
+	if isinstance(value, (str, int, float, type(None)) ): return str(value)
+	strings = []
+	if isinstance(value, dict):
+		strings.append( value_to_str(tuple(value.values())) )
+	elif isinstance(value, (list, tuple, set)):
+		strings.extend((value_to_str(i) for i in value))
+	return sep.join(strings)
+
 class DataEvent:
 	'''
 	Windows event as an object.
-	*.EventData* is a user-friendly dictionary
-	and *._EventDataDict* is an ugly data converted from XML.
+	
+	*EventData* can be a string, a dictionary or a list.
+
+	*_EventDataDict* is an ugly data converted from XML.
+
 	'''
 	{
 		'{http: //schemas.microsoft.com/win/2004/08/events/event}Event': {
@@ -1546,6 +1592,7 @@ class DataEvent:
 		self.Computer = ''
 		self.Security = None
 		self.EventData = {}
+		self.EventDataStr = ''
 		self._EventDataDict = full_dict.get('Event', {}) \
 			.get('EventData', {})
 		for attr in ATTRS:
@@ -1559,7 +1606,8 @@ class DataEvent:
 				else:
 					setattr(self, attr, e)
 		if self.TimeCreatedUTC:
-			ts = self.TimeCreatedUTC.get('@SystemTime', '.').split('.')[0]
+			ts = self.TimeCreatedUTC.get('attrib', {})\
+				.get('@SystemTime', '.').split('.')[0]
 			if ts:
 				self.TimeCreatedUTC = datetime.datetime.fromisoformat(ts)
 				self.TimeCreatedLocal = self.TimeCreatedUTC \
@@ -1571,12 +1619,24 @@ class DataEvent:
 		if self.Channel == 'Security' and self._EventDataDict:
 			for di in self._EventDataDict.get('Data', {}):
 				self.EventData[di.get('@Name', '')] = di.get('#text', '')
-			return
-		if self.Channel == 'System' and self._EventDataDict:
-			for di in self._EventDataDict.get('Data', {}):
-				data_name = di.get('attrib', {}).get('Name', '')
-				self.EventData[data_name] = di.get('value', '')
-			return
+		elif self._EventDataDict:
+			try:
+				edata = self._EventDataDict.get('Data')
+				if isinstance(edata, dict):
+					for elem in edata:
+						if isinstance(elem, dict):
+							data_name = elem.get('attrib', {}).get('Name', '')
+							self.EventData[data_name] = elem.get('value', '')
+						elif isinstance(elem, (dict, str)):
+							self.EventData = elem
+				elif isinstance(edata, (list, str)):
+					self.EventData = edata
+				else:
+					self.EventData = str(edata)
+			except Exception as e:
+				dev_print(f'EventData exception: {repr(e)}')
+				self.EventData = self._EventDataDict
+		if self.EventData: self.EventDataStr = value_to_str(self.EventData)
 
 def task_run(task_func, *args, **kwargs):
 	'''

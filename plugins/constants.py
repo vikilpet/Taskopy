@@ -80,6 +80,26 @@ FILE_ACTIONS = {
 	, 4 : FILE_RENAMED_FROM
 	, 5 : FILE_RENAMED_TO
 }
+HTML_MINI = '''
+<!doctype html>
+<style>
+	html, body {{
+		height: 100%;
+		font-size: calc((5vw + 5vh)/2);
+		overflow-wrap: anywhere;
+		margin: 0 1vw 0 1vw;
+	}}
+	.container {{
+		height: 100%;
+		display: flex;
+		justify-content: center;
+		flex-direction: column;
+		align-items: center;
+		gap: 0;
+	}}
+</style>
+<body><div class='container'>{}</div></body>
+'''.strip().replace('\t', '').replace('\r\n', '')
 
 if __name__ != '__main__':
 	try:

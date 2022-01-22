@@ -49,7 +49,7 @@ def _dir_slash(dirpath:str)->str:
 def file_path_fix(fullpath):
 	'''
 	Join list of paths and optionally
-	fix long path. Fill environment variables ('APPDATA')
+	fix long path. Fill environment variables ('%APPDATA%')
 	'''
 	if not fullpath: return fullpath
 	if isinstance(fullpath, (list, tuple)):
@@ -412,7 +412,8 @@ def dir_dirs(fullpath, subdirs:bool=True)->list:
 		for d in dirs: yield os.path.join(dirpath, d)
 		if not subdirs: return
 
-def dir_files(fullpath, ext:str=None, subdirs:bool=True):
+def dir_files(fullpath, ext:str=None, subdirs:bool=True
+, rule=lambda f: True):
 	'''
 	Returns list of full filenames of all files
 	in the given directory and its subdirectories.
@@ -420,14 +421,14 @@ def dir_files(fullpath, ext:str=None, subdirs:bool=True):
 	*ext* - only files with this extension.
 	'''
 	fullpath = file_path_fix(fullpath)
-	filt_fun = lambda f: True
 	if ext:
-		ext = '.' + ext.lower()
-		filt_fun = lambda f: f.lower().endswith(ext)
+		if isinstance(ext, str): ext = (ext, )
+		ext = tuple('.' + e.lstrip('.').lower() for e in ext)
+		rule = lambda f: os.path.splitext(f)[1].lower() in ext
 	for dirpath, dirs, filenames in os.walk(fullpath, topdown=True):
 		if not subdirs: dirs.clear()
 		for f in filenames:
-			if filt_fun(f):	yield os.path.join(dirpath, f)
+			if rule(f): yield os.path.join(dirpath, f)
 
 def dir_rnd_file(fullpath, attempts:int=5
 , filter_func=None)->str:

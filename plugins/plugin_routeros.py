@@ -209,7 +209,8 @@ def routeros_send(
 		else:
 			apiros.talk(cmd)
 	except Exception as e:
-		if info: print(f'routeros_send exception:\n{repr(e)}')
+		if info: print(f'routeros_send exception:\n{repr(e)}'
+		+ f'\nat line {e.__traceback__.tb_lineno}')
 		return False, repr(e)[:200]
 	return True, None
 
@@ -271,7 +272,8 @@ def routeros_find_send(
 		if info: print(f'routeros_find_send: len(id_list)={len(id_list)}')
 		apiros.talk(cmd_send + [f'=numbers=' + ','.join(id_list)])
 	except Exception as e:
-		if info: print(f'routeros_find_send exception:\n{repr(e)}')
+		if info: print(f'routeros_find_send exception:\n{repr(e)}'
+		+ f'\nat line {e.__traceback__.tb_lineno}')
 		return False, repr(e)[:200]
 	return True, None
 
@@ -363,7 +365,8 @@ def routeros_query(
 		else:
 			return results[0]
 	except Exception as e:
-		if info: print(f'routeros_query exception:\n{repr(e)}')
+		if info: print(f'routeros_query exception:\n{repr(e)}'
+		+ f'\nat line {e.__traceback__.tb_lineno}')
 		return False, repr(e)[:200]
 	return False, 'something went wrong'
 
