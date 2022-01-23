@@ -336,6 +336,10 @@ def free_ram(unit:str='percent'):
 	else:
 		return psutil.virtual_memory()[4] // e
 
+def process_threads_num(process):
+	pid = process_get(process)
+	return len(psutil.Process(pid=pid).threads())
+
 def process_close(process, timeout:int=10
 , cmd_filter:str=None):
 	''' Kills the process 'softly'. Returns 'True' if process

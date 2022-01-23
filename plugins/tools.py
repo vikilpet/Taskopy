@@ -39,7 +39,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2022-01-22'
+APP_VERSION = 'v2022-01-23'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -1049,8 +1049,10 @@ def safe(func)->tuple:
 	return wrapper
 _TaskDialogIndirect = ctypes.WinDLL('comctl32.dll').TaskDialogIndirect
 
-_callback_type = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.wintypes.HWND, ctypes.wintypes.UINT
-	, ctypes.c_uint, ctypes.c_uint, ctypes.POINTER(ctypes.c_long))
+_callback_type = ctypes.WINFUNCTYPE(
+	ctypes.c_int, ctypes.wintypes.HWND, ctypes.wintypes.UINT
+	, ctypes.c_uint, ctypes.c_uint, ctypes.POINTER(ctypes.c_long)
+)
 
 class _TaskDialogConfig(ctypes.Structure):
 	class TASKDIALOG_BUTTON(ctypes.Structure):

@@ -30,6 +30,8 @@ from resources.languages import Language
 # https://docs.python.org/3/library/threading.html
 # https://github.com/boppreh/keyboard
 # https://schedule.readthedocs.io/en/stable/
+
+set_title = win32api.SetConsoleTitle
 tasks = None
 crontab = None
 sett = None
@@ -46,9 +48,35 @@ APP_ICON_DIS = r'resources\icon_dis.png'
 TASK_DATE_FORMAT = \
 	r'^(\d\d\d\d|\*)\.(\d\d|\*)\.(\d\d|\*) (\d\d|\*):(\d\d|\*)$'
 PLUGIN_SOURCE = 'plugins\\*.py'
+class OVERLAPPED(ctypes.Structure):
+	_fields_ = [
+		('Internal', ctypes.wintypes.LPVOID),
+		('InternalHigh', ctypes.wintypes.LPVOID),
+		('Offset', ctypes.wintypes.DWORD),
+		('OffsetHigh', ctypes.wintypes.DWORD),
+		('Pointer', ctypes.wintypes.LPVOID),
+		('hEvent', ctypes.wintypes.HANDLE),
+	]
 
-set_title = win32api.SetConsoleTitle
-	
+def _errcheck_bool(value, func, args):
+	if not value:
+		raise ctypes.WinError()
+	return args
+
+CancelIoEx = ctypes.windll.kernel32.CancelIoEx
+CancelIoEx.restype = ctypes.wintypes.BOOL
+CancelIoEx.errcheck = _errcheck_bool
+CancelIoEx.argtypes = (
+	ctypes.wintypes.HANDLE,  # hObject
+	ctypes.POINTER(OVERLAPPED)  # lpOverlapped
+)
+
+def _close_directory_handle(handle):
+	try:
+		CancelIoEx(handle, None)
+	except WindowsError:
+		return
+
 class Settings:
 	''' Load global settings from settings.ini
 		Settings from all sections are collected.
@@ -275,10 +303,10 @@ class Tasks:
 			if task_opts['on_exit']:
 				self.task_list_exit.append(task_opts)
 			if task_opts['on_file_change']:
-				self.add_dir_change_watch(task_opts, its_file=True
+				self.add_dir_change_watch(task_opts, is_file=True
 				, path=task_opts['on_file_change'])
 			if task_opts['on_dir_change']:
-				self.add_dir_change_watch(task_opts, its_file=False
+				self.add_dir_change_watch(task_opts, is_file=False
 				, path=task_opts['on_dir_change'])
 			self.task_dict[ task_opts['task_func_name'] ] = task_opts
 			if task_opts['menu']:
@@ -375,16 +403,16 @@ class Tasks:
 			except Exception as e:
 				hk_error(repr(e))
 
-	def add_dir_change_watch(self, task:dict, path:str, its_file:bool):
+	def add_dir_change_watch(self, task:dict, path:str, is_file:bool):
 		' Watch for changes in directory '
 		WAIT_SEC = .1
 		FILE_LIST_DIRECTORY = 0x0001
 		BUFFER_LENGTH = 1024
 
-		def dir_watch(task:dict, path:str, stop_event:threading.Event
-		, its_file:bool):
+		def dir_watch(task:dict, path:str, stop_event:threading.Event=None
+		, is_file:bool=False):
 			hDir = win32file.CreateFile (
-				file_dir(path) if its_file else path
+				file_dir(path) if is_file else path
 				, FILE_LIST_DIRECTORY
 				, win32con.FILE_SHARE_READ | win32con.FILE_SHARE_WRITE | win32con.FILE_SHARE_DELETE
 				, None
@@ -392,18 +420,25 @@ class Tasks:
 				, win32con.FILE_FLAG_BACKUP_SEMANTICS
 				, None
 			)
+			self.dir_change_stop.append(hDir)
 			filename = file_name(path)
 			prev_file = ('', time.time())
-			while not stop_event.is_set():
-				results = win32file.ReadDirectoryChangesW(
-					hDir,
-					BUFFER_LENGTH,
-					not its_file,
-					win32con.FILE_NOTIFY_CHANGE_SIZE,
-					None,
-					None
-				)
-				if stop_event.is_set(): return
+			while True:
+				try:
+					results = win32file.ReadDirectoryChangesW(
+						hDir,
+						BUFFER_LENGTH,
+						not is_file,
+						win32con.FILE_NOTIFY_CHANGE_SIZE,
+						None,
+						None
+					)
+				except pywintypes.error as e:
+					if e.winerror == 995:
+						return
+					else:
+						dev_print('pywintypes error: ' + str(e.args))
+						raise e
 				if prev_file[0]:
 					pfile, ptime = prev_file
 					cfile, ctime = results[-1][1], time.time()
@@ -413,33 +448,29 @@ class Tasks:
 						continue
 				prev_file = (results[-1][1], time.time())
 				for res_action, res_relname in results[:1]:
-					if its_file and (
+					if is_file and (
 						res_relname != filename
 						or res_action != 3
 					):
 						continue
-					if its_file:
+					if is_file:
 						fullpath = path
 					else:
 						fullpath = os.path.join(path, res_relname)
 					self.run_task(
 						task=task
-						, caller=CALLER_FILE_CHANGE if its_file else CALLER_DIR_CHANGE
+						, caller=CALLER_FILE_CHANGE if is_file else CALLER_DIR_CHANGE
 						, data=(
 							fullpath
 							, FILE_ACTIONS.get(res_action, 'unknown')
 						)
 					)
-
-		stop_event = threading.Event()
-		self.dir_change_stop.append(stop_event)
 		threading.Thread(
 			target=dir_watch
 			, kwargs={
 				'task': task
 				, 'path': path
-				, 'stop_event': stop_event
-				, 'its_file': its_file
+				, 'is_file': is_file
 			}
 			, daemon=True
 		).start()
@@ -751,7 +782,7 @@ class Tasks:
 				eh.close()
 			except Exception as e:
 				dev_print(f'event close error: {e}')
-		for es in self.dir_change_stop: es.set()
+		for h in self.dir_change_stop: _close_directory_handle(h.handle)
 
 def create_menu_item(menu, task, func=None, parent_menu=None):
 	''' Task - task dict or menu item label
@@ -977,6 +1008,7 @@ class App(wx.App):
 		self.enabled = True
 		self.frame=wx.Frame(None, style=wx.DEFAULT_FRAME_STYLE | wx.STAY_ON_TOP)
 		self.taskbaricon = TaskBarIcon(self.frame)
+		self.app_pid = os.getpid()
 		hwnd_list = window_find(APP_NAME)
 		if len(hwnd_list) == 1:
 			self.app_hwnd = hwnd_list[0]
