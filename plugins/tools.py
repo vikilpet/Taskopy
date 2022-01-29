@@ -5,6 +5,7 @@ import datetime
 import statistics
 import pytz
 import threading
+import psutil
 import subprocess
 from multiprocessing.dummy import Pool as ThreadPool
 from operator import itemgetter
@@ -39,7 +40,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2022-01-23'
+APP_VERSION = 'v2022-01-29'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -82,6 +83,8 @@ TASK_OPTIONS = [
 	, ['hyperactive', False]
 	, ['on_file_change', None]
 	, ['on_dir_change', None]
+	, ['on_dir_change_flags', tcon.FILE_NOTIFY_CHANGE_LAST_WRITE]
+	, ['on_file_change_flags', tcon.FILE_NOTIFY_CHANGE_LAST_WRITE]
 ]
 APP_SETTINGS=[
 	['dev', False]
@@ -127,10 +130,10 @@ class DictToObj:
 	''' Converts dictionary to object.
 		Convert back: use vars() built-in function.
 	'''
-	def __init__(s, di:dict):
-		s.__dict__.update(di)
+	def __init__(self, di:dict):
+		self.__dict__.update(di)
 
-	def __getattr__(s, name):
+	def __getattr__(self, name):
 		return 'DictToObj - unknown key'
 
 def value_to_unit(value, unit:str='sec', unit_dict:dict=None
@@ -164,6 +167,19 @@ def value_to_unit(value, unit:str='sec', unit_dict:dict=None
 		return (int(v) * src_coef) / dst_coef
 	else:
 		raise('Wrong value')
+
+def _get_parents()->list:
+	' Returns a list with parent functions '
+	SKIP_LIST = ('thread_start', '<module>', '__init__')
+	parents = []
+	for lvl in range(1, 10):
+		try:
+			parent = sys._getframe(lvl).f_code.co_name
+			if parent in SKIP_LIST: continue
+			parents.append(parent)
+		except ValueError:
+			break
+	return parents
 
 def _get_parent_func_name(parent=None, repl_undrsc:str=None)->str:
 	''' Get name of parent function if any '''
@@ -218,6 +234,9 @@ def sound_play(fullpath, wait=False):
 def dev_print(*msg, **kwargs):
 	if ( '--developer' in sys.argv ) or tdebug():
 		tprint(*msg, **kwargs)
+
+def is_dev()->bool:
+	return ( '--developer' in sys.argv ) or hasattr(sys, 'ps1')
 
 def con_log(*msgs, **kwargs):
 	''' Log to console and logfile
@@ -576,24 +595,15 @@ def msgbox(msg:str, title:str=None
 	if wait:
 		if timeout:
 			result = []
-			threading.Thread(
-				target=lambda *a, r=result: r.append(mb_func(*a))
-				, args=mb_args
-				, daemon=True
-			).start()
+			thread_start(
+				func=lambda *a, r=result: r.append(mb_func(*a))
+				, args=mb_args 
+			)
 			hwnd = get_hwnd(title_tmp)
 			if hwnd:
 				if dis_timeout:
-					threading.Thread(
-						target=dis_buttons
-						, args=(hwnd, dis_timeout,)
-						, daemon=True
-					).start()
-				threading.Thread(
-					target=title_countdown
-					, args=(hwnd, timeout, title,)
-					, daemon=True
-				).start()
+					thread_start(dis_buttons, args=(hwnd, dis_timeout))
+				thread_start(title_countdown, args=(hwnd, timeout, title))
 			while not result: time.sleep(0.01)
 			if result:
 				return result[0]
@@ -602,19 +612,12 @@ def msgbox(msg:str, title:str=None
 		else:
 			if dis_timeout:
 				result = []
-				threading.Thread(
-					target=lambda *a, r=result: r.append(mb_func(*a))
-					, args=mb_args
-					, daemon=True
-				).start()
+				thread_start(lambda *a, r=result: r.append(mb_func(*a))
+				, args=mb_args)
 				hwnd = get_hwnd(title_tmp)
 				if hwnd:
 					win32gui.SetWindowText(hwnd, title)
-					threading.Thread(
-						target=dis_buttons
-						, args=(hwnd, dis_timeout,)
-						, daemon=True
-					).start()
+					thread_start(dis_buttons, args=(hwnd, dis_timeout))
 				while not result: time.sleep(0.01)
 				return result[0]
 			else:
@@ -622,59 +625,27 @@ def msgbox(msg:str, title:str=None
 	else:
 		if timeout:
 			if dis_timeout:
-				threading.Thread(
-					target=mb_func
-					, args=mb_args
-					, daemon=True
-				).start()
+				thread_start(mb_func, args=mb_args)
 				hwnd = get_hwnd(title_tmp)
 				if hwnd:
 					win32gui.SetWindowText(hwnd, title)
-					threading.Thread(
-						target=dis_buttons
-						, args=(hwnd, dis_timeout,)
-						, daemon=True
-					).start()
-					threading.Thread(
-						target=title_countdown
-						, args=(hwnd, timeout, title)
-						, daemon=True
-					).start()
+					thread_start(dis_buttons, args=(hwnd, dis_timeout))
+					thread_start(title_countdown, args=(hwnd, timeout, title))
 			else:
-				threading.Thread(
-					target=mb_func
-					, args=mb_args
-					, daemon=True
-				).start()
+				thread_start(mb_func, args=mb_args)
 				hwnd = get_hwnd(title_tmp)
 				if hwnd:
 					win32gui.SetWindowText(hwnd, title)
-					threading.Thread(
-						target=title_countdown
-						, args=(hwnd, timeout, title,)
-						, daemon=True
-					).start()
+					thread_start(title_countdown, args=(hwnd, timeout, title))
 		else:
 			if dis_timeout:
-				threading.Thread(
-					target=mb_func
-					, args=mb_args
-					, daemon=True
-				).start()
+				thread_start(mb_func, args=mb_args)
 				hwnd = get_hwnd(title_tmp)
 				if hwnd:
 					win32gui.SetWindowText(hwnd, title)
-					threading.Thread(
-						target=dis_buttons
-						, args=(hwnd, dis_timeout,)
-						, daemon=True
-					).start()
+					thread_start(dis_buttons, args=(hwnd, dis_timeout))
 			else:
-				threading.Thread(
-					target=mb_func
-					, args=mb_args
-					, daemon=True
-				).start()
+				thread_start(mb_func, args=mb_args)
 
 def msgbox_warning(msg:str, title:str=None):
 	if title:
@@ -913,10 +884,7 @@ def job_batch(jobs:list, timeout:int
 		
 	'''
 	for job in jobs:
-		threading.Thread(
-			target=job.run
-			, daemon=True
-		).start()
+		thread_start(job.run)
 	for _ in range(int(timeout / sleep_timeout)):
 		if all([j.finished for j in jobs]):
 			return jobs
@@ -1226,11 +1194,8 @@ def dialog(msg:str=None, buttons:list=None
 		_TaskDialogIndirect(ctypes.byref(tdc)
 			, ctypes.byref(result), None, None)
 	else:
-		threading.Thread(
-			target=lambda: _TaskDialogIndirect(ctypes.byref(tdc) \
-				, ctypes.byref(result), None, None)
-			, daemon=True
-		).start()
+		thread_start(lambda: _TaskDialogIndirect(ctypes.byref(tdc) \
+			, ctypes.byref(result), None, None))
 		return result
 	if buttons and return_button:
 		if result.value >= 1000:
@@ -1253,11 +1218,10 @@ def hint(text:str, position:tuple=None)->int:
 	if position: args += '--position', '{}_{}'.format(*position)
 	if getattr(sys, 'frozen', False):
 		mdl = importlib.import_module('resources.hint')
-		threading.Thread(
-			target=mdl.main
+		thread_start(
+			mdl.main
 			, kwargs={'text': text, 'position': position}
-			, daemon=False
-		).start()
+		)
 	else:
 		return subprocess.Popen(args=args
 		, creationflags=win32con.DETACHED_PROCESS).pid
@@ -1594,6 +1558,7 @@ class DataEvent:
 		self.Computer = ''
 		self.Security = None
 		self.EventData = {}
+		self.UserData = {}
 		self.EventDataStr = ''
 		self._EventDataDict = full_dict.get('Event', {}) \
 			.get('EventData', {})
@@ -1640,18 +1605,81 @@ class DataEvent:
 				self.EventData = self._EventDataDict
 		if self.EventData: self.EventDataStr = value_to_str(self.EventData)
 
-def task_run(task_func, *args, **kwargs):
+def thread_start(func, args:tuple=(), kwargs:dict={}
+, thr_daemon:bool=True, show_err_msg:bool=False, ident:str=''):
 	'''
 	Runs task in a thread.
-	TODO: use global tasks object?
-	'''
-	threading.Thread(
-		target=task_func
-		, args=args
-		, kwargs=kwargs
-		, daemon=True
-	).start()
 
+	*ident* - user-defined identifier of stream
+
+	'''
+	def wrapper():
+		nonlocal func, args, kwargs
+		try:
+			func(*args, **kwargs)
+		except Exception:
+			err_str = traceback.format_exc()
+			tprint(
+				f'exception in {func.__name__}:\n{err_str}'
+			)
+			if show_err_msg:
+				msgbox_warning(
+					f'Exception in thread {func.__name__}:\n{err_str}')
+
+	thr = threading.Thread(target=wrapper
+	, daemon=thr_daemon)
+	thr.start()
+	if not tdebug():
+		try:
+			parents = _get_parents()
+			parents.reverse()
+			if ident: ident = ': ' + ident
+			app.app_threads[thr.ident] = {
+				'func': '>'.join(
+					parents[-3:] if parents else ()
+				) + '>' + func.__name__ + ident
+				, 'stime': time_now()
+				, 'thread': thr
+			}
+		except Exception as e:
+			dev_print('thread_start save error: ' + repr(e))
+			pass
+	return thr.ident
+
+task_run = thread_start
+
+def app_threads_print():
+	thread: threading.Thread
+	table = [('ID', 'Daemon', 'Start time', 'Running time'
+	, 'Target', 'Function')]
+	for ident, thr_dic in app.app_threads.items():
+		func_name = thr_dic.get('func')
+		start_time = thr_dic.get('stime')
+		run_time = time_diff_str(start_time) if start_time else None
+		thread = thr_dic.get('thread', None)
+		daemon = None
+		target = None
+		if thread != None:
+			if not (is_alive := thread.is_alive()): continue
+			daemon = thread.daemon
+			target = getattr(thread, '_target', None)
+			if target: target = getattr(target, '__name__', None)
+		table.append((
+			ident
+			, daemon
+			, str(start_time).split('.')[0]
+			, run_time.split('.')[0]
+			, target
+			, func_name
+		))
+	dead = sum(1 for t in threading.enumerate() if not t.is_alive())
+	table_print(table, use_headers=True, sorting=[5])
+	tnum_sys = len(psutil.Process(pid=app.app_pid).threads())
+	print('Number of threads:')
+	print(f'table		{len(table) - 1}')
+	print(f'dead		{dead}')
+	print(f'threading	{len(threading.enumerate())}')
+	print(f'system		{tnum_sys}')
 
 
 def crontab_reload():
@@ -1704,10 +1732,7 @@ def speak(text:str, wait:bool=False):
 	if wait:
 		_speak()
 		return
-	threading.Thread(
-		target=_speak
-		, daemon=True
-	).start()
+	thread_start(_speak)
 
 def func_name_human(func_name:str)->str:
 	'''

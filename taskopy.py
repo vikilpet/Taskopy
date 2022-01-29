@@ -357,18 +357,10 @@ class Tasks:
 				, app.taskbaricon.on_left_down
 			)
 		if self.global_hk:
-			t = threading.Thread(target=self.global_hk.listen, daemon=True)
-			t.start()
-			self.global_hk_thread_id = t.ident
+			self.global_hk_thread_id = thread_start(self.global_hk.listen)
 		if self.task_list_http:
-			threading.Thread(
-				target=http_server_start
-				, args=(self, )
-				, daemon=True
-			).start()
-		t = threading.Thread(target=self.run_scheduler, daemon=True)
-		t.start()
-		self.sched_thread_id = t.ident
+			thread_start(http_server_start, args=(self,))
+		self.sched_thread_id = thread_start(self.run_scheduler)
 		dev_print(f'Total number of tasks: {len(self.task_dict)}')
 	
 	def add_hotkey(self, task):
@@ -409,8 +401,7 @@ class Tasks:
 		FILE_LIST_DIRECTORY = 0x0001
 		BUFFER_LENGTH = 1024
 
-		def dir_watch(task:dict, path:str, stop_event:threading.Event=None
-		, is_file:bool=False):
+		def dir_watch(task:dict, path:str, is_file:bool=False):
 			hDir = win32file.CreateFile (
 				file_dir(path) if is_file else path
 				, FILE_LIST_DIRECTORY
@@ -423,13 +414,17 @@ class Tasks:
 			self.dir_change_stop.append(hDir)
 			filename = file_name(path)
 			prev_file = ('', time.time())
+			if is_file:
+				flags = task['on_file_change_flags']
+			else:
+				flags = task['on_dir_change_flags']
 			while True:
 				try:
 					results = win32file.ReadDirectoryChangesW(
 						hDir,
 						BUFFER_LENGTH,
 						not is_file,
-						win32con.FILE_NOTIFY_CHANGE_SIZE,
+						flags,
 						None,
 						None
 					)
@@ -465,21 +460,20 @@ class Tasks:
 							, FILE_ACTIONS.get(res_action, 'unknown')
 						)
 					)
-		threading.Thread(
-			target=dir_watch
+		thread_start(
+			dir_watch
 			, kwargs={
-				'task': task
-				, 'path': path
-				, 'is_file': is_file
+					'task': task
+					, 'path': path
+					, 'is_file': is_file
 			}
-			, daemon=True
-		).start()
+		)
 
 	def add_schedule(self, task):
 		''' task - dict with task options
 		'''
 		intervals = task['schedule']
-		if isinstance(intervals, str): intervals = [intervals]
+		if isinstance(intervals, str): intervals = (intervals,)
 		for inter in intervals:
 			try:
 				sched_rule = (
@@ -660,19 +654,26 @@ class Tasks:
 				cs = f' ({caller})' if caller else ''
 				con_log(f'task{cs}: {task["task_name_full"]}')
 			if task['result']:
-				t = threading.Thread(target=catcher, args=(result,)
+				thr = threading.Thread(target=catcher, args=(result,)
 				, daemon=daemon)
-				t.start()
-				t.join()
+				thr.start()
+				thr.join()
+				app.app_threads[thr.ident] = {
+					'func': 'catcher: ' + task['task_name']
+					, 'stime': time_now()
+					, 'thread': thr
+				}
 			else:
-				threading.Thread(target=catcher, daemon=daemon).start()
+				thr = threading.Thread(target=catcher, daemon=daemon)
+				thr.start()
+				app.app_threads[thr.ident] = {
+					'func': 'catcher: ' + task['task_name']
+					, 'stime': time_now()
+					, 'thread': thr
+				}
 		daemon = (caller != CALLER_EXIT)
 		if task['result'] and not result is None:
-			threading.Thread(
-				target=run_task_inner
-				, args=(result,)
-				, daemon=daemon
-			).start()
+			thread_start(run_task_inner, thr_daemon=daemon, args=(result,))
 		else:
 			run_task_inner()
 
@@ -922,6 +923,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		'''
 		TASKS_MSG_MAX = 10
 		running_tasks = [t for t in tasks.task_dict.values() if t['running'] ]
+		if is_dev(): app_threads_print()
 		if not running_tasks:
 			if show_msg:
 				dialog(lang.warn_no_run_tasks
@@ -933,8 +935,8 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		for thread in threading.enumerate():
 			if thread._target is None: continue
 			cur_threads.append(thread.name)
-		table = [['Task function', 'Thread'
-		, 'Start time', 'Running time']]
+		table = [('Task function', 'Thread'
+		, 'Start time', 'Running time')]
 		for t in running_tasks:
 			if t['thread'] in cur_threads:
 				thread = t['thread']
@@ -1009,6 +1011,7 @@ class App(wx.App):
 		self.frame=wx.Frame(None, style=wx.DEFAULT_FRAME_STYLE | wx.STAY_ON_TOP)
 		self.taskbaricon = TaskBarIcon(self.frame)
 		self.app_pid = os.getpid()
+		self.app_threads = {}
 		hwnd_list = window_find(APP_NAME)
 		if len(hwnd_list) == 1:
 			self.app_hwnd = hwnd_list[0]

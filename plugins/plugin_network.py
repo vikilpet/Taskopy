@@ -259,7 +259,7 @@ def html_element(url:str, element
 	else:
 		status, html = safe(http_req)(url=url, **kwargs)
 		if not status: raise html
-	if isinstance(element, list):
+	if isinstance(element, (list, tuple)):
 		element_li = element
 	else:
 		element_li = [element]
@@ -364,7 +364,7 @@ def json_element(source:str, element:list=None
 		j = source
 	data = json.loads(j)
 	if element is None: return data
-	if isinstance(element[0], list):
+	if isinstance(element[0], (list, tuple)):
 		li = []
 		try:
 			for elem in element:
@@ -399,7 +399,7 @@ def xml_element(url:str, element:str
 	else:
 		status = True
 		content = url
-	if isinstance(element, list):
+	if isinstance(element, (list, tuple)):
 		element_li = element
 	else:
 		element_li = [element]
@@ -411,7 +411,7 @@ def xml_element(url:str, element:str
 			result.append(value.text)
 		else:
 			raise Exception(f'xml_element: element not found: {element}')
-	if isinstance(element, list):
+	if isinstance(element, (list, tuple)):
 		return result
 	else:
 		return result[0]

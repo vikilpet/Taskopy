@@ -1080,7 +1080,7 @@ def dvar_get(var:str, default=None, encoding='utf-8'
 	'''
 	var = _file_name_pe(var)
 	try:
-		content = file_read(['resources', 'var', var], encoding=encoding)
+		content = file_read(('resources', 'var', var), encoding=encoding)
 	except FileNotFoundError:
 		return default
 	if not as_literal: return content
