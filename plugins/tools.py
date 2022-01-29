@@ -83,7 +83,11 @@ TASK_OPTIONS = [
 	, ['hyperactive', False]
 	, ['on_file_change', None]
 	, ['on_dir_change', None]
-	, ['on_dir_change_flags', tcon.FILE_NOTIFY_CHANGE_LAST_WRITE]
+	, [
+		'on_dir_change_flags'
+		, tcon.FILE_NOTIFY_CHANGE_LAST_WRITE
+			| tcon.FILE_NOTIFY_CHANGE_FILE_NAME
+	]
 	, ['on_file_change_flags', tcon.FILE_NOTIFY_CHANGE_LAST_WRITE]
 ]
 APP_SETTINGS=[
@@ -1673,7 +1677,7 @@ def app_threads_print():
 			, func_name
 		))
 	dead = sum(1 for t in threading.enumerate() if not t.is_alive())
-	table_print(table, use_headers=True, sorting=[5])
+	table_print(table, use_headers=True, sorting=[2])
 	tnum_sys = len(psutil.Process(pid=app.app_pid).threads())
 	print('Number of threads:')
 	print(f'table		{len(table) - 1}')
