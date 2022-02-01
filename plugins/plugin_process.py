@@ -189,6 +189,7 @@ def app_start(
 		, 'creationflags': creationflags
 		, 'startupinfo': startupinfo
 		, 'encoding': encoding
+		, 'errors': 'replace'
 	}
 	if env:
 		env = {**os.environ, **env}

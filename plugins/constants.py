@@ -76,6 +76,7 @@ FILE_DELETED = 'deleted'
 FILE_UPDATED = 'updated'
 FILE_RENAMED_FROM = 'renamed_from'
 FILE_RENAMED_TO = 'renamed_to'
+# on_dir_change, on_file_change actions:
 FILE_ACTIONS = {
 	1 : FILE_CREATED
 	, 2 : FILE_DELETED

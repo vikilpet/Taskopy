@@ -27,7 +27,7 @@ from pathlib import Path
 import shutil
 import configparser
 from .tools import random_str, tdebug, patch_import \
-, time_sleep, dev_print
+, time_sleep, dev_print, tprint
 try:
 	import constants as tcon
 except ModuleNotFoundError:
@@ -454,6 +454,7 @@ def dir_rnd_file(fullpath, attempts:int=5
 
 		len( dir_list( temp_dir() ) ):
 		> 494
+		
 	'''
 	fullpath = file_path_fix(fullpath)
 	for _ in range(attempts):
@@ -1041,8 +1042,8 @@ class HTTPFile:
 		self.mime_type = mime_type
 		if not name: name = file_name(fullpath)
 		self.name = name
-
-def file_lock_wait(fullpath, wait_interval:str='100 ms')->bool:
+def file_lock_wait(fullpath, wait_interval:str='100 ms'
+, log:bool=False)->bool:
 	'''
 	Blocks execution until the file is available.
 	Usage - wait for another process to stop writing to the file.
@@ -1052,12 +1053,16 @@ def file_lock_wait(fullpath, wait_interval:str='100 ms')->bool:
 		try:
 
 			open(fullpath, 'a').close()
+
 			return True
 		except PermissionError:
-			dev_print('File is locked:', file_name(fullpath))
+			if log:
+				print('locked:', file_name(fullpath))
+			else:
+				dev_print('File is locked:', file_name(fullpath))
 			time_sleep(wait_interval)
 		except Exception as e:
-			dev_print('Wrong exception', file_name(fullpath), repr(e))
+			tprint('wrong exception:', file_name(fullpath), repr(e))
 			return False
 
 def file_relpath(fullpath, start)->str:
@@ -1071,12 +1076,12 @@ def _file_name_pe(filename:str):
 		filename = filename.replace(char, repl)
 	return filename
 
-def dvar_get(var:str, default=None, encoding='utf-8'
+def dvar_get(var:str, default=None, encoding:str='utf-8'
 , as_literal:bool=False):
 	'''
 	Gets the disk variable.
 	*as_literal* - converts to a literal (dict, list, tuple etc).
-	Dangerous! - it's just `eval` and not `ast.literal_eval`
+	Dangerous! - it's just **eval** and not **ast.literal_eval**
 	'''
 	var = _file_name_pe(var)
 	try:
@@ -1086,17 +1091,17 @@ def dvar_get(var:str, default=None, encoding='utf-8'
 	if not as_literal: return content
 	return eval(content)
 
-def dvar_set(var:str, value, encoding='utf-8'):
+def dvar_set(var:str, value, encoding:str='utf-8'):
 	'''
 	Sets the disk variable.
 	'''
 	var = _file_name_pe(var)
 	value = str(value)
 	try:
-		file_write(['resources', 'var', var], value, encoding=encoding)
+		file_write(('resources', 'var', var), value, encoding=encoding)
 	except FileNotFoundError:
 		os.makedirs(os.path.join('resources', 'var'))
-		file_write(['resources', 'var', var], value, encoding=encoding)
+		file_write(('resources', 'var', var), value, encoding=encoding)
 
 def file_drive(fullpath)->str:
 	'''

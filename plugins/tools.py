@@ -40,7 +40,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2022-01-29'
+APP_VERSION = 'v2022-02-01'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -1239,11 +1239,14 @@ def locale_set(name:str='C'):
 		finally:
 			locale.setlocale(locale.LC_ALL, saved)
 
-def table_print(table, use_headers=False, row_sep:str=None
-, headers_sep:str='-', col_pad:str='  ', row_sep_step:int=0
-, sorting=None, sorting_func=None, sorting_rev:bool=False
-, repeat_headers:int=None
-, empty_str:str='-', consider_empty:tuple=(None, '')):
+def table_print(
+	table, use_headers=False, row_sep:str=None
+	, headers_sep:str='-', col_pad:str='  ', row_sep_step:int=0
+	, sorting=None, sorting_func=None, sorting_rev:bool=False
+	, repeat_headers:int=None
+	, empty_str:str='-', consider_empty:tuple=(None, '')
+	, max_table_width:tuple=None
+):
 	'''	Print list of lists as a table.
 
 		use_headers - if it's True - takes first row as
@@ -1257,9 +1260,22 @@ def table_print(table, use_headers=False, row_sep:str=None
 		sorting_rev - sort in reverse order.
 		row_sep - string to repeat as a row separator.
 		headers_sep - same for header(s).
+		max_table_width:tuple - maximum width and number of
+		the column to trim or just the maximum width. In that
+		case column number will be set to -1:
+
+			max_table_width=(80, 3)
+			or
+			max_table_width=80
+
 	'''
 
 	DEF_SEP = '-'
+
+	def trim_str(string:str, max_len:int):
+		' Trim the string if its length exceeds *max_len* '
+		if len(string) <= max_len: return string
+		return '...' + string[-max_len + 3 : ]
 
 	def print_sep(sep=row_sep):
 		nonlocal max_row_len
@@ -1318,17 +1334,30 @@ def table_print(table, use_headers=False, row_sep:str=None
 		new_row = []
 		for cell in row:
 			if cell in consider_empty:
-				new_row.append(empty_str)
-				continue
-			if isinstance(cell, (int, float)):
+				cell = empty_str
+			elif isinstance(cell, (int, float)):
 				cell = '{:,}'.format(cell).replace(',', ' ')
 			else:
-				cell = str(cell)
+				cell = ' '.join( str(cell).splitlines() )
 			new_row.append(cell)
 		new_rows.append(new_row)
 	rows = new_rows
 	col_sizes = [ max( map(len, col) ) for col in zip(*rows) ]
 	max_row_len = sum(col_sizes) + len(col_pad) * (len(col_sizes) - 1)
+	trim_len, trim_col = 0, 0
+	if max_table_width and isinstance(max_table_width, int):
+		max_table_width = (max_table_width, -1)
+	if max_table_width and (max_row_len > max_table_width[0]):
+		trim_col = max_table_width[1]
+		trim_len = col_sizes[trim_col] - (max_row_len - max_table_width[0])
+		new_rows = []
+		for row in rows:
+			new_rows.append([
+				*row[:trim_col], trim_str(row[trim_col], trim_len)
+			])
+		rows = new_rows
+		col_sizes = [ max( map(len, col) ) for col in zip(*rows) ]
+		max_row_len = max_table_width[0]
 	template = col_pad.join(
 		[ '{{:<{}}}'.format(s) for s in col_sizes ]
 	)
@@ -1577,8 +1606,7 @@ class DataEvent:
 				else:
 					setattr(self, attr, e)
 		if self.TimeCreatedUTC:
-			ts = self.TimeCreatedUTC.get('attrib', {})\
-				.get('@SystemTime', '.').split('.')[0]
+			ts = self.TimeCreatedUTC.get('@SystemTime', '.').split('.')[0]
 			if ts:
 				self.TimeCreatedUTC = datetime.datetime.fromisoformat(ts)
 				self.TimeCreatedLocal = self.TimeCreatedUTC \
@@ -1683,7 +1711,7 @@ def app_threads_print():
 	print(f'table		{len(table) - 1}')
 	print(f'dead		{dead}')
 	print(f'threading	{len(threading.enumerate())}')
-	print(f'system		{tnum_sys}')
+	print(f'system		{tnum_sys}\n')
 
 
 def crontab_reload():
