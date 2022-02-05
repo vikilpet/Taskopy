@@ -334,7 +334,6 @@ def file_size_str(fullpath)->str:
 		if abs(size) < 1024.0:
 			return f'{size:.1f} {unit.upper()}'
 		size /= 1024.0
-	return "%.1f%s" % (size, 'Yi')
 
 def file_ext(fullpath)->str:
 	''' Returns file extension in lower case
@@ -743,10 +742,10 @@ def dir_zip(fullpath, destination:str=None
 		archive in same directory.
 		Returns destination.
 	'''
+	EXT = 'zip'
 	fullpath = file_path_fix(fullpath)
 	fullpath = fullpath.strip('\\')
 	destination = file_path_fix(destination)
-	EXT = 'zip'
 	if not destination:
 		new_fullpath = os.path.join(
 			os.path.dirname(fullpath)
@@ -776,6 +775,10 @@ def dir_zip(fullpath, destination:str=None
 	else:
 		result = shutil.make_archive(base_name, format=EXT
 			, root_dir=root_dir, base_dir=base_dir)
+		try:
+			os.makedirs(os.path.dirname(new_fullpath))
+		except FileExistsError:
+			pass
 		shutil.move(result, new_fullpath)
 	return new_fullpath
 
@@ -1057,7 +1060,7 @@ def file_lock_wait(fullpath, wait_interval:str='100 ms'
 			return True
 		except PermissionError:
 			if log:
-				print('locked:', file_name(fullpath))
+				tprint('locked:', file_name(fullpath))
 			else:
 				dev_print('File is locked:', file_name(fullpath))
 			time_sleep(wait_interval)
@@ -1089,7 +1092,7 @@ def dvar_get(var:str, default=None, encoding:str='utf-8'
 	except FileNotFoundError:
 		return default
 	if not as_literal: return content
-	return eval(content)
+	return eval(content) if content != '' else ''
 
 def dvar_set(var:str, value, encoding:str='utf-8'):
 	'''
@@ -1102,6 +1105,43 @@ def dvar_set(var:str, value, encoding:str='utf-8'):
 	except FileNotFoundError:
 		os.makedirs(os.path.join('resources', 'var'))
 		file_write(('resources', 'var', var), value, encoding=encoding)
+
+def dvar_add(var:str, value, var_type=list, encoding:str='utf-8'):
+	'''
+	Adds the value to the previous value and returns the new value.
+
+		dvar_add(5)
+		> 5
+		dvar_add(3)
+		> 8
+		
+	'''
+	var = _file_name_pe(var)
+	prev = dvar_get(var, encoding=encoding, as_literal=True)
+	if prev:
+		if isinstance(prev, list):
+			prev.append(value)
+			value = prev
+		elif isinstance(prev, int):
+			value = prev + value
+		elif isinstance(prev, set):
+			prev.add(value)
+			value = prev
+		else:
+			raise Exception('Wrong type of previous value')
+	else:
+		if var_type == set:
+			value = {value}
+		elif var_type == int:
+			pass
+		else:
+			value = [value]
+	try:
+		file_write(('resources', 'var', var), str(value), encoding=encoding)
+	except FileNotFoundError:
+		os.makedirs(os.path.join('resources', 'var'))
+		file_write(('resources', 'var', var), str(value), encoding=encoding)
+	return value
 
 def file_drive(fullpath)->str:
 	'''

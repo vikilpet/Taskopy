@@ -40,7 +40,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2022-02-01'
+APP_VERSION = 'v2022-02-05'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -149,8 +149,10 @@ def value_to_unit(value, unit:str='sec', unit_dict:dict=None
 
 		> value_to_unit('2 min', 'sec')
 		> 120
+
 	'''
 	if not unit_dict: unit_dict = _TIME_UNITS
+	unit = unit.lower()
 	dst_coef = unit_dict[unit]
 	if isinstance(value, (int, float)):
 		value = [value, def_src_unit]

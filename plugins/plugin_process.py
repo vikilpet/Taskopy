@@ -4,6 +4,7 @@ import sys
 import ctypes
 import psutil
 import time
+from typing import List
 import win32gui
 import win32api
 import win32con
@@ -452,6 +453,13 @@ def service_start(service:str, args:tuple=None):
 def service_stop(service:str)->tuple:
 	''' Stops windows service.'''
 	return win32serviceutil.StopService(service)
+
+def service_restart(service:str)->tuple:
+	' Restarts windows service '
+	return win32serviceutil.RestartService(service)
+
+def service_list()->List[psutil._pswindows.WindowsService]:
+	return psutil.win_service_iter()
 # https://stackoverflow.com/questions/48051283/call-binary-without-elevated-privilege
 ntdll = ctypes.WinDLL('ntdll')
 kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)

@@ -1,10 +1,12 @@
 import os
+import time
 import socket
 import requests
 import urllib
 import lxml.html
 import re
 import html
+import psutil
 import tempfile
 from hashlib import md5
 from bs4 import BeautifulSoup
@@ -16,7 +18,8 @@ import json2html
 from .tools import dev_print, time_sleep, tdebug \
 , locale_set, safe, patch_import, value_to_unit
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.99 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Safari/537.36'}
+_SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 
 def http_req(url:str, encoding:str='utf-8', session:bool=False
 , cookies:dict=None, headers:dict=None
@@ -605,3 +608,53 @@ def table_html(table:list, headers:bool=True
 	html += '</tbody>'
 	html += '</table>'
 	return html
+
+def net_usage(interf:str, unit='b')->tuple:
+	'''
+	Returns the current network usage (upload, download)
+	in bits/sec. See also **net_usage_str**
+	**interf** - name of a network interface.
+	Usage example:
+
+		for up_down in net_usage('Local Area Connection', unit='mb'):
+			print(up_down)
+			time_sleep('1 sec')
+
+	'''
+	prev_time = 0
+	prev_up, prev_down = .0, .0
+	while True:
+		if not prev_time:
+			prev_time = time.time()
+			prev_up, prev_down, *_ = psutil.net_io_counters(pernic=True)[interf]
+			yield 0, 0
+		cur_time = time.time()
+		cur_up, cur_down, *_ = psutil.net_io_counters(pernic=True)[interf]
+		coef = 8 / _SPEED_UNITS.get(unit.lower())
+		try:
+			up_speed = (cur_up - prev_up) * coef / (cur_time - prev_time)
+			down_speed = (cur_down - prev_down) * coef / (cur_time - prev_time)
+		except:
+			yield -1, -1
+		yield up_speed, down_speed
+
+def net_usage_str(interf:str)->tuple:
+	'''
+	Same as **net_usage** but in human readable format.
+	**interf** - name of a network interface.
+	Usage example:
+
+		for up_down in net_usage_str('Local Area Connection'):
+			print(up_down)
+			time_sleep('1 sec')
+
+	'''
+
+	def to_unit(val):
+		for unit in list(_SPEED_UNITS.keys())[::-1]:
+			if val < 1024.0: return f'{val:.1f} {unit}/s'
+			val /= 1024.0
+
+	for up_down in net_usage(interf):
+		yield tuple(map(to_unit, up_down))
+
