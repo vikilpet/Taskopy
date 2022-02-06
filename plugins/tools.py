@@ -40,7 +40,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2022-02-05'
+APP_VERSION = 'v2022-02-06'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -1150,14 +1150,18 @@ def dialog(msg:str=None, buttons:list=None
 		title = func_name_human(_get_parent_func_name())
 	else:
 		title = str(title)
-	if isinstance(msg, (list, tuple, set)):
+	if isinstance(msg, (list, tuple, set, dict)):
 		buttons = msg
 		msg = ''
 	else:
 		if msg: msg = str(msg)
+	orig_buttons = ()
 	if buttons:
 		orig_buttons = buttons
-		buttons = list(map(str, buttons))
+		if isinstance(buttons, dict):
+			buttons = tuple(map(str, buttons.keys()))
+		else:
+			buttons = tuple(map(str, buttons))
 	result = ctypes.c_int()
 	tdc = _TaskDialogConfig()
 	if common_buttons:
@@ -1202,14 +1206,19 @@ def dialog(msg:str=None, buttons:list=None
 	else:
 		thread_start(lambda: _TaskDialogIndirect(ctypes.byref(tdc) \
 			, ctypes.byref(result), None, None))
-		return result
+		return
 	if buttons and return_button:
 		if result.value >= 1000:
 			return True, orig_buttons[result.value - 1000]
 		else: 
 			return False, result.value
 	else:
-		return result.value
+		if not isinstance(orig_buttons, dict):
+			return result.value
+		if result.value >= 1000:
+			return tuple(orig_buttons.values())[result.value - 1000]
+		else:
+			return result.value
 
 def hint(text:str, position:tuple=None)->int:
 	'''	Shows hint.
@@ -1264,11 +1273,17 @@ def table_print(
 		headers_sep - same for header(s).
 		max_table_width:tuple - maximum width and number of
 		the column to trim or just the maximum width. In that
-		case column number will be set to -1:
+		case column number will be set to the number of
+		last column. Example:
 
-			max_table_width=(80, 3)
-			or
-			max_table_width=80
+			table = [
+				('Header-1', 'Header-2', 'Header-3')
+				, *(
+					(random_str(3), random_str(100), random_str(5))
+					for _ in range(3)
+				)
+			]
+			table_print(table, max_table_width=(100, 1))
 
 	'''
 
@@ -1280,9 +1295,9 @@ def table_print(
 		return '...' + string[-max_len + 3 : ]
 
 	def print_sep(sep=row_sep):
-		nonlocal max_row_len
+		nonlocal table_width
 		if not sep: return
-		print( sep * (max_row_len // len(sep) ) )
+		print( sep * (table_width // len(sep) ) )
 	
 	def print_headers(both=False):
 		nonlocal headers, template
@@ -1344,22 +1359,26 @@ def table_print(
 			new_row.append(cell)
 		new_rows.append(new_row)
 	rows = new_rows
-	col_sizes = [ max( map(len, col) ) for col in zip(*rows) ]
-	max_row_len = sum(col_sizes) + len(col_pad) * (len(col_sizes) - 1)
+	col_sizes = tuple( max( map(len, col) ) for col in zip(*rows) )
+	table_width = sum(col_sizes) + len(col_pad) * (len(col_sizes) - 1)
 	trim_len, trim_col = 0, 0
 	if max_table_width and isinstance(max_table_width, int):
-		max_table_width = (max_table_width, -1)
-	if max_table_width and (max_row_len > max_table_width[0]):
+		max_table_width = (max_table_width, len(rows[0]) - 1)
+	if max_table_width and (table_width > max_table_width[0]):
 		trim_col = max_table_width[1]
-		trim_len = col_sizes[trim_col] - (max_row_len - max_table_width[0])
+		trim_len = (
+			col_sizes[trim_col] - (table_width - max_table_width[0])
+		)
 		new_rows = []
 		for row in rows:
-			new_rows.append([
-				*row[:trim_col], trim_str(row[trim_col], trim_len)
-			])
+			new_rows.append((
+				*row[:trim_col]
+				, trim_str(row[trim_col], trim_len)
+				, *row[trim_col + 1:]
+			))
 		rows = new_rows
 		col_sizes = [ max( map(len, col) ) for col in zip(*rows) ]
-		max_row_len = max_table_width[0]
+		table_width = max_table_width[0]
 	template = col_pad.join(
 		[ '{{:<{}}}'.format(s) for s in col_sizes ]
 	)

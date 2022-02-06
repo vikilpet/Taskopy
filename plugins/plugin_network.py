@@ -18,7 +18,7 @@ import json2html
 from .tools import dev_print, time_sleep, tdebug \
 , locale_set, safe, patch_import, value_to_unit
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.81 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 
 def http_req(url:str, encoding:str='utf-8', session:bool=False
@@ -649,9 +649,10 @@ def net_usage_str(interf:str)->tuple:
 			time_sleep('1 sec')
 
 	'''
-
+	units = tuple(_SPEED_UNITS.keys())[::-1]
+	
 	def to_unit(val):
-		for unit in list(_SPEED_UNITS.keys())[::-1]:
+		for unit in units:
 			if val < 1024.0: return f'{val:.1f} {unit}/s'
 			val /= 1024.0
 
