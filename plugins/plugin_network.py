@@ -621,21 +621,14 @@ def net_usage(interf:str, unit='b')->tuple:
 			time_sleep('1 sec')
 
 	'''
-	prev_time = 0
-	prev_up, prev_down = .0, .0
+	prev_up, prev_down, prev_time = 0, 0, 0
+	coef = 8 / _SPEED_UNITS.get(unit.lower())
 	while True:
-		if not prev_time:
-			prev_time = time.time()
-			prev_up, prev_down, *_ = psutil.net_io_counters(pernic=True)[interf]
-			yield 0, 0
 		cur_time = time.time()
 		cur_up, cur_down, *_ = psutil.net_io_counters(pernic=True)[interf]
-		coef = 8 / _SPEED_UNITS.get(unit.lower())
-		try:
-			up_speed = (cur_up - prev_up) * coef / (cur_time - prev_time)
-			down_speed = (cur_down - prev_down) * coef / (cur_time - prev_time)
-		except:
-			yield -1, -1
+		up_speed = (cur_up - prev_up) * coef / (cur_time - prev_time)
+		down_speed = (cur_down - prev_down) * coef / (cur_time - prev_time)
+		prev_up, prev_down, prev_time = cur_up, cur_down, cur_time
 		yield up_speed, down_speed
 
 def net_usage_str(interf:str)->tuple:
