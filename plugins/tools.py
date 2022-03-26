@@ -40,7 +40,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2022-02-08'
+APP_VERSION = 'v2022-03-26'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -299,12 +299,16 @@ def time_str(template:str=tcon.DATE_STR_FILE
 	Use datetime in `time_val`. How to get yesterday's date:
 
 		time_val = datetime.date.today() - datetime.timedelta(days=1)
+
 	'''
 	if timezone == 'utc':
 		timezone = pytz.utc
 	elif isinstance(timezone, str):
 		timezone = pytz.timezone(timezone)
-	if not time_val: time_val = datetime.datetime.now(tz=timezone)
+	if isinstance(time_val, float):
+		time_val = datetime.datetime.fromtimestamp(time_val, tz=timezone)
+	elif not time_val:
+		time_val = datetime.datetime.now(tz=timezone)
 	with locale_set(use_locale):
 		return time_val.strftime(template)
 
@@ -354,12 +358,15 @@ def time_diff(start:datetime.datetime, end:datetime.datetime=None
 
 def time_diff_str(start:datetime.datetime
 , end:datetime.datetime=None, str_format:str=None)->str:
-	'''	Returns time difference as a string like that:
-		'5 days, 3:01:35.837127'
-		*start* and *end* should be in _datetime_ format.
-		*str_format* - standard time formating like '%y.%m.%d %H:%M:%S'
-			(see tcon.DATE_FORMAT)
 	'''
+	Returns time difference as a string like that:
+	'5 days, 3:01:35.837127'
+	*start* and *end* should be in _datetime_ format.
+	*str_format* - standard time formating like '%y.%m.%d %H:%M:%S'
+	(see tcon.DATE_FORMAT)
+	'''
+	if isinstance(start, float):
+		start = datetime.datetime.fromtimestamp(start)
 	if not end: end = datetime.datetime.now()
 	if not str_format: return str(end - start)
 	delta_as_time = time.gmtime( (end - start).total_seconds() )

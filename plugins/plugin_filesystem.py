@@ -4,6 +4,7 @@ import stat
 import time
 import glob
 from contextlib import contextmanager
+from collections import namedtuple
 import csv
 import ast
 import random
@@ -20,6 +21,7 @@ import win32print
 import hashlib
 import pythoncom
 import base64
+import psutil
 
 import win32api
 from win32com.shell import shell, shellcon
@@ -115,6 +117,7 @@ def file_rename(fullpath, dest:str
 
 			file_rename(r'd:\\IMG_123.jpg', 'my cat.jpg')
 			>'d:\\my cat.jpg'
+			
 	'''
 	fullpath = file_path_fix(fullpath)
 	if not ':' in dest:
@@ -190,7 +193,7 @@ def file_copy(fullpath, destination:str
 			return func(fullpath, destination)
 		except FileExistsError: pass
 
-def file_append(fullpath, content:str)->str:
+def file_append(fullpath, content:str, encoding:str='utf-8')->str:
 	''' Append content to a file. Creates fullpath
 		if not specified.
 		Returns fullpath.
@@ -199,7 +202,7 @@ def file_append(fullpath, content:str)->str:
 		fullpath = file_path_fix(fullpath)
 	else:
 		fullpath = temp_file()
-	with open(fullpath, 'a+') as fd:
+	with open(fullpath, 'a+', encoding=encoding) as fd:
 		fd.write(content)
 	return fullpath
 
@@ -318,12 +321,15 @@ def file_size(fullpath, unit:str='b')->int:
 
 def file_size_str(fullpath)->str:
 	'''
-	Size of file _for humans_. Example:
+	Size of file *for humans*.
 
-		>file_size_str(r'c:\\my_file.bin')
+	Example:
+
+		file_size_str(r'c:\\my_file.bin')
 		>'5 MB'
-		>file_size_str(336013)
+		file_size_str(336013)
 		>'328.1 KB'
+
 	'''
 	if isinstance(fullpath, (int, float)):
 		size = fullpath
@@ -719,16 +725,24 @@ def csv_write(fullpath, content:list, fieldnames:tuple=None
 		writer.writerows([di for di in content])
 	return fullpath
 
-def dir_size(fullpath, unit:str='b')->int:
-	''' Returns directory size without symlinks '''
+def dir_size(fullpath, unit:str='b', skip_err:bool=True)->int:
+	'''
+	Returns directory size without symlinks.
+	
+	*skip_err* - do not raise an exeption on non-existent files.
+	'''
 	fullpath = file_path_fix(fullpath)
 	e = _SIZE_UNITS.get(unit.lower(), 1)
 	total_size = 0
 	for dirpath, _, filenames in os.walk(fullpath):
 		for fi in filenames:
 			fp = os.path.join(dirpath, fi)
-			if not os.path.islink(fp):
+			if os.path.islink(fp): continue
+			try:
 				total_size += os.path.getsize(fp)
+			except Exception as e:
+				tdebug(f'skip {fp} ({e})')
+				continue
 	return total_size // e
 
 def dir_zip(fullpath, destination:str=None
@@ -1182,6 +1196,48 @@ def file_conf_read(fullpath:str, encoding:str='utf-8'
 			if value.isdigit(): sect_params[param] = int(value)
 	return confdict
 	
-	
+DriveIO = namedtuple(
+	'DriveIO'
+	, psutil._common.sdiskio._fields
+	+ ('read_bytes_delta', 'write_bytes_delta', 'total_bytes_delta')
+)
+def drive_io(drive_num:int=None)->dict:
+	'''
+	Returns physical drive (not partition!) I/O generator
+	that returns a named tuples with counters. Example:
+
+		dio = drive_io()
+		print(next(dio)[0].read_bytes)
+		time_sleep('1 sec')
+		print(
+			file_size_str(next(dio)[0].total_bytes_delta, suffix='/s')
+		)
+
+	'''
+	prev, prev_time = {}, 0
+	while True:
+		cur_time = time.time()
+		delta_time = cur_time - prev_time
+		cur = {}
+		for drive, info in psutil.disk_io_counters(perdisk=True).items():
+			drive = int(drive[13:])
+			if (drive_num != None) and drive_num != drive: continue
+			if not drive in prev:
+				prev[drive] = DriveIO(*info, 0, 0, 0)
+			cur_rb, cur_wb = info.read_bytes, info.write_bytes
+			delta_rb = int(
+				(cur_rb - prev[drive].read_bytes) / delta_time
+			)
+			delta_wb = int(
+				(cur_wb - prev[drive].write_bytes) / delta_time
+			)
+			prev[drive] = info
+			cur[drive] = DriveIO(*info, delta_rb
+			, delta_wb, delta_rb + delta_wb)
+		prev_time = cur_time
+		if drive_num:
+			yield cur[drive]
+		else:
+			yield cur
 
 if __name__ != '__main__': patch_import()

@@ -18,7 +18,7 @@ import json2html
 from .tools import dev_print, time_sleep, tdebug \
 , locale_set, safe, patch_import, value_to_unit
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.81 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.84 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 
 def http_req(url:str, encoding:str='utf-8', session:bool=False
@@ -625,9 +625,10 @@ def net_usage(interf:str, unit='b')->tuple:
 	coef = 8 / _SPEED_UNITS.get(unit.lower())
 	while True:
 		cur_time = time.time()
+		dtime = cur_time - prev_time
 		cur_up, cur_down, *_ = psutil.net_io_counters(pernic=True)[interf]
-		up_speed = (cur_up - prev_up) * coef / (cur_time - prev_time)
-		down_speed = (cur_down - prev_down) * coef / (cur_time - prev_time)
+		up_speed = (cur_up - prev_up) * coef / dtime
+		down_speed = (cur_down - prev_down) * coef / dtime
 		prev_up, prev_down, prev_time = cur_up, cur_down, cur_time
 		yield up_speed, down_speed
 
