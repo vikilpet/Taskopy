@@ -11,12 +11,15 @@ import tempfile
 from hashlib import md5
 from bs4 import BeautifulSoup
 import json
+import subprocess
 import datetime
+import random
 import warnings
 import threading
 import json2html
 from .tools import dev_print, time_sleep, tdebug \
-, locale_set, safe, patch_import, value_to_unit
+, locale_set, safe, patch_import, value_to_unit, time_diff \
+, median
 
 _USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.84 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
@@ -440,7 +443,8 @@ def tracking_status_rp(track_number:str)->str:
 	return ', '.join(status_list)
 
 def domain_ip(domain:str)->list:
-	''' Get IP adresses of domain
+	'''
+	Get IP adresses of domain.
 	'''
 	data = socket.gethostbyname_ex(domain)
 	return data[2]
@@ -448,9 +452,12 @@ def domain_ip(domain:str)->list:
 
 
 def url_hostname(url:str, second_lvl:bool=True)->str:
-	''' Get hostname (second level domain) from URL.
 	'''
-	domain = urllib.parse.urlparse(url).netloc
+	Get hostname (second level domain) from URL.
+	'''
+	if m := re.findall(r'//(\d+\.\d+\.\d+\.\d+)', url):
+		return m[0]
+	domain = urllib.parse.urlparse(url).netloc.split(':')[0]
 	if not second_lvl: return domain
 	if '.'.join(domain.split('.')[-2:]) in ['co.uk']:
 		suf_len = -3
@@ -653,3 +660,79 @@ def net_usage_str(interf:str)->tuple:
 	for up_down in net_usage(interf):
 		yield tuple(map(to_unit, up_down))
 
+def ping_tcp(host:str, port:int, count:int=1, pause:int=100
+, timeout:int=500)->tuple:
+	'''
+	Measure loss and response time with a TCP connection.
+	Returns (True, (loss percentage, time in ms) )
+	or (False, 'error text').
+	
+	*pause* - pause in milliseconds between attempts 
+	*timeout* - the waiting time for a response in milliseconds.
+
+	Examples:
+
+		ping_tcp('8.8.8.8', 443)
+		> (True, (0, 49))
+		ping_tcp('domain.does.not.exist', 80)
+		> (False, '[Errno 11004] getaddrinfo failed')
+
+	'''
+	timings = []
+	last_err = 'OK'
+	try:
+		ip = random.choice( domain_ip(host) )
+	except Exception as e:
+		return False, str(e)
+	full_start = datetime.datetime.now()
+	for _ in range(count):
+		with socket.socket( socket.AF_INET, socket.SOCK_STREAM ) as soc:
+			soc.settimeout(timeout/1000)
+			tstart = datetime.datetime.now()
+			try:
+				soc.connect((ip, port))
+				timings.append(time_diff(tstart, unit='ms'))
+				soc.shutdown(socket.SHUT_RD)
+			except Exception as e:
+				last_err = str(e)
+				tdebug(last_err)
+		time.sleep(pause / 1000)
+	tdebug(ip, timings)
+	tdebug('full time', time_diff(full_start, unit='ms'))
+	if timings:
+		perc = int( (count - len(timings)) / count * 100 )
+		return True, ( perc, int(median(timings)))
+	else:
+		return False, last_err
+
+def ping_icmp(host:str, count:int=3
+, timeout:int=500, encoding:str='cp866')->tuple:
+	'''
+	Returns (True, (loss %, aver. time) )
+	or (False, 'cause of failure')
+	
+	Examples:
+	
+		ping_icmp('8.8.8.8')
+		> (True, (0, 47))
+		ping_icmp('domain.does.not.exist')
+		> (False, 'host unreachable (1)')
+
+	'''
+	proc = subprocess.Popen(
+		('ping', '-n', str(count), '-w', str(timeout), host)
+		, stderr=subprocess.STDOUT
+		, stdout=subprocess.PIPE
+		, encoding=encoding
+	)
+	out, ret = proc.communicate()[0], proc.returncode
+	tdebug(ret, out)
+	if ret == 1: return False, 'host unreachable (1)'
+	loss = re.findall(r'\((\d+)%', out)
+	if not re.findall(r' \d+\.\d+\.\d+\.\d+: .+?=\d+\D+=\d+\D+=\d+', out):
+		return False, 'host unreachable (2)'
+	loss = int(loss[0])
+	av_time = int(
+		re.findall(r' = (\d+).+? = (\d+).+? = (\d+)', out)[1][2]
+	)
+	return True, (loss, av_time)
