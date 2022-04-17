@@ -34,7 +34,6 @@
 	- [Процессы](#процессы)
 	- [Шифрование](#шифрование)
 	- [Mikrotik RouterOS](#mikrotik-routeros)
-	- [Winamp](#winamp)
 - [Советы и рекомендации]()
 - [Расширение для Firefox](#расширение-для-firefox)
 - [Контекстное меню](#контекстное-меню)
@@ -578,21 +577,6 @@
 			, device_pwd='PasSWoRd'
 		)
 
-### Winamp
-- **winamp_close** - закрыть Винамп.
-- **winamp_fast_forward** - перемотка на 5 секунд вперёд.
-- **winamp_fast_rewind** - перемотка на 5 секунд назад.
-- **winamp_notification()** - показать уведомление (только для скина «Modern»).
-- **winamp_pause()** - пауза.
-- **winamp_play()** - воспроизведение.
-- **winamp_status()->str:** - статус воспроизведения ('playing', 'paused' или 'stopped').
-- **winamp_stop()** - остановить.
-- **winamp_toggle_always_on_top** - установить/снять окно поверх всех окон.
-- **winamp_toggle_main_window** - показать/скрыть окно Винампа.
-- **winamp_toggle_media_library** - показать/скрыть окно библиотеки.
-- **winamp_track_info(sep:str='   ')->str:** - получить строку с частотой, битрейтом и количеством каналов у текущего трека. *sep* — разделитель.
-- **winamp_track_length()->str:** - длина трека.
-- **winamp_track_title(clean:bool=True)->str:** - название текущего трека.
 
 ## Полезные советы
 

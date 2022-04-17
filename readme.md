@@ -34,7 +34,6 @@ Another example: show message box every day at 10:30 and hide this task from men
 	- [Process](#process)
 	- [Cryptography](#cryptography)
 	- [Mikrotik RouterOS](#mikrotik-routeros)
-	- [Winamp](#winamp)
 - [Tips and tricks](#tips-and-tricks)
 - [Firefox extension](#firefox-extension)
 - [Context menu](#context-menu)
@@ -578,21 +577,6 @@ In the functions for working with windows, the *window* argument can be either a
 			, device_pwd='PaSsW0rd'
 		)
 
-### Winamp
-- **winamp_close** - close Winamp.
-- **winamp_fast_forward** - fast forward 5 sec.
-- **winamp_fast_rewind** - rewind 5 sec.
-- **winamp_notification()** - show notification (for «Modern» skin only).
-- **winamp_pause()** - pause.
-- **winamp_play()** - play.
-- **winamp_status()->str:** - playback status ('playing', 'paused' or 'stopped').
-- **winamp_stop()** - stop.
-- **winamp_toggle_always_on_top** - toggle always on top.
-- **winamp_toggle_main_window** - show/hide Winamp window.
-- **winamp_toggle_media_library** - show/hide media library.
-- **winamp_track_info(sep:str='   ')->str:** - return string with samplerate, bitrate and channels. *sep* — separator.
-- **winamp_track_length()->str:** - track length.
-- **winamp_track_title(clean:bool=True)->str:** - current track title.
 
 ## Tips and tricks
 
