@@ -583,10 +583,10 @@ In the functions for working with windows, the *window* argument can be either a
 If you want to save something so that it survives a crontab reload, use the global dictionary **gdic**:
 
 	def demo__gdic():
-	if not gdic.get('test var'):
-		gdic['test var'] = 0
-	gdic['test var'] += 1
-	dialog(f'Try to reload crontab: {gdic["test var"]}')
+		if not gdic.get('test var'):
+			gdic['test var'] = 0
+		gdic['test var'] += 1
+		dialog(f'Try to reload crontab: {gdic["test var"]}')
 
 
 ## Firefox extension
