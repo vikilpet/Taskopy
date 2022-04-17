@@ -21,7 +21,7 @@ from .tools import dev_print, time_sleep, tdebug \
 , locale_set, safe, patch_import, value_to_unit, time_diff \
 , median
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.84 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 
 def http_req(url:str, encoding:str='utf-8', session:bool=False

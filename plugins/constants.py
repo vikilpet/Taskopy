@@ -1,8 +1,4 @@
 import win32con
-WA_PLAYING = 'playing'
-WA_PAUSED = 'paused'
-WA_STOPPED = 'stopped'
-WA_FULLPATH = r'C:\Program Files (x86)\Winamp\winamp.exe'
 CALLER_HOTKEY = 'hotkey'
 CALLER_HTTP = 'http'
 CALLER_MENU = 'menu'
@@ -49,9 +45,9 @@ TDF_CAN_BE_MINIMIZED = 32768
 DL_CANCEL = win32con.IDCANCEL
 DL_OK = win32con.IDOK
 DL_TIMEOUT = 0
-WINDOW_MINIMIZED = win32con.SW_SHOWMINNOACTIVE
-WINDOW_MAXIMIZED = win32con.SW_SHOWMAXIMIZED
-WINDOW_HIDDEN = win32con.SW_HIDE
+WIN_MINIMIZED = win32con.SW_SHOWMINNOACTIVE
+WIN_MAXIMIZED = win32con.SW_SHOWMAXIMIZED
+WIN_HIDDEN = win32con.SW_HIDE
 DATE_FORMAT = '%A, %d %B %Y %H:%M:%S.%f'
 DATE_STR_ISO_MCS = '%Y-%m-%d %H:%M:%S.%f'
 DATE_STR_ISO = '%Y-%m-%d %H:%M:%S'

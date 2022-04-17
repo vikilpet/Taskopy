@@ -22,7 +22,7 @@ from ctypes import wintypes
 
 from .tools import DictToObj, dev_print, msgbox, tprint, patch_import
 from .plugin_filesystem import path_exists
-from .plugin_system import window_list_top
+from .plugin_system import win_list_top
 
 # https://psutil.readthedocs.io/en/latest/
 
@@ -46,7 +46,7 @@ def file_open(fullpath:str, parameters:str=None, operation:str='open'
 	win32api.ShellExecute(None, operation.lower(), fullpath
 	, parameters, cwd, showcmd)
 
-def process_get(process, cmd_filter:str=None)->int:
+def proc_get(process, cmd_filter:str=None)->int:
 	''' Returns PID of process.
 		cmd_filter - find process with that
 			string in command line.
@@ -59,7 +59,7 @@ def process_get(process, cmd_filter:str=None)->int:
 		try:
 			proc_name = proc.name().lower()
 		except psutil.AccessDenied as e:
-			dev_print('process_get error: ' + repr(e))
+			dev_print('proc_get error: ' + repr(e))
 			continue
 		if proc_name == name:
 			if not cmd_filter:
@@ -213,7 +213,7 @@ def app_start(
 	else:
 		return r.pid
 
-def process_exist(process, cmd_filter:str=None
+def proc_exist(process, cmd_filter:str=None
 , user_filter:str=None)->bool:
 	''' Returns PID if the process with the specified name exists.
 		process - image name or PID.
@@ -249,7 +249,7 @@ def process_exist(process, cmd_filter:str=None
 			dev_print(f'proc_exist access denied: {process}')
 	return False
 
-def process_list(name:str='', cmd_filter:str=None
+def proc_list(name:str='', cmd_filter:str=None
 , ad_value=None)->list:
 	''' Returns list of DictToObj with process information.
 		name - image name. If not specified then list all
@@ -277,7 +277,7 @@ def process_list(name:str='', cmd_filter:str=None
 			try:
 				if proc.name().lower() != name: continue
 			except psutil.AccessDenied as e:
-				dev_print('process_list error: ' + repr(e))
+				dev_print('proc_list error: ' + repr(e))
 		di = proc.as_dict(attrs=ATTRS, ad_value=ad_value)
 		for key in di:
 			if isinstance(di[key], str):
@@ -295,7 +295,7 @@ def process_list(name:str='', cmd_filter:str=None
 		proc_list.append( DictToObj(di) )
 	return proc_list
 
-def process_cpu(pid:int, interval:int=1)->float:
+def proc_cpu(pid:int, interval:int=1)->float:
 	''' Returns CPU usage of specified PID for specified interval
 		of time in seconds.
 	'''
@@ -305,14 +305,14 @@ def process_cpu(pid:int, interval:int=1)->float:
 	except psutil.NoSuchProcess:
 		return 0
 
-def process_kill(process, cmd_filter:str=None):
+def proc_kill(process, cmd_filter:str=None):
 	''' Kills the prosess.
 	'''
 	if isinstance(process, int):
 		try:
 			psutil.Process(process).kill()
 		except ProcessLookupError:
-			dev_print(f'process_kill: PID {process} not found')
+			dev_print(f'proc_kill: PID {process} not found')
 	elif isinstance(process, str):
 		name = process.lower()
 		if cmd_filter: cmd_filter = cmd_filter.lower()
@@ -338,11 +338,11 @@ def free_ram(unit:str='percent'):
 	else:
 		return psutil.virtual_memory()[4] // e
 
-def process_threads_num(process):
-	pid = process_get(process)
+def proc_threads_num(process):
+	pid = proc_get(process)
 	return len(psutil.Process(pid=pid).threads())
 
-def process_close(process, timeout:int=10
+def proc_close(process, timeout:int=10
 , cmd_filter:str=None):
 	''' Kills the process 'softly'. Returns 'True' if process
 		was closed 'softly' and False if process was killed
@@ -353,7 +353,7 @@ def process_close(process, timeout:int=10
 		windows.append(hwnd)
 		return True
 	
-	pid = process_get(process, cmd_filter)
+	pid = proc_get(process, cmd_filter)
 	if not pid: return False
 	windows = []
 	try:
@@ -713,12 +713,12 @@ startupinfo=None, timeout:int=-1)->int:
 	)
 	return win32process.GetExitCodeProcess(proc_handle)
 
-def window_by_pid(process)->tuple:
+def win_by_pid(process)->tuple:
 	'''
 	Returns top window of a process as a tuple (hwnd:int, title:str).
 	'''
-	pid = process_get(process)
-	win_lst = window_list_top()
+	pid = proc_get(process)
+	win_lst = win_list_top()
 	for hwnd, title in win_lst:
 		if win32process.GetWindowThreadProcessId(hwnd)[1] == pid:
 			return (hwnd, title)

@@ -110,14 +110,14 @@ class GlobalHotKeys():
 				_user32.DispatchMessageA(ctypes.byref(msg))
 		finally:
 			s.unregister()
-keys_pressed = keyboard.is_pressed
-keys_send = keyboard.send
-keys_write = keyboard.write
+key_pressed = keyboard.is_pressed
+key_send = keyboard.send
+key_write = keyboard.write
 
-keys_press = keyboard.press
-keys_release = keyboard.release
+key_press = keyboard.press
+key_release = keyboard.release
 
-def keys_release_wait(keys:str, timeout='10 ms'):
+def key_release_wait(keys:str, timeout='10 ms'):
 	'''
 	Wait until all the keys are released.
 	*keys* - a string with hotkey for a task like 'ctrl+shift+m'

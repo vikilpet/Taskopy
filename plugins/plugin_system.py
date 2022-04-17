@@ -20,13 +20,13 @@ _APPCOMMAND_VOLUME_MUTE = 0x80000
 _APPCOMMAND_VOLUME_DOWN = 0x90000
 _APPCOMMAND_VOLUME_UP = 0xA0000
 
-def window_get(window=None, class_name:str=None)->int:
+def win_get(window=None, class_name:str=None)->int:
 	'''
 	Returns window handle. If window is not specified then
 	finds foreground window.
 	You can use atherisk for an imprecise search:
 
-		>window_get('Total Commander*')
+		>win_get('Total Commander*')
 		132940
 
 	'''
@@ -34,7 +34,7 @@ def window_get(window=None, class_name:str=None)->int:
 		return window
 	elif isinstance(window, str):
 		if '*' in window:
-			if not (li := window_find(title=window.strip('*'), exact=False) ):
+			if not (li := win_find(title=window.strip('*'), exact=False) ):
 				return
 			return li[0]
 		else:
@@ -104,32 +104,32 @@ def registry_set(fullpath:str, value, value_type:str=None):
 	except WindowsError as e:
 		return f'error: {e}'
 
-def window_class_name(window=None)->str:
+def win_class_name(window=None)->str:
 	''' Gets the name of the window class '''
-	hwnd = window_get(window)
+	hwnd = win_get(window)
 	if hwnd:
 		return win32gui.GetClassName(hwnd)
 	else:
 		return None
 
-def window_title_get(window=None)->str:
+def win_title_get(window=None)->str:
 	''' Gets the title of the window.
 	'''
-	hwnd = window_get(window)
+	hwnd = win_get(window)
 	if hwnd:
 		return win32gui.GetWindowText(hwnd)
 	else:
 		return 'error: not found'
 
-def window_title_set(window=None, new_title:str='')->int:
+def win_title_set(window=None, new_title:str='')->int:
 	''' Sets window title, returns hwnd.
 	'''
-	hwnd = window_get(window)
+	hwnd = win_get(window)
 	if hwnd:
 		win32gui.SetWindowText(hwnd, new_title)
 		return hwnd
 
-def window_list(title_filter:str=None
+def win_list(title_filter:str=None
 , class_filter:str=None
 , case_sensitive:bool=False)->list:
 	''' List titles of all the windows.
@@ -167,7 +167,7 @@ def window_list(title_filter:str=None
 			]
 	return titles
 
-def window_find(title:str, exact:bool=True)->list:
+def win_find(title:str, exact:bool=True)->list:
 	''' Find window handle by title.
 		Returns list of found window handles.
 	'''
@@ -184,67 +184,67 @@ def window_find(title:str, exact:bool=True)->list:
 	win32gui.EnumWindows(check_title, title)
 	return result
 
-def window_activate(window=None)->int:
+def win_activate(window=None)->int:
 	''' Bring window to front, returns hwnd.
 	'''
-	hwnd = window_get(window)
+	hwnd = win_get(window)
 	if hwnd:
 		win32gui.SetForegroundWindow(hwnd)
 		return hwnd
 
-def window_act_rest(window=None)->int:
+def win_act_rest(window=None)->int:
 	'''
 	Activates the window and restores it if it is minimized.
 	'''
-	if not (hwnd := window_get(window) ): return
+	if not (hwnd := win_get(window) ): return
 	win32gui.SetForegroundWindow(hwnd)
 	if win32gui.IsIconic(hwnd): win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
 	return hwnd
 
-def window_minimize(window=None)->int:
+def win_minimize(window=None)->int:
 	''' Minimize window. Returns hwnd.
 	'''
-	hwnd = window_get(window)
+	hwnd = win_get(window)
 	if hwnd:
 		win32gui.ShowWindow(hwnd, win32con.SW_MINIMIZE)
 		return hwnd
 	
-def window_maximize(window=None)->int:
+def win_maximize(window=None)->int:
 	''' Maximize window. Returns hwnd.
 	'''
-	hwnd = window_get(window)
+	hwnd = win_get(window)
 	if hwnd:
 		win32gui.ShowWindow(hwnd, win32con.SW_MAXIMIZE)
 		return hwnd
 
-def window_restore(window=None)->int:
+def win_restore(window=None)->int:
 	''' Restore window. Returns hwnd.
 	'''
-	hwnd = window_get(window)
+	hwnd = win_get(window)
 	if hwnd:
 		win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
 		return hwnd
 
-def window_show(window=None)->int:
+def win_show(window=None)->int:
 	''' Show window. Returns hwnd.
 	'''
-	hwnd = window_get(window)
+	hwnd = win_get(window)
 	if hwnd:
 		win32gui.ShowWindow(hwnd, win32con.SW_SHOW)
 		return hwnd
 
-def window_hide(window=None)->int:
+def win_hide(window=None)->int:
 	''' Hide window. Returns hwnd.
 	'''
-	hwnd = window_get(window)
+	hwnd = win_get(window)
 	if hwnd:
 		win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
 		return hwnd
 
-def window_on_top(window=None, on_top:bool=True)->int:
+def win_on_top(window=None, on_top:bool=True)->int:
 	''' Sets the window to stay always on top.
 	'''
-	hwnd = window_get(window)
+	hwnd = win_get(window)
 	if hwnd:
 		try:
 			win32gui.SetWindowPos(
@@ -293,35 +293,35 @@ def monitor_on():
 	
 
 
-def window_is_visible(window=None)->bool:
+def win_is_visible(window=None)->bool:
 	''' Is window visible?
 	''' 
-	hwnd = window_get(window)
+	hwnd = win_get(window)
 	if hwnd:
 		return win32gui.IsWindowVisible(hwnd) == 1
 	else:
 		return False
 
-def window_close(window=None, wait:bool=True)->bool:
+def win_close(window=None, wait:bool=True)->bool:
 	'''
 	Closes window and returns True on success.
 	'''
-	hwnd = window_get(window)
+	hwnd = win_get(window)
 	if not hwnd: return False
 	func = win32gui.SendMessage if wait else win32gui.PostMessage
 	func(hwnd, win32con.WM_CLOSE, 0, 0)
 	return True
 
-def window_coor_get(window=None)->tuple:
+def win_coor_get(window=None)->tuple:
 	''' Returns coordinates of window:
 		(top left x, y, bottom right x, y)
 	'''
-	hwnd = window_get(window)
+	hwnd = win_get(window)
 	if hwnd: return win32gui.GetWindowRect(hwnd)
 
 
 
-def window_list_top()->list:
+def win_list_top()->list:
 	'''
 	Gets a list of the top-level visible windows only.
 	Returns list of tuples: (hwnd, 'title')

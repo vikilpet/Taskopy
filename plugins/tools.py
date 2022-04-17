@@ -40,13 +40,13 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2022-03-27'
+APP_VERSION = 'v2022-04-17'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
-if not __builtins__.get('uglobals', None):
-	uglobals = {}
-	__builtins__['uglobals'] = uglobals
+if not __builtins__.get('gdic', None):
+	gdic = {}
+	__builtins__['gdic'] = gdic
 	_app:wx.App = None
 	__builtins__['_app'] = _app
 TASK_OPTIONS = [
@@ -1746,7 +1746,7 @@ def crontab_reload():
 	' Reloads the crontab '
 	return app.load_crontab()
 
-def app_window_show():
+def app_win_show():
 	' Shows the application console window '
 	app.show_window()
 

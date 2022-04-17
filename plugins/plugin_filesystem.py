@@ -351,8 +351,13 @@ def file_ext(fullpath)->str:
 	return ext[1:]
 
 def file_basename(fullpath)->str:
-	''' Returns basename: file name without 
-		parent folder and extension.
+	r'''
+	Returns basename: file name without 
+	parent folder and extension. Example:
+
+		file_basename(r'c:\pagefile.sys')
+		> 'pagefile'
+
 	'''
 	fullpath = file_path_fix(fullpath)
 	fname = os.path.basename(fullpath)
@@ -1210,7 +1215,7 @@ def drive_io(drive_num:int=None)->dict:
 		print(next(dio)[0].read_bytes)
 		time_sleep('1 sec')
 		print(
-			file_size_str(next(dio)[0].total_bytes_delta, suffix='/s')
+			file_size_str(next(dio)[0].total_bytes_delta)
 		)
 
 	'''
@@ -1236,7 +1241,7 @@ def drive_io(drive_num:int=None)->dict:
 			, delta_wb, delta_rb + delta_wb)
 		prev_time = cur_time
 		if drive_num:
-			yield cur[drive]
+			yield cur[drive_num]
 		else:
 			yield cur
 

@@ -14,7 +14,7 @@ try:
 except ModuleNotFoundError:
 	import plugins.constants as tcon
 
-_TASK_TIMEOUT = 60
+_TASK_TIMEOUT = 120
 _FAVICON = None
 
 if __name__ == '__main__':

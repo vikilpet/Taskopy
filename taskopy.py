@@ -312,11 +312,14 @@ class Tasks:
 			if task_opts['menu']:
 				submenu = None
 				if '__' in task_opts['task_func_name']:
-					submenu = task_opts['task_func_name'].split('__')[0]
+					submenu, sm_name = task_opts['task_func_name'].split('__', maxsplit=1)
 					submenu = submenu.replace('_', ' ')
-					if not submenu[0].isupper(): submenu = submenu.capitalize()
-				if task_opts['submenu']: submenu = task_opts['submenu']
+					sm_name = sm_name.replace('_', ' ').capitalize()
+					task_opts['task_name_submenu'] = sm_name
+				if s := task_opts.get('submenu'): submenu = s
 				if submenu:
+					if not submenu[0].isupper():
+						submenu = submenu.capitalize()
 					for m in self.task_list_submenus:
 						if m[0] == submenu:
 							m[1].append(task_opts)
@@ -533,7 +536,7 @@ class Tasks:
 
 	def run_at_startup(self):
 		if sett.hide_console:
-			window_hide(app.app_hwnd)
+			win_hide(app.app_hwnd)
 		for task in self.task_list_startup:
 			self.run_task(task, caller=CALLER_STARTUP)
 			
@@ -787,17 +790,21 @@ class Tasks:
 
 def create_menu_item(menu, task, func=None, parent_menu=None):
 	''' Task - task dict or menu item label
-		If task is dict then func = tasks.run_task
+		If task is a dict then func = tasks.run_task
 		parent_menu - only for submenu items.
 	'''
 	if isinstance(task, dict):
-		tn = task['task_name']
+		tname = task['task_name']
 		if task['hotkey']:
-			tn = f"{tn}\t{task['hotkey'].title()}"
+			tname = f"{tname}\t{task['hotkey'].title()}"
 		func = lambda evt, temp=task: tasks.run_task(task=temp, caller=CALLER_MENU)
 	else:
-		tn = task
-	item = wx.MenuItem(menu, -1, tn)
+		tname = task
+	if parent_menu:
+		tname = task.get('task_name_submenu', tname)
+		item = wx.MenuItem(menu, -1, tname)
+	else:
+		item = wx.MenuItem(menu, -1, tname)
 	if parent_menu:
 		parent_menu.Bind(wx.EVT_MENU, func, id=item.GetId())
 	else:
@@ -882,8 +889,8 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		if sett.kiosk and not keyboard.is_pressed(sett.kiosk_key): return
 		if app.app_hwnd:
 			if sett.hide_console:
-				if window_is_visible(app.app_hwnd):
-					window_hide(app.app_hwnd)
+				if win_is_visible(app.app_hwnd):
+					win_hide(app.app_hwnd)
 				else:
 					show_app_window()
 			else:
@@ -1012,7 +1019,7 @@ class App(wx.App):
 		self.taskbaricon = TaskBarIcon(self.frame)
 		self.app_pid = os.getpid()
 		self.app_threads = {}
-		hwnd_list = window_find(APP_NAME)
+		hwnd_list = win_find(APP_NAME)
 		if len(hwnd_list) == 1:
 			self.app_hwnd = hwnd_list[0]
 		elif len(hwnd_list) > 1:

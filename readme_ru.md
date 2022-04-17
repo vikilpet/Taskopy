@@ -35,6 +35,7 @@
 	- [Шифрование](#шифрование)
 	- [Mikrotik RouterOS](#mikrotik-routeros)
 	- [Winamp](#winamp)
+- [Советы и рекомендации]()
 - [Расширение для Firefox](#расширение-для-firefox)
 - [Контекстное меню](#контекстное-меню)
 - [Помочь проекту](#помощь-проекту)
@@ -281,9 +282,9 @@
 
 ### Клавиатура
 
-- **keys_pressed(hotkey:str)->bool** - нажата ли клавиша.
-- **keys_send(hotkey:str)** - нажать сочетание клавиш.
-- **keys_write(text:str)** - написать текст.
+- **key_pressed(hotkey:str)->bool** - нажата ли клавиша.
+- **key_send(hotkey:str)** - нажать сочетание клавиш.
+- **key_write(text:str)** - написать текст.
 
 ### Файловая система
 
@@ -420,15 +421,15 @@
 - **monitor_on()** - включает монитор.
 - **registry_get(fullpath:str)** - получить значение ключа из реестра Windows.
 	*fullpath* — строка вида 'HKEY_CURRENT_USER\\\Software\\\Microsoft\\\Calc\\\layout'
-- **window_activate(window=None)->int** - вывести указанное окно на передний план. *window* может строкой с заголовком или числовым хэндлом нужного окна.
-- **window_by_pid(process)->tuple** - возвращает главное окно процесса в виде кортежа `(hwnd:int, title:str)`.
-- **window_close(window=None, wait:bool=True)->bool** - закрывает окно и возвращает True при успехе.
-- **window_find(title:str)->list** - вернуть список хэндлов окон, с указанным заголовком.
-- **window_hide(window=None)->int** - скрыть окно.
-- **window_list(title_filter:str=None, class_filter:str=None, case_sensitive:bool=False)->list** - список заголовков всех окон. *title_filter* - вернуть только заголовки с этой подстрокой.
-**- window_on_top(window=None, on_top:bool=True)->int** - делает указанное окно поверх других окон.
-- **window_show(window=None)->int** - показать окно.
-- **window_title_set(window=None, new_title:str='')->int** -  найти окно по заголовку *cur_title* и поменять на *new_title*.
+- **win_activate(window=None)->int** - вывести указанное окно на передний план. *window* может строкой с заголовком или числовым хэндлом нужного окна.
+- **win_by_pid(process)->tuple** - возвращает главное окно процесса в виде кортежа `(hwnd:int, title:str)`.
+- **win_close(window=None, wait:bool=True)->bool** - закрывает окно и возвращает True при успехе.
+- **win_find(title:str)->list** - вернуть список хэндлов окон, с указанным заголовком.
+- **win_hide(window=None)->int** - скрыть окно.
+- **win_list(title_filter:str=None, class_filter:str=None, case_sensitive:bool=False)->list** - список заголовков всех окон. *title_filter* - вернуть только заголовки с этой подстрокой.
+**- win_on_top(window=None, on_top:bool=True)->int** - делает указанное окно поверх других окон.
+- **win_show(window=None)->int** - показать окно.
+- **win_title_set(window=None, new_title:str='')->int** -  найти окно по заголовку *cur_title* и поменять на *new_title*.
 
 ### Почта
 - **mail_check(server:str, login:str, password:str, folders:list=['inbox'], msg_status:str='UNSEEN')->tuple** - подсчитывает количество сообщений со статусом *msg_status* на сервере. Returns (msg_num:int, errors:list). 
@@ -446,9 +447,9 @@
 	*app_args* — аргументы командной строки.
 	*wait* — приостановить выполнение задачи, пока не завершится запущенный процесс.
 - **file_open(fullpath:str)** - открыть файл или URL в приложении по умолчанию.
-- **process_close(process, timeout:int=10, cmd_filter:str=None)** - мягкое завершение процесса: сначала закрываются все окна, принадлежащие указанному процессу, а по истечении таймаута (в секундах) убивается сам процесс, если ещё существует. *cmd_filter* - убивать только процессы, содержащие эту строку в командной строке.
-- **process_exist(process, cmd_filter:str=None, user_filter:str=None)->bool** - проверяет, существует ли процесс и возвращает PID или False. *cmd* - необязательная строка для поиска в командной строке. Таким образом можно различать процессы с одинаковым исполняемым файлом но разной командной строкой.
-- **process_list(name:str='', cmd_filter:str=None)->list —** получить список процессов. Список содержит объекты *DictToObj*, у которых есть следующие свойства:
+- **proc_close(process, timeout:int=10, cmd_filter:str=None)** - мягкое завершение процесса: сначала закрываются все окна, принадлежащие указанному процессу, а по истечении таймаута (в секундах) убивается сам процесс, если ещё существует. *cmd_filter* - убивать только процессы, содержащие эту строку в командной строке.
+- **proc_exist(process, cmd_filter:str=None, user_filter:str=None)->bool** - проверяет, существует ли процесс и возвращает PID или False. *cmd* - необязательная строка для поиска в командной строке. Таким образом можно различать процессы с одинаковым исполняемым файлом но разной командной строкой.
+- **proc_list(name:str='', cmd_filter:str=None)->list —** получить список процессов. Список содержит объекты *DictToObj*, у которых есть следующие свойства:
 	*pid* — числовой идентификатор.
 	*name* — имя файла.
 	*username* — имя пользователя.
@@ -459,11 +460,11 @@
 
 	Пример — распечатать PID всех процессов Firefox:
 
-		for proc in process_list('firefox.exe'):
+		for proc in proc_list('firefox.exe'):
 			print(proc.pid)
 
-- **process_cpu(pid:int, interval:int=1)->float** - процент загрузки процессора указанным PID. *interval* — время замера в секундах.
-- **process_kill(process, cmd_filter:str=None)** - убить указанный процесс. *process* может быть строкой с именем исполняемого файла, тогда будут завершены все процессы с таким названием, либо это может быть числовой PID, и тогда будет завершён только указанный процесс. *cmd_filter* - убивать только процессы, содержащие эту строку в командной строке.
+- **proc_cpu(pid:int, interval:int=1)->float** - процент загрузки процессора указанным PID. *interval* — время замера в секундах.
+- **proc_kill(process, cmd_filter:str=None)** - убить указанный процесс. *process* может быть строкой с именем исполняемого файла, тогда будут завершены все процессы с таким названием, либо это может быть числовой PID, и тогда будет завершён только указанный процесс. *cmd_filter* - убивать только процессы, содержащие эту строку в командной строке.
 - **screen_width()->int** - ширина экрана.
 - **screen_height()->int** - высота экрана.
 - **service_start(service:str, args:tuple=None)** - запускает службу.
@@ -593,6 +594,17 @@
 - **winamp_track_length()->str:** - длина трека.
 - **winamp_track_title(clean:bool=True)->str:** - название текущего трека.
 
+## Полезные советы
+
+Если вы хотите сохранить что-нибудь так, чтобы оно пережило перезагрузку кронтаба, используйте глобальный словарь **gdic**:
+
+	def demo__gdic():
+		if not gdic.get('test var'):
+			gdic['test var'] = 0
+		gdic['test var'] += 1
+		dialog(f'Попробуйте перечитать кронтаб: {gdic["test var"]}')
+
+
 ## Расширение для Firefox
 https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/
 
@@ -648,25 +660,25 @@ https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/
 	def iPython(on_load=False, submenu='WIP'
 	, task_name='iPython + Taskopy'):
 		TASKOPY_DIR = r'd:\soft\taskopy'
-		process_kill('ipython.exe')
+		proc_kill('ipython.exe')
 		file_open('ipython')
 		for _ in range(100):
-			if 'ipython' in window_title_get().lower():
+			if 'ipython' in win_title_get().lower():
 				break
 			pause('100 ms')
 		pause(1)
-		if not 'ipython'.lower() in window_title_get().lower():
+		if not 'ipython'.lower() in win_title_get().lower():
 			tprint('ipython not found')
 			return
-		keys_write('%cd ' + TASKOPY_DIR)
-		keys_send('enter')
-		keys_write(
+		key_write('%cd ' + TASKOPY_DIR)
+		key_send('enter')
+		key_write(
 			r'%load_ext autoreload' + '\n'
 			+ r'%autoreload 2' + '\n'
 			+ 'from crontab import *\n'
 		)
 		pause('200 ms')
-		keys_send('ctrl+enter')
+		key_send('ctrl+enter')
 	
 Проверяем свободное место на всех дисках. Планируем выполнение случайный интервал между 30 и 45 минутами:
 
@@ -715,7 +727,7 @@ https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/
 			, ['beznal', '840', '0', 'sellValue']
 		)
 		# Теперь меняем заголовок калькулятора на USD={найденное значение}
-		window_title_set('Калькулятор', f'USD={usd}')
+		win_title_set('Калькулятор', f'USD={usd}')
 
 Проверяем MD5 хеш файла на Virustotal. Вам нужно будет зарегистрироваться там, чтобы получить бесплатный API ключ:
 

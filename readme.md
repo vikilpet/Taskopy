@@ -35,10 +35,11 @@ Another example: show message box every day at 10:30 and hide this task from men
 	- [Cryptography](#cryptography)
 	- [Mikrotik RouterOS](#mikrotik-routeros)
 	- [Winamp](#winamp)
+- [Tips and tricks](#tips-and-tricks)
 - [Firefox extension](#firefox-extension)
 - [Context menu](#context-menu)
-- [Help Me](#help-me)
-- [Task Examples](#task-examples)
+- [Help me](#help-me)
+- [Task examples](#task-examples)
 
 ## Installation
 ### Option 1: binary file
@@ -281,9 +282,9 @@ Format: **setting** (default value) — description.
 
 ### Keyboard
 
-- **keys_pressed(hotkey:str)->bool** - is the key pressed?
-- **keys_send(hotkey:str)** - press the key combination.
-- **keys_write(text:str)** - write a text.
+- **key_pressed(hotkey:str)->bool** - is the key pressed?
+- **key_send(hotkey:str)** - press the key combination.
+- **key_write(text:str)** - write a text.
 
 ### Filesystem
 
@@ -420,15 +421,15 @@ In the functions for working with windows, the *window* argument can be either a
 - **monitor_on()** - turns on the monitor.
 - **registry_get(fullpath:str)** - get value from Windows Registry.
 	*fullpath* — string like 'HKEY_CURRENT_USER\\Software\\Microsoft\\Calc\\layout'
-- **window_activate(window=None)->int** - bring window to front. *window* may be a string with title or integer with window handle.
-- **window_by_pid(process)->tuple** - returns top window of a process as a tuple `(hwnd:int, title:str)`.
-- **window_close(window=None, wait:bool=True)->bool** - closes window and returns True on success.
-- **window_find(title:str)->list** - find window by title. Returns list of all found windows.
-- **window_hide(window=None)->int** - hide window.
-- **window_list(title_filter:str=None, class_filter:str=None, case_sensitive:bool=False)->list** - list of titles of all windows. *title_filter* - optional filter for titles.
-**- window_on_top(window=None, on_top:bool=True)->int** - makes the window to stay always on top.
-- **window_show(window=None)->int** - show window.
-- **window_title_set(window=None, new_title:str='')->int** - change window title from *cur_title* to *new_title*
+- **win_activate(window=None)->int** - bring window to front. *window* may be a string with title or integer with window handle.
+- **win_by_pid(process)->tuple** - returns top window of a process as a tuple `(hwnd:int, title:str)`.
+- **win_close(window=None, wait:bool=True)->bool** - closes window and returns True on success.
+- **win_find(title:str)->list** - find window by title. Returns list of all found windows.
+- **win_hide(window=None)->int** - hide window.
+- **win_list(title_filter:str=None, class_filter:str=None, case_sensitive:bool=False)->list** - list of titles of all windows. *title_filter* - optional filter for titles.
+**- win_on_top(window=None, on_top:bool=True)->int** - makes the window to stay always on top.
+- **win_show(window=None)->int** - show window.
+- **win_title_set(window=None, new_title:str='')->int** - change window title from *cur_title* to *new_title*
 
 ### Mail
 - **mail_check(server:str, login:str, password:str, folders:list=['inbox'], msg_status:str='UNSEEN')->tuple** - counts the number of messages with *msg_status* on the server. Returns (msg_num:int, errors:list). 
@@ -446,9 +447,9 @@ In the functions for working with windows, the *window* argument can be either a
 	*app_args* — command-line arguments.
 	*wait* — wait until application will be closed.
 - **file_open(fullpath:str)** - open file or URL in default application.
-- **process_close(process, timeout:int=10, cmd_filter:str=None)** - soft completion of the process: first all windows belonging to the specified process are closed, and after the timeout (in seconds) the process itself is killed, if still exists. *cmd_filter* - kill only processes with that string in command line.
-- **process_exist(process, cmd_filter:str=None, user_filter:str=None)->bool** - checks whether the process exists and returns a PID or False. *cmd* is an optional command line search. This way you can distinguish between processes with the same executable but different command lines.
-- **process_list(name:str='', cmd_filter:str=None)->list** - get list of processes with that name. Item in list is a *DictToObj* object with this attributes:
+- **proc_close(process, timeout:int=10, cmd_filter:str=None)** - soft completion of the process: first all windows belonging to the specified process are closed, and after the timeout (in seconds) the process itself is killed, if still exists. *cmd_filter* - kill only processes with that string in command line.
+- **proc_exist(process, cmd_filter:str=None, user_filter:str=None)->bool** - checks whether the process exists and returns a PID or False. *cmd* is an optional command line search. This way you can distinguish between processes with the same executable but different command lines.
+- **proc_list(name:str='', cmd_filter:str=None)->list** - get list of processes with that name. Item in list is a *DictToObj* object with this attributes:
 	*pid* — PID of found process.
 	*name* — short name of executable.
 	*username* — username.
@@ -459,11 +460,11 @@ In the functions for working with windows, the *window* argument can be either a
 
 	Example — print PIDs of all Firefox processes:
 
-		for proc in process_list('firefox.exe'):
+		for proc in proc_list('firefox.exe'):
 			print(proc.pid)
 
-- **process_cpu(pid:int, interval:int=1)->float** - CPU usage of process with specified PID. *interval* in seconds - how long to measure.
-- **process_kill(process, cmd_filter:str=None)** - kill process or processes. *process* may be an integer so only process with this PID will be terminated. If *process* is a string then kill every process with that name. *cmd_filter* - kill only processes with that string in command line.
+- **proc_cpu(pid:int, interval:int=1)->float** - CPU usage of process with specified PID. *interval* in seconds - how long to measure.
+- **proc_kill(process, cmd_filter:str=None)** - kill process or processes. *process* may be an integer so only process with this PID will be terminated. If *process* is a string then kill every process with that name. *cmd_filter* - kill only processes with that string in command line.
 - **screen_width()->int** - width of screen.
 - **screen_height()->int** - height of screen.
 - **service_start(service:str, args:tuple=None)** - starts the service.
@@ -593,6 +594,17 @@ In the functions for working with windows, the *window* argument can be either a
 - **winamp_track_length()->str:** - track length.
 - **winamp_track_title(clean:bool=True)->str:** - current track title.
 
+## Tips and tricks
+
+If you want to save something so that it survives a crontab reload, use the global dictionary **gdic**:
+
+	def demo__gdic():
+	if not gdic.get('test var'):
+		gdic['test var'] = 0
+	gdic['test var'] += 1
+	dialog(f'Try to reload crontab: {gdic["test var"]}')
+
+
 ## Firefox extension
 https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/
 
@@ -647,25 +659,25 @@ Launch iPython (Jupyter) animport crontab for quick access to all keywords from 
 	def iPython(on_load=False, submenu='WIP'
 	, task_name='iPython + Taskopy'):
 		TASKOPY_DIR = r'd:\soft\taskopy'
-		process_kill('ipython.exe')
+		proc_kill('ipython.exe')
 		file_open('ipython')
 		for _ in range(100):
-			if 'ipython' in window_title_get().lower():
+			if 'ipython' in win_title_get().lower():
 				break
 			pause('100 ms')
 		pause(1)
-		if not 'ipython'.lower() in window_title_get().lower():
+		if not 'ipython'.lower() in win_title_get().lower():
 			tprint('ipython not found')
 			return
-		keys_write('%cd ' + TASKOPY_DIR)
-		keys_send('enter')
-		keys_write(
+		key_write('%cd ' + TASKOPY_DIR)
+		key_send('enter')
+		key_write(
 			r'%load_ext autoreload' + '\n'
 			+ r'%autoreload 2' + '\n'
 			+ 'from crontab import *\n'
 		)
 		pause('200 ms')
-		keys_send('ctrl+enter')
+		key_send('ctrl+enter')
 
  Check the free space on all local discs. Scheduled for a random interval between 30 and 45 minutes:
  
