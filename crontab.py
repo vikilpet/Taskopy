@@ -2,7 +2,6 @@ from plugins.tools import *
 from plugins.plugin_process import *
 from plugins.plugin_filesystem import *
 from plugins.plugin_network import *
-from plugins.plugin_winamp import *
 from plugins.plugin_system import *
 from plugins.plugin_routeros import *
 from plugins.plugin_hotkey import *
@@ -36,7 +35,7 @@ def demo_task_2(schedule='every().day.at("10:30")', menu=False):
 
 # Example of an HTTP task. «result» option means that the task should
 # return some value.
-# Open in your browser http://127.0.0.1:8275/task?demo_task_3
+# Open in your browser http://127.0.0.1:8275/demo_task_3
 def demo_task_3(http=True, result=True, menu=False):
 	# Get a list of files and folders in application directory:
 	listing = dir_list(r'*')

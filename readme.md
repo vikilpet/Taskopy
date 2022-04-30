@@ -12,7 +12,7 @@ Run your python code with hotkey or by HTTP-request just like that:
 	def my_task(hotkey='ctrl+shift+t', http=True):
 		print('This is my code!')
 
-Then press Ctrl+Shift+T or open in browser URL http://127.0.0.1:8275/task?my_task and your task will be executed.
+Then press Ctrl+Shift+T or open in browser URL http://127.0.0.1:8275/my_task and your task will be executed.
 
 Another example: show message box every day at 10:30 and hide this task from menu:
 
@@ -117,7 +117,7 @@ Format: **option name** (default value) — description.
 - **single** (True) — allow only one instance of running task.
 - **submenu** (None) — place task in this sub menu.
 - **result** (False) — task should return some value. Use together with http option to get page with task results.
-- **http** (False) — run task by HTTP request. HTTP request syntax: http://127.0.0.1:8275/task?your_task_name where «your_task_name» is the name of function from crontab.
+- **http** (False) — run task by HTTP request. HTTP request syntax: http://127.0.0.1:8275/your_task_name where «your_task_name» is the name of function from crontab.
 	If option **result** also enabled then HTTP request will show what task will return or 'OK' if there is no value returned.
 	Example:
 
@@ -184,7 +184,7 @@ Format: **setting** (default value) — description.
 
 	def http_file_demo(http=True, result=True
 	, submenu='demo'):
-		# http://127.0.0.1:8275/task?http_file_demo
+		# http://127.0.0.1:8275/http_file_demo
 		return HTTPFile(
 			fullpath=r'resources\icon.png'
 			, use_save_to=True
@@ -588,6 +588,7 @@ If you want to save something so that it survives a crontab reload, use the glob
 		gdic['test var'] += 1
 		dialog(f'Try to reload crontab: {gdic["test var"]}')
 
+If you want to save something so that it survives a Taskopy restart, use the file variables **dvar_get**, **dvar_set**, etc.
 
 ## Firefox extension
 https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/
@@ -596,7 +597,7 @@ Extension adds item to context menu. With it you can run task in Taskopy.
 
 In extension settings specify the URL of your task that will process data, for example:
 
-	http://127.0.0.1:8275/task?get_data_from_browser
+	http://127.0.0.1:8275/get_data_from_browser
 
 This task should have _data_ and _http=True_ properties. The *data* argument will be passed information about the request in *DataBrowserExt* format.
 
@@ -728,4 +729,4 @@ Receive a file via HTTP POST request and show a message with a comment and the f
 
 Example of sending a request to a task:
 
-	curl -F "filecomment=Take this!" -F "file=@d:\my_picture.jpg" http://127.0.0.1:8275/task?http_post_demo
+	curl -F "filecomment=Take this!" -F "file=@d:\my_picture.jpg" http://127.0.0.1:8275/http_post_demo

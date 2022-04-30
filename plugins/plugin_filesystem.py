@@ -29,7 +29,7 @@ from pathlib import Path
 import shutil
 import configparser
 from .tools import random_str, tdebug, patch_import \
-, time_sleep, dev_print, tprint
+, time_sleep, dev_print, tprint, is_iter, time_diff
 try:
 	import constants as tcon
 except ModuleNotFoundError:
@@ -42,6 +42,7 @@ _FORBIDDEN_DICT = dict(
 	**{chr(d) : '%' + hex(d)[2:] for d in range(32)}
 	, **{ c : '%' + hex(ord(c))[2:].upper() for c in _FORBIDDEN_CHARS}
 )
+_VAR_DIR = 'resources\\var'
 
 def _dir_slash(dirpath:str)->str:
 	''' Adds a trailing slash if it's not there. '''
@@ -69,14 +70,14 @@ def file_path_fix(fullpath):
 		return '\\\\?\\' + fullpath
 	return fullpath
 
-def file_read(fullpath, encoding:str='utf-8')->str:
+def file_read(fullpath, encoding:str='utf-8', errors:str=None)->str:
 	''' Returns content of file '''
 	fullpath = file_path_fix(fullpath)
 	if encoding == 'binary':
 		with open(fullpath, 'rb') as f:
 			return f.read()
 	else:
-		with open(fullpath, 'tr', encoding=encoding) as f:
+		with open(fullpath, 'tr', encoding=encoding, errors=errors) as f:
 			return f.read()
 
 def file_write(fullpath, content:str
@@ -1098,44 +1099,84 @@ def _file_name_pe(filename:str):
 		filename = filename.replace(char, repl)
 	return filename
 
+def _dvar_fpath(var)->str:
+	if not isinstance(var, str) and is_iter(var):
+		return os.path.join(_VAR_DIR
+		, *map(_file_name_pe, var) )
+	else:
+		return os.path.join(_VAR_DIR, _file_name_pe(var) )
+
+
 def dvar_get(var:str, default=None, encoding:str='utf-8'
 , as_literal:bool=False):
 	'''
 	Gets the disk variable.
+
 	*as_literal* - converts to a literal (dict, list, tuple etc).
 	Dangerous! - it's just **eval** and not **ast.literal_eval**
+
+		dvar_set('test', 1)
+		assert dvar_get('test') == '1'
+		assert dvar_get('test', as_literal=True) == 1
+		assert dvar_del('test') == True
+
 	'''
-	var = _file_name_pe(var)
+	fpath = _dvar_fpath(var)
 	try:
-		content = file_read(('resources', 'var', var), encoding=encoding)
+		content = file_read(fpath, encoding=encoding)
 	except FileNotFoundError:
 		return default
-	if not as_literal: return content
-	return eval(content) if content != '' else ''
+	if as_literal:
+		return eval(content) if content != '' else ''
+	else:
+		return content
 
-def dvar_set(var:str, value, encoding:str='utf-8'):
+def dvar_set(var, value, encoding:str='utf-8'):
 	'''
 	Sets the disk variable.
+
+		dvar_set('test', 5)
+		assert dvar_get('test') == '5'
+		assert dvar_del('test') == True
+		var = ('file', 'c:\\pagefile.sys')
+		dvar_set(var, 1)
+		assert dvar_get(var, 1) == '1'
+		assert dvar_del(var) == True
+
 	'''
-	var = _file_name_pe(var)
+	fpath = _dvar_fpath(var)
 	value = str(value)
 	try:
-		file_write(('resources', 'var', var), value, encoding=encoding)
+		file_write(fpath, value, encoding=encoding)
 	except FileNotFoundError:
-		os.makedirs(os.path.join('resources', 'var'))
-		file_write(('resources', 'var', var), value, encoding=encoding)
+		os.makedirs(_VAR_DIR)
+		file_write(fpath, value, encoding=encoding)
 
-def dvar_add(var:str, value, var_type=list, encoding:str='utf-8'):
+def dvar_del(var:str):
+	'''
+	Deletes variable. Returns True if var exists.
+
+		dvar_set('test', 'a')
+		assert dvar_del('test') == True
+		
+	'''
+	fpath = _dvar_fpath(var)
+	try:
+		os.remove(fpath)
+		return True
+	except FileNotFoundError:
+		return False
+
+def dvar_add(var:str, value, var_type=None
+, encoding:str='utf-8'):
 	'''
 	Adds the value to the previous value and returns the new value.
 
-		dvar_add(5)
-		> 5
-		dvar_add(3)
-		> 8
-		
+		assert dvar_add('test', 5, var_type=int) == 5
+		assert dvar_add('test', 3) == 8
+		assert dvar_del('test') == True
+
 	'''
-	var = _file_name_pe(var)
 	prev = dvar_get(var, encoding=encoding, as_literal=True)
 	if prev:
 		if isinstance(prev, list):
@@ -1150,17 +1191,93 @@ def dvar_add(var:str, value, var_type=list, encoding:str='utf-8'):
 			raise Exception('Wrong type of previous value')
 	else:
 		if var_type == set:
-			value = {value}
+			value = set(value)
 		elif var_type == int:
-			pass
+			value = int(value)
 		else:
 			value = [value]
-	try:
-		file_write(('resources', 'var', var), str(value), encoding=encoding)
-	except FileNotFoundError:
-		os.makedirs(os.path.join('resources', 'var'))
-		file_write(('resources', 'var', var), str(value), encoding=encoding)
+	dvar_set(var, value, encoding=encoding)
 	return value
+
+def dvar_lst_get(var:str, default=[]
+, encoding:str='utf-8', com_str:str='#')->list:
+	'''
+	Returns list with the text lines. Excludes empty lines
+	and lines that begin with *com_str*
+
+		dvar_lst_set('test', ['a', 'b'])
+		assert dvar_lst_get('test') == ['a', 'b']
+		dvar_lst_set('test', map(str, (1, 2)))
+		assert dvar_lst_get('test') == ['1', '2']
+		assert dvar_del('test') == True
+
+	'''
+	cont = dvar_get(var, default=default
+	, encoding=encoding)
+	if cont:
+		lst = cont.strip().splitlines()
+		return [l for l in lst
+			if l and (not l.startswith(com_str)) ]
+	else:
+		return cont
+
+def dvar_mod(var)->datetime.datetime:
+	'''
+	Returns the date of the last modification.
+	'''
+	fpath = _dvar_fpath(var)
+	return file_date_m(fpath)
+
+def dvar_mod_dif(var, unit:str='sec')->int:
+	'''
+	Returns how many time units have passed
+	since the last change.
+
+		assert dvar_mod_dif('_public_suffix_list', 'month') < 2
+
+	'''
+	return time_diff(dvar_mod(var), unit=unit)
+
+def dvar_lst_set(var, value, encoding:str='utf-8'):
+	'''
+	Sets the disk list variable.
+		dvar_lst_set('test', ['a', 'b', 1])
+		assert dvar_lst_get('test') == ['a', 'b', '1']
+		assert dvar_del('test')
+
+	'''
+	dvar_set(var, '\n'.join(map(str, value))
+	, encoding=encoding)
+
+def dvar_lst_add(var, value, encoding:str='utf-8')->list:
+	'''
+	Adds the value to the list
+	and returns the list.
+
+		dvar_lst_set('test', 'ab')
+		assert dvar_lst_add('test', 'c') == ['a', 'b', 'c']
+		assert dvar_del('test')
+
+	'''
+	lst = dvar_lst_get(var, encoding=encoding)
+	lst.append(str(value))
+	dvar_lst_set(var, lst, encoding=encoding)
+	return lst
+
+def dvar_lst_ext(var, value, encoding:str='utf-8')->list:
+	'''
+	Expands the list with the values of *value*. Returns
+	new list.
+
+		dvar_lst_set('test', 'ab')
+		assert dvar_lst_upd('test', 'cd') == ['a', 'b', 'c', 'd']
+		assert dvar_del('test')
+
+	'''
+	lst = dvar_lst_get(var, encoding=encoding)
+	lst.extend(map(str, value))
+	dvar_lst_set(var, lst, encoding=encoding)
+	return lst
 
 def file_drive(fullpath)->str:
 	'''

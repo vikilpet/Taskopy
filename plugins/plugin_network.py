@@ -20,9 +20,11 @@ import json2html
 from .tools import dev_print, time_sleep, tdebug \
 , locale_set, safe, patch_import, value_to_unit, time_diff \
 , median
+from .plugin_filesystem import dvar_lst_get
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.99 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
+_PUB_SUF_LST = set()
 
 def http_req(url:str, encoding:str='utf-8', session:bool=False
 , cookies:dict=None, headers:dict=None
@@ -449,21 +451,36 @@ def domain_ip(domain:str)->list:
 	data = socket.gethostbyname_ex(domain)
 	return data[2]
 
-
-
-def url_hostname(url:str, second_lvl:bool=True)->str:
+def url_hostname(url:str, sec_lvl:bool=True)->str:
 	'''
 	Get hostname (second level domain) from URL.
+
+		assert url_hostname('https://www.ncsc.gov.uk') == 'ncsc.gov.uk'
+		assert url_hostname('https://www.ncsc.gov.uk', sec_lvl=False) \
+			== 'www.ncsc.gov.uk'
+		assert url_hostname('http://user:pwd@abc.hostname.com:443/something') \
+			== 'hostname.com'
+		assert url_hostname('http://user:pwd@abc.hostname.com:443/something'
+		, sec_lvl=False)== 'abc.hostname.com'
+
 	'''
+	global _PUB_SUF_LST
 	if m := re.findall(r'//(\d+\.\d+\.\d+\.\d+)', url):
 		return m[0]
-	domain = urllib.parse.urlparse(url).netloc.split(':')[0]
-	if not second_lvl: return domain
-	if '.'.join(domain.split('.')[-2:]) in ['co.uk']:
-		suf_len = -3
-	else:
-		suf_len = -2
-	domain = '.'.join(domain.split('.')[suf_len:])
+	domain = urllib.parse.urlparse(url).netloc
+	if '@' in domain: domain = domain.split('@')[1]
+	if ':' in domain: domain = domain.split(':')[0]
+	if not sec_lvl: return domain
+	if not _PUB_SUF_LST:
+		_PUB_SUF_LST = set(
+			dvar_lst_get('_public_suffix_list')
+		)
+	variants = []
+	for i in range(domain.count('.')):
+		variants.append( '.'.join(domain.split('.')[-(i+1):]) )
+	for var in variants:
+		if var in _PUB_SUF_LST: continue
+		domain = var
 	return domain
 
 def net_url_decode(url:str, encoding:str='utf-8')->str:
@@ -529,6 +546,7 @@ def http_header(url:str, header:str, **kwargs)->str:
 def http_h_last_modified(url:str, **kwargs):
 	'HTTP Last Modified time in datetime format'
 	date_str = http_header(url, header='Last-Modified', **kwargs)
+	tdebug(date_str)
 	with locale_set('C'):
 		return datetime.datetime.strptime(date_str
 			, '%a, %d %b %Y %H:%M:%S GMT')

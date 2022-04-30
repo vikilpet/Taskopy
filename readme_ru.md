@@ -12,7 +12,7 @@
 	def my_task(hotkey='ctrl+shift+t', http=True):
 		print('Это моя задача!')
 
-Теперь можно нажать Ctrl+Shift+T или открыть в браузере http://127.0.0.1:8275/task?my_task и задача будет выполнена.
+Теперь можно нажать Ctrl+Shift+T или открыть в браузере http://127.0.0.1:8275/my_task и задача будет выполнена.
 
 Другой пример: показываем сообщение каждый день в 10:30 и скрываем из меню:
 
@@ -117,7 +117,7 @@
 - **single** (True) — одновременно может выполняться только одна копия задачи.
 - **submenu** (None) — разместить в подменю.
 - **result** (False) — задача должна вернуть какое-то значение. Используется вместе с **http** опцией для выдачи результатов задачи.
-- **http** (False) — запускать задачу через HTTP запрос. Синтаксис запроса: *http://127.0.0.1:8275/task?имя_задачи* где «имя_задачи» это название функции-задачи из crontab.
+- **http** (False) — запускать задачу через HTTP запрос. Синтаксис запроса: *http://127.0.0.1:8275/имя_задачи* где «имя_задачи» это название функции-задачи из crontab.
 	Если свойство **result** также включено, то HTTP-запрос покажет то, что вернула задача или 'OK' если ничего не было возвращено.
 	Пример:
 
@@ -184,7 +184,7 @@
 
 	def http_file_demo(http=True, result=True
 	, submenu='demo'):
-		# http://127.0.0.1:8275/task?http_file_demo
+		# http://127.0.0.1:8275/http_file_demo
 		return HTTPFile(
 			fullpath=r'resources\icon.png'
 			, use_save_to=True
@@ -588,6 +588,7 @@
 		gdic['test var'] += 1
 		dialog(f'Попробуйте перечитать кронтаб: {gdic["test var"]}')
 
+Если вы хотите сохранить что-нибудь, чтобы это пережило перезапуск Taskopy, то используйте файловые переменные **dvar_get**, **dvar_set** и т.д.
 
 ## Расширение для Firefox
 https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/
@@ -596,7 +597,7 @@ https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/
 
 В настройках расширения указываете URL вашей задачи, которая будет обрабатывать данные, например:
 
-	http://127.0.0.1:8275/task?get_data_from_browser
+	http://127.0.0.1:8275/get_data_from_browser
 
 У этой задачи должны быть указаны атрибуты _data_ и _http=True_. В атрибут *data* будут передана информация в формате *DataBrowserExt*.
 
@@ -743,4 +744,4 @@ https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/
 
 Пример отправки запроса в задачу:
 
-	curl -F "filecomment=Take this!" -F "file=@d:\my_picture.jpg" http://127.0.0.1:8275/task?http_post_demo
+	curl -F "filecomment=Take this!" -F "file=@d:\my_picture.jpg" http://127.0.0.1:8275/http_post_demo

@@ -566,7 +566,7 @@ class Tasks:
 		return task.get(option, 'task_opt_get error: option not found')
 
 	def run_task(self, task:dict, caller:str=None, data=None
-	, result:list=None):
+	, result:list=None, wait_event:threading.Event=None):
 		'''
 		Logging, threading, error catching and other stuff.
 		task - dict with task options
@@ -603,14 +603,13 @@ class Tasks:
 							r = task['task_func'](**task_kwargs)
 					else:
 						r = task['task_func'](**task_kwargs)
-					if r:
-						if not result is None:
-							result.append(r)
+					if result != None: result.append(r)
 					if ( t := tasks.task_dict.get(task['task_func_name']) ):
 						t['running'] = False
 						t['thread'] = None
 					self.task_opt_set(task['task_func_name']
 						, 'err_counter', 0)
+					if wait_event: wait_event.set()
 				except Exception:
 					if ( t := tasks.task_dict.get(task['task_func_name']) ):
 						t['running'] = False
@@ -651,7 +650,6 @@ class Tasks:
 					dev_print(f'{task["task_name"]} rule exception: {e}')
 					r = False
 				if not r:
-					dev_print(f'{task["task_name"]} canceled by rule')
 					return
 			if task['log']:
 				cs = f' ({caller})' if caller else ''

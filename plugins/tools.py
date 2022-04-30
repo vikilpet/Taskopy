@@ -40,7 +40,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2022-04-17'
+APP_VERSION = 'v2022-04-30'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -89,6 +89,7 @@ TASK_OPTIONS = [
 			| tcon.FILE_NOTIFY_CHANGE_FILE_NAME
 	]
 	, ['on_file_change_flags', tcon.FILE_NOTIFY_CHANGE_LAST_WRITE]
+	, ['timeout', 60]
 ]
 APP_SETTINGS=[
 	['dev', False]
@@ -126,6 +127,9 @@ _TIME_UNITS = {
 	, 'minute': 60_000, 'minutes': 60_000, 'min': 60_000, 'm':60_000
 	, 'hour': 3_600_000, 'hours': 3_600_000, 'h': 3_600_000
 	, 'day': 86_400_000, 'days': 86_400_000, 'd': 86_400_000
+	, 'week': 604_800_000, 'weeks': 604_800_000, 'w': 604_800_000
+	, 'month': 2_635_200_000, 'months': 2_635_200_000, 'mn': 2_635_200_000
+	, 'year': 31_536_000_000, 'years': 2_31_536_000_000, 'y': 31_536_000_000
 }
 _LOCALE_LOCK = threading.Lock()
 _LOG_TIME_FORMAT = '%Y.%m.%d %H:%M:%S'
@@ -147,8 +151,9 @@ def value_to_unit(value, unit:str='sec', unit_dict:dict=None
 	to the desired unit of measure.
 	Usage:
 
-		> value_to_unit('2 min', 'sec')
-		> 120
+		assert value_to_unit('1 min', 'sec') == 60
+		assert value_to_unit('2m', 'sec') == 120
+		assert value_to_unit(3, 'sec') == 3
 
 	'''
 	if not unit_dict: unit_dict = _TIME_UNITS
@@ -1666,9 +1671,9 @@ class DataEvent:
 		if self.EventData: self.EventDataStr = value_to_str(self.EventData)
 
 def thread_start(func, args:tuple=(), kwargs:dict={}
-, thr_daemon:bool=True, show_err_msg:bool=False, ident:str=''):
+, thr_daemon:bool=True, show_err_msg:bool=False, ident:str='')->int:
 	'''
-	Runs task in a thread.
+	Runs task in a thread. Returns thread id.
 
 	*ident* - user-defined identifier of stream
 
@@ -1811,5 +1816,23 @@ def func_name_human(func_name:str)->str:
 	new_name = func_name.replace('__', '_').replace('_', ' ')
 	if new_name and new_name[0].isupper(): return new_name
 	return new_name.capitalize()
+
+def is_iter(obj)->bool:
+	'''
+	Is the object iterable?
+
+		assert is_iter('abc') == True
+		assert is_iter((1, 2)) == True
+		assert is_iter(map(str, (1, 2))) == True
+		assert is_iter(1) == False
+
+	'''
+	try:
+		iter(obj)
+		return True
+	except TypeError:
+		return False
+	except:
+		raise
 
 if __name__ != '__main__': patch_import()
