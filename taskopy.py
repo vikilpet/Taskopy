@@ -640,15 +640,18 @@ class Tasks:
 					else:
 						self.task_opt_set(task['task_func_name']
 							, 'err_counter', err_counter)
-			if (not self.enabled) \
-			and ( not task['hyperactive'] ): return
+			if (
+				(not self.enabled)
+				and ( not task['hyperactive'])
+				and caller != tcon.CALLER_MENU
+			): return
 			if task['single'] and task['running']: return
 			if callable(task['rule']):
+				r = False
 				try:
 					r = task['rule']()
 				except Exception as e:
 					dev_print(f'{task["task_name"]} rule exception: {e}')
-					r = False
 				if not r:
 					return
 			if task['log']:

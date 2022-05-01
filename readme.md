@@ -588,7 +588,7 @@ If you want to save something so that it survives a crontab reload, use the glob
 		gdic['test var'] += 1
 		dialog(f'Try to reload crontab: {gdic["test var"]}')
 
-If you want to save something so that it survives a Taskopy restart, use the file variables **dvar_get**, **dvar_set**, etc.
+If you want to save something so that it survives a Taskopy restart, use the file variables **var_get**, **var_set**, etc.
 
 ## Firefox extension
 https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/

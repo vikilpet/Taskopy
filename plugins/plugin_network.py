@@ -20,7 +20,7 @@ import json2html
 from .tools import dev_print, time_sleep, tdebug \
 , locale_set, safe, patch_import, value_to_unit, time_diff \
 , median
-from .plugin_filesystem import dvar_lst_get
+from .plugin_filesystem import var_lst_get
 
 _USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.99 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
@@ -473,7 +473,7 @@ def url_hostname(url:str, sec_lvl:bool=True)->str:
 	if not sec_lvl: return domain
 	if not _PUB_SUF_LST:
 		_PUB_SUF_LST = set(
-			dvar_lst_get('_public_suffix_list')
+			var_lst_get('_public_suffix_list')
 		)
 	variants = []
 	for i in range(domain.count('.')):

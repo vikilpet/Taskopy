@@ -64,13 +64,13 @@ def taskopy_update(
 	DOWNLOAD_DIR = temp_dir()
 	json_str = http_req('https://api.github.com/repos/vikilpet/Taskopy/releases')
 	new_ver = json_element(json_str, element=[0, 'name'])
-	cur_ver = dvar_get(VAR)
+	cur_ver = var_get(VAR)
 	if cur_ver == None:
 		# The task has been launched for the first time, 
 		# do not disturb the user:
 		tprint('First update check')
 		# Just save the current version and exit:
-		dvar_set(VAR, new_ver)
+		var_set(VAR, new_ver)
 		return
 	if cur_ver == new_ver: return
 	news = json_element(json_str, [0, 'body'])
@@ -88,7 +88,7 @@ def taskopy_update(
 	# Escape or 'Cancel':
 	if choice in (tcon.DL_CANCEL, 1003): return
 	# Save the new version:
-	dvar_set(VAR, new_ver)
+	var_set(VAR, new_ver)
 	if choice == 1000:
 		# Open page in default browser:
 		file_open('https://github.com/vikilpet/Taskopy/releases')

@@ -40,7 +40,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2022-04-30'
+APP_VERSION = 'v2022-05-01'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -427,74 +427,6 @@ def time_sleep(interval, unit:str=None):
 	time.sleep( value_to_unit(interval, 'sec') )
 pause = time_sleep
 wait = time_sleep
-
-def db_execute(sql:str):
-	''' Execute sql in _DB_FILE
-	'''
-	conn = sqlite3.connect(_DB_FILE)
-	cur = conn.cursor()
-	cur.execute(sql)
-	conn.commit()
-	conn.close()
-
-def _create_table_var():
-	db_execute('''CREATE TABLE variables
-				(vname TEXT PRIMARY KEY, vvalue TEXT)''')
-
-def var_set(var_name:str, value:str):
-	''' Store variable value in db.sqlite3 in table "variables"
-		It needs sqlite version 3.24+ (just replace dll)
-	'''
-	value = str(value).replace("'", "''")
-	try:
-		conn = sqlite3.connect(_DB_FILE)
-		cur = conn.cursor()
-		cur.execute(f'''
-			INSERT INTO variables (vname, vvalue)
-			VALUES('{var_name}', '{value}')
-			ON CONFLICT(vname)
-			DO UPDATE SET vvalue=excluded.vvalue;
-		''')
-		conn.commit()
-	except sqlite3.OperationalError:
-		dev = False
-		if (sett := __builtins__.get('sett', None) ):
-			dev = sett.dev
-		if dev: raise
-		_create_table_var()
-		cur.execute(f'''
-			INSERT INTO variables (vname, vvalue)
-			VALUES('{var_name}', '{value}')
-			ON CONFLICT(vname)
-			DO UPDATE SET vvalue=excluded.vvalue;
-		''')
-		conn.commit()
-	conn.close()
-
-def var_get(var_name:str, default=None, table:str='variables')->str:
-	''' Retrieves value from db.sqlite3 and returns '' if 
-		there is none.
-	'''
-	try:
-		conn = sqlite3.connect(_DB_FILE)
-		cur = conn.cursor()
-		cur.execute(
-			f'''SELECT vvalue
-				FROM {table}
-				WHERE vname = '{var_name}'
-			'''
-		)
-		r = cur.fetchone()
-		if r:
-			r = r[0]
-		else:
-			r = ''
-	except sqlite3.OperationalError:
-		_create_table_var()
-		r = ''
-	if not r and default: r = default
-	conn.close()
-	return r
 
 def clip_set(txt:str):
 	pyperclip.copy(str(txt))

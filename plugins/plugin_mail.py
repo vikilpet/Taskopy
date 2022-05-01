@@ -12,9 +12,10 @@ import imaplib
 from email import message_from_bytes
 from email.header import Header, decode_header, make_header
 import mimetypes
-from .tools import Job, job_batch, var_get, var_set, tprint \
+from .tools import Job, job_batch, tprint \
 , patch_import
-from .plugin_filesystem import file_name_fix, file_size_str
+from .plugin_filesystem import file_name_fix, file_size_str \
+, var_get, var_set
 _CC_LIMIT = 35
 _errors = []
 _MAX_FILE_LEN = 200
