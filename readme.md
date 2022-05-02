@@ -19,6 +19,12 @@ Another example: show message box every day at 10:30 and hide this task from men
 	def my_another_task(schedule='every().day.at("10:30")', menu=False):
 		dialog('Take the pills')
 
+An example using the extension for Firefox:
+
+<div align="center">
+  <a href="https://www.youtube.com/watch?v=LPMzMv8f9H0"><img src="https://img.youtube.com/vi/LPMzMv8f9H0/0.jpg" alt="IMAGE ALT TEXT"></a>
+</div>
+
 ## Contents
 - [Installation](#installation)
 - [Usage](#usage)
@@ -405,7 +411,20 @@ Format: **setting** (default value) — description.
 - **net_url_decode(url:str, encoding:str='utf-8')->str** - decodes URL.
 - **net_url_encode(url:str, encoding:str='utf-8')->str** - encodes URL.
 - **pc_name()->str** - computer name.
-- **url_hostname(url:str)->str** - extract the domain name from the URL.
+- **url_hostname(url:str, , sld:bool=True)->str** - extract the domain name from the URL.
+
+	*sld* - if True then return the second level domain otherwise return the full domain.
+
+		assert url_hostname('https://www.example.gov.uk') == 'example.gov.uk'
+		assert url_hostname('https://www.example.gov.uk', sld=False) \
+		== 'www.example.gov.uk'
+		assert url_hostname('http://user:pwd@abc.example.com:443/api') \
+		== 'example.com'
+		assert url_hostname('http://user:pwd@abc.example.com:443/api'
+		, sld=False) == 'abc.example.com'
+		assert url_hostname('http://user:pwd@192.168.0.1:80/api') \
+		== '192.168.0.1'
+
 - **xml_element(url:str, element:str, element_num:int=0, encoding:str='utf-8', \*\*kwargs)** - downloads the document from URL and returns the value by the specified XPath e.g:
 
 	element='/result/array/msgContact[1]/msgCtnt'

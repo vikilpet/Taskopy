@@ -19,6 +19,12 @@
 	def my_another_task(schedule='every().day.at("10:30")', menu=False):
 		dialog('Прими таблетки')
 
+Пример с использованием расширения для Firefox:
+
+<div align="center">
+  <a href="https://www.youtube.com/watch?v=LPMzMv8f9H0"><img src="https://img.youtube.com/vi/LPMzMv8f9H0/0.jpg" alt="IMAGE ALT TEXT"></a>
+</div>
+
 ## Содержание
 - [Установка](#установка)
 - [Использование](#использование)
@@ -405,7 +411,20 @@
 - **net_url_decode(url:str, encoding:str='utf-8')->str** - декодирует URL.
 - **net_url_encode(url:str, encoding:str='utf-8')->str** - кодирует URL.
 - **pc_name()->str** - имя компьютера.
-- **url_hostname(url:str)->str** - извлечь имя домена из URL.
+- **url_hostname(url:str, , sld:bool=True)->str** - извлечь имя домена из URL.
+
+	*sld* - если True, то вернуть домен второго уровня, иначе вернуть полный.
+
+		assert url_hostname('https://www.example.gov.uk') == 'example.gov.uk'
+		assert url_hostname('https://www.example.gov.uk', sld=False) \
+		== 'www.example.gov.uk'
+		assert url_hostname('http://user:pwd@abc.example.com:443/api') \
+		== 'example.com'
+		assert url_hostname('http://user:pwd@abc.example.com:443/api'
+		, sld=False) == 'abc.example.com'
+		assert url_hostname('http://user:pwd@192.168.0.1:80/api') \
+		== '192.168.0.1'
+
 - **xml_element(url:str, element:str, element_num:int=0, encoding:str='utf-8', \*\*kwargs)** - скачивает документ по ссылке и возвращает значение по указанному XPath. Например:
 
 	element='/result/array/msgContact[1]/msgCtnt'

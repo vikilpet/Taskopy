@@ -451,37 +451,42 @@ def domain_ip(domain:str)->list:
 	data = socket.gethostbyname_ex(domain)
 	return data[2]
 
-def url_hostname(url:str, sec_lvl:bool=True)->str:
+def url_hostname(url:str, sld:bool=True)->str:
 	'''
-	Get hostname (second level domain) from URL.
+	Get hostname (domain name) from URL.
 
-		assert url_hostname('https://www.ncsc.gov.uk') == 'ncsc.gov.uk'
-		assert url_hostname('https://www.ncsc.gov.uk', sec_lvl=False) \
-			== 'www.ncsc.gov.uk'
-		assert url_hostname('http://user:pwd@abc.hostname.com:443/something') \
-			== 'hostname.com'
-		assert url_hostname('http://user:pwd@abc.hostname.com:443/something'
-		, sec_lvl=False)== 'abc.hostname.com'
+	*sld* - if True then return the second level domain
+	otherwise return the full domain.
+
+		assert url_hostname('https://www.example.gov.uk') == 'example.gov.uk'
+		assert url_hostname('https://www.example.gov.uk', sld=False) \
+		== 'www.example.gov.uk'
+		assert url_hostname('http://user:pwd@abc.example.com:443/api') \
+		== 'example.com'
+		assert url_hostname('http://user:pwd@abc.example.com:443/api'
+		, sld=False) == 'abc.example.com'
+		assert url_hostname('http://user:pwd@192.168.0.1:80/api') \
+		== '192.168.0.1'
 
 	'''
 	global _PUB_SUF_LST
-	if m := re.findall(r'//(\d+\.\d+\.\d+\.\d+)', url):
+	if m := re.findall(r'\D(\d+\.\d+\.\d+\.\d+)', url):
 		return m[0]
 	domain = urllib.parse.urlparse(url).netloc
 	if '@' in domain: domain = domain.split('@')[1]
 	if ':' in domain: domain = domain.split(':')[0]
-	if not sec_lvl: return domain
+	if not sld: return domain
 	if not _PUB_SUF_LST:
 		_PUB_SUF_LST = set(
 			var_lst_get('_public_suffix_list')
 		)
 	variants = []
-	for i in range(domain.count('.')):
+	for i in range(domain.count('.') + 1):
 		variants.append( '.'.join(domain.split('.')[-(i+1):]) )
+	tdebug(variants)
 	for var in variants:
 		if var in _PUB_SUF_LST: continue
-		domain = var
-	return domain
+		return var
 
 def net_url_decode(url:str, encoding:str='utf-8')->str:
 	' Decodes URL '
