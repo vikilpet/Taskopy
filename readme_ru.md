@@ -21,9 +21,7 @@
 
 Пример с использованием расширения для Firefox:
 
-<div align="center">
-  <a href="https://www.youtube.com/watch?v=LPMzMv8f9H0"><img src="https://img.youtube.com/vi/LPMzMv8f9H0/0.jpg" alt="IMAGE ALT TEXT"></a>
-</div>
+[![Taskopy + PotPlayer + youtube-dl](https://img.youtube.com/vi/LPMzMv8f9H0/0.jpg)](https://www.youtube.com/watch?v=LPMzMv8f9H0)
 
 ## Содержание
 - [Установка](#установка)
@@ -172,6 +170,10 @@
 ## Ключевые слова
 ### Общие
 - **balloon(msg:str, title:str=APP_NAME,timeout:int=None, icon:str=None)** - показывает сообщение у иконки в трее. `title` - 63 символа максимум, `msg` - 255 символов. `icon` - 'info', 'warning' или 'error'.
+- **benchmark(func, b_iter:int=1000, a:tuple=(), ka:dict={})->datetime.timedelta** - выполняет футкцию `func` `b_iter` раз и выводит время выполнения. Пример:
+
+		benchmark(dir_size, b_iter=100, a=('logs',) )
+
 - **crontab_reload()** - перезагружает кронтаб.
 - **dialog(msg:str=None, buttons:list=None, title:str=None, content:str=None, default_button:int=0, timeout:int=None, return_button:bool=False)->int** - показывает сообщение с несколькими кнопками. Возвращает ID нажатой кнопки, начиная с 1000.
 	*buttons* - список строк с текстом на кнопках. Сколько строк, столько и кнопок.
@@ -357,6 +359,7 @@
 - **file_print(fullpath, printer:str=None, use_alternative:bool=False)->bool** - распечатывает файл на указанном принтере.
 - **file_read(fullpath:str)->str:** - получить содержимое файла.
 - **file_recycle(fullpath:str, silent:bool=True)->bool** - переместить файл в корзину. *silent* - не показывать стандартный системный диалог подтверждения удаления в корзину. Возвращает True в случае успешного удаления.
+- **file_relpath(fullpath, start)->str** - относительное имя файла.
 - **file_rename(fullpath:str, dest:str)->str** - переименовать файл. *dest* — полный путь или просто новое имя файла без папки.
 - **file_size(fullpath:str, unit:str='b')->bool:** - получить размер файла (gb, mb, kb, b).
 - **file_write(fullpath:str, content=str, encoding:str='utf-8')->str** - сохраняет *content* в файл. Создаёт файл, если он не существует. Если fullpath = '' или None, используется temp_file(). Возвращает полное имя файла.
@@ -404,6 +407,10 @@
 	*element* — список с картой для нахождения нужного элемента в структуре json.
 	Пример: *element=['usd', 2, 'value']*
 - **http_req(url:str, encoding:str='utf-8', post_file:str=None, post_hash:bool=False)->str:** - скачать указанную страницу и вернуть её содержимое. *post_file* - отправить указанный файл POST запросом. *post_hash* - в запросе указать хэш файла для проверки целостности (смотрите [Свойства задачи](#свойства-задачи)).
+- **http_req_status(url:str, method='HEAD')->int** - возвращает статус HTTP-запроса:
+
+		assert http_req_status('https://github.com') == 200
+	
 - **net_html_unescape(html_str:str)->str** - декодирует экранированные символы (HTML):
 		
 		"That&#039;s an example" -> "That's an example"

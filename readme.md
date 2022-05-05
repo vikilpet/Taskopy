@@ -21,9 +21,7 @@ Another example: show message box every day at 10:30 and hide this task from men
 
 An example using the extension for Firefox:
 
-<div align="center">
-  <a href="https://www.youtube.com/watch?v=LPMzMv8f9H0"><img src="https://img.youtube.com/vi/LPMzMv8f9H0/0.jpg" alt="IMAGE ALT TEXT"></a>
-</div>
+[![Taskopy + PotPlayer + youtube-dl](https://img.youtube.com/vi/LPMzMv8f9H0/0.jpg)](https://www.youtube.com/watch?v=LPMzMv8f9H0)
 
 ## Contents
 - [Installation](#installation)
@@ -172,6 +170,10 @@ Format: **setting** (default value) — description.
 ## Keywords
 ### Miscelanneous
 - **balloon(msg:str, title:str=APP_NAME,timeout:int=None, icon:str=None)** - shows *baloon* message from tray icon. `title` - 63 symbols max, `msg` - 255 symbols. `icon` - 'info', 'warning' or 'error'.
+- **benchmark(func, b_iter:int=1000, a:tuple=(), ka:dict={})->datetime.timedelta** - run function `func` `b_iter` times and print time. Returns the total time as a datetime.timedelta object. Example:
+
+		benchmark(dir_size, b_iter=100, a=('logs',) )
+
 - **crontab_reload()** - reloads the crontab.
 - **dialog(msg:str=None, buttons:list=None, title:str=None, content:str=None, default_button:int=0, timeout:int=None, return_button:bool=False)->int** - shows a dialog with many buttons. Returns ID of selected buttons starting with 1000.
 	*buttons* - a list with text on the buttons. Number of strings = number of buttons.
@@ -357,6 +359,7 @@ Format: **setting** (default value) — description.
 - **file_print(fullpath, printer:str=None, use_alternative:bool=False)->bool** - prints the file on the specified printer.
 - **file_read(fullpath:str)->str:** - get content of file.
 - **file_recycle(fullpath:str, silent:bool=True)->bool** - move file to the recycle bin. *silent* - do not show standard windows dialog to confirm deletion. Returns True on successful operation.
+- **file_relpath(fullpath, start)->str** - relative file name.
 - **file_rename(fullpath:str, dest:str)->str** - rename the file. *dest* is the full path or just a new file name without a folder.
 - **file_size(fullpath:str, unit:str='b')->bool:** - get size of file in units (gb, mb, kb, b).
 - **file_write(fullpath:str, content=str, encoding:str='utf-8')->str** - saves *content* to a file. Creates file if the fullpath doesn't exist. If fullpath is '' or None - uses temp_file(). Returns fullpath.
@@ -404,6 +407,10 @@ Format: **setting** (default value) — description.
 	*element* — a list with a map to desired item.
 	Example: *element=['usd', 2, 'value']*
 - **http_req(url:str, encoding:str='utf-8', post_file:str=None, post_hash:bool=False)->str:** - download page by url and return it's html as a string. *post_file* - send this file with POST request. *post_hash* - add the checksum of the file to request headers to check the integrity (see [Task Options](#task-options)).
+- **http_req_status(url:str, method='HEAD')->int** - returns just a status of HTTP request:
+
+		assert http_req_status('https://github.com') == 200
+	
 - **net_html_unescape(html_str:str)->str** - decodes HTML escaped symbols:
 		
 		"That&#039;s an example" -> "That's an example"

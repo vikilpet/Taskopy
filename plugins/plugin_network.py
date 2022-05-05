@@ -16,11 +16,12 @@ import datetime
 import random
 import warnings
 import threading
+import ftplib
 import json2html
 from .tools import dev_print, time_sleep, tdebug \
 , locale_set, safe, patch_import, value_to_unit, time_diff \
-, median
-from .plugin_filesystem import var_lst_get
+, median, is_iter
+from .plugin_filesystem import var_lst_get, file_path_fix
 
 _USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.99 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
@@ -759,3 +760,78 @@ def ping_icmp(host:str, count:int=3
 		re.findall(r' = (\d+).+? = (\d+).+? = (\d+)', out)[1][2]
 	)
 	return True, (loss, av_time)
+
+def ftp_upload(fullpath, server:str
+, user:str, pwd:str, dst_dir:str='/', port:int=21
+, active:bool=True, debug_lvl:int=0, attempts:int=3
+, timeout:int=10, secure:bool=False, encoding:str='utf-8')->tuple:
+	'''
+	Uploads file(s) to an FTP server
+	Returns (True, None) or (False, ('error1', 'error2'...))
+
+	*debug_lvl* - set to 1 to see the commands.
+	
+	Error 'EOF occurred in violation of protocol' - self signed
+	certificate of server?
+
+	'''
+	SLEEP_MULT = 5
+	if isinstance(fullpath, str):
+		files = (fullpath, )
+	elif is_iter(fullpath):
+		files = tuple(fullpath)
+	else:
+		raise Exception('unknown type of fullpath')
+	errors = []
+	ftpclass = ftplib.FTP_TLS if secure else ftplib.FTP
+	try:
+		with ftpclass() as ftp:
+			ftp.set_debuglevel(debug_lvl)
+			ftp.connect(host=server, port=port, timeout=timeout)
+			ftp.login(user=user, passwd=pwd)
+			if secure: ftp.prot_p()
+			ftp.set_pasv(not active)
+			if encoding: ftp.encoding = encoding
+			if encoding == 'utf-8':
+				features = tuple(
+					f.strip() for f in ftp.sendcmd('FEAT').splitlines()
+				)
+				if 'UTF8' in features:
+					ftp.sendcmd('CLNT Python')
+					ftp.sendcmd('OPTS UTF8 ON')
+			ftp.cwd(dst_dir)
+			for fpath in files:
+				for att in range(attempts):
+					time.sleep(att * SLEEP_MULT)
+					basename = os.path.basename(fpath)
+					try:
+						with open(fpath, 'br') as fd:
+							ftp.storbinary(
+								cmd='STOR ' + basename
+								, fp=fd
+							)
+					except OSError as e:
+						if e.errno != 0:
+							errors.append(f'ftp.storbinary OSError: {repr(e)}')
+					except Exception as e:
+						errors.append(f'ftp.storbinary exception: {repr(e)}')
+					ftp.size(basename)
+					ftp_size = ftp.size(basename)
+					loc_size = os.stat(fpath).st_size
+					if ftp_size != None:
+						if ftp_size == loc_size:
+							break
+						else:
+							errors.append('file sizes do not match:'
+							+ f' local={loc_size} vs ftp={ftp_size}')
+				else:
+					errors.append(f'no more attempts')
+	except Exception as e:
+		errors.append(
+			f'general error at line {e.__traceback__.tb_lineno}: '
+			+ repr(e)
+		)
+	return len(errors) == 0, errors
+	
+
+	

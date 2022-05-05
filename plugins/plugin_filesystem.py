@@ -460,10 +460,10 @@ def dir_rnd_file(fullpath, attempts:int=5
 		benchmark(lambda: random.choice( list(dir_files(temp_dir() ) ) ), b_iter=100)
 		> datetime.timedelta(seconds=18, microseconds=920000)
 
-		benchmark(dir_rnd_file, fullpath=temp_dir(), b_iter=100)
+		benchmark(dir_rnd_file, a=(temp_dir(), ), b_iter=100)
 		> datetime.timedelta(microseconds=77500)
 
-		len( dir_list( temp_dir() ) ):
+		len( tuple( dir_list( temp_dir() ) ) )
 		> 494
 		
 	'''
@@ -614,8 +614,11 @@ def file_backup(fullpath, dest_dir:str=''
 , suffix_format:str='_%y-%m-%d_%H-%M-%S')->str:
 	r'''
 	Copy *somefile.txt* to *backup_dir\somefile_2019-05-19_21-23-02.txt*
+
 	*dest_dir* - destination. If not specified - current folder.
+
 	Returns full path of the new file.
+
 	It will preserve the date of the file.
 	'''
 	fullpath = file_path_fix(fullpath)

@@ -40,7 +40,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2022-05-02'
+APP_VERSION = 'v2022-05-05'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -1695,18 +1695,19 @@ def app_tasks()->dict:
 	' Returns dictionary with tasks '
 	return app.tasks
 
-def benchmark(func, b_iter:int=1
-, *args, **kwargs)->datetime.timedelta:
+def benchmark(func, b_iter:int=1000
+, a:tuple=(), ka:dict={})->datetime.timedelta:
 	'''
 	Run function `func` `b_iter` times and print time.
 	Returns the total time as a datetime.timedelta object.
 	Example:
 
-		benchmark(dir_size, b_iter=100, fullpath='logs')
+		benchmark(dir_size, b_iter=100, a=('logs',) )
+	
 	'''
 	start = time_now()
 	for _ in range(b_iter):
-		func(*args, **kwargs)
+		func(*a, **ka)
 	dur = time_now() - start
 	tdebug(f'{dur}, iterations: {b_iter}')
 	return dur
