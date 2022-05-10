@@ -67,7 +67,7 @@
 Откройте _crontab.py_ в вашем любимом текстовом редакторе и создайте задачу как функцию с аргументами:
 
 	def demo_task_3('left_click'=True, log=False):
-		app_start('calc.exe')
+		proc_start('calc.exe')
 
 Затем кликните на иконке в трее и выберите _Reload crontab (перечитать кронтаб)_ и ваша задача готова.
 
@@ -467,9 +467,9 @@
 - **mail_send(recipient:str, subject:str, message:str, smtp_server:str, smtp_port:int, smtp_user:str, smtp_password:str)** - отправить письмо. Поддерживает отправку с русским заголовком и русским текстом.
 
 ### Процессы
-- **app_start(app_path:str, app_args:str, wait:bool=False)** - запустить приложение. Если *wait=True* — возвращает код возврата, а если *False*, то возвращает PID созданного процесса.
-	*app_path* — полный путь к исполняемому файлу.
-	*app_args* — аргументы командной строки.
+- **proc_start(proc_path:str, args:str, wait:bool=False)** - запустить приложение. Если *wait=True* — возвращает код возврата, а если *False*, то возвращает PID созданного процесса.
+	*proc_path* — полный путь к исполняемому файлу.
+	*args* — аргументы командной строки.
 	*wait* — приостановить выполнение задачи, пока не завершится запущенный процесс.
 - **file_open(fullpath:str)** - открыть файл или URL в приложении по умолчанию.
 - **proc_close(process, timeout:int=10, cmd_filter:str=None)** - мягкое завершение процесса: сначала закрываются все окна, принадлежащие указанному процессу, а по истечении таймаута (в секундах) убивается сам процесс, если ещё существует. *cmd_filter* - убивать только процессы, содержащие эту строку в командной строке.
@@ -632,7 +632,7 @@ https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/
 	def get_data_from_browser(data, http=True, menu=False, log=False):
 		if ('youtube.com' in data.link_url
 		or 'youtu.be' in data.link_url):
-			app_start(
+			proc_start(
 				r'c:\Program Files\DAUM\PotPlayer\PotPlayerMini64.exe'
 				, data.link_url
 			)
@@ -730,7 +730,7 @@ https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/
 
 	def calc_usd_demo(left_click=True, submenu='demo'):
 		# Запускаем калькулятор:
-		app_start(r'calc.exe')
+		proc_start(r'calc.exe')
 		# Скачиваем json, по которому грузится список валют
 		# и получаем из него курс продажи доллара:
 		usd = json_element(

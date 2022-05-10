@@ -27,7 +27,7 @@ def demo__task_1(startup=True):
 		+ '\nWhen you press OK I will open the crontab in notepad'
 		+ ' so you can disable or even delete me.'
 	)
-	app_start('notepad.exe', 'crontab.py')
+	proc_start('notepad.exe', 'crontab.py')
 
 # Another example — task with two options: scheduled task
 # that is hidden in the menu because there is no point in

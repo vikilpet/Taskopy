@@ -68,11 +68,11 @@ def proc_get(process, cmd_filter:str=None)->int:
 				return proc.pid
 	return False
 
-def app_start(
-	app_path:str
-	, app_args=None
+def proc_start(
+	proc_path:str
+	, args=None
 	, wait:bool=False
-	, capture_output:bool=False
+	, capture:bool=False
 	, encoding:str=None
 	, shell:bool=False
 	, cwd:str=None
@@ -80,22 +80,23 @@ def app_start(
 	, window:str=None
 	, priority:str=None
 	, its_script:bool=False
-	, app_args_as_str:bool=False
+	, args_as_str:bool=False
 ):
 	'''
 	Starts application.
 	
 	Returns:
-		if capture_output - (returncode, stdout, stderr)
-		if wait - returncode
-		otherwise - PID of new process.
+
+		if capture - (returncode, stdout, stderr)
+		if wait - return code
+		otherwise - PID of a new process.
 	
-	app_path - path to file or path to executable. Do not add
+	proc_path - path to file or path to executable. Do not add
 	double quotes.
 	
-	app_args (list or str) - command-line parameters.
+	args (list or str) - command-line parameters.
 
-	app_args_as_str - do not split app_args into list. Useful
+	args_as_str - do not split args into list. Useful
 	if application command line contains quotes. It will
 	strip white space characters so you can use multiline string.
 
@@ -103,7 +104,7 @@ def app_start(
 	
 	wait - wait for the program to complete.
 
-	capture_output - capture stdout and stderr.
+	capture - capture stdout and stderr.
 
 	env - add this environments to the process
 
@@ -127,39 +128,39 @@ def app_start(
 		, 'normal': subprocess.NORMAL_PRIORITY_CLASS
 		, 'realtime': subprocess.REALTIME_PRIORITY_CLASS
 	}
-	if isinstance(app_path, str):
+	if isinstance(proc_path, str):
 		if its_script:
-			if not app_path.endswith('.exe'): app_path += '.exe'
-			app_path = [
+			if not proc_path.endswith('.exe'): proc_path += '.exe'
+			proc_path = [
 				sys.executable
 				, os.path.join(
 					os.path.dirname(sys.executable)
-					, 'Scripts', app_path
+					, 'Scripts', proc_path
 				)
 			]
 		else:
-			app_path = [app_path]
-	elif not isinstance(app_path, (list, tuple)):
-		raise Exception('Unknown type of app_path')
-	if app_args:
-		if isinstance(app_args, str):
-			if app_args_as_str:
-				app_path = app_path[0] + ' ' \
-					+ app_args.strip().replace('\r\n', ' ') \
+			proc_path = [proc_path]
+	elif not isinstance(proc_path, (list, tuple)):
+		raise Exception('Unknown type of proc_path')
+	if args:
+		if isinstance(args, str):
+			if args_as_str:
+				proc_path = proc_path[0] + ' ' \
+					+ args.strip().replace('\r\n', ' ') \
 						.replace('\n', ' ').replace('\t', ' ')
 			else:
-				app_path += app_args.split()
-		elif isinstance(app_args, (list, tuple)):
-			app_path += app_args
+				proc_path += args.split()
+		elif isinstance(args, (list, tuple)):
+			proc_path += args
 		else:
-			raise Exception('Unknown type of app_args')
-	if not app_args_as_str: app_path = list( map(str, app_path) )
-	if not cwd and not app_args_as_str:
-		if ':\\' in app_path[0]:
+			raise Exception('Unknown type of args')
+	if not args_as_str: proc_path = list( map(str, proc_path) )
+	if not cwd and not args_as_str:
+		if ':\\' in proc_path[0]:
 			if its_script:
 				cwd = os.getcwd()
 			else:
-				cwd = os.path.dirname(app_path[0])
+				cwd = os.path.dirname(proc_path[0])
 	startupinfo = subprocess.STARTUPINFO()
 	creationflags = win32con.DETACHED_PROCESS
 	startupinfo.dwFlags = subprocess.STARTF_USESHOWWINDOW
@@ -183,7 +184,7 @@ def app_start(
 		else:
 			startupinfo.wShowWindow = win32con.SW_SHOWNORMAL
 	proc_args = {
-		'args': app_path
+		'args': proc_path
 		, 'shell': shell
 		, 'close_fds': True
 		, 'cwd': cwd
@@ -195,10 +196,10 @@ def app_start(
 	if env:
 		env = {**os.environ, **env}
 		proc_args['env'] = env
-	if capture_output: wait=True
+	if capture: wait=True
 	if wait:
 		proc_func = subprocess.run
-		if capture_output:
+		if capture:
 			proc_args['capture_output'] = True
 			proc_args['shell'] = False
 			proc_args['text'] = True
@@ -206,7 +207,7 @@ def app_start(
 		proc_func = subprocess.Popen
 	r = proc_func(**proc_args)
 	if wait:
-		if capture_output:
+		if capture:
 			return r.returncode, r.stdout, r.stderr
 		else:
 			return r.returncode
@@ -454,11 +455,19 @@ def service_stop(service:str)->tuple:
 	''' Stops windows service.'''
 	return win32serviceutil.StopService(service)
 
-def service_restart(service:str)->tuple:
+def service_restart(service:str):
 	' Restarts windows service '
 	return win32serviceutil.RestartService(service)
 
 def service_list()->List[psutil._pswindows.WindowsService]:
+	'''
+	Returns the list (generator) of services
+
+		for s in service_list():
+			if 'Microsoft' in s.description():
+				print(s)
+
+	'''
 	return psutil.win_service_iter()
 # https://stackoverflow.com/questions/48051283/call-binary-without-elevated-privilege
 ntdll = ctypes.WinDLL('ntdll')

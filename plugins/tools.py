@@ -40,7 +40,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2022-05-05'
+APP_VERSION = 'v2022-05-10'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -475,7 +475,13 @@ def re_split(source:str, re_pattern:str, maxsplit:int=0
 
 def re_match(source:str, re_pattern:str
 , re_flags:int=re.IGNORECASE)->bool:
-	''' Regexp match '''
+	'''
+	Regexp match.
+
+		assert re_match('C - 25.11.19.mp3', r'.+ - \d\d\.\d\d\.\d\d.+') == True
+		assert re_match('C - 25.11.19.mp3', r' - \d\d\.\d\d\.\d\d.+') == False
+
+	'''
 	return bool(re.match(re_pattern, source, flags=re_flags))
 
 _MessageBox = ctypes.windll.user32.MessageBoxW
@@ -1044,6 +1050,10 @@ def dialog(msg:str=None, buttons:list=None
 	
 	Note: do not start button text with new line (\\n) or dialog
 	will fail silently.
+
+		assert dialog(('y', 'n'), return_button=True) == (True, 'y')
+		assert dialog({'y': 1, 'n': 2}) == 1
+
 	'''
 	TDN_TIMER = 4
 	S_OK = 0
@@ -1157,7 +1167,7 @@ def dialog(msg:str=None, buttons:list=None
 		else: 
 			return False, result.value
 	else:
-		if not isinstance(orig_buttons, dict):
+		if not isinstance(orig_buttons, set):
 			return result.value
 		if result.value >= 1000:
 			return tuple(orig_buttons.values())[result.value - 1000]

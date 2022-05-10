@@ -977,10 +977,10 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		dialog(tasks_str, timeout=10, wait=False)
 
 	def on_edit_crontab(self, event=None):
-		app_start(sett.editor, os.path.join(APP_PATH, 'crontab.py'))
+		proc_start(sett.editor, os.path.join(APP_PATH, 'crontab.py'))
 
 	def on_edit_settings(self, event=None):
-		app_start(sett.editor, os.path.join(APP_PATH, r'settings.ini'))
+		proc_start(sett.editor, os.path.join(APP_PATH, r'settings.ini'))
 
 	def on_disable(self, event=None):
 		tasks.enabled = not tasks.enabled

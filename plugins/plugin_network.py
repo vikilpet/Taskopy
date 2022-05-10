@@ -572,6 +572,12 @@ def port_scan(host:str, port:int
 	return connected
 
 def http_req_status(url:str, method='HEAD')->int:
+	r'''
+	Returns just a status of HTTP request:
+
+		assert http_req_status('https://github.com') == 200
+		
+	'''
 	return getattr(requests, method.lower())(url).status_code
 
 if __name__ == '__main__':

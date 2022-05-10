@@ -67,7 +67,7 @@ In shortcut options choose *Run: minimized* option and change shortcut icon to r
 Open crontab.py in your favorite text editor and create your task as function with arguments:
 
 	def demo_task_3('left_click'=True, log=False):
-		app_start('calc.exe')
+		proc_start('calc.exe')
 
 Then right click on tray icon and choose "Reload crontab" and your task is ready.
 
@@ -467,9 +467,9 @@ In the functions for working with windows, the *window* argument can be either a
 - **mail_send(recipient:str, subject:str, message:str, smtp_server:str, smtp_port:int, smtp_user:str, smtp_password:str)** - send email.
 
 ### Process
-- **app_start(app_path:str, app_args:str='', wait:bool=False)** - start application. If *wait=True* — returns process return code, if *False* — returns PID of created process.
-	*app_path* — path to executable file.
-	*app_args* — command-line arguments.
+- **proc_start(proc_path:str, args:str='', wait:bool=False)** - start application. If *wait=True* — returns process return code, if *False* — returns PID of created process.
+	*proc_path* — path to executable file.
+	*args* — command-line arguments.
 	*wait* — wait until application will be closed.
 - **file_open(fullpath:str)** - open file or URL in default application.
 - **proc_close(process, timeout:int=10, cmd_filter:str=None)** - soft completion of the process: first all windows belonging to the specified process are closed, and after the timeout (in seconds) the process itself is killed, if still exists. *cmd_filter* - kill only processes with that string in command line.
@@ -632,7 +632,7 @@ Example - play Youtube video in PotPlayer:
 	def get_data_from_browser(data:DataBrowserExt, http=True, menu=False, log=False):
 		if ('youtube.com' in data.link_url
 		or 'youtu.be' in data.link_url):
-			app_start(
+			proc_start(
 				r'c:\Program Files\DAUM\PotPlayer\PotPlayerMini64.exe'
 				, data.link_url
 			)
