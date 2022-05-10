@@ -202,13 +202,13 @@ Format: **setting** (default value) — description.
 - **hint(text:str, position:tuple=None)->int** - shows a small window with the specified text. Only for the *Python* version. *position* - a tuple with coordinates. If no coordinates are specified, it appears in the center of the screen. Returns the PID of the hint process.
 - **HTTPFile** - Use this class if your HTTP task returns a file:
 
-	def http_file_demo(http=True, result=True
-	, submenu='demo'):
-		# http://127.0.0.1:8275/http_file_demo
-		return HTTPFile(
-			fullpath=r'resources\icon.png'
-			, use_save_to=True
-		)
+		def http_file_demo(http=True, result=True
+		, submenu='demo'):
+			# http://127.0.0.1:8275/http_file_demo
+			return HTTPFile(
+				fullpath=r'resources\icon.png'
+				, use_save_to=True
+			)
 
 - **Job(func, args, job_name:str='', kwargs)** - class for concurrent function execution in *job_batch* and *job_pool*. Properties:
 	- *result* - functional result
@@ -426,8 +426,8 @@ Format: **setting** (default value) — description.
 - **file_name(fullpath:str)->str** - get file name without directory.
 - **file_name_add(fullpath, suffix:str='', prefix:str='')->str** - adds a string (prefix or suffix) to the file name before the extension (or from beginning). Example:
 	
-	file_name_add('my_file.txt', suffix='_1')
-	'my_file_1.txt'
+		file_name_add('my_file.txt', suffix='_1')
+		'my_file_1.txt'
 
 - **file_name_fix(filename:str, repl_char:str='\_')->str** - replaces forbidden characters with _repl_char_. Removes leading and trailing spaces. Adds '\\\\?\\' for long paths.
 - **file_name_rem(fullpath, suffix:str='', prefix:str='')->str** - removes a suffix or prefix from a filename.
@@ -480,6 +480,7 @@ Format: **setting** (default value) — description.
 		}
 
 	See *get_current_ip* in [task examples](#task-examples)
+
 - **html_clean(html_str:str, separator=' ')->str** - removes HTML tags from string.
 - **is_online(*sites, timeout:int=2)->int:** - checks if you have access to the Internet using HEAD queries to specified sites. If sites are not specified, then use google and yandex.
 - **json_element(url:str, element:list)** - same as **html_element** but for JSON.
@@ -762,42 +763,16 @@ Example - pass the file name to the task _virustotal\_demo_ from [Task examples]
 Inside _virustotal\_demo_ you can see another way to pass a file name to a task - via **file_dialog**
 
 ## Help me
-- [My StackOverflow question about menu by hotkey in wxPython](https://stackoverflow.com/questions/56079269/wxpython-popupmenu-by-global-hotkey) You can add a bounty if you have a lot of reputation.
+- I've been in need of a tester for a long time :)
 - [Donate via PayPal](https://www.paypal.me/vikil)
 
 ## Task examples
-- iPython + Taskopy
 - Disk free space
 - Current IP address
 - Add IP-address to MikroTik router
 - Virustotal check
 
-Launch iPython (Jupyter) animport crontab for quick access to all keywords from plugins:
-
-	def iPython(on_load=False, submenu='WIP'
-	, task_name='iPython + Taskopy'):
-		TASKOPY_DIR = r'd:\soft\taskopy'
-		proc_kill('ipython.exe')
-		file_open('ipython')
-		for _ in range(100):
-			if 'ipython' in win_title_get().lower():
-				break
-			pause('100 ms')
-		pause(1)
-		if not 'ipython'.lower() in win_title_get().lower():
-			tprint('ipython not found')
-			return
-		key_write('%cd ' + TASKOPY_DIR)
-		key_send('enter')
-		key_write(
-			r'%load_ext autoreload' + '\n'
-			+ r'%autoreload 2' + '\n'
-			+ 'from crontab import *\n'
-		)
-		pause('200 ms')
-		key_send('ctrl+enter')
-
- Check the free space on all local discs. Scheduled for a random interval between 30 and 45 minutes:
+Check the free space on all local discs. Scheduled for a random interval between 30 and 45 minutes:
  
 	def check_free_space_demo(submenu='demo'
 	, schedule='every(30).to(45).minutes'):

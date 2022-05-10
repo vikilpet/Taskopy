@@ -202,13 +202,13 @@
 - **hint(text:str, position:tuple=None)->int** - показывает небольшое окошко с указанным текстом. Только для *Python* версии. *position* - кортеж с координатами. Если координаты не указаны - появится в центре экрана. Возвращает PID процесса с окошком.
 - **HTTPFile** - Используйте этот класс, если ваша HTTP задача возвращает файл:
 
-	def http_file_demo(http=True, result=True
-	, submenu='demo'):
-		# http://127.0.0.1:8275/http_file_demo
-		return HTTPFile(
-			fullpath=r'resources\icon.png'
-			, use_save_to=True
-		)
+		def http_file_demo(http=True, result=True
+		, submenu='demo'):
+			# http://127.0.0.1:8275/http_file_demo
+			return HTTPFile(
+				fullpath=r'resources\icon.png'
+				, use_save_to=True
+			)
 
 - **Job(func, args, job_name:str='', kwargs)** - класс для параллельного запуска функций в *job_batch* и *job_pool*. Свойства:
 	- *result* - результат выполнения функции
@@ -426,8 +426,8 @@
 - **file_name(fullpath:str)->str** - получить имя файла без папки.
 - **file_name_add(fullpath, suffix:str='', prefix:str='')->str** - добавляет строку (префикс или суффикс) к файлу перед расширением. Пример: 
 	
-	>>> file_name_add('my_file.txt', suffix='_1')
-	'my_file_1.txt'
+		file_name_add('my_file.txt', suffix='_1')
+		'my_file_1.txt'
 
 - **file_name_fix(filename:str, repl_char:str='\_')->str** - заменяет запрещённые символы на _repl_char_. Удаляет пробелы в начале и в конце. Добавляет '\\\\?\\' к длинным путям.
 - **file_name_rem(fullpath, suffix:str='', prefix:str='')->str** - удаляет суффикс или префикс из имени файла.
@@ -480,6 +480,7 @@
 		}
 	
 	Посмотрите на задачу *get_current_ip* в [Примеры задач](#task-examples)
+
 - **html_clean(html_str:str, separator=' ')->str** - очищает строку от HTML тэгов.
 - **is_online(*sites, timeout:int=2)->int:** - проверяет, есть ли доступ в Интернет, используя HEAD запросы к указанным сайтам. Если сайты не указаны, то использует google и yandex.
 - **json_element(url:str, element:list)** - аналог **html_element** для JSON.
@@ -762,42 +763,15 @@ https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/
 В самой задаче _virustotal\_demo_ можно увидеть другой способ передачи файла в задачу - через **file_dialog**.
 
 ## Помощь проекту
-- [Мой вопрос на StackOverflow про показ меню по горячей клавише.](https://stackoverflow.com/questions/56079269/wxpython-popupmenu-by-global-hotkey) Если у вас есть знакомый эксперт по wxPython, пришлите ему эту ссылку, или добавьте награду, если ваш рейтинг позволяет.
+- По идее давно уже нужен тестировщик :)
 - Расскажите о Taskopy друзьям.
 
 ## Примеры задач
-- iPython + Taskopy
 - Свободное место на дисках
 - Текущий IP адрес
 - Добавление IP-адреса в маршрутизатор MikroTik
-- Калькулятор и курс валют
 - Проверка на Virustotal
 
-Запуск iPython (Jupyter) и загрузка кронтаба для быстрого доступа ко всем функциям из плагинов:
-
-	def iPython(on_load=False, submenu='WIP'
-	, task_name='iPython + Taskopy'):
-		TASKOPY_DIR = r'd:\soft\taskopy'
-		proc_kill('ipython.exe')
-		file_open('ipython')
-		for _ in range(100):
-			if 'ipython' in win_title_get().lower():
-				break
-			pause('100 ms')
-		pause(1)
-		if not 'ipython'.lower() in win_title_get().lower():
-			tprint('ipython not found')
-			return
-		key_write('%cd ' + TASKOPY_DIR)
-		key_send('enter')
-		key_write(
-			r'%load_ext autoreload' + '\n'
-			+ r'%autoreload 2' + '\n'
-			+ 'from crontab import *\n'
-		)
-		pause('200 ms')
-		key_send('ctrl+enter')
-	
 Проверяем свободное место на всех дисках. Планируем выполнение случайный интервал между 30 и 45 минутами:
 
 	def check_free_space_demo(submenu='demo'
@@ -832,20 +806,6 @@ https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/
 			, device_pwd='PaSsWoRd'
 		)
 		dialog('Готово!', timeout=5)
-
-Запускаем калькулятор и меняем его заголовок на курс продажи доллара в Сбербанке. Назначаем выполнение задачи на клик левой клавишей мыши по иконке:
-
-	def calc_usd_demo(left_click=True, submenu='demo'):
-		# Запускаем калькулятор:
-		proc_start(r'calc.exe')
-		# Скачиваем json, по которому грузится список валют
-		# и получаем из него курс продажи доллара:
-		usd = json_element(
-			'https://www.sberbank.ru/portalserver/proxy/?pipe=shortCachePipe&url=http://localhost/rates-web/rateService/rate/current%3FregionId%3D77%26currencyCode%3D840%26currencyCode%3D978%26rateCategory%3Dbeznal'
-			, ['beznal', '840', '0', 'sellValue']
-		)
-		# Теперь меняем заголовок калькулятора на USD={найденное значение}
-		win_title_set('Калькулятор', f'USD={usd}')
 
 Проверяем MD5 хеш файла на Virustotal. Вам нужно будет зарегистрироваться там, чтобы получить бесплатный API ключ:
 
