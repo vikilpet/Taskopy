@@ -23,6 +23,8 @@ An example using the extension for Firefox:
 
 [![Taskopy + PotPlayer + youtube-dl](https://img.youtube.com/vi/LPMzMv8f9H0/0.jpg)](https://www.youtube.com/watch?v=LPMzMv8f9H0)
 
+[![Taskopy + Total Commander](https://img.youtube.com/vi/IAkXV_XJyfY/0.jpg)](https://www.youtube.com/watch?v=IAkXV_XJyfY)
+
 ## Contents
 - [Installation](#installation)
 - [Usage](#usage)
@@ -91,7 +93,7 @@ Format: **option name** (default value) — description.
 		):
 			balloon(f'Event (ID {data.EventID}): {data.Provider}\n{data.TimeCreated}')
 
-- **event_xpath** (*) - XPath to filter events. Example:
+- **event_xpath** ('*') - XPath to filter events. Case-sensitive. Example:
 
 	event_xpath='*[System[Level < 4]]' - only for new events with level less than 4.
 
@@ -146,8 +148,16 @@ Format: **option name** (default value) — description.
 - **http_dir** - folder where to save files sent via HTTP POST request. If not set then use system temporary folder.
 - **http_white_list** - white list of IP addresses for this task only. Example:
 	
-	http_white_list=['127.0.0.1', '192.168.0.*']
+		http_white_list=['127.0.0.1', '192.168.0.*']
 
+- **on_dir_change** - run the task when changes are made in the folder.
+
+		def demo__on_dir_change(on_dir_change=temp_dir()
+		, data:tuple=None, active=True):
+			fpath, action = data
+			tprint(f'{action}: {fpath}')
+
+- **on_exit** - start the task when you exit Taskopy. Notice that Taskopy will not be closed until these tasks are completed.
 - **on_file_change** - run task when the file changes.
 - **caller** - place this option before other options and in task body you will know who actually launched task this time. Possible values: http, menu, scheduler, hotkey. See *def check_free_space* in [Task Examples](#task-examples).
 - **data** - to pass any data to the task, e.g. *DataEvent* or *DataHTTPReq*.
@@ -275,13 +285,53 @@ Format: **setting** (default value) — description.
 
 - **time_now_str(template:str='%Y-%m-%d_%H-%M-%S')->str** - string with current time.
 - **pause(sec:float)** - pause the execution of the task for the specified number of seconds. *interval* - time in seconds or a string specifying a unit like '5 ms' or '6 sec' or '7 min'.
+- **var_lst_get(var:str, default=[], encoding:str='utf-8', com_str:str='#')->list** - returns list with the text lines. Excludes empty lines and lines that begin with *com_str*
+
+		var_lst_set('test', ['a', 'b'])
+		assert var_lst_get('test') == ['a', 'b']
+		var_lst_set('test', map(str, (1, 2)))
+		assert var_lst_get('test') == ['1', '2']
+		assert var_del('test') == True
+
+- **var_lst_set(var, value, encoding:str='utf-8')** - sets the *disk list variable*.
+
+		# Note that the number has become a string:
+		var_lst_set('test', ['a', 'b', 1])
+		assert var_lst_get('test') == ['a', 'b', '1']
+		assert var_del('test')
+
 - **var_set(var_name:str, value:str)** - save *value* of variable *var_name* to disk so it will persist between program starts.
-- **var_get(var_name:str)->str** - retrieve variable value.
+
+		var_set('test', 5)
+		assert var_get('test') == '5'
+		assert var_del('test') == True
+
+		# Composite variable name. Intermediate folders
+		# will be created:
+		var = ('file', 'c:\\pagefile.sys')
+		var_set(var, 1)
+		assert var_get(var, 1) == '1'
+		assert var_del(var) == True
+
+- **var_get(var_name:str)->str** - retrieve *disk variable* value.
+
+	*as_literal* - converts to a literal (dict, list, tuple etc).
+	Dangerous! - it's just **eval** and not **ast.literal_eval**
+
+		var_set('test', 1)
+		assert var_get('test') == '1'
+		assert var_get('test', as_literal=True) == 1
+		assert var_del('test') == True
+
 - **clip_set(txt:str)->** - copy text to clipboard.
 - **clip_get()->str->** - get text from clipboard.
 - **re_find(source:str, re_pattern:str, sort:bool=True)->list** - search in *source* with regular expression.
 - **re_match(source:str, re_pattern:str, re_flags:int=re.IGNORECASE)->bool** - regexp match.
 - **re_replace(source:str, re_pattern:str, repl:str='')** - replace in *source* all matches with *repl* string.
+- **re_split(source:str, re_pattern:str, maxsplit:int=0, re_flags:int=re.IGNORECASE)->str** - regexp split:
+	
+		assert re_split('abc', 'b') == ['a', 'c']
+
 - **inputbox(message:str, title:str, is_pwd:bool=False)->str** - show a message with an input request. Returns the entered line or empty string if user pressed cancel.
 	*is_pwd* — hide the typed text.
 - **random_num(a, b)->int** - return a random integer in the range from a to b, including a and b.
@@ -312,22 +362,40 @@ Format: **setting** (default value) — description.
 - **dir_copy(fullpath:str, destination:str)->int** - copy the folder and all its contents. Returns the number of errors.
 - **dir_delete(fullpath:str)** - delete directory.
 - **dir_dialog(title:str=None, default_dir:str='', on_top:bool=True, must_exist:bool=True)->str** - directory selection dialog.
+- **dir_dirs(fullpath, subdirs:bool=True)->list** - returns list of full paths of all directories in this directory and its subdirectories.
 - **dir_exists(fullpath:str)->bool** - directory exists?
 - **dir_files(fullpath)->list** - Returns list of full filenames of all files in the given directory and its subdirectories.
-- **dir_list(fullpath:str)->list:** - get list of files in directory.
+- **dir_find(fullpath, only_files:bool=False)->list** - returns list of paths in specified folder.
+
+	*fullpath* passed to the **glob.glob**
+
+	*only_files* - return only files and not files and directories.
+
 	Examples:
-	- Get a list of all log files in 'c:\\\Windows' **without** subfolders:
+		
+		# Only files in current directory:
+		dir_list('d:\\folder\\*.jpg')
 
-		dir_list('c:\\Windows\\*.log')
+		# with subdirectories:
+		dir_list('d:\\folder\\**\\*.jpg')
 
-	- Get all log files in 'c:\\\Windows\\\' **with** subfolders:
+- **dir_list(fullpath)->Iterator[str]** - returns all directory content (dirs and files).
 
-		dir_list('c:\\Windows\\**\\*.log')
+		assert 'resources\\icon.png' in dir_list('resources')
 
 - **dir_size(fullpath:str, unit:str='b')->int** - folder size in specified units.
 - **dir_zip(source:str, destination:str)->str** - zip the folder return the path to the archive.
 - **dir_user_desktop()->str** - current user's *desktop* folder.
 - **dir_user_startup()->str** - *startup* folder of the current user*.
+- **drive_io(drive_num:int=None)->dict** - returns physical drive (not partition!) i/o generator that returns a named tuples with counters. example:
+
+		dio = drive_io()
+		print(next(dio)[0].read_bytes)
+		time_sleep('1 sec')
+		print(
+			file_size_str(next(dio)[0].total_bytes_delta)
+		)
+
 - **drive_list(exclude:str='')->str** - string of logical drives letters.
 - **file_append(fullpath:str, content:str)->str** - appends *content* to a file. Creates fullpath if not specified. Returns fullpath.
 - **file_attr_set(fullpath, attribute:int=win32con.FILE_ATTRIBUTE_NORMAL)** - sets file attribute.
@@ -342,6 +410,11 @@ Format: **setting** (default value) — description.
 - **file_delete(fullpath:str)** - delete file. See also *file_recycle*.
 - **file_dialog(title:str=None, multiple:bool=False, default_dir:str='', default_file:str='', wildcard:str='', on_top:bool=True)** - Shows standard file dialog and returns fullpath or list of fullpaths if _multiple_ == True.
 - **file_dir(fullpath:str)->str:** - get parent directory name of file.
+- **file_dir_repl(fullpath, new_dir:str)->str** - changes the directory of the file (in full path)
+- **file_drive(fullpath)->str** - returns a drive letter in lowercase from a file name:
+
+		assert file_drive(r'c:\\pagefile.sys') == 'c'
+
 - **file_exists(fullpath:str)->bool** - file exists?
 - **file_ext(fullpath:str)->str** - file extension in lower case without dot.
 - **file_hash(fullpath:str, algorithm:str='crc32')->str** - returns hash of file. *algorithm* - 'crc32' or any algorithm from hashlib ('md5', 'sha512' etc)
@@ -388,6 +461,10 @@ Format: **setting** (default value) — description.
 - **domain_ip(domain:str)->list** - get a list of IP-addresses by domain name.
 - **file_download(url:str, destination:str=None)->str:** - download file and return fullpath.
 	*destination* — it may be None, fullpath or folder. If None then download to temporary folder with random name.
+- **ftp_upload(fullpath, server:str, user:str, pwd:str, dst_dir:str='/', port:int=21, active:bool=True, debug_lvl:int=0, attempts:int=3, timeout:int=10, secure:bool=False, encoding:str='utf-8')->tuple** - uploads file(s) to an FTP server. Returns (True, None) or (False, ('error1', 'error2'...))
+
+	*debug_lvl* - set to 1 to see the commands.
+	
 - **html_element(url:str, element, element_num:int=0)->str:** - download page and retrieve value of html element.
 	*element* — dictionary that contain element information such as name or attributes, or list with such dictionaries or string with xpath.
 	*element_num* - item number, if there are several of them found.
@@ -418,6 +495,34 @@ Format: **setting** (default value) — description.
 - **net_url_decode(url:str, encoding:str='utf-8')->str** - decodes URL.
 - **net_url_encode(url:str, encoding:str='utf-8')->str** - encodes URL.
 - **pc_name()->str** - computer name.
+- **ping_icmp(host:str, count:int=3, timeout:int=500, encoding:str='cp866')->tuple** - Returns (True, (loss %, aver. time) ) or (False, 'cause of failure'). Examples:
+	
+		ping_icmp('8.8.8.8')
+		> (True, (0, 47))
+		ping_icmp('domain.does.not.exist')
+		> (False, 'host unreachable (1)')
+
+- **ping_tcp(host:str, port:int, count:int=1, pause:int=100, timeout:int=500)->tuple** - measure loss and response time with a tcp connection. Returns (True, (loss percentage, time in ms) ) or (False, 'error text').
+	
+	*pause* - pause in milliseconds between attempts 
+	
+	*timeout* - the waiting time for a response in milliseconds.
+
+	Examples:
+
+		ping_tcp('8.8.8.8', 443)
+		> (true, (0, 49))
+		ping_tcp('domain.does.not.exist', 80)
+		> (false, '[errno 11004] getaddrinfo failed')
+
+- **table_html(table:list, headers:bool=True , empty_str:str='-', consider_empty:tuple=(None, '') , table_class:str='')->str** - converts list of tuples/lists to a html table.List example:
+
+		[
+			('name', 'age'),
+			('john', '27'),
+			('jane', '24'),
+		]
+
 - **url_hostname(url:str, , sld:bool=True)->str** - extract the domain name from the URL.
 
 	*sld* - if True then return the second level domain otherwise return the full domain.

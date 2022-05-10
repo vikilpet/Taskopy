@@ -28,6 +28,7 @@ import win32api
 import win32gui
 import win32con
 import win32com.client
+from typing import List
 import pythoncom
 import wx
 from collections import defaultdict
@@ -435,7 +436,7 @@ def clip_get()->str:
 	return pyperclip.paste()
 
 def re_find(source:str, re_pattern:str, sort:bool=False
-, unique:bool=False, re_flags:int=re.IGNORECASE)->list:
+, unique:bool=False, re_flags:int=re.IGNORECASE)->List[str]:
 	r''' Return list with matches.
 		re_flags:
 			re.IGNORECASE	ignore case
@@ -465,7 +466,12 @@ def re_replace(source:str, re_pattern:str, repl:str=''
 
 def re_split(source:str, re_pattern:str, maxsplit:int=0
 , re_flags:int=re.IGNORECASE)->str:
-	''' Regexp split '''
+	'''
+	Regexp split
+	
+		assert re_split('abc', 'b') == ['a', 'c']
+	
+	'''
 	return re.split(
 		pattern=re_pattern
 		, maxsplit=maxsplit

@@ -23,6 +23,8 @@
 
 [![Taskopy + PotPlayer + youtube-dl](https://img.youtube.com/vi/LPMzMv8f9H0/0.jpg)](https://www.youtube.com/watch?v=LPMzMv8f9H0)
 
+[![Taskopy + Total Commander](https://img.youtube.com/vi/IAkXV_XJyfY/0.jpg)](https://www.youtube.com/watch?v=IAkXV_XJyfY)
+
 ## Содержание
 - [Установка](#установка)
 - [Использование](#использование)
@@ -91,7 +93,7 @@
 		):
 			balloon(f'Event (ID {data.EventID}): {data.Provider}\n{data.TimeCreated}')
 
-- **event_xpath** (*) - XPath для отфильтровывания нужных событий. Например:
+- **event_xpath** ('*') - XPath для отфильтровывания нужных событий. Регистр имеет значение. Например:
 
 	event_xpath='*[System[Level < 4]]' - только для событий журнала Система с уровнем меньше четырёх.
 
@@ -146,8 +148,16 @@
 - **http_dir** - папка, куда сохранять файлы, отправленные через HTTP POST запрос. Если не указано - временная папка.
 - **http_white_list** - белый список IP адресов только для этой задачи. Пример:
 	
-	http_white_list=['127.0.0.1', '192.168.0.*']
+		http_white_list=['127.0.0.1', '192.168.0.*']
 
+- **on_dir_change** - запускать задачу при появлении изменений в папке:
+
+		def demo__on_dir_change(on_dir_change=temp_dir()
+		, data:tuple=None, active=True):
+			fpath, action = data
+			tprint(f'{action}: {fpath}')
+
+- **on_exit** - запускать задачу при выходе из Taskopy. Обратите внимание, что Taskopy не будет закрыт, пока эти задачи не будут выполнены.
 - **on_file_change** - запускать задачу при изменении файла.
 - **caller** - при указании в свойствах, в эту переменную будет записано, кто именно запустил задачу. Возможные варианты: http, menu, scheduler, hotkey. caller следует указывать перед другими свойствами задачи.
 - **data** - для того, чтобы передать в задачу какие-либо данные, например *DataEvent* или *DataHTTPReq*.
@@ -275,13 +285,53 @@
 		
 - **time_now_str(template:str='%Y-%m-%d\_%H-%M-%S')->str** - строка с текущей датой и временем.
 - **pause(interval)** - приостановить выполнение задачи на указанное кол-во секунд. *interval* — время в секундах или строка с указанием единицы вроде '5 ms' или '6 sec' или '7 min'.
+- **var_lst_get(var:str, default=[], encoding:str='utf-8', com_str:str='#')->list** - возвращает список со строками. Исключает пустые строки и строки, начинающиеся с *com_str*
+
+		var_lst_set('test', ['a', 'b'])
+		assert var_lst_get('test') == ['a', 'b']
+		var_lst_set('test', map(str, (1, 2)))
+		assert var_lst_get('test') == ['1', '2']
+		assert var_del('test') == True
+
+- **var_lst_set(var, value, encoding:str='utf-8')** - устанавливает переменную *дисковую переменную со списком*.
+
+		# Обратите внимание на то, что число стало строкой:
+		var_lst_set('test', ['a', 'b', 1])
+		assert var_lst_get('test') == ['a', 'b', '1']
+		assert var_del('test')
+
 - **var_set(var_name:str, value:str)** - сохранить _значение_ переменной на диск. Таким образом можно хранить данные между запусками Taskopy.
+	
+		var_set('test', 5)
+		assert var_get('test') == '5'
+		assert var_del('test') == True
+
+		# Составное имя переменной
+		# промежуточные папки будут созданы:
+		var = ('file', 'c:\\pagefile.sys')
+		var_set(var, 1)
+		assert var_get(var, 1) == '1'
+		assert var_del(var) == True
+
 - **var_get(var_name:str)->str** - получить значение переменной.
+
+	*as_literal* - преобразуется в литерал (dict, list, tuple и т.д.).
+	Опасно! - это просто **eval**, а не **ast.literal_eval**
+
+		var_set('test', 1)
+		assert var_get('test') == '1'
+		assert var_get('test', as_literal=True) == 1
+		assert var_del('test') == True
+
 - **clip_set(txt:str)->** - поместить текст в буфер обмена.
 - **clip_get()->str->** - получить текст из буфера обмена.
 - **re_find(source:str, re_pattern:str, sort:bool=True)->list** - поиск в строке с помощью регулярного выражения. Возвращает список найденных значений.
 - **re_match(source:str, re_pattern:str, re_flags:int=re.IGNORECASE)->bool** - соответствие регулярному выражению.
 - **re_replace(source:str, re_pattern:str, repl:str='')** - заменить в строке всё найденное с помощью регулярного выражения на _repl._
+- **re_split(source:str, re_pattern:str, maxsplit:int=0, re_flags:int=re.IGNORECASE)->str** - разделение по регулярному выражению:
+	
+		assert re_split('abc', 'b') == ['a', 'c']
+
 - **inputbox(message:str, title:str, is_pwd:bool=False)->str** - показать сообщение с вводом текста. Возвращает введённую строку или пустую строку, если пользователь нажал отмену.
 	*is_pwd* — скрыть вводимый текст.
 - **random_num(a, b)->int** - вернуть случайное целое число в диапазоне от a до b, включая a и b.
@@ -312,22 +362,40 @@
 - **dir_copy(fullpath:str, destination:str)->int** - копировать папку и всё её содержимое. Возвращает количество ошибок при копировании.
 - **dir_delete(fullpath:str)** - удалить папку.
 - **dir_dialog(title:str=None, default_dir:str='', on_top:bool=True, must_exist:bool=True)->str** - диалог выбора папки.
+- **dir_dirs(fullpath, subdirs:bool=True)->list** - возвращает список полных путей всех каталогов в данном каталоге и его подкаталогах.
 - **dir_exists(fullpath:str)->bool** - папка существует?
 - **dir_files(fullpath)->list** - возвращает список полных путей всех файлов в указанной папке и её подпапках.
-- **dir_list(fullpath:str)->list:** - получить список файлов в папке.
+- **dir_find(fullpath, only_files:bool=False)->list** - возвращает список путей в указанной папке.
+
+	*fullpath* передается в **glob.glob**
+
+	*only_files* - возвращать только файлы, а не файлы и каталоги.
+
 	Примеры:
-	- Получить список всех .log файлов в 'c:\\\Windows' **не учитывая** подпапки:
+		
+		# Только файлы в текущем каталоге:
+		dir_list('d:\\folder\\*.jpg')
 
-		dir_list('c:\\Windows\\*.log')
+		# с подкаталогами:
+		dir_list('d:\\folder\\**\\*.jpg')
 
-	- Получить список всех .log файлов в 'c:\\\Windows' **включая** подпапки:
+- **dir_list(fullpath)->Iterator[str]** - возвращает все содержимое каталога (файлы и папки).
 
-		dir_list('c:\\Windows\\**\\*.log')
+		assert 'resources\\icon.png' in dir_list('resources')
 
 - **dir_size(fullpath:str, unit:str='b')->int** - размер папки в указанных единицах.
 - **dir_zip(source:str, destination:str)->str** - упаковать папку в архив и вернуть путь к архиву.
 - **dir_user_desktop()->str** - папка *рабочего стола* текущего пользователя.
 - **dir_user_startup()->str** - папка *автозагрузки* текущего пользователя.
+- **drive_io(drive_num:int=None)->dict** - возвращает генератор счетчиков физического диска (не раздела!) который возвращает именованные кортежи со счетчиками. пример:
+
+		dio = drive_io()
+		print(next(dio)[0].read_bytes)
+		time_sleep('1 sec')
+		print(
+			file_size_str(next(dio)[0].total_bytes_delta)
+		)
+		
 - **drive_list(exclude:str='')->str** - строка с буквами логических дисков.
 - **file_append(fullpath:str, content:str)->str** - дописывает *content* к файлу. Создаёт файл, если он не существует. Возвращает полное имя файла.
 - **file_attr_set(fullpath, attribute:int=win32con.FILE_ATTRIBUTE_NORMAL)** - изменение атрибутов файла.
@@ -342,6 +410,11 @@
 - **file_delete(fullpath:str)** - удалить файл. Смотрите так же *file_recycle*.
 - **file_dialog(title:str=None, multiple:bool=False, default_dir:str='', default_file:str='', wildcard:str='', on_top:bool=True)** - открывает стандартный диалог выбора файла. Возвращает полный путь или список полных путей, если _multiple_ == True.
 - **file_dir(fullpath:str)->str:** - получить полное имя папки, в которой файл лежит.
+- **file_dir_repl(fullpath, new_dir:str)->str** - изменяет каталог файла (в полном пути)
+- **file_drive(fullpath)->str** - возвращает букву диска в нижнем регистре из имени файла:
+
+		assert file_drive(r'c:\\pagefile.sys') == 'c'
+
 - **file_exists(fullpath:str)->bool** - файл существует?
 - **file_ext(fullpath:str)->str** - расширение файла без точки.
 - **file_hash(fullpath:str, algorithm:str='crc32')->str**: - возвращает хэш файла. *algorithm* - 'crc32' или любой алгоритм из hashlib ('md5', 'sha512' и т.д.)
@@ -388,6 +461,10 @@
 - **domain_ip(domain:str)->list** - получить список IP-адресов по имени домена.
 - **file_download(url:str, destination:str=None)->str:** - скачать файл и вернуть полный путь.
 	*destination* — может быть *None*, полным путём к файлу или папкой. Если *None*, то скачать во временную папку и вернуть полное имя.
+- **ftp_upload(fullpath, server:str, user:str, pwd:str, dst_dir:str='/', port:int=21, active:bool=True, debug_lvl:int=0, attempts:int=3, timeout:int=10, secure:bool=False, encoding:str='utf-8')->tuple** - загружает файл(ы) на FTP-сервер. Возвращает (True, None) или (False, ('error1', 'error2'...)).
+  
+	*debug_lvl* - установите в 1, чтобы увидеть команды.
+
 - **html_element(url:str, element, element_num:int=0)->str:** - получить текст HTML-элемента по указанной ссылке.
 	*element* — словарь, который содержит информацию о нужном элементе (его имя, атрибуты); или список таких словарей; или строка с xpath.
 	*element_num* - номер элемента, если таких находится несколько.
@@ -418,6 +495,34 @@
 - **net_url_decode(url:str, encoding:str='utf-8')->str** - декодирует URL.
 - **net_url_encode(url:str, encoding:str='utf-8')->str** - кодирует URL.
 - **pc_name()->str** - имя компьютера.
+- **ping_icmp(host:str, count:int=3, timeout:int=500, encoding:str='cp866')->tuple** - возвращает (True, (% потерь, среднее время) ) или (False, 'текст ошибки'). Примеры:
+	
+		ping_icmp('8.8.8.8')
+		> (True, (0, 47))
+		ping_icmp('domain.does.not.exist')
+		> (False, 'host unreachable (1)')
+
+- **ping_tcp(host:str, port:int, count:int=1, pause:int=100, timeout:int=500)->tuple** - измерение потерь и времени отклика при tcp-соединении. Возвращает (True, (% потерь, время в мс) ) или (False, 'текст ошибки').
+	
+	*pause* - пауза в миллисекундах между попытками 
+	
+	*timeout* - время ожидания ответа в миллисекундах
+
+	Примеры:
+
+		ping_tcp('8.8.8.8', 443)
+		> (true, (0, 49))
+		ping_tcp('domain.does.not.exist', 80)
+		> (false, '[errno 11004] getaddrinfo failed')
+
+- **table_html(table:list, headers:bool=True , empty_str:str='-', consider_empty:tuple=(None, '') , table_class:str='')->str** - преобразует список кортежей в HTML таблицу. Пример списка:
+
+		[
+			('name', 'age'),
+			('john', '27'),
+			('jane', '24'),
+		]
+
 - **url_hostname(url:str, , sld:bool=True)->str** - извлечь имя домена из URL.
 
 	*sld* - если True, то вернуть домен второго уровня, иначе вернуть полный.

@@ -805,7 +805,7 @@ def ftp_upload(fullpath, server:str
 				if 'UTF8' in features:
 					ftp.sendcmd('CLNT Python')
 					ftp.sendcmd('OPTS UTF8 ON')
-			ftp.cwd(dst_dir)
+			if dst_dir != '/': ftp.cwd(dst_dir)
 			for fpath in files:
 				for att in range(attempts):
 					time.sleep(att * SLEEP_MULT)

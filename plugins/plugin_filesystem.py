@@ -21,6 +21,7 @@ import win32print
 import hashlib
 import pythoncom
 import base64
+from typing import Iterator
 import psutil
 
 import win32api
@@ -643,16 +644,12 @@ def drive_free(letter:str, unit:str='GB')->int:
 	except:
 		return -1
 
-def dir_list(fullpath):
+def dir_list(fullpath)->Iterator[str]:
 	'''
 	Returns all directory content (dirs and files).
 
-		>list(dir_content(r'resources'))
-		['resources\\__pycache__',
-		'resources\\context_menu.reg',
-		'resources\\db.sqlite3',
-		'resources\\hint.py',
-		'resources\\icon.png']
+		assert 'resources\\icon.png' in dir_list('resources')
+
 	'''
 	fullpath = file_path_fix(fullpath)
 	for dirpath, dirnames, filenames in os.walk(fullpath):
@@ -662,9 +659,9 @@ def dir_list(fullpath):
 def dir_find(fullpath, only_files:bool=False)->list:
 	'''
 	Returns list of paths in specified folder.
-	'fullpath' passed to glob.glob
+	*fullpath* passed to **glob.glob**
 
-	only_files - return only files and not
+	*only_files* - return only files and not
 	files and directories.
 
 	Examples:
@@ -1113,7 +1110,7 @@ def _var_fpath(var)->str:
 def var_get(var:str, default=None, encoding:str='utf-8'
 , as_literal:bool=False):
 	'''
-	Gets the disk variable.
+	Gets the *disk variable*.
 
 	*as_literal* - converts to a literal (dict, list, tuple etc).
 	Dangerous! - it's just **eval** and not **ast.literal_eval**
@@ -1286,8 +1283,7 @@ def file_drive(fullpath)->str:
 	'''
 	Returns a drive letter in lowercase from a file name:
 
-		file_disk(r'c:\\pagefile.sys')
-		> 'c'
+		assert file_drive(r'c:\\pagefile.sys') == 'c'
 
 	'''
 	fullpath = file_path_fix(fullpath)
