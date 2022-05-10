@@ -23,6 +23,8 @@ An example using the extension for Firefox:
 
 [![Taskopy + PotPlayer + youtube-dl](https://img.youtube.com/vi/LPMzMv8f9H0/0.jpg)](https://www.youtube.com/watch?v=LPMzMv8f9H0)
 
+Use with Total Commander:
+
 [![Taskopy + Total Commander](https://img.youtube.com/vi/IAkXV_XJyfY/0.jpg)](https://www.youtube.com/watch?v=IAkXV_XJyfY)
 
 ## Contents
@@ -424,7 +426,7 @@ Format: **setting** (default value) — description.
 - **file_name(fullpath:str)->str** - get file name without directory.
 - **file_name_add(fullpath, suffix:str='', prefix:str='')->str** - adds a string (prefix or suffix) to the file name before the extension (or from beginning). Example:
 	
-	>>> file_name_add('my_file.txt', suffix='_1')
+	file_name_add('my_file.txt', suffix='_1')
 	'my_file_1.txt'
 
 - **file_name_fix(filename:str, repl_char:str='\_')->str** - replaces forbidden characters with _repl_char_. Removes leading and trailing spaces. Adds '\\\\?\\' for long paths.

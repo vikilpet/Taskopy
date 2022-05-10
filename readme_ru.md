@@ -23,6 +23,8 @@
 
 [![Taskopy + PotPlayer + youtube-dl](https://img.youtube.com/vi/LPMzMv8f9H0/0.jpg)](https://www.youtube.com/watch?v=LPMzMv8f9H0)
 
+Использование вместе с Total Commander:
+
 [![Taskopy + Total Commander](https://img.youtube.com/vi/IAkXV_XJyfY/0.jpg)](https://www.youtube.com/watch?v=IAkXV_XJyfY)
 
 ## Содержание
