@@ -17,6 +17,7 @@ import random
 import warnings
 import threading
 import ftplib
+from typing import Iterator, Tuple
 import json2html
 from .tools import dev_print, time_sleep, tdebug \
 , locale_set, safe, patch_import, value_to_unit, time_diff \
@@ -227,11 +228,33 @@ def file_download(url:str, destination:str=None
 		raise last_exc
 	return dst_file
 
-def html_clean(html_str:str, separator=' ')->str:
-	''' Removes HTML tags from string '''
-	warnings.filterwarnings("ignore", category=UserWarning, module='bs4')
+def html_clean(html_str:str, sep:str=' ', is_mail:bool=False
+, del_spec:bool=True)->str:
+	'''
+	Removes HTML tags from a string. Also removes content
+	of non-text tags: *style, script, img* 
+
+		assert html_clean('\r\n<a>t</a>\t') == 't'
+		assert html_clean('\u200b\r \n<a>t</a>\t'
+		, is_mail=True) == 't'
+		assert html_clean('<style>{}</style><a>t</a>\t') == 't'
+		assert html_clean('<img>jpg</img><a>t</a>\t'
+		, del_spec=False) == 'jpg t'
+
+	'''
+	SPEC_CHARS = ' \r\n\t\u200b\xa0\u200c'
+	DEL_TAGS = ('script', 'style', 'img')
+	warnings.filterwarnings('ignore', category=UserWarning, module='bs4')
 	soup = BeautifulSoup(html_str, 'html.parser')
-	return soup.get_text(separator=separator)
+	if del_spec:
+		for tag in DEL_TAGS: [s.decompose() for s in soup(tag)]
+	text = soup.get_text(separator=sep)
+	if is_mail:
+		text = text.strip(SPEC_CHARS)
+	else:
+		text = text.strip()
+	if is_mail: text = ' '.join(text.split())
+	return text
 
 def html_element(url:str, element
 , clean:bool=True, element_num:int=0
@@ -646,14 +669,14 @@ def table_html(table:list, headers:bool=True
 	html += '</table>'
 	return html
 
-def net_usage(interf:str, unit='b')->tuple:
+def net_usage(interf:str, unit='b')->Iterator[ Tuple[float] ]:
 	'''
 	Returns the current network usage (upload, download)
 	in bits/sec. See also **net_usage_str**
 	**interf** - name of a network interface.
 	Usage example:
 
-		for up_down in net_usage('Local Area Connection', unit='mb'):
+		for up_down in net_usage('LAN', unit='mb'):
 			print(up_down)
 			time_sleep('1 sec')
 
@@ -669,7 +692,7 @@ def net_usage(interf:str, unit='b')->tuple:
 		prev_up, prev_down, prev_time = cur_up, cur_down, cur_time
 		yield up_speed, down_speed
 
-def net_usage_str(interf:str)->tuple:
+def net_usage_str(interf:str)->Iterator[ Tuple[str] ]:
 	'''
 	Same as **net_usage** but in human readable format.
 	**interf** - name of a network interface.

@@ -28,7 +28,7 @@ import win32api
 import win32gui
 import win32con
 import win32com.client
-from typing import List
+from typing import List, Callable
 import pythoncom
 import wx
 from collections import defaultdict
@@ -41,7 +41,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2022-05-10'
+APP_VERSION = 'v2022-05-13'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -957,10 +957,10 @@ def decor_except_status(func):
 			return func
 decor_except_status.homemade = True
 
-def safe(func)->tuple:
+def safe(func:Callable)->Callable:
 	'''
 	Evaluate function inside 'try... except'
-	and return (True, func result)
+	and return (True, <function result>)
 	or (False, Exception)
 	'''
 	@functools.wraps(func)
@@ -1173,7 +1173,7 @@ def dialog(msg:str=None, buttons:list=None
 		else: 
 			return False, result.value
 	else:
-		if not isinstance(orig_buttons, set):
+		if not isinstance(orig_buttons, dict):
 			return result.value
 		if result.value >= 1000:
 			return tuple(orig_buttons.values())[result.value - 1000]
@@ -1783,5 +1783,22 @@ def is_iter(obj)->bool:
 		return False
 	except:
 		raise
+
+class lazy_property(object):
+	'''
+	meant to be used for lazy evaluation of an object attribute.
+	property should represent non-mutable data, as it replaces itself.
+	'''
+	def __init__(self, fget):
+		self.fget = fget
+		functools.update_wrapper(self, fget)
+
+	def __get__(self, obj, cls):
+		if obj is None:
+			return self
+
+		value = self.fget(obj)
+		setattr(obj, self.fget.__name__, value)
+		return value
 
 if __name__ != '__main__': patch_import()

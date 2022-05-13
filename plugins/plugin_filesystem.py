@@ -50,10 +50,22 @@ def _dir_slash(dirpath:str)->str:
 	if dirpath.endswith('\\'): return dirpath
 	return dirpath + '\\'
 
-def file_path_fix(fullpath):
+def file_path_fix(fullpath, len_limit:int=0
+, trim_suf:str='...'):
 	'''
 	Join list of paths and optionally
 	fix long path. Fill environment variables ('%APPDATA%')
+
+	*len_limit* - trim file name so that the full path
+	length does not exceed this number.
+
+	*trim_suf* - attach this string when trimming
+	a file name that is too long.
+
+		assert dir_exists( file_path_fix(('%appdata%', 'Media Center Programs')) )
+		assert len(file_path_fix('c:\\dir\\' + ('f' * 150) + '.txt'
+		, len_limit=99)) == 99
+
 	'''
 	if not fullpath: return fullpath
 	if isinstance(fullpath, (list, tuple)):
@@ -63,7 +75,14 @@ def file_path_fix(fullpath):
 		rem = fullpath[start + 1: ]
 		if rem.startswith('\\'): rem = rem[1:]
 		fullpath = os.path.join( os.getenv(env_var), rem )
-	if (
+	if len_limit and (len(fullpath) > len_limit):
+		fname, ext = os.path.splitext( os.path.basename(fullpath) )
+		fdir = os.path.dirname(fullpath)
+		limit = len(fullpath) - len_limit + len(trim_suf)
+		fullpath = os.path.join(
+			fdir, fname[:-limit] + trim_suf + ext
+		)
+	elif (
 		len(fullpath) > 255
 		and not '\\\\?\\' in fullpath
 		and fullpath[1:3] == ':\\'
@@ -413,10 +432,13 @@ def file_name_fix(filename:str, repl_char:str='_')->str:
 			new_fn += char
 	return new_fn
 
-def dir_dirs(fullpath, subdirs:bool=True)->list:
-	'''
+def dir_dirs(fullpath, subdirs:bool=True)->Iterator[str]:
+	r'''
 	Returns list of full paths of all directories
 	in this directory and its subdirectories.
+
+		assert r'c:\windows\System32' in dir_dirs(r'c:\windows', subdirs=False)
+
 	'''
 	fullpath = file_path_fix(fullpath)
 
@@ -425,12 +447,15 @@ def dir_dirs(fullpath, subdirs:bool=True)->list:
 		if not subdirs: return
 
 def dir_files(fullpath, ext:str=None, subdirs:bool=True
-, rule=lambda f: True):
+, rule=lambda f: True)->Iterator[str]:
 	'''
 	Returns list of full filenames of all files
 	in the given directory and its subdirectories.
+	
 	*subdirs* - including files from subfolders.
+	
 	*ext* - only files with this extension.
+
 	'''
 	fullpath = file_path_fix(fullpath)
 	if ext:
@@ -909,8 +934,9 @@ def drive_list(exclude:str='')->str:
 
 @contextmanager
 def working_directory(directory:str):
-	''' Change current working directory
-		and revert it back.
+	'''
+	Change current working directory
+	and revert it back. You would better never use this.
 	'''
 	owd = os.getcwd()
 	try:
@@ -1322,7 +1348,7 @@ DriveIO = namedtuple(
 	, psutil._common.sdiskio._fields
 	+ ('read_bytes_delta', 'write_bytes_delta', 'total_bytes_delta')
 )
-def drive_io(drive_num:int=None)->dict:
+def drive_io(drive_num:int=None)->Iterator[namedtuple]:
 	'''
 	Returns physical drive (not partition!) I/O generator
 	that returns a named tuples with counters. Example:
