@@ -363,18 +363,28 @@ def time_diff(start:datetime.datetime, end:datetime.datetime=None
 	return int(seconds // coef)
 
 def time_diff_str(start:datetime.datetime
-, end:datetime.datetime=None, str_format:str=None)->str:
+, end:datetime.datetime=None, str_format:str=''
+, no_ms:bool=False)->str:
 	'''
 	Returns time difference as a string like that:
 	'5 days, 3:01:35.837127'
+	
 	*start* and *end* should be in _datetime_ format.
+	
 	*str_format* - standard time formating like '%y.%m.%d %H:%M:%S'
 	(see tcon.DATE_FORMAT)
+
+	*no_ms* - just remove microseconds from string
+
 	'''
 	if isinstance(start, float):
 		start = datetime.datetime.fromtimestamp(start)
 	if not end: end = datetime.datetime.now()
-	if not str_format: return str(end - start)
+	if not str_format:
+		if no_ms:
+			return str(end - start).split('.')[0]
+		else:
+			return str(end - start)
 	delta_as_time = time.gmtime( (end - start).total_seconds() )
 	return time.strftime(str_format, delta_as_time)
 
@@ -1390,41 +1400,41 @@ class DataHTTPReq:
 	'''
 	Browser request data as an object.
 	'''
-	def __init__(s, client_ip:str, path:str
+	def __init__(self, client_ip:str, path:str
 	, headers:dict={}, params:dict={}
-	, form_data:dict={}, post_file:str=None):
+	, form_data:dict={}, post_file:str=''):
 		'''
 		client_ip - str
 		path - '/task_name'
 		headers - {"Accept-Encoding": "gzip, deflate", ...}
 		params - {'par1': '123', ...}
 		'''
-		s.client_ip = client_ip
-		s.path = path
-		s.post_file = post_file
-		s.host = ''
-		s.accept = ''
-		s.accept_encoding = ''
-		s.accept_language = ''
-		s.referer = ''
-		s.headers = headers
-		s.params = params
-		s.form = form_data
-		s.__dict__.update(form_data)
+		self.client_ip = client_ip
+		self.path = path
+		self.post_file = post_file
+		self.host = ''
+		self.accept = ''
+		self.accept_encoding = ''
+		self.accept_language = ''
+		self.referer = ''
+		self.headers = headers
+		self.params = params
+		self.form = form_data
+		self.__dict__.update(form_data)
 
 class DataBrowserExt(DataHTTPReq):
 	''' HTTP request data helper for 'SendToTaskopy'
 		browser extension.
 	'''
-	def __init__(s):
-		s.link_url = ''
-		s.page_url = ''
-		s.editable = False
-		s.media_type = ''
-		s.src_url = ''
-		s.selection = ''
+	def __init__(self):
+		self.link_url:str = ''
+		self.page_url:str = ''
+		self.editable:bool = False
+		self.media_type:str = ''
+		self.src_url:str = ''
+		self.selection:str = ''
 
-def _etree_to_dict(tree: _ElementTree):
+def _etree_to_dict(tree: _ElementTree.ElementTree):
 	di = {tree.tag: {} if tree.attrib else None}
 	children = list(tree)
 	if children:

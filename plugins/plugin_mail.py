@@ -4,15 +4,17 @@ import ssl
 import glob
 import os
 import time
+import datetime
 from typing import Tuple, List
 from email.message import EmailMessage, Message
 from email import message_from_bytes
 from email.header import decode_header, make_header
+from email.utils import parsedate_to_datetime
 import imaplib
 import mimetypes
 from .tools import Job, job_batch, tdebug \
 , patch_import, dev_print, lazy_property \
-, table_print
+, table_print, time_diff_str
 from .plugin_filesystem import file_name_fix, file_size_str \
 , var_get, var_set, file_path_fix
 from .plugin_network import html_clean
@@ -28,8 +30,8 @@ class MailMsg:
 	'''
 
 	def __init__(self, login:str, server:str
-	, check_only:bool=False, raw_bytes:bytes=None
-	, error:str=None, exception:Exception=None):
+	, check_only:bool=False, raw_bytes:bytes=b''
+	, error:str='', exception:Exception=None):
 		self.raw_bytes:bytes = raw_bytes
 		self.error:str = error
 		self.exception:Exception = exception 
@@ -59,7 +61,7 @@ class MailMsg:
 		'''
 		Subject as a filesystem safe string (not a full path)
 		'''
-		return file_name_fix(self.subject)
+		return file_name_fix(self.h_subject)
 
 	@lazy_property
 	def body(self)->str:
@@ -92,25 +94,62 @@ class MailMsg:
 		body = body.strip()
 		return body
 
-	@lazy_property
-	def subject(self)->str:
+	def _get_header(self, header:str)->str:
 		'''
-		Returns decoded Subject header.
+		Returns decoded header as string.
 		'''
-		subj = 'no-subject'
+		hdr_str = ''
 		try:
-			subj = str(
+			hdr_str = str(
 				make_header(
-					decode_header( self._message.get('Subject') )
+					decode_header( self._message.get(header) )
 				)
 			)
 		except LookupError:
-			dev_print(subj := 'subject LookupError')
+			dev_print(hdr_str := f'header "{header}" LookupError')
 		except TypeError:
-			dev_print(subj := 'no-subject')
+			dev_print(hdr_str := f'header "{header}" not found')
 		except Exception as e:
-			dev_print(subj := f'subject error: {repr(e)}')
-		return subj
+			dev_print(hdr_str := f'header "{header}" error: {repr(e)}')
+		return hdr_str
+
+	@lazy_property
+	def h_date(self)->str:
+		'''
+		Returns decoded *Date* header.
+		'''
+		return self._get_header('Date')
+	
+	@property
+	def date_dif(self)->str:
+		return time_diff_str(
+			parsedate_to_datetime( self.h_date )
+			, end=datetime.datetime.now(
+				tz=datetime.datetime.now().astimezone().tzinfo
+			)
+			, no_ms=True
+		)
+
+	@lazy_property
+	def h_subject(self)->str:
+		'''
+		Returns decoded *Subject* header.
+		'''
+		return self._get_header('Subject')
+
+	@lazy_property
+	def h_to(self)->str:
+		'''
+		Returns decoded *To* header.
+		'''
+		return self._get_header('To')
+
+	@lazy_property
+	def h_from(self)->str:
+		'''
+		Returns decoded *From* header.
+		'''
+		return self._get_header('From')
 
 	@lazy_property
 	def body_text(self)->str:
@@ -130,9 +169,19 @@ class MailMsg:
 			)
 			, len_limit=_MAX_FILE_LEN
 		)
+	
+	def __getattr__(self, name: str):
+		if not name.startswith('h_'):
+			raise Exception(f'MailMsg unknown attribute: {name}')
+		name = name[2:]
+		dev_print(f'get unknown header "{name}"')
+		hdr_str = self._get_header(name)
+		setattr(self, 'h_' + name, hdr_str)
+		return hdr_str
+
 
 	def __str__(self):
-		return 'MailMsg: ' + self.subject[:20]
+		return 'MailMsg: ' + self.h_subject[:20]
 
 class _MailLog:
 
@@ -147,7 +196,7 @@ class _MailLog:
 	def log(self, msg:str):
 		if isinstance(msg, Exception):
 			msg = ( f'exception «{repr(msg)}»'
-			+ f'\nat line {msg.__traceback__.tb_lineno}' )
+			+ f' at line {msg.__traceback__.tb_lineno}' )
 		else:
 			msg = str(msg)
 		msg = f'{self.prefix} {self.login}@{self.server}: {msg}'
@@ -247,11 +296,15 @@ def mail_send_batch(recipients:str=''
 
 def mail_check(server:str, login:str, password:str
 , folders:list=['inbox'], msg_status:str='UNSEEN'
+, headers:tuple=('subject', 'from', 'to', 'date')
 , silent:bool=True)->Tuple[ List[MailMsg], List[str] ]:
 	'''
 	Returns subjects of messages with *msg_status*
 	on the server in specified folder(s).
 	Returns list of MailMsg and list of errors.
+
+	*headers* - message headers to fetch. You can access them later
+	in MailMsg attributes.
 
 	'''
 	msgs:list = []
@@ -285,7 +338,9 @@ def mail_check(server:str, login:str, password:str
 					time.sleep(att * 2)
 					status, data = imap.fetch(
 						msg_id
-						, '(BODY.PEEK[HEADER.FIELDS (SUBJECT)])'.encode()
+						, '(BODY.PEEK[HEADER.FIELDS ({})])'.format(
+							' '.join(h.upper() for h in headers)
+						).encode()
 					)
 					if status == 'OK': break
 					log(f'fetch attempt {att} ({status}): {data}')
@@ -373,6 +428,7 @@ def mail_download(server:str, login:str, password:str
 					continue
 				msg = MailMsg(login=login, server=server
 				, raw_bytes=fetch_data[0][1])
+				log(f'message fetched ({msg_id}): «{msg.h_subject}»')
 				if last_index == 0:
 					last_index = _get_last_index(dst_dir) + 1
 				else:
