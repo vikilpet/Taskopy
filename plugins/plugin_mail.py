@@ -1,8 +1,6 @@
 
 import smtplib
 import ssl
-import argparse
-import sys
 import glob
 import os
 import time
@@ -12,34 +10,17 @@ from email import message_from_bytes
 from email.header import decode_header, make_header
 import imaplib
 import mimetypes
-from .tools import Job, job_batch, tprint \
-, patch_import, dev_print, lazy_property, safe \
+from .tools import Job, job_batch, tdebug \
+, patch_import, dev_print, lazy_property \
 , table_print
 from .plugin_filesystem import file_name_fix, file_size_str \
 , var_get, var_set, file_path_fix
 from .plugin_network import html_clean
 _CC_LIMIT = 35
-_errors = []
 _MAX_FILE_LEN = 200
 _FILE_EXT = 'eml'
 _MAX_ERR_STR_LEN = 200
 _LAST_NUM_VAR = 'last_mail_msg_num_in_'
-
-def _parse_args():
-	parser = argparse.ArgumentParser()
-	parser.add_argument('--recipient', '-r', help='Email(s) of receiver(s)'
-		, type=str, default='')
-	parser.add_argument('--subject', '-s', help='Subject', type=str
-		, default='Test subject')
-	parser.add_argument('--from_name', '-f', help='Sender name', type=str
-		, default='Script')
-	parser.add_argument('--reply_to', '-rt', help='Reply-to', type=str
-		, default='')
-	parser.add_argument('--message', '-m', help='Message body', type=str
-		, default='Test message')
-	parser.add_argument('--attachment', '-a', help='Fullpath to file', type=str
-		, default='')
-	return parser.parse_args()
 
 class MailMsg:
 	'''
@@ -153,116 +134,151 @@ class MailMsg:
 	def __str__(self):
 		return 'MailMsg: ' + self.subject[:20]
 
+class _MailLog:
+
+	def __init__(self, prefix:str, login:str, server:str, silent:bool
+	, err_lst:list):
+		self.prefix:str = prefix
+		self.login:str = login
+		self.server:str = server
+		self.silent:bool = silent
+		self.err_lst:list = err_lst
+	
+	def log(self, msg:str):
+		if isinstance(msg, Exception):
+			msg = ( f'exception «{repr(msg)}»'
+			+ f'\nat line {msg.__traceback__.tb_lineno}' )
+		else:
+			msg = str(msg)
+		msg = f'{self.prefix} {self.login}@{self.server}: {msg}'
+		if 'error' in msg.lower(): self.err_lst.append(msg)
+		if self.silent:
+			tdebug(msg)
+		else:
+			print(msg)
+
 def mail_send(
-		recipient:str
-		, subject:str
-		, message:str
-		, smtp_server:str
-		, smtp_port:int
-		, smtp_user:str
-		, smtp_password:str
-		, from_name:str=''
-		, attachment:str=''
-		, reply_to:str=''
-	)->tuple:
+	recipient:str
+	, subject:str
+	, message:str
+	, server:str
+	, port:int
+	, login:str
+	, password:str
+	, from_name:str=''
+	, attachment:str=''
+	, reply_to:str=''
+)->Tuple[bool, str]:
 	'''
-	Send email.
-	recipient - emails separated with commas.
-	Returns (True, None) on success or
+	Send mail. Returns (True, None) on success or
 	(False, 'error text').
+
+	*recipient* - emails separated with commas.
+
+	*attachment* - the full path to a file or
+	a list of such paths.
+
 	'''
+	
 	context = ssl.create_default_context()
 	msg = EmailMessage()
 	msg['Subject'] = subject
-	msg['From'] = f'"{from_name}" <{smtp_user}>'
+	if from_name:
+		msg['From'] = f'{from_name} <{login}>'
+	else:
+		msg['From'] = login
 	msg.set_content(message, cte='base64')
 	if reply_to: msg.add_header('Reply-To', reply_to)
-	if attachment:
-		if not os.path.isfile(attachment):
+	if isinstance(attachment, str): attachment = [attachment]
+	for attach in attachment:
+		if not os.path.isfile(attach):
 			raise Exception('wrong attachment')
-		ctype, encoding = mimetypes.guess_type(attachment)
-		if ctype is None or encoding is not None:
-			ctype = 'application/octet-stream'
-		maintype, subtype = ctype.split('/', 1)
-		with open(attachment, 'rb') as fp:
+		filetype, encoding = mimetypes.guess_type(attach)
+		if filetype is None or encoding is not None:
+			filetype = 'application/octet-stream'
+		maintype, subtype = filetype.split('/', 1)
+		with open(attach, 'rb') as fp:
 			msg.add_attachment(
 				fp.read()
 				, maintype=maintype
 				, subtype=subtype
-				, filename=attachment[attachment.rfind('\\') + 1:]
+				, filename=os.path.basename(attach)
 			)
+	
 	try:
-		with smtplib.SMTP_SSL(smtp_server, smtp_port
-		, context=context) as server:
-			server.login(smtp_user, smtp_password)
-			server.send_message(
+		with smtplib.SMTP_SSL(host=server, port=port
+		, context=context) as smtp:
+			smtp.login(login, password)
+			smtp.send_message(
 				msg
 				, to_addrs=recipient.split(',')
 			)
 	except smtplib.SMTPResponseException as e:
-		_errors.append(f'smtplib error: {e.smtp_code}'
-		+ f' ({e.smtp_error.decode()[:100]})')
-		return False, e.smtp_error.decode()[:100]
+		return False, e.smtp_error.decode()
 	except Exception as e:
-		dev_print(repr(e)[:100])
-		_errors.append(f'mail_send error: {repr(e)[:100]}')
-		return False, repr(e)[:100]
-	return True, None
+		tdebug(repr(e))
+		return False, repr(e)
+	return True, ''
 	
 def mail_send_batch(recipients:str=''
-, cc_limit:int=-1, **mail_send_args):
-	''' Send email to many recipients
-		recipient - emails separated with commas
+, cc_limit:int=_CC_LIMIT, **mail_send_args)->List[str]:
 	'''
-	rec_li = recipients.replace(' ', '').split(',')
+	Send email to many recipients.
+	Returns list of errors if any.
+	
+	*recipients* - list of emails or
+	a string with comma separated emails.
+
+	*cc_limit* - carbon copy limit of the server.
+
+	'''
+	
+	errors = []
+	if isinstance(recipients, str):
+		rec_li = recipients.replace(' ', '').split(',')
 	rec_li = list(set(rec_li))
-	if cc_limit == -1: cc_limit = _CC_LIMIT
-	recipients = [rec_li[x:x+cc_limit] for x in range(0, len(rec_li), cc_limit)]
-	for r in recipients:
-		mail_send(
-			recipient = ','.join(r)
+	rec_li = [rec_li[x:x+cc_limit] for x in range(0, len(rec_li), cc_limit)]
+	for rec in rec_li:
+		errors.extend( mail_send(
+			recipient=','.join(rec)
 			, **mail_send_args
-		)
+		)[1] )
+	return errors
 
 def mail_check(server:str, login:str, password:str
 , folders:list=['inbox'], msg_status:str='UNSEEN'
 , silent:bool=True)->Tuple[ List[MailMsg], List[str] ]:
 	'''
-	Counts the number of messages with *msg_status*
-	on the server.
-	Returns (msg_num:int, errors:list)
-
-		>(5, [])
-		>(0, ['login failed'])
+	Returns subjects of messages with *msg_status*
+	on the server in specified folder(s).
+	Returns list of MailMsg and list of errors.
 
 	'''
 	msgs:list = []
 	errors:list = []
-
-	def pr(add_text, is_error:bool=False):
-		nonlocal errors
-		if not silent:
-			print (f'mail_check (serv={server}, login={login}): {add_text}')
-		if is_error:
-			errors.append ( (f'{login}@{server}: {add_text}') )
-
+	log = _MailLog(prefix='check', login=login, server=server
+	, silent=silent, err_lst=errors).log
 	try:
 		imap = imaplib.IMAP4_SSL(server)
-		imap.login(login, password)
+		status, data = imap.login(login, password)
+		if status != 'OK':
+			log(f'login error: {data}')
+			return [], errors
+		log('login OK')
 		for folder in folders:
-			pr(f'select folder "{folder}"')
+			log(f'select folder «{folder}»')
 			status, data = imap.select(folder, True)
 			if status != 'OK':
-				pr(f'imap select error ({status}): {data}', True)
+				log(f'select error ({status}): {data}')
 				continue
-			pr('select "OK", now search in folder')
+			log('select "OK", now search in folder')
 			status, msg_ids = imap.search(None, msg_status)
 			if status != 'OK':
-				pr(f'imap search error ({status}): {msg_ids}', True)
+				log(f'imap search error ({status}): {msg_ids}')
 				continue
 			msg_ids = msg_ids[0].split()
 			msg_cnt = len(msg_ids)
-			pr(f'{msg_cnt} "{msg_status}" messages in "{folder}"')
+			log(f'{msg_cnt} «{msg_status}» messages in «{folder}»')
 			if not msg_cnt: continue
 			for msg_id in msg_ids:
 				for att in range(3):
@@ -272,17 +288,16 @@ def mail_check(server:str, login:str, password:str
 						, '(BODY.PEEK[HEADER.FIELDS (SUBJECT)])'.encode()
 					)
 					if status == 'OK': break
-					pr(f'fetch attempt {att} ({status}): {data}')
+					log(f'fetch attempt {att} ({status}): {data}')
 				else:
-					pr(f'fetch error ({status}): {data}')
+					log(f'fetch error ({status}): {data}')
 					continue
 				msgs.append( MailMsg(login=login, server=server
 				, raw_bytes=data[0][1], check_only=True) )
-		imap.close()
-		imap.logout()
+		log(imap.close())
+		log(imap.logout())
 	except Exception as e:
-		pr(f'mail_check exception: {repr(e)}'
-		+ f' at line {e.__traceback__.tb_lineno}', True)
+		log(e)
 	return msgs, errors
 
 def _get_last_index(folder:str)->int:
@@ -292,9 +307,11 @@ def _get_last_index(folder:str)->int:
 	try:
 		fi_list = glob.glob(folder + f'\\*.{_FILE_EXT}')
 		if fi_list:
-			num = max(
-				[int(os.path.basename(x).split()[0]) for x in fi_list]
-			)
+			num = max([
+				int(
+					os.path.basename(f).split()[0]
+				) for f in fi_list
+			])
 		else:
 			num = 0
 	except Exception as e:
@@ -303,15 +320,15 @@ def _get_last_index(folder:str)->int:
 	return num
 	
 def mail_download(server:str, login:str, password:str
-, output_dir:str, folders:list=['inbox']
+, dst_dir:str, folders:list=['inbox']
 , trash_folder:str='Trash', silent:bool=True
 , attempts:int=3)->Tuple[List[MailMsg], List[str] ]:
 	'''
 	Downloads all messages from the server to the
-	specified directory (*output_dir*).
+	specified directory (*dst_dir*).
 	
 	*trash_folder* - IMAP folder where deleted messages
-	are moved. For GMail use None.
+	are moved. For GMail use `None`.
 	
 	Returns tuple with messages (MailMsg) and errors (str).
 	'''
@@ -319,51 +336,48 @@ def mail_download(server:str, login:str, password:str
 	errors = []
 	last_index = 0
 	msgs = []
+	log = _MailLog(prefix='downl', login=login, server=server
+	, silent=silent, err_lst=errors).log
 	
-	def pr(add_text:str, is_error:bool=False):
-		nonlocal errors
-		if not silent:
-			print (f'mail_dl ({login}@{server}): {add_text}')
-		if is_error:
-			errors.append(f'{login}@{server}: {add_text}')
 	try:
-		pr('connect to server')
+		log('connect to server')
 		imap = imaplib.IMAP4_SSL(server)
-		pr('login')
+		log('login')
 		status, data = imap.login(login, password)
 		if status != 'OK':
-			pr(f'login failed: {status} {data}', True)
-			return False, [], errors
-		pr('login successful')
+			log(f'login error: {status} {data}')
+			return [], errors
+		log('login successful')
 		for folder in folders:
-			pr(f'select folder {folder}')
+			log(f'select folder {folder}')
 			status, mail_count = imap.select(folder, readonly=False)
 			if status != 'OK':
-				pr(f'select folder error ({folder}): {status} {mail_count}', True)
+				log(f'select error («{folder}»): {status} {mail_count}')
 				continue
-			pr('select is "OK"')
+			log('select is OK')
 			number = int(mail_count[0].decode('utf-8'))
-			pr(f'found {number} messages in "{folder}" folder')
+			log(f'found {number} messages in «{folder}» folder')
 			msg_number += number
 			status, search_data = imap.search(None, 'ALL')
 			if status != 'OK':
-				pr(f'error imap search: {status} {search_data}', True)
+				log(f'search error: {status} {search_data}')
 				continue
 			for msg_id in search_data[0].split():
 				for att in range(attempts):
 					time.sleep(att * 2)
 					status, fetch_data = imap.fetch(msg_id, '(RFC822)')
 					if status == 'OK': break
+					log(f'fetch attempt {att} ({status}): {data}')
 				else:
-					pr(f'fetch error ({status}): {fetch_data}', True)
+					log(f'fetch error ({status}): {fetch_data}')
 					continue
 				msg = MailMsg(login=login, server=server
 				, raw_bytes=fetch_data[0][1])
 				if last_index == 0:
-					last_index = _get_last_index(output_dir) + 1
+					last_index = _get_last_index(dst_dir) + 1
 				else:
 					last_index += 1
-				msg.dst_dir = output_dir
+				msg.dst_dir = dst_dir
 				msg.file_index = last_index
 				try:
 					with open(msg.fullpath, 'bw') as f:
@@ -371,33 +385,30 @@ def mail_download(server:str, login:str, password:str
 					file_ok = True
 				except Exception as e:
 					file_ok = False
-					pr(f'file write error: {repr(e)}', True)
-					safe(os.remove)(msg.fullpath)
-					continue
+					log(f'file write error: {repr(e)}')
+					try:
+						os.remove(msg.fullpath)
+					except:
+						log(f'file deletion error')
 				msgs.append(msg)
 				if file_ok:
-					var_set(_LAST_NUM_VAR + output_dir, last_index)
+					var_set(_LAST_NUM_VAR + dst_dir, last_index)
 					if trash_folder:
 						status, data = imap.copy(msg_id, trash_folder)
 						if status == 'OK':
 							imap.store(msg_id, '+FLAGS', '\\Deleted')
 						else:
-							pr(f'message move error ({status}): {data}', True)
+							log(f'message move error ({status}): {data}')
 					else:
 						imap.store(msg_id, '+FLAGS', '\\Deleted')
-			pr('expunge')
-			imap.expunge()
-			pr('close')
-			imap.close()
-			pr('logout')
-			imap.logout()
+			log(imap.expunge())
+			log(imap.close())
+			log(imap.logout())
 	except Exception as e:
-		tprint(f'mail_download {login}@{server} exception: {repr(e)}'
-		+ f' at line {e.__traceback__.tb_lineno}')
-		pr(f'general error: {e}', True)
+		log(e)
 	return msgs, errors
 
-def mail_download_batch(mailboxes:list, output_dir:str, timeout:int=60
+def mail_download_batch(mailboxes:list, dst_dir:str, timeout:int=60
 , log_file:str=r'mail_errors.log', err_thr:int=8
 , silent:bool=True)->Tuple[ List[MailMsg], List[str] ]:
 	''' Downloads (or checks) all mailboxes in list of dictionaries
@@ -408,7 +419,8 @@ def mail_download_batch(mailboxes:list, output_dir:str, timeout:int=60
 		detected.
 	'''
 	def write_log()->tuple:
-		''' Write errors to log. Returns True and log file name.
+		'''
+		Write errors to the log. Returns True and log file name.
 		'''
 		try:
 			if errors:
@@ -423,7 +435,7 @@ def mail_download_batch(mailboxes:list, output_dir:str, timeout:int=60
 					pass
 			return True, log_file
 		except Exception as e:
-			return False, 'error write_log ' + repr(e)
+			return False, 'write_log error: ' + repr(e)
 		
 	def log_warning()->tuple:
 		''' Returns True and last line if there is too many errors
@@ -445,24 +457,18 @@ def mail_download_batch(mailboxes:list, output_dir:str, timeout:int=60
 		jobs = []
 		for box in mailboxes:
 			box['silent'] = silent
-			if box.get('check_only', False):
-				jobs.append(
-					Job(
-						mail_check
-						, **{k:box[k] for k in box if k!='check_only'}
-					)
-				)
-				continue
-			box['output_dir'] = output_dir
-			jobs.append(
-				Job(
-					mail_download
-					, **{k:box[k] for k in box if k!='check_only'}
-				)
-			)
+			target = mail_download
+			if box.get('check_only'):
+				target = mail_check
+			else:
+				box['dst_dir'] = dst_dir
+			jobs.append( Job(
+				target
+				, **{k:box[k] for k in box if k!='check_only'}
+			) )
 		errors = []
 		msgs = []
-		table = [('User', 'Time')]
+		table = [('Login', 'Time')]
 		job: Job
 		for job in job_batch(jobs, timeout=timeout):
 			if job.error:
@@ -496,17 +502,4 @@ def mail_download_batch(mailboxes:list, output_dir:str, timeout:int=60
 		errors.append(m)
 	return msgs, errors
 	
-if __name__ == '__main__':
-	if len(sys.argv) > 3:
-		args = _parse_args()
-		try:
-			mail_send_batch(**vars(args))
-			if len(_errors): sys.exit(3)
-		except:
-			sys.exit(2)
-		sys.exit(0)
-	else:
-		print(f'Not enough arguments!')
-		sys.exit(1)
-else:		
-	patch_import()
+if __name__ != '__main__': patch_import()
