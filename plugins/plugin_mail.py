@@ -5,7 +5,7 @@ import glob
 import os
 import time
 import datetime
-from typing import Tuple, List
+from typing import Callable, Tuple, List
 from email.message import EmailMessage, Message
 from email import message_from_bytes
 from email.header import decode_header, make_header
@@ -31,7 +31,8 @@ class MailMsg:
 
 	def __init__(self, login:str, server:str
 	, check_only:bool=False, raw_bytes:bytes=b''
-	, error:str='', exception:Exception=None):
+	, error:str='', exception:Exception=None
+	, sub_rule:Callable=lambda m: ''):
 		self.raw_bytes:bytes = raw_bytes
 		self.error:str = error
 		self.exception:Exception = exception 
@@ -43,6 +44,7 @@ class MailMsg:
 			self.size:int = len(raw_bytes)
 			self.size_str:str = file_size_str(self.size)
 		self.check_only:bool = check_only
+		self.sub_rule:Callable = sub_rule
 	
 	@lazy_property
 	def as_str(self)->str:
@@ -165,6 +167,7 @@ class MailMsg:
 		return file_path_fix(
 			(
 				self.dst_dir
+				, self.sub_rule(self)
 				, f'{self.file_index} - {self._subj_fname}.{_FILE_EXT}'
 			)
 			, len_limit=_MAX_FILE_LEN
@@ -313,9 +316,10 @@ def mail_check(server:str, login:str, password:str
 	, silent=silent, err_lst=errors).log
 	try:
 		imap = imaplib.IMAP4_SSL(server)
-		status, data = imap.login(login, password)
-		if status != 'OK':
-			log(f'login error: {data}')
+		try:
+			imap.login(login, password)
+		except Exception as e:
+			log(f'login error: {repr(e)}')
 			return [], errors
 		log('login OK')
 		for folder in folders:
@@ -377,17 +381,27 @@ def _get_last_index(folder:str)->int:
 def mail_download(server:str, login:str, password:str
 , dst_dir:str, folders:list=['inbox']
 , trash_folder:str='Trash', silent:bool=True
-, attempts:int=3)->Tuple[List[MailMsg], List[str] ]:
+, attempts:int=3
+, sub_rule:Callable=lambda m: '')->Tuple[List[MailMsg], List[str] ]:
 	'''
 	Downloads all messages from the server to the
 	specified directory (*dst_dir*).
-	
+	Returns tuple with messages (MailMsg) and errors (str).
+
 	*trash_folder* - IMAP folder where deleted messages
 	are moved. For GMail use `None`.
-	
-	Returns tuple with messages (MailMsg) and errors (str).
+
+	*folders* - list of IMAP folders to check.
+
+	*sub_rule* is a function that accepts *MailMsg* instance
+	and which returns the name of the subfolder. Example:
+
+		def _mail_sort(msg: MailMsg)->str:
+			if 'amazon.com' in msg.h_from.lower():
+				return 'shopping'
+			return ''
+
 	'''
-	msg_number = 0
 	errors = []
 	last_index = 0
 	msgs = []
@@ -397,22 +411,21 @@ def mail_download(server:str, login:str, password:str
 	try:
 		log('connect to server')
 		imap = imaplib.IMAP4_SSL(server)
-		log('login')
-		status, data = imap.login(login, password)
-		if status != 'OK':
-			log(f'login error: {status} {data}')
+		try:
+			imap.login(login, password)
+		except Exception as e:
+			log(f'login error: {repr(e)}')
 			return [], errors
-		log('login successful')
+		log('login OK')
 		for folder in folders:
-			log(f'select folder {folder}')
+			log(f'select folder «{folder}»')
 			status, mail_count = imap.select(folder, readonly=False)
 			if status != 'OK':
 				log(f'select error («{folder}»): {status} {mail_count}')
 				continue
 			log('select is OK')
-			number = int(mail_count[0].decode('utf-8'))
-			log(f'found {number} messages in «{folder}» folder')
-			msg_number += number
+			cnt = int(mail_count[0].decode('utf-8'))
+			log(f'found {cnt} messages in «{folder}» folder')
 			status, search_data = imap.search(None, 'ALL')
 			if status != 'OK':
 				log(f'search error: {status} {search_data}')
@@ -427,7 +440,7 @@ def mail_download(server:str, login:str, password:str
 					log(f'fetch error ({status}): {fetch_data}')
 					continue
 				msg = MailMsg(login=login, server=server
-				, raw_bytes=fetch_data[0][1])
+				, raw_bytes=fetch_data[0][1], sub_rule=sub_rule)
 				log(f'message fetched ({msg_id}): «{msg.h_subject}»')
 				if last_index == 0:
 					last_index = _get_last_index(dst_dir) + 1
