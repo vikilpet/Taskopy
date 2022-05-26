@@ -243,6 +243,7 @@ def mail_send(
 	if reply_to: msg.add_header('Reply-To', reply_to)
 	if isinstance(attachment, str): attachment = [attachment]
 	for attach in attachment:
+		if not attach: continue
 		if not os.path.isfile(attach):
 			raise Exception('wrong attachment')
 		filetype, encoding = mimetypes.guess_type(attach)
