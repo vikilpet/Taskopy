@@ -9,7 +9,7 @@ import cgi
 import urllib
 import tempfile
 from .tools import dev_print, app_log_get, DataHTTPReq \
-	, patch_import, tprint, value_to_unit
+	, patch_import, tprint, value_to_unit, exc_text
 from .plugin_filesystem import file_b64_dec, HTTPFile
 try:
 	import constants as tcon
@@ -119,23 +119,23 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 		else:
 			self.wfile.write(bytes(page, 'utf-8'))
 
-	def process_req(self, request_type:str):
+	def process_req(self, method:str):
 		' Parse the URL and decide which action to perform '
 		
 		def start_data_processing(http_dir:str=None)->tuple:
 			'''
 			Launch data_processing and calculate hash.
-			Returns (True, data:dict, fullpath:str) or
+			Returns (True, form:dict, fullpath:str) or
 			(False, error:str, None)
 			'''
-			status, data, fullpath, file_hash_header = \
+			status, form, fullpath, file_hash_header = \
 				self.data_processing(http_dir)
 			if status:
 				if not file_hash_header:
-					return True, data, fullpath
+					return True, form, fullpath
 				file_hash_local = _file_hash(fullpath)
 				if file_hash_local == file_hash_header:
-					return True, data, fullpath
+					return True, form, fullpath
 				else:
 					return (
 						False
@@ -145,7 +145,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 						, None
 					)
 			else:
-				return False, data, None
+				return False, form, None
 		try:
 			(
 				_, _
@@ -189,21 +189,23 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			self.headers_and_page('403')
 			return
 		post_file = None
-		form_data = {}
-		if request_type == 'POST':
-			status, data, post_file = start_data_processing(
+		form = {}
+		body = None
+		if method == 'POST':
+			status, form, post_file = start_data_processing(
 				http_dir=task['http_dir'])
 			if not status:
-				self.s_print(f'data_processing error: {data}')
+				self.s_print(f'data_processing error: {form}')
 				self.headers_and_page('error')
 				return
-			form_data = data
+			body = form
 		try:
 			req_data = DataHTTPReq(
 				client_ip=self.client_address[0]
+				, method=method
 				, path=self.path, headers=dict(self.headers)
-				, params=params, form_data=form_data
-				, post_file=post_file
+				, params=params, form_data=form
+				, post_file=post_file, body=body
 			)
 			if task['result']:
 				result = []
@@ -228,9 +230,8 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 					, data=req_data
 				)
 				page = 'OK'
-		except Exception as e:
-			self.s_print(f'HTTP task exception: {repr(e)} at line '
-			+ str(e.__traceback__.tb_lineno) )
+		except:
+			self.s_print(f'HTTP task exception:\n{exc_text(6)}')
 			page = 'error'
 		self.headers_and_page(page)
 
@@ -239,6 +240,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 		if 'favicon.' in self.path:
 			if self.white_list_check():
 				if not _FAVICON: _FAVICON = file_b64_dec(tcon._APP_FAVICON)
+				self.send_response(200)
 				self.wfile.write(_FAVICON)
 			else:
 				dev_print(f'unknown favicon request: {self.path}')
@@ -246,44 +248,58 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			return
 		self.process_req('GET')
 		
-	def data_processing(self, http_dir:str=None)->tuple:
-		''' Reads form data and file from POST request.
-			Writes file on disk, calculates MD5 if 'Content-MD5'
+	def data_processing(self, http_dir:str='')->tuple:
+		''' Reads form data or file from a POST request.
+			Writes the file on disk, calculates MD5 if 'Content-MD5'
 			header exists.
-			Returns (status, data:dict, fullpath:str, MD5:str)
+			Returns (status, form:dict, fullpath:str, MD5:str)
 			or (status, error:str, None, None)
 		'''
 		try:
-			form = cgi.FieldStorage(
-				fp=self.rfile,
-				headers=self.headers,
-				environ={
-					'REQUEST_METHOD': 'POST'
-					, 'CONTENT_TYPE': self.headers['Content-Type']
-			 	}
-			)
-			data = {}
-			for key in form.keys():
+			form_obj: cgi.FieldStorage = None
+			if not self.headers['Content-Type']:
+				self.headers['Content-Type'] = 'multipart/form-data'
+			if 'form-data' in self.headers['Content-Type']:
+				form_obj = cgi.FieldStorage(
+					fp=self.rfile
+					, headers=self.headers
+					, environ={
+						'REQUEST_METHOD': 'POST'
+						, 'CONTENT_TYPE': self.headers['Content-Type']
+					}
+				)
+			else:
+				fullpath = os.path.join(
+					http_dir
+					, time.strftime('%m%d%H%M%S') + random_str(5)
+				)
+				content = self.rfile.read(
+					int( self.headers['Content-Length'] )
+				)
+				with open(fullpath, 'wb') as fd: fd.write(content)
+				return True, {}, fullpath, None
+			form = {}
+			for key in form_obj.keys():
 				if key == 'file': continue
 				if key == 'editable':
-					data[key] = (form.getfirst(key) == 'true')
-				elif form.getfirst(key) == 'undefined':
-					data[key] = ''
+					form[key] = (form_obj.getfirst(key) == 'true')
+				elif form_obj.getfirst(key) == 'undefined':
+					form[key] = None
 				else:
-					data[key] = form.getfirst(key)
-			filename = None
-			if form.getvalue('file', None):
-				if form['file'].file is None:
-					return False, 'File is None', None, None
-				filename = form['file'].filename
+					form[key] = form_obj.getfirst(key)
+			fullpath:str = None
+			if form_obj.getvalue('file', None):
+				if form_obj['file'].file is None:
+					return False, 'error: file is None', None, None
+				filename = form_obj['file'].filename
 				if not filename:
 					filename = time.strftime('%m%d%H%M%S') + random_str(5)
-				filename = os.path.join(http_dir, filename)
-				with open(filename, 'wb') as fd:
-					fd.write(form['file'].file.read())
-			return True, data, filename, self.headers.get('Content-MD5', None)
-		except Exception as e:
-			return False, f'upload error: {repr(e)}', None, None
+				fullpath = os.path.join(http_dir, filename)
+				with open(fullpath, 'wb') as fd:
+					fd.write(form_obj['file'].file.read())
+			return True, form, fullpath, self.headers.get('Content-MD5', None)
+		except:
+			return False, f'upload error: {exc_text(6)}', None, None
 
 	def do_POST(self):
 		self.process_req('POST')

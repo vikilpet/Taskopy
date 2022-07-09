@@ -41,7 +41,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2022-05-23'
+APP_VERSION = 'v2022-07-09'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -374,7 +374,7 @@ def time_diff_str(start:datetime.datetime
 	*str_format* - standard time formating like '%y.%m.%d %H:%M:%S'
 	(see tcon.DATE_FORMAT)
 
-	*no_ms* - just remove microseconds from string
+	*no_ms* - do not show microseconds.
 
 	'''
 	if isinstance(start, float):
@@ -1401,8 +1401,8 @@ class DataHTTPReq:
 	Browser request data as an object.
 	'''
 	def __init__(self, client_ip:str, path:str
-	, headers:dict={}, params:dict={}
-	, form_data:dict={}, post_file:str=''):
+	, headers:dict={}, params:dict={}, method:str='GET'
+	, form_data:dict={}, post_file:str='', body=None):
 		'''
 		client_ip - str
 		path - '/task_name'
@@ -1411,6 +1411,8 @@ class DataHTTPReq:
 		'''
 		self.client_ip = client_ip
 		self.path = path
+		self.method:str = method
+		self.body = body
 		self.post_file = post_file
 		self.host = ''
 		self.accept = ''
@@ -1420,11 +1422,16 @@ class DataHTTPReq:
 		self.headers = headers
 		self.params = params
 		self.form = form_data
-		self.__dict__.update(form_data)
+		try:
+			self.__dict__.update(form_data)
+		except:
+			dev_print('not a dict')
+			pass
 
 class DataBrowserExt(DataHTTPReq):
-	''' HTTP request data helper for 'SendToTaskopy'
-		browser extension.
+	'''
+	HTTP request data helper for the 'SendToTaskopy'
+	browser extension.
 	'''
 	def __init__(self):
 		self.link_url:str = ''
@@ -1810,5 +1817,34 @@ class lazy_property(object):
 		value = self.fget(obj)
 		setattr(obj, self.fget.__name__, value)
 		return value
+
+def tass(value, expect):
+	'''
+	Assertion showing the difference.
+	Example:
+
+		tass(APP_NAME, 'Taskopy')
+		tass(APP_NAME, 'Tasko')
+
+	'''
+	if str(value) == str(expect): return
+	raise Exception(f'does not match:\n«{value}»\n«{expect}»')
+
+def exc_text(last_n:int=3):
+	'''
+	Get exception text.
+
+	*last_n* - the number of lines of the exception text from the end
+
+	Example:
+
+		try:
+			raise ZeroDivisionError('Just a test')
+		except:
+			dialog(exc_text())
+
+	'''
+	lines = traceback.format_exc().splitlines()
+	return '\n'.join(lines[-last_n:])
 
 if __name__ != '__main__': patch_import()

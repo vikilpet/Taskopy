@@ -37,8 +37,12 @@ def http_req(url:str, encoding:str='utf-8', session:bool=False
 	'''
 	Gets content of the specified URL
 	
+	**Kwargs tips:**
+	
 	Skip SSL verification: `verify=False`
+	
 	Follow redirects: `allow_redirects=True`
+
 	'''
 	if (post_file or post_form_data): http_method = 'POST'
 	if http_method: http_method = http_method.lower()
@@ -482,19 +486,21 @@ def url_hostname(url:str, sld:bool=True)->str:
 	*sld* - if True then return the second level domain
 	otherwise return the full domain.
 
-		assert url_hostname('https://www.example.gov.uk') == 'example.gov.uk'
-		assert url_hostname('https://www.example.gov.uk', sld=False) \
-		== 'www.example.gov.uk'
-		assert url_hostname('http://user:pwd@abc.example.com:443/api') \
-		== 'example.com'
-		assert url_hostname('http://user:pwd@abc.example.com:443/api'
-		, sld=False) == 'abc.example.com'
-		assert url_hostname('http://user:pwd@192.168.0.1:80/api') \
-		== '192.168.0.1'
+		tass( url_hostname('https://www.example.gov.uk'), 'example.gov.uk')
+		tass( url_hostname('https://www.example.gov.uk', sld=False) \
+		, 'www.example.gov.uk')
+		tass( url_hostname('http://user:pwd@abc.example.com:443/api') \
+		, 'example.com')
+		tass( url_hostname('http://user:pwd@abc.example.com:443/api'
+		, sld=False), 'abc.example.com')
+		tass( url_hostname('http://user:pwd@192.168.0.1:80/api') \
+		, '192.168.0.1')
+		tass( url_hostname('http://abc.example.com:443/api?ip=1.2.3.4') \
+		, 'example.com')
 
 	'''
 	global _PUB_SUF_LST
-	if m := re.findall(r'\D(\d+\.\d+\.\d+\.\d+)', url):
+	if m := re.findall(r'\D(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})[\:/]', url):
 		return m[0]
 	domain = urllib.parse.urlparse(url).netloc
 	if '@' in domain: domain = domain.split('@')[1]

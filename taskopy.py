@@ -1025,7 +1025,7 @@ class App(wx.App):
 			self.app_hwnd = hwnd_list[0]
 		elif len(hwnd_list) > 1:
 			self.app_hwnd = hwnd_list[0]
-			if sett.dev:
+			if not sett.dev:
 				msgbox_warning(
 					lang.warn_too_many_win.format(
 					APP_NAME, len(hwnd_list) )
