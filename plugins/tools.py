@@ -41,7 +41,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2022-07-09'
+APP_VERSION = 'v2022-07-21'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -244,11 +244,11 @@ def sound_play(fullpath, wait=False):
 		winsound.PlaySound(fi, winsound.SND_FILENAME + winsound.SND_ASYNC)
 
 def dev_print(*msg, **kwargs):
-	if ( '--developer' in sys.argv ) or tdebug():
+	if is_dev() or tdebug():
 		tprint(*msg, **kwargs)
 
 def is_dev()->bool:
-	return ( '--developer' in sys.argv ) or hasattr(sys, 'ps1')
+	return ('--developer' in sys.argv) or hasattr(sys, 'ps1')
 
 def con_log(*msgs, **kwargs):
 	''' Log to console and logfile
@@ -620,6 +620,9 @@ def msgbox(msg:str, title:str=None
 				thread_start(mb_func, args=mb_args)
 
 def msgbox_warning(msg:str, title:str=None):
+	if sett.kiosk:
+		con_log(f'msgbox_warning: {msg}')
+		return
 	if title:
 		title = f'{APP_NAME}: {title}'
 	else:
@@ -1818,7 +1821,7 @@ class lazy_property(object):
 		setattr(obj, self.fget.__name__, value)
 		return value
 
-def tass(value, expect):
+def tass(value, expect, comparison:str='=='):
 	'''
 	Assertion showing the difference.
 	Example:
@@ -1827,7 +1830,12 @@ def tass(value, expect):
 		tass(APP_NAME, 'Tasko')
 
 	'''
-	if str(value) == str(expect): return
+	if comparison == '==':
+		if str(value) == str(expect): return
+	elif comparison == '>':
+		if value > expect: return
+	elif comparison == '<':
+		if value < expect: return
 	raise Exception(f'does not match:\n«{value}»\n«{expect}»')
 
 def exc_text(last_n:int=3):

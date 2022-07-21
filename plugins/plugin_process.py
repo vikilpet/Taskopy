@@ -47,9 +47,12 @@ def file_open(fullpath:str, parameters:str=None, operation:str='open'
 	, parameters, cwd, showcmd)
 
 def proc_get(process, cmd_filter:str=None)->int:
-	''' Returns PID of process.
-		cmd_filter - find process with that
+	'''
+	Returns PID of process or *-1* if not found.
+	
+	*cmd_filter* - find process with that
 			string in command line.
+	
 	'''
 	if isinstance(process, int): return process
 	if cmd_filter: cmd_filter = cmd_filter.lower()
@@ -66,7 +69,7 @@ def proc_get(process, cmd_filter:str=None)->int:
 				return proc.pid
 			if cmd_filter in ' '.join(proc.cmdline()).lower():
 				return proc.pid
-	return False
+	return -1
 
 def proc_start(
 	proc_path:str
@@ -296,15 +299,19 @@ def proc_list(name:str='', cmd_filter:str=None
 		proc_list.append( DictToObj(di) )
 	return proc_list
 
-def proc_cpu(pid:int, interval:int=1)->float:
-	''' Returns CPU usage of specified PID for specified interval
-		of time in seconds.
+def proc_cpu(process, interval:float=1.0)->float:
 	'''
-	try:
-		proc = psutil.Process(pid)
-		return proc.cpu_percent(interval)
-	except psutil.NoSuchProcess:
-		return 0
+	Returns CPU usage of specified PID for specified interval
+	of time in seconds.
+	If a process not found then returns -1
+
+		tass(proc_cpu('not existing process'), -1)
+		tass(proc_cpu(0), 1, '>')
+		
+	'''
+	if (pid := proc_get(process)) == -1: return -1
+	proc = psutil.Process(pid)
+	return proc.cpu_percent(interval)
 
 def proc_kill(process, cmd_filter:str=None):
 	''' Kills the prosess.
@@ -340,11 +347,11 @@ def free_ram(unit:str='percent'):
 		return psutil.virtual_memory()[4] // e
 
 def proc_threads_num(process):
-	pid = proc_get(process)
+	if (pid := proc_get(process)) == -1: return -1
 	return len(psutil.Process(pid=pid).threads())
 
 def proc_close(process, timeout:int=10
-, cmd_filter:str=None):
+, cmd_filter:str=None)->int:
 	''' Kills the process 'softly'. Returns 'True' if process
 		was closed 'softly' and False if process was killed
 		after timeout.
@@ -354,8 +361,7 @@ def proc_close(process, timeout:int=10
 		windows.append(hwnd)
 		return True
 	
-	pid = proc_get(process, cmd_filter)
-	if not pid: return False
+	if (pid := proc_get(process, cmd_filter)) == -1: return -1
 	windows = []
 	try:
 		for thread in psutil.Process(pid).threads():
@@ -726,7 +732,7 @@ def win_by_pid(process)->tuple:
 	'''
 	Returns top window of a process as a tuple (hwnd:int, title:str).
 	'''
-	pid = proc_get(process)
+	if (pid := proc_get(process)) == -1: return None, None
 	win_lst = win_list_top()
 	for hwnd, title in win_lst:
 		if win32process.GetWindowThreadProcessId(hwnd)[1] == pid:

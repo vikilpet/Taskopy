@@ -257,8 +257,6 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 		'''
 		try:
 			form_obj: cgi.FieldStorage = None
-			if not self.headers['Content-Type']:
-				self.headers['Content-Type'] = 'multipart/form-data'
 			if 'form-data' in self.headers['Content-Type']:
 				form_obj = cgi.FieldStorage(
 					fp=self.rfile

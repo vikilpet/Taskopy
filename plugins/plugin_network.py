@@ -537,12 +537,19 @@ def net_html_unescape(html_str:str)->str:
 
 
 
-def is_online(*sites, timeout:int=2)->int:
-	''' Checks if there is an internet connection using HEAD
-		requests to the specified web sites.
+def is_online(*sites, timeout:float=1)->int:
 	'''
-	if not sites: sites = ['https://www.google.com/'
-		, 'https://yandex.ru/']
+	Checks if there is an internet connection using HEAD
+	requests to the specified web sites.
+
+	*timeout* - timeout in seconds
+
+	'''
+	if not sites:
+		sites = (
+			'https://www.google.com/'
+			, 'https://yandex.ru/'
+		)
 	r = 0
 	for site in sites:
 		try:
