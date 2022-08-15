@@ -22,7 +22,7 @@ import json2html
 from .tools import dev_print, time_sleep, tdebug \
 , locale_set, safe, patch_import, value_to_unit, time_diff \
 , median, is_iter
-from .plugin_filesystem import var_lst_get, file_path_fix
+from .plugin_filesystem import var_lst_get, file_path_fix, file_name, file_dir
 
 _USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.99 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
@@ -148,7 +148,8 @@ def file_download(url:str, destination:str=None
 		
 		*attempts* - how many times to retry download if failed.
 		*destination* - file, directory or None. If the latter,
-		download to a temporary folder.
+		download to a temporary folder. If it is 'devnull'
+		then do not write the file.
 
 		*overwrite* - overwrite file if exists.
 
@@ -183,6 +184,11 @@ def file_download(url:str, destination:str=None
 	dst_file = destination
 	if dst_file:
 		find_name = os.path.isdir(dst_file)
+		if not find_name:
+			dst_file = file_path_fix((
+				file_dir(dst_file)
+				, file_name(dst_file)
+			))
 	else:
 		find_name = True
 		dst_file = tempfile.gettempdir()
@@ -209,6 +215,8 @@ def file_download(url:str, destination:str=None
 						dst_file = f.name
 			if os.path.isfile(dst_file) and not overwrite:
 				return dst_file
+			if dst_file == 'devnull':
+				dst_file = os.devnull
 			with open(dst_file, 'wb+') as fd:
 				cur_size = 0
 				for chunk in req.iter_content(chunk_size=chunk_size):
@@ -430,7 +438,7 @@ def xml_element(url:str, element:str
 		kwargs - additional arguments for http_req.
 	'''
 	if url.startswith('http'):
-		status, content = http_req(url=url, **kwargs)
+		status, content = safe(http_req)(url=url, **kwargs)
 		if not status: raise content
 	else:
 		status = True

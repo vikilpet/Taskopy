@@ -41,7 +41,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2022-07-21'
+APP_VERSION = 'v2022-08-15'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -1399,18 +1399,18 @@ def screen_height()->int:
 	' Returns screen height in pixels '
 	return win32api.GetSystemMetrics(1)
 
-class DataHTTPReq:
+
+class DataHTTPReq(object):
 	'''
 	Browser request data as an object.
 	'''
-	def __init__(self, client_ip:str, path:str
+	def __init__(self, client_ip:str='', path:str=''
 	, headers:dict={}, params:dict={}, method:str='GET'
 	, form_data:dict={}, post_file:str='', body=None):
 		'''
-		client_ip - str
-		path - '/task_name'
-		headers - {"Accept-Encoding": "gzip, deflate", ...}
-		params - {'par1': '123', ...}
+		*path* - '/task_name'
+		*headers* - {"Accept-Encoding": "gzip, deflate", ...}
+		*params* - URL parameters as a dictionary like {'par1': '123', ...}
 		'''
 		self.client_ip = client_ip
 		self.path = path

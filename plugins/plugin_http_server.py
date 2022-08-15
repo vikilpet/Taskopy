@@ -257,7 +257,10 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 		'''
 		try:
 			form_obj: cgi.FieldStorage = None
-			if 'form-data' in self.headers['Content-Type']:
+			if (ct := self.headers['Content-Type']) != None and (
+				'form-data' in ct
+				or 'x-www-form-urlencoded' in ct
+			):
 				form_obj = cgi.FieldStorage(
 					fp=self.rfile
 					, headers=self.headers

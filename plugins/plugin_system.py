@@ -4,6 +4,7 @@ import win32gui
 import win32con
 import win32process
 import winreg
+import pywintypes
 import uptime
 from time import sleep
 import ctypes
@@ -185,12 +186,15 @@ def win_find(title:str, exact:bool=True)->list:
 	return result
 
 def win_activate(window=None)->int:
-	''' Bring window to front, returns hwnd.
-	'''
+	''' Brings window to front, returns hwnd.'''
 	hwnd = win_get(window)
-	if hwnd:
+	if not hwnd: return
+	try:
 		win32gui.SetForegroundWindow(hwnd)
-		return hwnd
+	except pywintypes.error:
+		win32api.SetCursorPos((-10000, 500))
+		win32gui.SetForegroundWindow(hwnd)
+	return hwnd
 
 def win_act_rest(window=None)->int:
 	'''

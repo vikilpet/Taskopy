@@ -36,7 +36,6 @@ try:
 except ModuleNotFoundError:
 	import plugins.constants as tcon
 
-
 _SIZE_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 _FORBIDDEN_CHARS = '<>:"\\/|?*'
 _FORBIDDEN_DICT = dict(
@@ -91,7 +90,12 @@ def file_path_fix(fullpath, len_limit:int=0
 	return fullpath
 
 def file_read(fullpath, encoding:str='utf-8', errors:str=None)->str:
-	''' Returns content of file '''
+	'''
+	Returns content of file
+
+	*encoding* - if set to 'binary' then returns bytes.
+	
+	'''
 	fullpath = file_path_fix(fullpath)
 	if encoding == 'binary':
 		with open(fullpath, 'rb') as f:
@@ -454,7 +458,7 @@ def dir_files(fullpath, ext:str=None, subdirs:bool=True
 	
 	*subdirs* - including files from subfolders.
 	
-	*ext* - only files with this extension.
+	*ext* - only files with this extension (str, tuple).
 
 	'''
 	fullpath = file_path_fix(fullpath)
@@ -1319,8 +1323,10 @@ def file_conf_read(fullpath:str, encoding:str='utf-8'
 , lowercase:bool=True, as_literal:bool=True)->dict:
 	'''
 	Returns the contents of an config (.ini) file as a dictionary.
+	
 	*as_literal* - convert numeric values to numbers.
-	Example:
+	
+	Example (.ini file):
 
 		[Section A]
 		par1 = 1
