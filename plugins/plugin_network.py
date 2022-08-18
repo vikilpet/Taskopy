@@ -787,10 +787,8 @@ def ping_icmp(host:str, count:int=3
 	
 	Examples:
 	
-		ping_icmp('8.8.8.8')
-		> (True, (0, 47))
-		ping_icmp('domain.does.not.exist')
-		> (False, 'host unreachable (1)')
+		tass( ping_icmp('8.8.8.8')[0], True)
+		tass( ping_icmp('domain.does.not.exist'), (False, 'host unreachable (1)') )
 
 	'''
 	proc = subprocess.Popen(
@@ -803,7 +801,7 @@ def ping_icmp(host:str, count:int=3
 	tdebug(ret, out)
 	if ret == 1: return False, 'host unreachable (1)'
 	loss = re.findall(r'\((\d+)%', out)
-	if not re.findall(r' \d+\.\d+\.\d+\.\d+: .+?=\d+\D+=\d+\D+=\d+', out):
+	if not re.findall(r' \d+\.\d+\.\d+\.\d+: .+?=\d+\D+[<=]\d+\D+=\d+', out):
 		return False, 'host unreachable (2)'
 	loss = int(loss[0])
 	av_time = int(

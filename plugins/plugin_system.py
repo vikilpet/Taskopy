@@ -192,8 +192,14 @@ def win_activate(window=None)->int:
 	try:
 		win32gui.SetForegroundWindow(hwnd)
 	except pywintypes.error:
-		win32api.SetCursorPos((-10000, 500))
-		win32gui.SetForegroundWindow(hwnd)
+		dev_print('SetCursorPos')
+		cur_pos = win32api.GetCursorPos()
+		win32api.SetCursorPos((-500, -500))
+		try:
+			win32gui.SetForegroundWindow(hwnd)
+		except:
+			dev_print('SetForegroundWindow failed again')
+		win32api.SetCursorPos(cur_pos)
 	return hwnd
 
 def win_act_rest(window=None)->int:
@@ -201,7 +207,7 @@ def win_act_rest(window=None)->int:
 	Activates the window and restores it if it is minimized.
 	'''
 	if not (hwnd := win_get(window) ): return
-	win32gui.SetForegroundWindow(hwnd)
+	win_activate(hwnd)
 	if win32gui.IsIconic(hwnd): win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
 	return hwnd
 
@@ -372,6 +378,27 @@ def sound_vol_down():
 def sound_vol_mute():
 	_sound_cmd(_APPCOMMAND_VOLUME_MUTE)
 
+def mouse_pos_get()->tuple:
+	' Returns mouse cursor position: (x, y) '
+	return win32api.GetCursorPos()
+
+def mouse_pos_set(pos:tuple):
+	' Sets mouse cursor position '
+	win32api.SetCursorPos(pos)	
+def screen_size()->tuple:
+	' Returns screen size: (width, height)'
+	return (
+		win32api.GetSystemMetrics(win32con.SM_CXSCREEN)
+		, win32api.GetSystemMetrics(win32con.SM_CYSCREEN)
+	)
+
+def screen_width()->int:
+	' Returns screen widht in pixels '
+	return win32api.GetSystemMetrics(win32con.SM_CXSCREEN)
+
+def screen_height()->int:
+	' Returns screen height in pixels '
+	return win32api.GetSystemMetrics(win32con.SM_CYSCREEN)
 if __name__ == '__main__':
 	_test_reg_key()
 else:

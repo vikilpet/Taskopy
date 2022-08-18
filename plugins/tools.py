@@ -41,7 +41,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2022-08-15'
+APP_VERSION = 'v2022-08-18'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -1390,15 +1390,6 @@ def patch_import():
 		dev_print('patch loaded:', caller_name)
 	except ModuleNotFoundError:
 		pass
-
-def screen_width()->int:
-	' Returns screen widht in pixels '
-	return win32api.GetSystemMetrics(0)
-
-def screen_height()->int:
-	' Returns screen height in pixels '
-	return win32api.GetSystemMetrics(1)
-
 
 class DataHTTPReq(object):
 	'''
