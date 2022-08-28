@@ -209,7 +209,7 @@ def file_download(url:str, destination:str=None
 					tdebug(f'content-disposition error: {e}')
 					fname = req.url.split('/')[-1]
 				if fname:
-					dst_file = os.path.join(dst_file, fname)
+					dst_file = os.path.join(dst_file, fname.strip('"'))
 				else:
 					with tempfile.TemporaryFile() as f:
 						dst_file = f.name
@@ -782,13 +782,15 @@ def ping_tcp(host:str, port:int, count:int=1, pause:int=100
 def ping_icmp(host:str, count:int=3
 , timeout:int=500, encoding:str='cp866')->tuple:
 	'''
+	Wrapper over ping.exe
 	Returns (True, (loss %, aver. time) )
 	or (False, 'cause of failure')
 	
 	Examples:
 	
 		tass( ping_icmp('8.8.8.8')[0], True)
-		tass( ping_icmp('domain.does.not.exist'), (False, 'host unreachable (1)') )
+		tass( ping_icmp('non.existent.domain'), (False, 'host unreachable (1)') )
+		tass( ping_icmp('127.0.0.1'), (True, (0, 0)) )
 
 	'''
 	proc = subprocess.Popen(

@@ -192,14 +192,13 @@ def win_activate(window=None)->int:
 	try:
 		win32gui.SetForegroundWindow(hwnd)
 	except pywintypes.error:
-		dev_print('SetCursorPos')
-		cur_pos = win32api.GetCursorPos()
-		win32api.SetCursorPos((-500, -500))
+		cur_pos = mouse_pos_get()
+		mouse_pos_set((-500, -500))
 		try:
 			win32gui.SetForegroundWindow(hwnd)
 		except:
-			dev_print('SetForegroundWindow failed again')
-		win32api.SetCursorPos(cur_pos)
+			pass
+		mouse_pos_set(cur_pos)
 	return hwnd
 
 def win_act_rest(window=None)->int:
@@ -380,11 +379,17 @@ def sound_vol_mute():
 
 def mouse_pos_get()->tuple:
 	' Returns mouse cursor position: (x, y) '
-	return win32api.GetCursorPos()
+	try:
+		return win32api.GetCursorPos()
+	except pywintypes.error:
+		return (0, 0)
 
 def mouse_pos_set(pos:tuple):
 	' Sets mouse cursor position '
-	win32api.SetCursorPos(pos)	
+	try:
+		win32api.SetCursorPos(pos)
+	except pywintypes.error:
+		pass
 def screen_size()->tuple:
 	' Returns screen size: (width, height)'
 	return (
