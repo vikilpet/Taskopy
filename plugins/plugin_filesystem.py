@@ -951,19 +951,25 @@ def working_directory(directory:str):
 		os.chdir(owd)
 
 
-def file_date_m(fullpath):
-	' Returns file modification date in datetime '
+def file_date_m(fullpath)->datetime.datetime:
+	'''
+	Returns file modification date in datetime.  
+	Drop microseconds:
+
+		file_date_m(r'...').replace(microsecond=0)
+
+	'''
 	fullpath = file_path_fix(fullpath)
 	ts = os.path.getmtime(fullpath)
 	return datetime.datetime.fromtimestamp(ts)
 
-def file_date_c(fullpath):
+def file_date_c(fullpath)->datetime.datetime:
 	' Returns file creation date in datetime '
 	fullpath = file_path_fix(fullpath)
 	ts = os.path.getctime(fullpath)
 	return datetime.datetime.fromtimestamp(ts)
 
-def file_date_a(fullpath):
+def file_date_a(fullpath)->datetime.datetime:
 	' Returns file access date in datetime '
 	fullpath = file_path_fix(fullpath)
 	ts = os.path.getatime(fullpath)

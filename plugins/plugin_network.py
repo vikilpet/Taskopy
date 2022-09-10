@@ -274,29 +274,39 @@ def html_element(url:str, element
 	'''
 	Get text of specified page element (div).
 	Returns str or list of str.
-	url - URL or string with HTML.
-	attrib - get specific attribute from element (TODO: not only for 'all').
-	element - dict (list of dictionaries)
-		, or str (list of strings). If 'element' is a list
-		then 'html_element' returns list of found elements.
-		If it's a dict or list of dicts then method find_all
-		of Beautiful Soup will be used.
-		If it's a str or list of str then xpath will be used.
-		Example for Soup:
+	
+	*url* - URL or string with HTML.  
+	*attrib* - get specific attribute from element
+	(TODO: not only for 'all').  
+	*element* - dictionary (list of dictionaries)
+	, or str (list of strings). If 'element' is a list
+	then 'html_element' returns list of found elements.
+	If it's a dict or list of dicts then method find_all
+	of Beautiful Soup (BS) will be used.
+	If it's a str or list of str then xpath will be used.  
+	Example of dictionary for the BS:
+
 			element={
 				'name': 'span'
 				, 'attrs': {'itemprop':'softwareVersion'}
 			}
-		Example for xpath:
-			element='/html/body/div[1]/div/div'
-	clean - remove html tags and spaces (Soup).
-	kwargs - additional arguments for http_req.
 
-	XPath cheatsheet: https://devhints.io/xpath
-	XPath examples:
+	XPath example:
+
+			element='/html/body/div[1]/div/div'
+
+	*clean* - remove html tags and spaces (Soup).  
+	*kwargs* - additional arguments for http_req.  
+	*element_num* - number of found element. If set
+	to 'all' then returns all this elements.
+
+	XPath cheatsheet: https://devhints.io/xpath  
+	More XPath examples:
 		'//div[@id="id"]/p'
 		'//div[contains(@class, "main")]/div/script'
 		'//table[2]/thead/tr/th[2]'
+		'//ul[contains(@class, "pagination")]/li[1]/a/@href'
+
 	'''
 	if not url[:4].lower().startswith('http'):
 		html = url
@@ -741,15 +751,14 @@ def ping_tcp(host:str, port:int, count:int=1, pause:int=100
 	Returns (True, (loss percentage, time in ms) )
 	or (False, 'error text').
 	
-	*pause* - pause in milliseconds between attempts 
+	*pause* - pause in milliseconds between attempts  
 	*timeout* - the waiting time for a response in milliseconds.
 
 	Examples:
 
-		ping_tcp('8.8.8.8', 443)
-		> (True, (0, 49))
-		ping_tcp('domain.does.not.exist', 80)
-		> (False, '[Errno 11004] getaddrinfo failed')
+		tass( ping_tcp('8.8.8.8', 443)[1][1] > 10, True )
+		tass( ping_tcp('127.0.0.1', 445)[1][1] < 15, True )
+		tass( ping_tcp('non.existent.domain', 80), (False, '[Errno 11004] getaddrinfo failed') )
 
 	'''
 	timings = []

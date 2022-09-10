@@ -41,7 +41,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2022-08-28'
+APP_VERSION = 'v2022-09-10'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -1295,8 +1295,8 @@ def table_print(
 		rows = [l[:] for l in table]
 	elif isinstance(table[0], tuple):
 		rows = [list(t) for t in table]
-	if isinstance(use_headers, list):
-		headers = use_headers
+	if is_iter(use_headers):
+		headers = tuple(use_headers)
 	elif use_headers == True:
 		try:
 			headers = rows.pop(0)
@@ -1630,11 +1630,15 @@ class DataEvent:
 		if self.EventData: self.EventDataStr = value_to_str(self.EventData)
 
 def thread_start(func, args:tuple=(), kwargs:dict={}
-, thr_daemon:bool=True, show_err_msg:bool=False, ident:str='')->int:
+, thr_daemon:bool=True, err_msg:bool=False, ident:str=''
+, err_action=None)->int:
 	'''
 	Runs task in a thread. Returns thread id.
 
 	*ident* - user-defined identifier of stream
+
+	*err_action* - function to run if an exception occurs.
+	The text of exception will be passed to the function.
 
 	'''
 	def wrapper():
@@ -1646,9 +1650,14 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 			tprint(
 				f'exception in {func.__name__}:\n{err_str}'
 			)
-			if show_err_msg:
+			if err_msg:
 				msgbox_warning(
 					f'Exception in thread {func.__name__}:\n{err_str}')
+			if err_action:
+				try:
+					err_action(err_str)
+				except:
+					pass
 
 	thr = threading.Thread(target=wrapper
 	, daemon=thr_daemon)

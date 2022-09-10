@@ -177,7 +177,7 @@ class MailMsg:
 		if not name.startswith('h_'):
 			raise Exception(f'MailMsg unknown attribute: {name}')
 		name = name[2:]
-		dev_print(f'get unknown header "{name}"')
+		dev_print(f'get: unknown header: "{name}"')
 		hdr_str = self._get_header(name)
 		setattr(self, 'h_' + name, hdr_str)
 		return hdr_str
