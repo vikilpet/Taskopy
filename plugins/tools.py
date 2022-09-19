@@ -28,7 +28,7 @@ import win32api
 import win32gui
 import win32con
 import win32com.client
-from typing import List, Callable
+from typing import List, Callable, Union, Iterable
 import pythoncom
 import wx
 from collections import defaultdict
@@ -41,7 +41,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2022-09-10'
+APP_VERSION = 'v2022-09-19'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -414,10 +414,13 @@ def date_weekday(date_val:datetime.datetime=None
 	if not date_val: date_val = datetime.date.today()
 	return date_val.strftime(template)
 
-def date_weekday_num(date_val:datetime.datetime=None
-, template:str='%A')->str:
-	''' Weekday number (Monday is 1).
-		tdate - None (today) or datetime.date(2019, 6, 12)
+def date_weekday_num(date_val:datetime.datetime=None)->int:
+	'''
+	Weekday number (monday is 1).  
+	*tdate* - None (today) or datetime.date(2019, 6, 12)
+
+		tass( date_weekday_num(datetime.date(2022, 9, 12) ), 1)
+
 	'''
 	if not date_val: date_val = datetime.date.today()
 	return date_val.weekday() + 1
@@ -1050,11 +1053,18 @@ class _TaskDialogConfig(ctypes.Structure):
 	def __init__(self):
 		self.cbSize = ctypes.sizeof(self)
 
-def dialog(msg:str=None, buttons:list=None
-, title:str=None, content:str=None, flags:int=None
-, common_buttons:int=None, default_button:int=0
-, timeout:int=None, icon=None, return_button:bool=False
-, wait:bool=True)->int:
+def dialog(
+	msg:Iterable=''
+	, buttons:Union[Iterable, None]=None
+	, title:str=''
+	, content:str=''
+	, flags:int=0
+	, common_buttons:Union[int, None]=None
+	, default_button:int=0
+	, timeout:Union[str, int]=0
+	, return_button:bool=False
+	, wait:bool=True
+)->Union[int, str]:
 	'''
 	Shows dialog with multiple optional buttons.
 	Returns ID of selected button starting with 1000
@@ -1123,7 +1133,7 @@ def dialog(msg:str=None, buttons:list=None
 		title = func_name_human(_get_parent_func_name())
 	else:
 		title = str(title)
-	if isinstance(msg, (list, tuple, set, dict)):
+	if (not isinstance(msg, str)) and is_iter(msg):
 		buttons = msg
 		msg = ''
 	else:
@@ -1226,37 +1236,38 @@ def locale_set(name:str='C'):
 def table_print(
 	table, use_headers=False, row_sep:str=None
 	, headers_sep:str='-', col_pad:str='  ', row_sep_step:int=0
-	, sorting=None, sorting_func=None, sorting_rev:bool=False
+	, sorting:tuple=(), sorting_func=None, sorting_rev:bool=False
 	, repeat_headers:int=None
 	, empty_str:str='-', consider_empty:tuple=(None, '')
-	, max_table_width:tuple=None
+	, max_table_width:Union[int, tuple]=()
 ):
-	'''	Print list of lists as a table.
+	'''
+	Print list of lists/tuples as a table.
 
-		use_headers - if it's True - takes first row as
-			a headers. If list, then use this list as
-			a headers.
-		sorting - list of column numbers to sort by.
-			Example:
-				sorting=[0, 1] - sort table by first
-				and second column
-		sorting_func - sort with this function.
-		sorting_rev - sort in reverse order.
-		row_sep - string to repeat as a row separator.
-		headers_sep - same for header(s).
-		max_table_width:tuple - maximum width and number of
-		the column to trim or just the maximum width. In that
-		case column number will be set to the number of
-		last column. Example:
+	*use_headers* - if it's True - takes first row as
+	a headers. If list, then use this list as
+	a headers.  
+	*sorting* - list of column numbers to sort by.  
+	Example:
+	sorting=[0, 1] - sort table by first
+	and second column  
+	*sorting_func* - sort with this function.  
+	*sorting_rev* - sort in reverse order.  
+	*row_sep* - string to repeat as a row separator.  
+	*headers_sep* - same for header(s).  
+	*max_table_width* - maximum width and number of
+	the column to trim or just the maximum width. In that
+	case column number will be set to the number of
+	last column. Example:
 
-			table = [
-				('Header-1', 'Header-2', 'Header-3')
-				, *(
-					(random_str(3), random_str(100), random_str(5))
-					for _ in range(3)
-				)
-			]
-			table_print(table, max_table_width=(100, 1))
+		table = [
+			('Header-1', 'Header-2', 'Header-3')
+			, *(
+				(random_str(3), random_str(100), random_str(5))
+				for _ in range(3)
+			)
+		]
+		table_print(table, max_table_width=(100, 1))
 
 	'''
 
@@ -1790,10 +1801,10 @@ def is_iter(obj)->bool:
 	'''
 	Is the object iterable?
 
-		assert is_iter('abc') == True
-		assert is_iter((1, 2)) == True
-		assert is_iter(map(str, (1, 2))) == True
-		assert is_iter(1) == False
+		tass(is_iter('abc'), True)
+		tass(is_iter((1, 2)), True)
+		tass(is_iter(map(str, (1, 2))), True)
+		tass(is_iter(1), False)
 
 	'''
 	try:

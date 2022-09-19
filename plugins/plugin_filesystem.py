@@ -6,12 +6,10 @@ import glob
 from contextlib import contextmanager
 from collections import namedtuple
 import csv
-import ast
 import random
 import pyodbc
 import mimetypes
 import zipfile
-from distutils import dir_util
 from zlib import crc32
 import tempfile
 import datetime
@@ -21,7 +19,7 @@ import win32print
 import hashlib
 import pythoncom
 import base64
-from typing import Iterator
+from typing import Iterator, Tuple, Union, Iterable
 import psutil
 
 import win32api
@@ -29,7 +27,7 @@ from win32com.shell import shell, shellcon
 from pathlib import Path
 import shutil
 import configparser
-from .tools import random_str, tdebug, patch_import \
+from .tools import exc_text, random_str, table_print, tdebug, patch_import, time_diff_str, time_now \
 , time_sleep, dev_print, tprint, is_iter, time_diff
 try:
 	import constants as tcon
@@ -57,8 +55,7 @@ def file_path_fix(fullpath, len_limit:int=0
 	fix long path. Fill environment variables ('%APPDATA%')
 
 	*len_limit* - trim file name so that the full path
-	length does not exceed this number.
-
+	length does not exceed this number.  
 	*trim_suf* - attach this string when trimming
 	a file name that is too long.
 
@@ -70,6 +67,7 @@ def file_path_fix(fullpath, len_limit:int=0
 	if not fullpath: return fullpath
 	if isinstance(fullpath, (list, tuple)):
 		fullpath = os.path.join(*map(str, fullpath))
+	if fullpath.endswith('\\\\'): fullpath = fullpath[:-1]
 	if fullpath.startswith('%'):
 		env_var = fullpath[1 : ( start := fullpath.find('%', 1) )]
 		rem = fullpath[start + 1: ]
@@ -159,19 +157,19 @@ def file_rename(fullpath, dest:str
 			raise e
 	return dest
 
-def dir_rename(fullpath, dest:str
+def dir_rename(fullpath, dest
 , overwrite:bool=False)->str:
 	'''
-	Renames path.
+	Renames path.  
 	*dest* - fullpath or just new file name
-	without parent directory.
+	without parent directory.  
 	*overwrite* - overwrite destination file
-	if exists.
-	Returns destination.
+	if exists.  
+	Returns destination.  
 	Example:
 
-			file_rename(r'd:\\IMG_123.jpg', 'my cat.jpg')
-			>'d:\\my cat.jpg'
+		file_rename(r'd:\\IMG_123.jpg', 'my cat.jpg')
+		>'d:\\my cat.jpg'
 
 	'''
 	fullpath = file_path_fix(fullpath)
@@ -196,7 +194,7 @@ def file_log(fullpath, message:str, encoding:str='utf-8'
 	with open(fullpath, 'at+', encoding=encoding) as f:
 		f.write(time.strftime(time_format) + '\t' + message + '\n')
 
-def file_copy(fullpath, destination:str
+def file_copy(fullpath, destination:Iterable
 , copy_metadata:bool=False):
 	'''
 	Copies file to destination.
@@ -232,7 +230,7 @@ def file_append(fullpath, content:str, encoding:str='utf-8')->str:
 		fd.write(content)
 	return fullpath
 
-def file_move(fullpath, destination:str)->str:
+def file_move(fullpath, destination)->str:
 	''' Move file to destination.
 		Returns full path of destination file.
 		Destination may be fullpath or folder name.
@@ -262,8 +260,9 @@ def file_delete(fullpath):
 			os.chmod(fullpath, stat.S_IWRITE)
 			os.remove(fullpath)
 		except Exception as e:
-			print(f'file_delete error: {e}')
+			tdebug(f'file_delete error: {e}')
 	except FileNotFoundError:
+		tdebug('not found')
 		pass
 
 def file_recycle(fullpath, silent:bool=True)->bool:
@@ -763,8 +762,7 @@ def csv_write(fullpath, content:list, fieldnames:tuple=None
 
 def dir_size(fullpath, unit:str='b', skip_err:bool=True)->int:
 	'''
-	Returns directory size without symlinks.
-	
+	Returns directory size without symlinks.  
 	*skip_err* - do not raise an exeption on non-existent files.
 	'''
 	fullpath = file_path_fix(fullpath)
@@ -781,7 +779,7 @@ def dir_size(fullpath, unit:str='b', skip_err:bool=True)->int:
 				continue
 	return total_size // e
 
-def dir_zip(fullpath, destination:str=None
+def dir_zip(fullpath, destination=None
 , do_cwd:bool=False)->str:
 	''' Compresses folder and returns the full
 		path to archive.
@@ -898,7 +896,7 @@ def temp_dir(new_dir:str=None)->str:
 def temp_file(prefix:str='', suffix:str=''
 , content=None, encoding='utf-8')->str:
 	'''
-	Returns the name for the temporary file.
+	Returns the name for the temporary file.  
 	If *content* is specified then writes content to the file.
 	'''
 	fname = os.path.join(tempfile.gettempdir()
@@ -1399,5 +1397,254 @@ def drive_io(drive_num:int=None)->Iterator[namedtuple]:
 			yield cur[drive_num]
 		else:
 			yield cur
+
+def _path_filter(
+	paths:Iterable
+	, ex_ext:Iterable = ()
+	, ex_path:Iterable = ()
+	, ex_dir:Iterable = ()
+)->Iterator[str]:
+	'''
+	Filters the list of files by criteria.  
+	*ex_dir* - simply compares the beginning of a path
+	with this string(s) so you can use part of a file path
+	, not just top directory.
+
+		from plugins.plugin_filesystem import _path_filter as pf
+		files = tuple(dir_files('plugins'))
+		tass( tuple( pf(files, ex_dir='__pycache__'))[0], 'plugins\\constants.py')
+		tass( tuple( pf(files, ex_ext='pyc'))[0], 'plugins\\constants.py')
+		tass( tuple( pf(files, ex_ext='pyc', ex_path='_TOOLS_patc'))[-1], 'plugins\\tools.py')
+		tass( tuple( pf(files, ex_ext=('pyc', 'py') ) ), ())
+
+	'''
+	rules = list()
+	if ex_ext:
+		if isinstance(ex_ext, str): ex_ext = (ex_ext, )
+		ex_ext = set((e.lower() for e in ex_ext))
+		rules.append(lambda p: any(
+			os.path.splitext(p)[1][1:].lower() == e
+			for e in ex_ext
+		))
+	if ex_path:
+		if isinstance(ex_path, str): ex_path = (ex_path, )
+		ex_path = set((e.lower() for e in ex_path))
+		rules.append(lambda p: any(
+			e in p.lower()
+			for e in ex_path
+		))
+	if ex_dir:
+		if isinstance(ex_dir, str): ex_dir = (ex_dir, )
+		ex_dir = set((e.lower().lstrip('\\') for e in ex_dir))
+		for ex in ex_dir:
+			assert not ':' in ex, 'The ex_dir must contain relative paths'
+		rules.append(lambda p: any(
+			p.lower().startswith(e)
+			for e in ex_dir
+		))
+	for path in paths:
+		if any(r(path) for r in rules): continue
+		yield path
+
+
+class DirSync:
+	'''
+	Syncrhonize two directories.
+	'''
+	
+
+	def __init__(
+		self
+		, src_dir:str
+		, dst_dir:str
+		, ex_ext:Iterable = ()
+		, ex_path:Iterable = ()
+		, ex_dir:Iterable = ()
+		, report:bool=False
+	):
+		'''
+		*ex_dir*, *ex_path*, *ex_ext* - substring
+		or tuple of substrings to exclude
+		in source directory file name, case insensetive.
+		*ex_dir* must be a relative path.  
+		*report* - print every file copy/del operation.
+		'''
+		self._src_dir = file_path_fix(src_dir)
+		self._dst_dir = file_path_fix(dst_dir)
+		self._report = report
+		self._ex_path = ex_path
+		self._ex_dir = ex_dir
+		self._ex_ext = ex_ext
+		self._src_files = set()
+		self._dst_files = set()
+		self._src_dirs = set()
+		self._dst_dirs = set()
+		self._new_files = set()
+		self._src_only_files = set()
+		self._dst_only_files = set()
+		self.errors = dict()
+		self.duration = ''
+
+	def compare(self)->bool:
+		'''
+		Read the directories and make a comparison.
+		'''
+		tstart = time_now()
+		self.errors = dict()
+		self._src_files = dir_files(self._src_dir)
+		self._dst_files = dir_files(self._dst_dir)
+		slen = len(self._src_dir.rstrip('\\')) + 1
+		dlen = len(self._dst_dir.rstrip('\\')) + 1
+		self._src_files = set( (p[slen:].lower() for p in self._src_files) )
+		self._dst_files = set( (p[dlen:].lower() for p in self._dst_files) )
+		if any((self._ex_dir, self._ex_ext, self._ex_path)):
+			self._src_files = set(_path_filter(
+				paths=self._src_files
+				, ex_dir=self._ex_dir
+				, ex_ext=self._ex_ext
+				, ex_path=self._ex_path
+			))
+		self._src_only_files = self._src_files - self._dst_files
+		self._dst_only_files = self._dst_files - self._src_files
+		self._src_dirs = dir_dirs(self._src_dir)
+		self._dst_dirs = dir_dirs(self._dst_dir)
+		self._src_dirs = set( (p[slen:].lower() for p in self._src_dirs) )
+		self._dst_dirs = set( (p[dlen:].lower() for p in self._dst_dirs) )
+		if any((self._ex_dir, self._ex_path)):
+			self._src_dirs = set(_path_filter(
+				paths=self._src_dirs
+				, ex_dir=self._ex_dir
+				, ex_path=self._ex_path
+			))
+		self._dst_only_dirs = self._dst_dirs - self._src_dirs
+		self._get_new_files()
+		self.duration = time_diff_str(tstart, no_ms=True)
+		tdebug('done in', self.duration)
+		return len(self.errors) == 0
+	
+	def _log(self, oper:str, path:str):
+		' Print current file operation '
+		if not self._report: return
+		print(f'sync {oper}: {path}')
+	
+	def _get_new_files(self):
+		self._new_files = set()
+		for rpath in (self._src_files.intersection(self._dst_files)):
+			try:
+				src_mtime = int(os.path.getmtime(
+					'\\\\?\\' + os.path.join(self._src_dir, rpath)
+				))
+				dst_mtime = int(os.path.getmtime(
+					'\\\\?\\' + os.path.join(self._dst_dir, rpath)
+				))
+				if src_mtime > dst_mtime:
+					self._new_files.add(rpath)
+			except:
+				tdebug('mdate error', exc_text())
+				self.errors[rpath] = 'mdate error'
+
+	def _copy(self):
+		''' Copy unique and new files from src to dst '''
+		for fileset in self._src_only_files, self._new_files:
+			for rpath in fileset:
+				try:
+					self._log('copy', rpath)
+					file_copy(
+						fullpath=(self._src_dir, rpath)
+						, destination=(self._dst_dir, rpath)
+					)
+				except:
+					tdebug('copy error', exc_text())
+					self.errors[rpath] = 'copy error'
+	
+	def _delete_dirs(self):
+		for rpath in self._dst_only_dirs:
+			try:
+				shutil.rmtree( os.path.join(self._dst_dir, rpath) )
+				self._log('del dir', rpath)
+			except:
+				tdebug('dir del error', exc_text())
+				self.errors[rpath] = 'dir del error'
+
+	def _delete_files(self):
+		' Delete files that do not exist in the src '
+		for rpath in self._dst_only_files:
+			try:
+				file_delete((self._dst_dir, rpath))
+				self._log('del file', rpath)
+			except FileNotFoundError:
+				pass
+			except:
+				tdebug('file del error', exc_text())
+				self.errors[rpath] = 'file del error'
+
+	def print_diff(self, max_table_width:Union[int, tuple]=100):
+		'''
+		Print a table with the difference between
+		the directories.
+		'''
+		table = [('Diff', 'Path')]
+		table.extend( (('src only', p) for p in self._src_only_files) )
+		table.extend( (('dst only', p) for p in self._dst_only_files) )
+		table.extend( (('dst only', p) for p in self._dst_only_dirs) )
+		table.extend( (('new', p) for p in self._new_files) )
+		table_print(table, use_headers=True
+		, max_table_width=max_table_width, sorting=(0, 1))
+		print(
+			f'src only files: {len(self._src_only_files)}'
+			, f'dst only files: {len(self._dst_only_files)}'
+			, f'dst only dirs: {len(self._dst_only_dirs)}'
+			, f'new files: {len(self._new_files)}'
+			,''
+			, sep='\n'
+		)
+	
+	def save_diff(self, dst_file:str='')->str:
+		' Save the difference between directories to a file '
+		if not dst_file: dst_file=temp_file(prefix='dirsync_'
+		, suffix='.txt')
+		content = '\n'.join(
+			f'src only\t{p}' for p in sorted(self._src_only_files)
+		)
+		content += '\n'.join(
+			f'dst only\t{p}' for p in sorted(self._dst_only_files)
+		)
+		content += '\n'.join(
+			f'dst only\t{p}' for p in sorted(self._dst_only_dirs)
+		)
+		file_write(dst_file, content=content)
+		return dst_file
+	
+	def print_errors(self, max_table_width:Union[int, tuple]=100):
+		table = [('Error', 'Path')]
+		for path, err in self.errors.items():
+			table.append((err, path))
+		table_print(table, use_headers=True
+		, max_table_width=max_table_width, sorting=(0, 1))
+	
+	def sync(self)->bool:
+		' Perform synchronization '
+		tstart = time_now()
+		self.errors = dict()
+		self._copy()
+		self._delete_dirs()
+		self._delete_files()
+		self.duration = time_diff_str(tstart, no_ms=True)
+		tdebug('done in', self.duration)
+		return len(self.errors) == 0
+
+def dir_sync(src_dir, dst_dir, report:bool=False)->dict:
+	'''
+	Syncrhonize two directories.  
+	Returns dict of errors: {'file.exe': 'copy error'}
+	'''
+	sync = DirSync(src_dir=src_dir, dst_dir=dst_dir
+	, report=report)
+	sync.compare()
+	if report: sync.print_diff()
+	sync.sync()
+	if sync.errors and report: sync.print_errors()
+	return sync.errors
+
 
 if __name__ != '__main__': patch_import()

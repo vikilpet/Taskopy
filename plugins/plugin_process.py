@@ -4,7 +4,7 @@ import sys
 import ctypes
 import psutil
 import time
-from typing import List
+from typing import List, Iterable, Tuple, Union
 import win32gui
 import win32api
 import win32con
@@ -72,19 +72,19 @@ def proc_get(process, cmd_filter:str=None)->int:
 	return -1
 
 def proc_start(
-	proc_path:str
-	, args=None
+	proc_path:Iterable
+	, args:Iterable=()
 	, wait:bool=False
 	, capture:bool=False
-	, encoding:str=None
+	, encoding:Union[str,None]=None
 	, shell:bool=False
-	, cwd:str=None
-	, env:dict=None
-	, window:str=None
-	, priority:str=None
+	, cwd:Union[str,None]=None
+	, env:dict=dict()
+	, window:str=''
+	, priority:str=''
 	, its_script:bool=False
 	, args_as_str:bool=False
-):
+)->Union[Tuple, int]:
 	'''
 	Starts application.
 	
