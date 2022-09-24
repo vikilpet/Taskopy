@@ -1234,12 +1234,20 @@ def locale_set(name:str='C'):
 			locale.setlocale(locale.LC_ALL, saved)
 
 def table_print(
-	table, use_headers=False, row_sep:str=None
-	, headers_sep:str='-', col_pad:str='  ', row_sep_step:int=0
-	, sorting:tuple=(), sorting_func=None, sorting_rev:bool=False
+	table
+	, use_headers=False
+	, row_sep:str=''
+	, headers_sep:str='-'
+	, col_pad:str='  '
+	, row_sep_step:int=0
+	, sorting:tuple=()
+	, sorting_func=None
+	, sorting_rev:bool=False
 	, repeat_headers:int=None
-	, empty_str:str='-', consider_empty:tuple=(None, '')
+	, empty_str:str='-'
+	, consider_empty:tuple=(None, '')
 	, max_table_width:Union[int, tuple]=()
+	, trim_func=None
 ):
 	'''
 	Print list of lists/tuples as a table.
@@ -1258,7 +1266,12 @@ def table_print(
 	*max_table_width* - maximum width and number of
 	the column to trim or just the maximum width. In that
 	case column number will be set to the number of
-	last column. Example:
+	last column.  
+	*trim_func* - function to trim a long string. If not
+	set then internal *trim_str* will be used. The function
+	receives a string and its maximum length as input.
+	
+	Example:
 
 		table = [
 			('Header-1', 'Header-2', 'Header-3')
@@ -1354,10 +1367,11 @@ def table_print(
 			col_sizes[trim_col] - (table_width - max_table_width[0])
 		)
 		new_rows = []
+		if not trim_func: trim_func = trim_str
 		for row in rows:
 			new_rows.append((
 				*row[:trim_col]
-				, trim_str(row[trim_col], trim_len)
+				, trim_func(row[trim_col], trim_len)
 				, *row[trim_col + 1:]
 			))
 		rows = new_rows
@@ -1797,16 +1811,21 @@ def func_name_human(func_name:str)->str:
 	if new_name and new_name[0].isupper(): return new_name
 	return new_name.capitalize()
 
-def is_iter(obj)->bool:
+def is_iter(obj, and_not_str:bool=True)->bool:
 	'''
-	Is the object iterable?
+	Is the object iterable?  
+	*and_not_str* - exclude strings.
 
-		tass(is_iter('abc'), True)
+		tass(is_iter('a'), False)
+		tass(is_iter('a', and_not_str=False), True)
 		tass(is_iter((1, 2)), True)
-		tass(is_iter(map(str, (1, 2))), True)
+		mapobj = map(str, (1, 2))
+		tass(is_iter(mapobj), True)
+		tass(tuple(mapobj), ('1', '2'))
 		tass(is_iter(1), False)
 
 	'''
+	if and_not_str and isinstance(obj, str): return False
 	try:
 		iter(obj)
 		return True

@@ -1,5 +1,4 @@
 import os
-import sys
 import stat
 import time
 import glob
@@ -19,7 +18,7 @@ import win32print
 import hashlib
 import pythoncom
 import base64
-from typing import Iterator, Tuple, Union, Iterable
+from typing import Callable, Iterator, List, Union, Iterable
 import psutil
 
 import win32api
@@ -48,41 +47,41 @@ def _dir_slash(dirpath:str)->str:
 	if dirpath.endswith('\\'): return dirpath
 	return dirpath + '\\'
 
-def file_path_fix(fullpath, len_limit:int=0
-, trim_suf:str='...'):
-	'''
+def file_path_fix(fullpath):
+	r'''
 	Join list of paths and optionally
 	fix long path. Fill environment variables ('%APPDATA%')
 
-	*len_limit* - trim file name so that the full path
-	length does not exceed this number.  
-	*trim_suf* - attach this string when trimming
-	a file name that is too long.
-
-		assert dir_exists( file_path_fix(('%appdata%', 'Media Center Programs')) )
-		assert len(file_path_fix('c:\\dir\\' + ('f' * 150) + '.txt'
-		, len_limit=99)) == 99
+		path = file_path_fix(('%appdata%', 'Media Center Programs'))
+		tass( dir_exists(path), True)
+		path = (r'c:\Windows', '\\notepad.exe')
+		path2 = r'c:\Windows\notepad.exe'
+		tass( file_path_fix( path ), path2 )
+		path = (r'c:\Windows\\', 'notepad.exe')
+		tass( file_path_fix( path ), path2 )
+		path = (r'c:\Windows\\', '\\notepad.exe')
+		tass( file_path_fix( path ), path2 )
 
 	'''
 	if not fullpath: return fullpath
-	if isinstance(fullpath, (list, tuple)):
-		fullpath = os.path.join(*map(str, fullpath))
-	if fullpath.endswith('\\\\'): fullpath = fullpath[:-1]
+	if is_iter(fullpath):
+		fullpath = (
+			p.lstrip('\\')
+			for p in map(str, fullpath)
+		)
+		fullpath = (
+			p[:-1] if p.endswith('\\\\') else p
+			for p in map(str, fullpath)
+		)
+		fullpath = os.path.join(*fullpath)
 	if fullpath.startswith('%'):
 		env_var = fullpath[1 : ( start := fullpath.find('%', 1) )]
 		rem = fullpath[start + 1: ]
-		if rem.startswith('\\'): rem = rem[1:]
+		rem = rem.lstrip('\\')
 		fullpath = os.path.join( os.getenv(env_var), rem )
-	if len_limit and (len(fullpath) > len_limit):
-		fname, ext = os.path.splitext( os.path.basename(fullpath) )
-		fdir = os.path.dirname(fullpath)
-		limit = len(fullpath) - len_limit + len(trim_suf)
-		fullpath = os.path.join(
-			fdir, fname[:-limit] + trim_suf + ext
-		)
-	elif (
+	if (
 		len(fullpath) > 255
-		and not '\\\\?\\' in fullpath
+		and not fullpath.startswith('\\\\?\\')
 		and fullpath[1:3] == ':\\'
 	):
 		return '\\\\?\\' + fullpath
@@ -441,7 +440,7 @@ def dir_dirs(fullpath, subdirs:bool=True)->Iterator[str]:
 	Returns list of full paths of all directories
 	in this directory and its subdirectories.
 
-		assert r'c:\windows\System32' in dir_dirs(r'c:\windows', subdirs=False)
+		tass( r'c:\windows\System32' in dir_dirs(r'c:\windows', False), True )
 
 	'''
 	fullpath = file_path_fix(fullpath)
@@ -677,7 +676,7 @@ def dir_list(fullpath)->Iterator[str]:
 	'''
 	Returns all directory content (dirs and files).
 
-		assert 'resources\\icon.png' in dir_list('resources')
+		tass( 'resources\\icon.png' in dir_list('resources'), True)
 
 	'''
 	fullpath = file_path_fix(fullpath)
@@ -1151,9 +1150,9 @@ def var_get(var:str, default=None, encoding:str='utf-8'
 	Dangerous! - it's just **eval** and not **ast.literal_eval**
 
 		var_set('test', 1)
-		assert var_get('test') == '1'
+		tass( var_get('test'), '1')
 		assert var_get('test', as_literal=True) == 1
-		assert var_del('test') == True
+		tass( var_del('test'), True)
 
 	'''
 	fpath = _var_fpath(var)
@@ -1398,24 +1397,21 @@ def drive_io(drive_num:int=None)->Iterator[namedtuple]:
 		else:
 			yield cur
 
-def _path_filter(
-	paths:Iterable
-	, ex_ext:Iterable = ()
+def path_rule(
+	ex_ext:Iterable = ()
 	, ex_path:Iterable = ()
 	, ex_dir:Iterable = ()
-)->Iterator[str]:
+)->List[Callable]:
 	'''
-	Filters the list of files by criteria.  
-	*ex_dir* - simply compares the beginning of a path
-	with this string(s) so you can use part of a file path
-	, not just top directory.
+	Creates a list of rules to check a file or directory.
+	All rules are case-insensitive. All rules may be a string
+	or a tuple/list of strings:  
+	*ex_ext='py'*  
+	*ex_ext=('py', 'pyc')*
 
-		from plugins.plugin_filesystem import _path_filter as pf
-		files = tuple(dir_files('plugins'))
-		tass( tuple( pf(files, ex_dir='__pycache__'))[0], 'plugins\\constants.py')
-		tass( tuple( pf(files, ex_ext='pyc'))[0], 'plugins\\constants.py')
-		tass( tuple( pf(files, ex_ext='pyc', ex_path='_TOOLS_patc'))[-1], 'plugins\\tools.py')
-		tass( tuple( pf(files, ex_ext=('pyc', 'py') ) ), ())
+	*ex_ext* - exclude by extension.  
+	*ex_path* - exclude by any part of file path.  
+	*ex_dir* - exclude by beginning of a file path.  
 
 	'''
 	rules = list()
@@ -1442,6 +1438,25 @@ def _path_filter(
 			p.lower().startswith(e)
 			for e in ex_dir
 		))
+	return rules
+
+
+def path_filter(
+	paths:Iterable
+	, **ex_kwargs
+)->Iterator[str]:
+	'''
+	Filters a list of files by criteria from *path_rule*
+
+		pf = path_filter
+		files = tuple(dir_files('plugins'))
+		tass( tuple( pf(files, ex_dir='__pycache__'))[0], 'plugins\\constants.py')
+		tass( tuple( pf(files, ex_ext='pyc'))[0], 'plugins\\constants.py')
+		tass( tuple( pf(files, ex_ext='pyc', ex_path='_TOOLS_patc'))[-1], 'plugins\\tools.py')
+		tass( tuple( pf(files, ex_ext=('pyc', 'py') ) ), ())
+
+	'''
+	rules = path_rule(**ex_kwargs)
 	for path in paths:
 		if any(r(path) for r in rules): continue
 		yield path
@@ -1486,21 +1501,47 @@ class DirSync:
 		self._max_table_width:int=max_table_width
 		self.errors = dict()
 		self.duration = ''
+	
+	def _walk(self):
+		' Reads contens of src and dst directories '
+		tstart = time_now()
+		self._src_files = set()
+		self._src_dirs = set()
+		self._dst_files = set()
+		self._dst_dirs = set()
+		for dirpath, dirnames, filenames in os.walk(self._src_dir):
+			for d in dirnames:
+				self._src_dirs.add(
+					os.path.join(dirpath, d)
+				)
+			for f in filenames:
+				self._src_files.add(
+					os.path.join(dirpath, f)
+				)
+		for dirpath, dirnames, filenames in os.walk(self._dst_dir):
+			for d in dirnames:
+				self._dst_dirs.add(
+					os.path.join(dirpath, d)
+				)
+			for f in filenames:
+				self._dst_files.add(
+					os.path.join(dirpath, f)
+				)
+
 
 	def compare(self)->bool:
 		'''
-		Read the directories and make a comparison.
+		Reads the directories and makes a comparison.
 		'''
 		tstart = time_now()
 		self.errors = dict()
-		self._src_files = dir_files(self._src_dir)
-		self._dst_files = dir_files(self._dst_dir)
+		self._walk()
 		slen = len(self._src_dir.rstrip('\\')) + 1
 		dlen = len(self._dst_dir.rstrip('\\')) + 1
 		self._src_files = set( (p[slen:].lower() for p in self._src_files) )
 		self._dst_files = set( (p[dlen:].lower() for p in self._dst_files) )
 		if any((self._ex_dir, self._ex_ext, self._ex_path)):
-			self._src_files = set(_path_filter(
+			self._src_files = set(path_filter(
 				paths=self._src_files
 				, ex_dir=self._ex_dir
 				, ex_ext=self._ex_ext
@@ -1508,12 +1549,10 @@ class DirSync:
 			))
 		self._src_only_files = self._src_files - self._dst_files
 		self._dst_only_files = self._dst_files - self._src_files
-		self._src_dirs = dir_dirs(self._src_dir)
-		self._dst_dirs = dir_dirs(self._dst_dir)
 		self._src_dirs = set( (p[slen:].lower() for p in self._src_dirs) )
 		self._dst_dirs = set( (p[dlen:].lower() for p in self._dst_dirs) )
 		if any((self._ex_dir, self._ex_path)):
-			self._src_dirs = set(_path_filter(
+			self._src_dirs = set(path_filter(
 				paths=self._src_dirs
 				, ex_dir=self._ex_dir
 				, ex_path=self._ex_path
@@ -1528,9 +1567,7 @@ class DirSync:
 		' Print current file operation '
 		if not self._report: return
 		maxw = self._max_table_width - len(oper) - 7
-		pt = path[-maxw:]
-		if len(path) > maxw: pt = '...' + pt[3:]
-		print(f'sync {oper}: {pt}')
+		print(f'sync {oper}: {path_short(path, maxw)}')
 	
 	def _get_new_files(self):
 		self._new_files = set()
@@ -1563,13 +1600,24 @@ class DirSync:
 					self.errors[rpath] = 'copy error'
 	
 	def _delete_dirs(self):
+		'''
+		Deletes dst-only directories and removes
+		their files from self._dst_only_files.
+		'''
+		errors = set()
 		for rpath in self._dst_only_dirs:
 			try:
 				shutil.rmtree( os.path.join(self._dst_dir, rpath) )
 				self._log('del dir', rpath)
 			except:
+				errors.add(rpath)
 				tdebug('dir del error', exc_text())
 				self.errors[rpath] = 'dir del error'
+		del_dirs = self._dst_only_dirs - errors
+		self._dst_only_files = set(
+			f for f in self._dst_only_files
+			if not any(f.startswith(d) for d in del_dirs)
+		)
 
 	def _delete_files(self):
 		' Delete files that do not exist in the src '
@@ -1598,6 +1646,7 @@ class DirSync:
 			, use_headers=True
 			, max_table_width=self._max_table_width
 			, sorting=(0, 1)
+			, trim_func=path_short
 		)
 		print(
 			f'Done in {self.duration}'
@@ -1636,6 +1685,7 @@ class DirSync:
 			, use_headers=True
 			, max_table_width=self._max_table_width
 			, sorting=(0, 1)
+			, trim_func=path_short
 		)
 	
 	def sync(self)->bool:
@@ -1649,12 +1699,16 @@ class DirSync:
 		tdebug('done in', self.duration)
 		return len(self.errors) == 0
 
+
 def dir_sync(src_dir, dst_dir, report:bool=False
 , **ex_args)->dict:
 	'''
 	Syncrhonize two directories.  
+	For exclude arguments (*ex_args*) see `path_rule`.  
 	Returns dict with errors:  
-	{'path\\file.exe': 'copy error', ...}
+	
+		{'path\\file.exe': 'copy error', ...}
+
 	'''
 	sync = DirSync(src_dir=src_dir, dst_dir=dst_dir
 	, **ex_args)
@@ -1664,5 +1718,16 @@ def dir_sync(src_dir, dst_dir, report:bool=False
 	if sync.errors and report: sync.print_errors()
 	return sync.errors
 
+def path_short(fullpath, max_len:int=100)->str:
+	r'''
+	Shortens a long file name to display.
+
+		path = r'c:\Windows\System32\msiexec.exe'
+		tass(path_short(path, 22), 'c:\Windo...msiexec.exe')
+		tass(path_short(path, 23), 'c:\Window...msiexec.exe')
+
+	'''
+	if len(fp := fullpath) <= max_len: return fullpath
+	return fp[:( -(-max_len // 2 ) )-3] + '...' + fp[-(max_len//2):]
 
 if __name__ != '__main__': patch_import()
