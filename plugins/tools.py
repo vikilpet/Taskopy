@@ -41,7 +41,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2022-09-19'
+APP_VERSION = 'v2022-09-24'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -1129,7 +1129,7 @@ def dialog(
 					dev_print(f'SetWindowPos exception {hwnd=}: {e}')
 		return S_OK
 	if content: content = str(content)
-	if title == None:
+	if title == '':
 		title = func_name_human(_get_parent_func_name())
 	else:
 		title = str(title)

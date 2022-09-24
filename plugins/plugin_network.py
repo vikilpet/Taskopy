@@ -235,7 +235,7 @@ def file_download(url:str, destination:str=None
 			try:
 				os.remove(dst_file)
 			except Exception as e:
-				dev_print('Couldn not delete a bad file: ' + str(e))
+				dev_print('could not delete a bad file: ' + str(e))
 		last_exc.fullpath = dst_file
 		raise last_exc
 	return dst_file

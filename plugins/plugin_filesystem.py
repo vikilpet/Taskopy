@@ -1461,6 +1461,7 @@ class DirSync:
 		, ex_path:Iterable = ()
 		, ex_dir:Iterable = ()
 		, report:bool=False
+		, max_table_width:int=100
 	):
 		'''
 		*ex_dir*, *ex_path*, *ex_ext* - substring
@@ -1482,6 +1483,7 @@ class DirSync:
 		self._new_files = set()
 		self._src_only_files = set()
 		self._dst_only_files = set()
+		self._max_table_width:int=max_table_width
 		self.errors = dict()
 		self.duration = ''
 
@@ -1525,7 +1527,10 @@ class DirSync:
 	def _log(self, oper:str, path:str):
 		' Print current file operation '
 		if not self._report: return
-		print(f'sync {oper}: {path}')
+		maxw = self._max_table_width - len(oper) - 7
+		pt = path[-maxw:]
+		if len(path) > maxw: pt = '...' + pt[3:]
+		print(f'sync {oper}: {pt}')
 	
 	def _get_new_files(self):
 		self._new_files = set()
@@ -1578,7 +1583,7 @@ class DirSync:
 				tdebug('file del error', exc_text())
 				self.errors[rpath] = 'file del error'
 
-	def print_diff(self, max_table_width:Union[int, tuple]=100):
+	def print_diff(self):
 		'''
 		Print a table with the difference between
 		the directories.
@@ -1588,13 +1593,20 @@ class DirSync:
 		table.extend( (('dst only', p) for p in self._dst_only_files) )
 		table.extend( (('dst only', p) for p in self._dst_only_dirs) )
 		table.extend( (('new', p) for p in self._new_files) )
-		table_print(table, use_headers=True
-		, max_table_width=max_table_width, sorting=(0, 1))
+		table_print(
+			table
+			, use_headers=True
+			, max_table_width=self._max_table_width
+			, sorting=(0, 1)
+		)
 		print(
-			f'src only files: {len(self._src_only_files)}'
+			f'Done in {self.duration}'
+			, f'src files: {len(self._src_files)}'
+			, f'src only files: {len(self._src_only_files)}'
 			, f'dst only files: {len(self._dst_only_files)}'
 			, f'dst only dirs: {len(self._dst_only_dirs)}'
 			, f'new files: {len(self._new_files)}'
+			, f'errors: {len(self.errors)}'
 			,''
 			, sep='\n'
 		)
@@ -1615,12 +1627,16 @@ class DirSync:
 		file_write(dst_file, content=content)
 		return dst_file
 	
-	def print_errors(self, max_table_width:Union[int, tuple]=100):
+	def print_errors(self):
 		table = [('Error', 'Path')]
 		for path, err in self.errors.items():
 			table.append((err, path))
-		table_print(table, use_headers=True
-		, max_table_width=max_table_width, sorting=(0, 1))
+		table_print(
+			table
+			, use_headers=True
+			, max_table_width=self._max_table_width
+			, sorting=(0, 1)
+		)
 	
 	def sync(self)->bool:
 		' Perform synchronization '
@@ -1633,16 +1649,18 @@ class DirSync:
 		tdebug('done in', self.duration)
 		return len(self.errors) == 0
 
-def dir_sync(src_dir, dst_dir, report:bool=False)->dict:
+def dir_sync(src_dir, dst_dir, report:bool=False
+, **ex_args)->dict:
 	'''
 	Syncrhonize two directories.  
-	Returns dict of errors: {'file.exe': 'copy error'}
+	Returns dict with errors:  
+	{'path\\file.exe': 'copy error', ...}
 	'''
 	sync = DirSync(src_dir=src_dir, dst_dir=dst_dir
-	, report=report)
+	, **ex_args)
 	sync.compare()
-	if report: sync.print_diff()
 	sync.sync()
+	if report: sync.print_diff()
 	if sync.errors and report: sync.print_errors()
 	return sync.errors
 

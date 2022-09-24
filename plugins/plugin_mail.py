@@ -5,14 +5,14 @@ import glob
 import os
 import time
 import datetime
-from typing import Callable, Tuple, List
+from typing import Callable, Iterable, Tuple, List
 from email.message import EmailMessage, Message
 from email import message_from_bytes
 from email.header import decode_header, make_header
 from email.utils import parsedate_to_datetime
 import imaplib
 import mimetypes
-from .tools import Job, job_batch, tdebug \
+from .tools import Job, is_iter, job_batch, tdebug \
 , patch_import, dev_print, lazy_property \
 , table_print, time_diff_str
 from .plugin_filesystem import file_name_fix, file_size_str \
@@ -218,7 +218,7 @@ def mail_send(
 	, login:str
 	, password:str
 	, from_name:str=''
-	, attachment:str=''
+	, attachment:Iterable=''
 	, reply_to:str=''
 )->Tuple[bool, str]:
 	'''
@@ -241,22 +241,23 @@ def mail_send(
 		msg['From'] = login
 	msg.set_content(message, cte='base64')
 	if reply_to: msg.add_header('Reply-To', reply_to)
-	if isinstance(attachment, str): attachment = [attachment]
-	for attach in attachment:
-		if not attach: continue
-		if not os.path.isfile(attach):
-			raise Exception('wrong attachment')
-		filetype, encoding = mimetypes.guess_type(attach)
-		if filetype is None or encoding is not None:
-			filetype = 'application/octet-stream'
-		maintype, subtype = filetype.split('/', 1)
-		with open(attach, 'rb') as fp:
-			msg.add_attachment(
-				fp.read()
-				, maintype=maintype
-				, subtype=subtype
-				, filename=os.path.basename(attach)
-			)
+	if attachment and isinstance(attachment, str):
+			attachment = (attachment, )
+	if attachment:
+		for attach in attachment:
+			if not attach: continue
+			assert os.path.isfile(attach), 'wrong attachment'
+			filetype, encoding = mimetypes.guess_type(attach)
+			if filetype is None or encoding is not None:
+				filetype = 'application/octet-stream'
+			maintype, subtype = filetype.split('/', 1)
+			with open(attach, 'rb') as fp:
+				msg.add_attachment(
+					fp.read()
+					, maintype=maintype
+					, subtype=subtype
+					, filename=os.path.basename(attach)
+				)
 	
 	try:
 		with smtplib.SMTP_SSL(host=server, port=port
@@ -271,7 +272,7 @@ def mail_send(
 	except Exception as e:
 		tdebug(repr(e))
 		return False, repr(e)
-	return True, ''
+	return True, 'ok'
 	
 def mail_send_batch(recipients:str=''
 , cc_limit:int=_CC_LIMIT, **mail_send_args)->List[str]:
