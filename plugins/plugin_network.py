@@ -24,7 +24,7 @@ from .tools import dev_print, time_sleep, tdebug \
 , median, is_iter
 from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.99 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:104.0) Gecko/20100101 Firefox/104.0'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 _PUB_SUF_LST = set()
 

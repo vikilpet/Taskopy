@@ -66,6 +66,7 @@ def path_get(fullpath, max_len:int=0
 		path = (r'c:\Windows\\', '\\notepad.exe')
 		tass( path_get( path ), path2 )
 		tass( path_get( path, 20 ), r'c:\Windows\no....exe' )
+		tass( path_get(r'c:\Windows\\'), 'c:\\Windows\\')
 
 	'''
 	if not fullpath: return fullpath
@@ -79,6 +80,8 @@ def path_get(fullpath, max_len:int=0
 			for p in map(str, fullpath)
 		)
 		fullpath = os.path.join(*fullpath)
+	else:
+		fullpath = fullpath[:-1] if fullpath.endswith('\\\\') else fullpath
 	if fullpath.startswith('%'):
 		env_var = fullpath[1 : ( start := fullpath.find('%', 1) )]
 		rem = fullpath[start + 1: ]
@@ -1539,6 +1542,7 @@ class DirSync:
 				self._dst_files.add(
 					os.path.join(dirpath, f)
 				)
+		tdebug(time_diff_str(tstart))
 
 
 	def compare(self)->bool:
