@@ -22,7 +22,7 @@ import json2html
 from .tools import dev_print, time_sleep, tdebug \
 , locale_set, safe, patch_import, value_to_unit, time_diff \
 , median, is_iter
-from .plugin_filesystem import var_lst_get, file_path_fix, file_name, file_dir
+from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 
 _USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.99 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
@@ -185,7 +185,7 @@ def file_download(url:str, destination:str=None
 	if dst_file:
 		find_name = os.path.isdir(dst_file)
 		if not find_name:
-			dst_file = file_path_fix((
+			dst_file = path_get((
 				file_dir(dst_file)
 				, file_name(dst_file)
 			))

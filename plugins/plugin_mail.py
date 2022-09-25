@@ -16,7 +16,7 @@ from .tools import Job, is_iter, job_batch, tdebug \
 , patch_import, dev_print, lazy_property \
 , table_print, time_diff_str
 from .plugin_filesystem import file_name_fix, file_size_str \
-, var_get, var_set, file_path_fix
+, var_get, var_set, path_get
 from .plugin_network import html_clean
 _CC_LIMIT = 35
 _MAX_FILE_LEN = 200
@@ -164,13 +164,13 @@ class MailMsg:
 	@lazy_property
 	def fullpath(self)->str:
 		' Full path for the message file '
-		return file_path_fix(
+		return path_get(
 			(
 				self.dst_dir
 				, self.sub_rule(self)
 				, f'{self.file_index} - {self._subj_fname}.{_FILE_EXT}'
 			)
-			, len_limit=_MAX_FILE_LEN
+			, max_len=_MAX_FILE_LEN
 		)
 	
 	def __getattr__(self, name: str):

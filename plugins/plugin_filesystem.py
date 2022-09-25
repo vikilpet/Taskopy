@@ -47,20 +47,25 @@ def _dir_slash(dirpath:str)->str:
 	if dirpath.endswith('\\'): return dirpath
 	return dirpath + '\\'
 
-def file_path_fix(fullpath):
+def path_get(fullpath, max_len:int=0
+, trim_suf:str='...'):
 	r'''
 	Join list of paths and optionally
-	fix long path. Fill environment variables ('%APPDATA%')
+	fix long path. Fill environment variables ('%APPDATA%').  
+	*max_len* - if set, then limit the
+	maximum length of the full path.  
 
-		path = file_path_fix(('%appdata%', 'Media Center Programs'))
+		path = path_get(('%appdata%', 'Media Center Programs'))
 		tass( dir_exists(path), True)
 		path = (r'c:\Windows', '\\notepad.exe')
 		path2 = r'c:\Windows\notepad.exe'
-		tass( file_path_fix( path ), path2 )
+		tass( os.path.join(*path), r'c:\notepad.exe' )
+		tass( path_get( path ), path2 )
 		path = (r'c:\Windows\\', 'notepad.exe')
-		tass( file_path_fix( path ), path2 )
+		tass( path_get( path ), path2 )
 		path = (r'c:\Windows\\', '\\notepad.exe')
-		tass( file_path_fix( path ), path2 )
+		tass( path_get( path ), path2 )
+		tass( path_get( path, 20 ), r'c:\Windows\no....exe' )
 
 	'''
 	if not fullpath: return fullpath
@@ -79,7 +84,14 @@ def file_path_fix(fullpath):
 		rem = fullpath[start + 1: ]
 		rem = rem.lstrip('\\')
 		fullpath = os.path.join( os.getenv(env_var), rem )
-	if (
+	if max_len and (len(fullpath) > max_len):
+		fname, ext = os.path.splitext( os.path.basename(fullpath) )
+		fdir = os.path.dirname(fullpath)
+		limit = len(fullpath) - max_len + len(trim_suf)
+		fullpath = os.path.join(
+			fdir, fname[:-limit] + trim_suf + ext
+		)
+	elif (
 		len(fullpath) > 255
 		and not fullpath.startswith('\\\\?\\')
 		and fullpath[1:3] == ':\\'
@@ -94,7 +106,7 @@ def file_read(fullpath, encoding:str='utf-8', errors:str=None)->str:
 	*encoding* - if set to 'binary' then returns bytes.
 	
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	if encoding == 'binary':
 		with open(fullpath, 'rb') as f:
 			return f.read()
@@ -115,7 +127,7 @@ def file_write(fullpath, content:str
 		open_args = {'mode': 'wt+', 'encoding': encoding
 		, 'errors': 'ignore'}
 	if fullpath:
-		fullpath = file_path_fix(fullpath)
+		fullpath = path_get(fullpath)
 		if not os.path.exists(os.path.dirname(fullpath)):
 			os.makedirs(os.path.dirname(fullpath))
 	else:
@@ -126,7 +138,7 @@ def file_write(fullpath, content:str
 
 def file_ext_replace(fullpath, new_ext:str)->str:
 	' Replaces file extension '
-	return os.path.splitext(file_path_fix(fullpath))[0] + '.' + new_ext
+	return os.path.splitext(path_get(fullpath))[0] + '.' + new_ext
 
 def file_rename(fullpath, dest:str
 , overwrite:bool=False)->str:
@@ -142,10 +154,10 @@ def file_rename(fullpath, dest:str
 			>'d:\\my cat.jpg'
 			
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	if not ':' in dest:
 		dest = os.path.join( os.path.dirname(fullpath), dest )
-	dest = file_path_fix(dest)
+	dest = path_get(dest)
 	try:
 		os.rename(fullpath, dest)
 	except FileExistsError as e:
@@ -171,11 +183,11 @@ def dir_rename(fullpath, dest
 		>'d:\\my cat.jpg'
 
 	'''
-	fullpath = file_path_fix(fullpath)
-	dest = file_path_fix(dest)
+	fullpath = path_get(fullpath)
+	dest = path_get(dest)
 	if not ':' in dest:
 		dest = os.path.join( os.path.dirname(fullpath), dest )
-	dest = file_path_fix(dest)
+	dest = path_get(dest)
 	try:
 		os.rename(fullpath, dest)
 	except FileExistsError as e:
@@ -189,7 +201,7 @@ def dir_rename(fullpath, dest
 def file_log(fullpath, message:str, encoding:str='utf-8'
 , time_format:str='%Y.%m.%d %H:%M:%S'):
 	''' Writes message to log '''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	with open(fullpath, 'at+', encoding=encoding) as f:
 		f.write(time.strftime(time_format) + '\t' + message + '\n')
 
@@ -203,8 +215,8 @@ def file_copy(fullpath, destination:Iterable
 	If destination is a folder, subfolders will
 	be created if they don't exist.
 	'''
-	fullpath = file_path_fix(fullpath)
-	destination = file_path_fix(destination)
+	fullpath = path_get(fullpath)
+	destination = path_get(destination)
 	func = shutil.copy2 if copy_metadata else shutil.copy
 	try:
 		return func(fullpath, destination)
@@ -222,7 +234,7 @@ def file_append(fullpath, content:str, encoding:str='utf-8')->str:
 		Returns fullpath.
 	'''
 	if fullpath:
-		fullpath = file_path_fix(fullpath)
+		fullpath = path_get(fullpath)
 	else:
 		fullpath = temp_file()
 	with open(fullpath, 'a+', encoding=encoding) as fd:
@@ -235,8 +247,8 @@ def file_move(fullpath, destination)->str:
 		Destination may be fullpath or folder name.
 		If destination path exist it will be overwritten.
 	'''
-	fullpath = file_path_fix(fullpath)
-	destination = file_path_fix(destination)
+	fullpath = path_get(fullpath)
+	destination = path_get(destination)
 	if os.path.isdir(destination):
 		new_fullpath = _dir_slash(destination) \
 			+ os.path.basename(fullpath)
@@ -251,7 +263,7 @@ def file_move(fullpath, destination)->str:
 
 def file_delete(fullpath):
 	''' Deletes the file. '''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	try:
 		os.remove(fullpath)
 	except PermissionError:
@@ -270,7 +282,7 @@ def file_recycle(fullpath, silent:bool=True)->bool:
 		dialog to confirm deletion.
 		Returns True on successful operation.
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	flags = shellcon.FOF_ALLOWUNDO
 	if silent:
 		flags = flags | shellcon.FOF_SILENT | shellcon.FOF_NOCONFIRMATION
@@ -292,8 +304,8 @@ def dir_copy(fullpath, destination:str
 	''' Copy a folder with all content to a new location.
 		Returns number of errors.
 	'''
-	fullpath = file_path_fix(fullpath)
-	destination = file_path_fix(destination)
+	fullpath = path_get(fullpath)
+	destination = path_get(destination)
 	err = 0
 	try:
 		shutil.copytree(fullpath, destination, symlinks=symlinks)
@@ -308,7 +320,7 @@ def dir_create(fullpath=None)->str:
 	''' Creates new dir and returns full path.
 		If fullpath=None then creates temporary directory.
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	if not fullpath: return temp_dir('temp')
 	fullpath = fullpath.rstrip('.').rstrip(' ')
 	try:
@@ -318,7 +330,7 @@ def dir_create(fullpath=None)->str:
 
 def dir_delete(fullpath):
 	''' Deletes folder with it's contents '''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	try:
 		shutil.rmtree(fullpath
 		, onerror=lambda func, path, exc: file_delete(path))
@@ -327,19 +339,19 @@ def dir_delete(fullpath):
 		return fullpath
 
 def dir_exists(fullpath)->bool:
-	return os.path.isdir( file_path_fix(fullpath) )
+	return os.path.isdir( path_get(fullpath) )
 
 def file_exists(fullpath)->bool:
-	return os.path.isfile( file_path_fix(fullpath) )
+	return os.path.isfile( path_get(fullpath) )
 
 def path_exists(fullpath)->bool:
 	''' Check if directory or file exist '''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	p = Path(fullpath)
 	return p.exists()
 
 def file_size(fullpath, unit:str='b')->int:
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	e = _SIZE_UNITS.get(unit.lower(), 1)
 	return os.stat(fullpath).st_size // e
 
@@ -358,7 +370,7 @@ def file_size_str(fullpath)->str:
 	if isinstance(fullpath, (int, float)):
 		size = fullpath
 	else:
-		fullpath = file_path_fix(fullpath)
+		fullpath = path_get(fullpath)
 		size = os.stat(fullpath).st_size
 	for unit in list(_SIZE_UNITS.keys())[::-1]:
 		if abs(size) < 1024.0:
@@ -369,7 +381,7 @@ def file_ext(fullpath)->str:
 	''' Returns file extension in lower case
 		without dot.
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	ext = os.path.splitext(fullpath)[1].lower()
 	if ext == '': return ext
 	return ext[1:]
@@ -383,7 +395,7 @@ def file_basename(fullpath)->str:
 		> 'pagefile'
 
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	fname = os.path.basename(fullpath)
 	return os.path.splitext(fname)[0]
 
@@ -394,7 +406,7 @@ def file_name_add(fullpath, suffix:str='', prefix:str='')->str:
 			file_name_add('my_file.txt', suffix='_1')
 			> 'my_file_1.txt'
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	if not isinstance(suffix, str): suffix = str(suffix)
 	if not isinstance(prefix, str): prefix = str(prefix)
 	par_dir, name = os.path.split(fullpath)
@@ -408,7 +420,7 @@ def file_name_rem(fullpath, suffix:str='', prefix:str='')->str:
 			file_name_rem('my_file_1.txt', suffix='_1')
 			> 'my_file.txt'
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	if suffix: suffix = str(suffix)
 	if prefix: prefix = str(prefix)
 	par_dir, name = os.path.split(fullpath)
@@ -421,7 +433,7 @@ def file_name_rem(fullpath, suffix:str='', prefix:str='')->str:
 
 def file_name_fix(filename:str, repl_char:str='_')->str:
 	'''
-	Replaces forbidden characters with repl_char.
+	Replaces forbidden characters with *repl_char*.
 	Don't use it with a full path or it will replace
 	all backslashes.
 	Removes the leading and trailing spaces and dots.
@@ -443,7 +455,7 @@ def dir_dirs(fullpath, subdirs:bool=True)->Iterator[str]:
 		tass( r'c:\windows\System32' in dir_dirs(r'c:\windows', False), True )
 
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 
 	for dirpath, dirs, _ in os.walk(fullpath, topdown=True):
 		for d in dirs: yield os.path.join(dirpath, d)
@@ -460,7 +472,7 @@ def dir_files(fullpath, ext:str=None, subdirs:bool=True
 	*ext* - only files with this extension (str, tuple).
 
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	if ext:
 		if isinstance(ext, str): ext = (ext, )
 		ext = tuple('.' + e.lstrip('.').lower() for e in ext)
@@ -496,7 +508,7 @@ def dir_rnd_file(fullpath, attempts:int=5
 		> 494
 		
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	for _ in range(attempts):
 		path = fullpath
 		for _ in range(attempts):
@@ -516,7 +528,7 @@ def dir_rnd_dir(fullpath, attempts:int=5
 	'''
 	Same as `dir_rnd_file` but returns a directory.
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	for _ in range(attempts):
 		path = fullpath
 		for _ in range(attempts):
@@ -583,7 +595,7 @@ def dir_purge(fullpath, days:int=0, recursive:bool=False
 		counter += 1
 		print(os.path.relpath(fn, fullpath))
 
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	counter = 0
 	if days: delta = 24 * 3600 * days
 	if creation:
@@ -623,20 +635,20 @@ def dir_purge(fullpath, days:int=0, recursive:bool=False
 
 def file_name(fullpath)->str:
 	''' Returns only name from fullpath '''
-	return os.path.basename( file_path_fix(fullpath) )
+	return os.path.basename( path_get(fullpath) )
 
 def file_name_wo_ext(fullpath)->str:
-	return os.path.splitext(file_path_fix(fullpath))[0]
+	return os.path.splitext(path_get(fullpath))[0]
 
 def file_dir(fullpath)->str:
 	''' Returns directory from fullpath
 	'''
-	return os.path.dirname(file_path_fix(fullpath))
+	return os.path.dirname(path_get(fullpath))
 
 def file_dir_repl(fullpath, new_dir:str)->str:
 	''' Changes the directory of the file (in full path)
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	return os.path.join(new_dir, os.path.basename(fullpath) )
 
 def file_backup(fullpath, dest_dir:str=''
@@ -650,7 +662,7 @@ def file_backup(fullpath, dest_dir:str=''
 
 	It will preserve the date of the file.
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	if not dest_dir: dest_dir = os.path.dirname(fullpath)
 	if not os.path.isdir(dest_dir): dir_create(dest_dir)
 	name, ext = os.path.splitext(
@@ -679,7 +691,7 @@ def dir_list(fullpath)->Iterator[str]:
 		tass( 'resources\\icon.png' in dir_list('resources'), True)
 
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	for dirpath, dirnames, filenames in os.walk(fullpath):
 		for d in dirnames: yield os.path.join(dirpath, d)
 		for f in filenames: yield os.path.join(dirpath, f)
@@ -697,7 +709,7 @@ def dir_find(fullpath, only_files:bool=False)->list:
 		dir_list('d:\\folder\\**\\*.jpg')
 
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	if not '*' in fullpath: fullpath = os.path.join(fullpath, '*')
 	recursive = ('**' in fullpath)
 	fullpath = fullpath.replace('[', '[[]')
@@ -720,7 +732,7 @@ def csv_read(fullpath, encoding:str='utf-8', fieldnames:tuple=None
 		If no fieldnames is provided uses first row as fieldnames.
 		All cell values is strings.
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	with open(fullpath, 'r', encoding=encoding) as f:
 		reader = csv.DictReader(f, skipinitialspace=True, fieldnames=fieldnames
 		, delimiter=delimiter, quotechar=quotechar)
@@ -743,7 +755,7 @@ def csv_write(fullpath, content:list, fieldnames:tuple=None
 			...	
 		]
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	if not fieldnames:
 		fieldnames = content[0].keys()
 	with open(fullpath, 'w', encoding=encoding
@@ -764,7 +776,7 @@ def dir_size(fullpath, unit:str='b', skip_err:bool=True)->int:
 	Returns directory size without symlinks.  
 	*skip_err* - do not raise an exeption on non-existent files.
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	e = _SIZE_UNITS.get(unit.lower(), 1)
 	total_size = 0
 	for dirpath, _, filenames in os.walk(fullpath):
@@ -790,9 +802,9 @@ def dir_zip(fullpath, destination=None
 		Returns destination.
 	'''
 	EXT = 'zip'
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	fullpath = fullpath.strip('\\')
-	destination = file_path_fix(destination)
+	destination = path_get(destination)
 	if not destination:
 		new_fullpath = os.path.join(
 			os.path.dirname(fullpath)
@@ -835,8 +847,8 @@ def file_zip(fullpath, destination=None)->str:
 		destination - full path to the archive or destination
 		directory.
 	'''
-	fullpath = file_path_fix(fullpath)
-	destination = file_path_fix(destination)
+	fullpath = path_get(fullpath)
+	destination = path_get(destination)
 	if not destination:
 		destination = file_ext_replace(fullpath, 'zip')
 	if isinstance(fullpath, str):
@@ -865,7 +877,7 @@ def file_zip(fullpath, destination=None)->str:
 
 def file_zip_cont(fullpath, only_files:bool=False)->list:
 	' Returns list of paths in zip file'
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	with zipfile.ZipFile(fullpath) as z:
 		if only_files:
 			return [f.filename for f in z.filelist
@@ -909,7 +921,7 @@ def file_hash(fullpath, algorithm:str='crc32'
 		algorithm - 'crc32' or any algorithm
 		from hashlib (md5, sha512 etc).
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	algorithm = algorithm.lower().replace('-', '')
 	if algorithm == 'crc32':
 		prev = 0
@@ -956,19 +968,19 @@ def file_date_m(fullpath)->datetime.datetime:
 		file_date_m(r'...').replace(microsecond=0)
 
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	ts = os.path.getmtime(fullpath)
 	return datetime.datetime.fromtimestamp(ts)
 
 def file_date_c(fullpath)->datetime.datetime:
 	' Returns file creation date in datetime '
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	ts = os.path.getctime(fullpath)
 	return datetime.datetime.fromtimestamp(ts)
 
 def file_date_a(fullpath)->datetime.datetime:
 	' Returns file access date in datetime '
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	ts = os.path.getatime(fullpath)
 	return datetime.datetime.fromtimestamp(ts)
 
@@ -978,7 +990,7 @@ def file_attr_set(fullpath
 		Type 'win32con.FILE_' to get syntax hints for
 		constants.
 	'''
-	win32api.SetFileAttributes(file_path_fix(fullpath), attribute)
+	win32api.SetFileAttributes(path_get(fullpath), attribute)
 
 def shortcut_create(fullpath, dest:str=None, descr:str=None
 , icon_fullpath:str=None, icon_index:int=None
@@ -994,7 +1006,7 @@ def shortcut_create(fullpath, dest:str=None, descr:str=None
 		icon_index - if specified and icon_fullpath is None
 			then fullpath is used as icon_fullpath.
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	if not descr: descr = file_name(fullpath)
 	if not dest:
 		dest = os.path.join(
@@ -1033,7 +1045,7 @@ def file_print(fullpath, printer:str=None
 		If no printer is specified - print on 
 		system default printer.
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	if ' ' in fullpath: fullpath = f'"{fullpath}"'
 	if not printer:
 		try:
@@ -1069,7 +1081,7 @@ def file_b64_enc(fullpath:str)->str:
 	'''
 	Encodes a file to the base64 string.
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	with open(fullpath, 'rb') as fd:
 		return base64.b64encode(fd.read()).decode('utf-8')
 
@@ -1090,7 +1102,7 @@ class HTTPFile:
 		, mime_type:str=None
 		, name:str=None
 	):
-		self.fullpath = file_path_fix(fullpath)
+		self.fullpath = path_get(fullpath)
 		self.use_save_to = use_save_to
 		if not mime_type:
 			mime_type = mimetypes.MimeTypes() \
@@ -1105,7 +1117,7 @@ def file_lock_wait(fullpath, wait_interval:str='100 ms'
 	Blocks execution until the file is available.
 	Usage - wait for another process to stop writing to the file.
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	while True:
 		try:
 
@@ -1124,8 +1136,8 @@ def file_lock_wait(fullpath, wait_interval:str='100 ms'
 
 def file_relpath(fullpath, start)->str:
 	''' Returns a relative path '''
-	fullpath = file_path_fix(fullpath)
-	start = file_path_fix(start)
+	fullpath = path_get(fullpath)
+	start = path_get(start)
 	return os.path.relpath(fullpath, start=start)
 
 def _file_name_pe(filename:str):
@@ -1320,7 +1332,7 @@ def file_drive(fullpath)->str:
 		assert file_drive(r'c:\\pagefile.sys') == 'c'
 
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	return os.path.splitdrive(fullpath)[0][:1].lower()
 
 def file_conf_read(fullpath:str, encoding:str='utf-8'
@@ -1341,7 +1353,7 @@ def file_conf_read(fullpath:str, encoding:str='utf-8'
 		{ 'Section A': {'par1': 1, 'par2': 'a string' } }
 
 	'''
-	fullpath = file_path_fix(fullpath)
+	fullpath = path_get(fullpath)
 	parser = configparser.ConfigParser()
 	if not lowercase: parser.optionxform = str
 	parser.read(fullpath, encoding=encoding)
@@ -1485,8 +1497,8 @@ class DirSync:
 		*ex_dir* must be a relative path.  
 		*report* - print every file copy/del operation.
 		'''
-		self._src_dir = file_path_fix(src_dir)
-		self._dst_dir = file_path_fix(dst_dir)
+		self._src_dir = path_get(src_dir)
+		self._dst_dir = path_get(dst_dir)
 		self._report = report
 		self._ex_path = ex_path
 		self._ex_dir = ex_dir
