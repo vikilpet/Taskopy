@@ -18,7 +18,8 @@ import win32print
 import hashlib
 import pythoncom
 import base64
-from typing import Callable, Iterator, List, Union, Iterable
+from typing import Callable, Iterator, List, Union \
+, Iterable, Tuple
 import psutil
 
 import win32api
@@ -26,7 +27,7 @@ from win32com.shell import shell, shellcon
 from pathlib import Path
 import shutil
 import configparser
-from .tools import exc_text, random_str, table_print, tdebug, patch_import, time_diff_str, time_now \
+from .tools import _APP_PATH, APP_NAME, exc_text, random_str, table_print, tdebug, patch_import, time_diff_str, time_now \
 , time_sleep, dev_print, tprint, is_iter, time_diff
 try:
 	import constants as tcon
@@ -52,6 +53,7 @@ def path_get(fullpath, max_len:int=0
 	r'''
 	Join list of paths and optionally
 	fix long path. Fill environment variables ('%APPDATA%').  
+	Special variable (os.getcwd): %taskopy%  
 	*max_len* - if set, then limit the
 	maximum length of the full path.  
 
@@ -67,13 +69,14 @@ def path_get(fullpath, max_len:int=0
 		tass( path_get( path ), path2 )
 		tass( path_get( path, 20 ), r'c:\Windows\no....exe' )
 		tass( path_get(r'c:\Windows\\'), 'c:\\Windows\\')
+		tass( file_exists('%taskopy%\\crontab.py'), True)
 
 	'''
 	if not fullpath: return fullpath
 	if is_iter(fullpath):
 		fullpath = (
-			p.lstrip('\\')
-			for p in map(str, fullpath)
+			(p if n == 0 else p.lstrip('\\'))
+			for n, p in enumerate(map(str, fullpath))
 		)
 		fullpath = (
 			p[:-1] if p.endswith('\\\\') else p
@@ -86,7 +89,10 @@ def path_get(fullpath, max_len:int=0
 		env_var = fullpath[1 : ( start := fullpath.find('%', 1) )]
 		rem = fullpath[start + 1: ]
 		rem = rem.lstrip('\\')
-		fullpath = os.path.join( os.getenv(env_var), rem )
+		if env_var.lower() == APP_NAME.lower():
+			fullpath = os.path.join( _APP_PATH, rem )
+		else:
+			fullpath = os.path.join( os.getenv(env_var), rem )
 	if max_len and (len(fullpath) > max_len):
 		fname, ext = os.path.splitext( os.path.basename(fullpath) )
 		fdir = os.path.dirname(fullpath)
@@ -97,7 +103,10 @@ def path_get(fullpath, max_len:int=0
 	elif (
 		len(fullpath) > 255
 		and not fullpath.startswith('\\\\?\\')
-		and fullpath[1:3] == ':\\'
+		and (
+			fullpath[1:3] == ':\\'
+			or fullpath.startswith('\\\\')
+		)
 	):
 		return '\\\\?\\' + fullpath
 	return fullpath
@@ -465,15 +474,12 @@ def dir_dirs(fullpath, subdirs:bool=True)->Iterator[str]:
 		if not subdirs: return
 
 def dir_files(fullpath, ext:str=None, subdirs:bool=True
-, rule=lambda f: True)->Iterator[str]:
+, rule:Callable=lambda f: True)->Iterator[str]:
 	'''
 	Returns list of full filenames of all files
-	in the given directory and its subdirectories.
-	
-	*subdirs* - including files from subfolders.
-	
-	*ext* - only files with this extension (str, tuple).
-
+	in the given directory and its subdirectories.  
+	*subdirs* - including files from subfolders.  
+	*ext* - only files with this extension (str, tuple).  
 	'''
 	fullpath = path_get(fullpath)
 	if ext:
@@ -485,19 +491,20 @@ def dir_files(fullpath, ext:str=None, subdirs:bool=True
 		for f in filenames:
 			if rule(f): yield os.path.join(dirpath, f)
 
-def dir_rnd_file(fullpath, attempts:int=5
-, filter_func=None)->str:
+def dir_rnd_files(fullpath, file_num:int=1
+, attempts:int=5, **rules)->Iterator[str]:
 	'''
-	Gets a random file from a directory or None
-	if nothing is found.
-	`filter_func` - a function that takes a full path and
-	returns True if the file fits.
+	Gets random files from a directory or None
+	if nothing is found.  
+	*file_num* - how many files to return.  
+	*rules* - a tuple of rules from the `path_rule`.
+
 	Designed for large directories that take a significant
-	amount of time to list.
+	amount of time to list.  
 	Example:
 
-		dir_rnd_file('.')
-		dir_rnd_file('.', filter_func=lambda f: file_ext(f) == 'py')
+		dir_rnd_files('.')
+		tuple(dir_rnd_files('.', ex_ext='py'))
 	
 	Compared to `dir_list` with `random.choice`:
 
@@ -512,19 +519,30 @@ def dir_rnd_file(fullpath, attempts:int=5
 		
 	'''
 	fullpath = path_get(fullpath)
-	for _ in range(attempts):
-		path = fullpath
+	found_num = 0
+	in_rules, ex_rules = path_rule(**rules)
+	for _ in range(file_num):
 		for _ in range(attempts):
-			dlist = os.listdir(path)
-			if not dlist: break
-			path = os.path.join(path, random.choice(dlist) )
-			if os.path.isfile(path):
-				if not filter_func: return path
-				if filter_func(path):
-					return path
-				else:
-					break
-	return None
+			path = fullpath
+			if found_num == file_num: return
+			for _ in range(attempts):
+				dlist = os.listdir(path)
+				if not dlist: break
+				path = os.path.join(path, random.choice(dlist) )
+				if os.path.isfile(path):
+					if (
+						(not rules)
+						or _path_match(
+							path
+							, in_rules=in_rules
+							, ex_rules=ex_rules
+						)
+					):
+						found_num += 1
+						yield path
+						break
+					else:
+						break
 
 def dir_rnd_dir(fullpath, attempts:int=5
 , filter_func=None)->str:
@@ -1416,52 +1434,94 @@ def path_rule(
 	ex_ext:Iterable = ()
 	, ex_path:Iterable = ()
 	, ex_dir:Iterable = ()
-)->List[Callable]:
+	, in_ext:Iterable = ()
+	, in_path:Iterable = ()
+	, in_dir:Iterable = ()
+)->Tuple[ List[Callable], List[Callable] ]:
 	'''
-	Creates a list of rules to check a file or directory.
+	Creates a list of rules (functions) to check
+	a file or directory.  
 	All rules are case-insensitive. All rules may be a string
 	or a tuple/list of strings:  
 	*ex_ext='py'*  
 	*ex_ext=('py', 'pyc')*
 
-	*ex_ext* - exclude by extension.  
-	*ex_path* - exclude by any part of file path.  
-	*ex_dir* - exclude by beginning of a file path.  
+	*ex_ext*, *in_ext* - exclude/include by extension.  
+	*ex_path*, *in_path* - exclude/include by any part of file path.  
+	*ex_dir*, *in_dir* - exclude/include by beginning of a file path.  
 
 	'''
-	rules = list()
+	ex_rules = list()
+	in_rules = list()
 	if ex_ext:
 		if isinstance(ex_ext, str): ex_ext = (ex_ext, )
 		ex_ext = set((e.lower() for e in ex_ext))
-		rules.append(lambda p: any(
+		ex_rules.append(lambda p: any(
 			os.path.splitext(p)[1][1:].lower() == e
 			for e in ex_ext
+		))
+	if in_ext:
+		if isinstance(in_ext, str): in_ext = (in_ext, )
+		in_ext = set((e.lower() for e in in_ext))
+		in_rules.append(lambda p: any(
+			os.path.splitext(p)[1][1:].lower() == e
+			for e in in_ext
 		))
 	if ex_path:
 		if isinstance(ex_path, str): ex_path = (ex_path, )
 		ex_path = set((e.lower() for e in ex_path))
-		rules.append(lambda p: any(
+		ex_rules.append(lambda p: any(
 			e in p.lower()
 			for e in ex_path
+		))
+	if in_path:
+		if isinstance(in_path, str): in_path = (in_path, )
+		in_path = set((e.lower() for e in in_path))
+		in_rules.append(lambda p: any(
+			e in p.lower()
+			for e in in_path
 		))
 	if ex_dir:
 		if isinstance(ex_dir, str): ex_dir = (ex_dir, )
 		ex_dir = set((e.lower().lstrip('\\') for e in ex_dir))
 		for ex in ex_dir:
-			assert not ':' in ex, 'The ex_dir must contain relative paths'
-		rules.append(lambda p: any(
+			assert not ':' in ex, 'the ex_dir must contain relative paths'
+		ex_rules.append(lambda p: any(
 			p.lower().startswith(e)
 			for e in ex_dir
 		))
-	return rules
+	if in_dir:
+		if isinstance(in_dir, str): in_dir = (in_dir, )
+		in_dir = set((e.lower().lstrip('\\') for e in in_dir))
+		for ex in in_dir:
+			assert not ':' in ex, 'the in_dir must contain relative paths'
+		in_rules.append(lambda p: any(
+			p.lower().startswith(e)
+			for e in in_dir
+		))
+	return in_rules, ex_rules
 
+def _path_match(path:str, in_rules:list, ex_rules:list)->bool:
+	'''
+	Returns True if path matches rules from the `path_rule`.
+
+		inr, exr = path_rule(in_ext='py', ex_ext='pyc')
+		tass( _path_match(r'crontab.py', inr, exr), True )
+		tass( _path_match(r'crontab.pyc', inr, exr), False )
+
+	'''
+	return (
+		(any(r(path) for r in in_rules) if in_rules else True)
+		and
+		not (any(r(path) for r in ex_rules) if ex_rules else False)
+	)
 
 def path_filter(
 	paths:Iterable
-	, **ex_kwargs
+	, **rules
 )->Iterator[str]:
 	'''
-	Filters a list of files by criteria from *path_rule*
+	Filters a list of files by criteria from `path_rule`
 
 		pf = path_filter
 		files = tuple(dir_files('plugins'))
@@ -1469,12 +1529,16 @@ def path_filter(
 		tass( tuple( pf(files, ex_ext='pyc'))[0], 'plugins\\constants.py')
 		tass( tuple( pf(files, ex_ext='pyc', ex_path='_TOOLS_patc'))[-1], 'plugins\\tools.py')
 		tass( tuple( pf(files, ex_ext=('pyc', 'py') ) ), ())
+		tass( tuple( pf(files, in_ext='txt' ) ), ())
+		tass( tuple( pf(files, in_ext='py', ex_path='_TOOLS_patc'))[-1], 'plugins\\tools.py')
+		tass( tuple( pf(files, in_path='constants.py'))[0], 'plugins\\constants.py')
+		tass( tuple( pf(files, in_dir='\\plugins\\', ex_ext='pyc', ex_path='paTch'))[-1], 'plugins\\tools.py')
 
 	'''
-	rules = path_rule(**ex_kwargs)
+	in_rules, ex_rules = path_rule(**rules)
 	for path in paths:
-		if any(r(path) for r in rules): continue
-		yield path
+		if _path_match(path=path, in_rules=in_rules, ex_rules=ex_rules):
+			yield path
 
 
 class DirSync:

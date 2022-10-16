@@ -217,14 +217,15 @@ def proc_start(
 	else:
 		return r.pid
 
-def proc_exist(process, cmd_filter:str=None
+def proc_exists(process, cmd_filter:str=None
 , user_filter:str=None)->bool:
-	''' Returns PID if the process with the specified name exists.
-		process - image name or PID.
-		cmd_filter - optional string to search in the
-			command line of the process.
-		user_filter - only search within processes of
-			specified user. Format: pc\\username
+	'''
+	Returns PID if the process with the specified name exists.  
+	*process* - image name or PID.  
+	*cmd_filter* - optional string to search in the
+	command line of the process.  
+	*user_filter* - only search within processes of
+	specified user. Format: pc\\username  
 	'''
 	if cmd_filter: cmd_filter = cmd_filter.lower()
 	if user_filter: user_filter = user_filter.lower()
@@ -250,7 +251,7 @@ def proc_exist(process, cmd_filter:str=None
 					else:
 						return proc.pid
 		except psutil.AccessDenied:
-			dev_print(f'proc_exist access denied: {process}')
+			dev_print(f'proc_exists access denied: {process}')
 	return False
 
 def proc_list(name:str='', cmd_filter:str=None

@@ -169,8 +169,9 @@ def load_crontab(event=None)->bool:
 		return False
 	
 def load_modules():
-	''' (Re)Loads all application plugins and additional
-		crontab modules if any.
+	'''
+	(Re)Loads all application plugins and
+	crontab extensions if any.
 	'''
 	global crontab
 	if not hasattr(sett, 'own_modules'):
@@ -1014,6 +1015,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		app.frame.PopupMenu(self.CreatePopupMenu())
 
 class App(wx.App):
+
 	def OnInit(self):
 		self.enabled = True
 		self.frame=wx.Frame(None, style=wx.DEFAULT_FRAME_STYLE | wx.STAY_ON_TOP)
@@ -1035,6 +1037,10 @@ class App(wx.App):
 			if sett.dev:
 				msgbox_warning(f'None of {APP_NAME} windows was found')
 		return True
+
+	def InitLocale(self):
+		'''Override with nothing (or impliment local if actually needed)'''
+		pass
 
 	def popup_menu_hk(self):
 		tprint('app menu by hotkey')
