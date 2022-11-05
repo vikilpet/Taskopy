@@ -41,7 +41,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2022-10-16'
+APP_VERSION = 'v2022-11-05'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -425,6 +425,19 @@ def date_weekday_num(date_val:datetime.datetime=None)->int:
 	if not date_val: date_val = datetime.date.today()
 	return date_val.weekday() + 1
 
+def date_fill(date_str:str)->str:
+	'''
+	Replace asterisk to current datetime value:  
+	date_fill('*.*.01 12:30') -> '2020.10.01 12:30'
+	'''
+	if not '*' in date_str: return date_str
+	date_str = date_str.replace('.', ' ').replace(':', ' ')
+	new_date_lst = list( datetime.datetime.now().timetuple() )
+	for pos, value  in enumerate( date_str.split() ):
+		if value != '*': new_date_lst[pos] = value
+	return '{:0>4}.{:0>2}.{:0>2} {:0>2}:{:0>2}' \
+		.format(*new_date_lst)
+
 def time_sleep(interval, unit:str=None):
 	''' Pauses for specified amount of time.
 		interval - number of seconds or str with unit like '5 min'
@@ -450,17 +463,18 @@ def clip_get()->str:
 
 def re_find(source:str, re_pattern:str, sort:bool=False
 , unique:bool=False, re_flags:int=re.IGNORECASE)->List[str]:
-	r''' Return list with matches.
-		re_flags:
-			re.IGNORECASE	ignore case
-			re.MULTILINE	make begin/end {^, $} consider each line.
-			re.DOTALL	make . match newline too.
-			re.UNICODE	make {\w, \W, \b, \B} follow Unicode rules.
-			re.LOCALE	make {\w, \W, \b, \B} follow locale.
-			re.VERBOSE	allow comment in regex.
+	r'''
+	Returns list with matches.  
+	re_flags:  
+		re.IGNORECASE	ignore case
+		re.MULTILINE	make begin/end {^, $} consider each line.
+		re.DOTALL	make . match newline too.
+		re.UNICODE	make {\w, \W, \b, \B} follow Unicode rules.
+		re.LOCALE	make {\w, \W, \b, \B} follow locale.
+		re.VERBOSE	allow comment in regex.
 
-		Non-capturing group: (?:aaa)
-		Positive lookbehind: (?<=abc)
+	Non-capturing group: (?:aaa)
+	Positive lookbehind: (?<=abc)
 	'''
 	matches = re.findall(re_pattern, source, flags=re_flags)
 	if unique: matches = list(set(matches))
@@ -1133,7 +1147,7 @@ def dialog(
 		title = func_name_human(_get_parent_func_name())
 	else:
 		title = str(title)
-	if (not isinstance(msg, str)) and is_iter(msg):
+	if is_iter(msg):
 		buttons = msg
 		msg = ''
 	else:

@@ -3,7 +3,7 @@ from plugins.plugin_filesystem import *
 from plugins.plugin_process import *
 from plugins.plugin_system import *
 def emb_backup_and_purge():
-	for fpath in dir_files(app_dir(), ext='py', subdirs=False):
+	for fpath in dir_files(app_dir(), in_ext='py', subdirs=False):
 		tprint(file_backup(fpath, 'backup'))
 	dir_purge('log', days=10)
 	dir_purge('backup', days=20)

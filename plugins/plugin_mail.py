@@ -12,7 +12,7 @@ from email.header import decode_header, make_header
 from email.utils import parsedate_to_datetime
 import imaplib
 import mimetypes
-from .tools import Job, is_iter, job_batch, tdebug \
+from .tools import Job, job_batch, tdebug \
 , patch_import, dev_print, lazy_property \
 , table_print, time_diff_str
 from .plugin_filesystem import file_name_fix, file_size_str \

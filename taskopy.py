@@ -74,8 +74,10 @@ CancelIoEx.argtypes = (
 def _close_directory_handle(handle):
 	try:
 		CancelIoEx(handle, None)
-	except WindowsError:
-		return
+	except WindowsError as e:
+		tprint(f'expected error: {e}')
+	except Exception as e:
+		tprint(f'unexpected error: {e}')
 
 class Settings:
 	''' Load global settings from settings.ini
@@ -436,7 +438,7 @@ class Tasks:
 					if e.winerror == 995:
 						return
 					else:
-						dev_print('pywintypes error: ' + str(e.args))
+						tprint(f'pywintypes error: {e.args}')
 						raise e
 				if prev_file[0]:
 					pfile, ptime = prev_file
@@ -494,23 +496,10 @@ class Tasks:
 
 	def add_schedule_date(self, task):
 		''' task - dict with task options '''
-
-		def date_replace_ast(date:str)->str:
-			'''	Replace asterisk to current date time value.
-				date_replace_ast('*.*.01 12:30')
-				->	'2020.10.01 12:30'
-			'''
-			if not '*' in date: return date
-			date = date.replace('.', ' ').replace(':', ' ')
-			new_date_li = list( time_now().timetuple() )
-			for pos, value  in enumerate( date.split() ):
-				if value != '*': new_date_li[pos] = value
-			return '{:0>4}.{:0>2}.{:0>2} {:0>2}:{:0>2}' \
-				.format(*new_date_li)
-
+		
 		def run_task_date(date:str, task:dict):
 			if time_now_str('%Y.%m.%d %H:%M') != \
-			date_replace_ast(date):
+			date_fill(date):
 				return
 			if task['last_start']:
 				if time_diff(
@@ -926,9 +915,10 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 
 	def running_tasks(self, show_msg:bool= True
 	, event=None)->list:
-		''' Prints running tasks and shows dialog
-			(if show_msg == True).
-			Returns list of running task names.
+		'''
+		Prints running tasks and shows dialog
+		(if show_msg == True).  
+		Returns the list of running task names.
 		'''
 		TASKS_MSG_MAX = 10
 		running_tasks = [t for t in tasks.task_dict.values() if t['running'] ]
@@ -939,7 +929,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 					, title=lang.menu_list_run_tasks
 					, timeout=3
 					, wait=False)
-			return
+			return []
 		cur_threads = []
 		for thread in threading.enumerate():
 			if thread._target is None: continue

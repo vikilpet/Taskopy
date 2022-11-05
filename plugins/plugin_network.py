@@ -752,7 +752,7 @@ def ping_tcp(host:str, port:int, count:int=1, pause:int=100
 	or (False, 'error text').
 	
 	*pause* - pause in milliseconds between attempts  
-	*timeout* - the waiting time for a response in milliseconds.
+	*timeout* - waiting time for a response in milliseconds.  
 
 	Examples:
 

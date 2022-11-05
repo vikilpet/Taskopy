@@ -1,3 +1,4 @@
+from ctypes import WinError
 import os
 import stat
 import time
@@ -49,7 +50,7 @@ def _dir_slash(dirpath:str)->str:
 	return dirpath + '\\'
 
 def path_get(fullpath, max_len:int=0
-, trim_suf:str='...'):
+, trim_suf:str='...')->str:
 	r'''
 	Join list of paths and optionally
 	fix long path. Fill environment variables ('%APPDATA%').  
@@ -217,28 +218,47 @@ def file_log(fullpath, message:str, encoding:str='utf-8'
 	with open(fullpath, 'at+', encoding=encoding) as f:
 		f.write(time.strftime(time_format) + '\t' + message + '\n')
 
-def file_copy(fullpath, destination:Iterable
-, copy_metadata:bool=False):
+
+
+def file_copy(fullpath, destination)->str:
 	'''
-	Copies file to destination.
-	Returns destination.
-	Destination may be fullpath or folder name.
-	If destination file exists it will be overwritten.
+	Copies file to destination.  
+	Destination may be a full path or directory.  
+	Returns destination full path.  
+	If destination file exists it will be overwritten.  
 	If destination is a folder, subfolders will
-	be created if they don't exist.
+	be created if they don't exist.  
+
+		tf, td = temp_file(suffix='.txt'), temp_dir('test_fc')
+		file_write(tf, 't')
+		tass(
+			file_copy(tf, (td, file_name(tf) ))
+			, os.path.join(td, file_name(tf) )
+		)
+		tass( file_copy(tf, td), os.path.join(td, file_name(tf) ) )
+		tass(
+			file_copy(tf, (td, 'nx', file_name(tf) ) )
+			, os.path.join(td, 'nx', file_name(tf) )
+		)
+		file_delete(tf), dir_delete(td)
+
 	'''
+
 	fullpath = path_get(fullpath)
 	destination = path_get(destination)
-	func = shutil.copy2 if copy_metadata else shutil.copy
+	if os.path.isdir(destination):
+		destination = os.path.join(
+			destination, os.path.basename(fullpath)
+		)
 	try:
-		return func(fullpath, destination)
-	except FileNotFoundError:
-		try:
-			os.makedirs(
-				os.path.dirname(destination)
-			)
-			return func(fullpath, destination)
-		except FileExistsError: pass
+		win32api.CopyFile(fullpath, destination)
+	except win32api.error as e:
+		if e.winerror != 3: raise
+		os.makedirs(
+			os.path.dirname(destination)
+		)
+		win32api.CopyFile(fullpath, destination)
+	return destination
 
 def file_append(fullpath, content:str, encoding:str='utf-8')->str:
 	''' Append content to a file. Creates fullpath
@@ -403,8 +423,7 @@ def file_basename(fullpath)->str:
 	Returns basename: file name without 
 	parent folder and extension. Example:
 
-		file_basename(r'c:\pagefile.sys')
-		> 'pagefile'
+		tass( file_basename(r'c:\pagefile.sys'), 'pagefile')
 
 	'''
 	fullpath = path_get(fullpath)
@@ -473,23 +492,39 @@ def dir_dirs(fullpath, subdirs:bool=True)->Iterator[str]:
 		for d in dirs: yield os.path.join(dirpath, d)
 		if not subdirs: return
 
-def dir_files(fullpath, ext:str=None, subdirs:bool=True
-, rule:Callable=lambda f: True)->Iterator[str]:
+def dir_files(fullpath, subdirs:bool=True
+, **rules)->Iterator[str]:
 	'''
 	Returns list of full filenames of all files
 	in the given directory and its subdirectories.  
 	*subdirs* - including files from subfolders.  
-	*ext* - only files with this extension (str, tuple).  
+	*rules* - rules for the `path_rule` function  
+
+		tass( tuple(dir_files('plugins', in_ext='jpg') ), tuple() )
+		tass(
+			tuple(dir_files('plugins', in_ext='py'))[0]
+			, 'plugins\\constants.py'
+		)
+		tass(
+			tuple( dir_files('plugins', ex_ext='pyc') )
+			, tuple( dir_files('plugins', in_ext='py') )
+		)
+
 	'''
 	fullpath = path_get(fullpath)
-	if ext:
-		if isinstance(ext, str): ext = (ext, )
-		ext = tuple('.' + e.lstrip('.').lower() for e in ext)
-		rule = lambda f: os.path.splitext(f)[1].lower() in ext
+	if rules: in_rules, ex_rules = path_rule(**rules)
 	for dirpath, dirs, filenames in os.walk(fullpath, topdown=True):
 		if not subdirs: dirs.clear()
-		for f in filenames:
-			if rule(f): yield os.path.join(dirpath, f)
+		for rpath in filenames:
+			if rules:
+				if _path_match(
+					path=rpath
+					, in_rules=in_rules
+					, ex_rules=ex_rules
+				):
+					yield os.path.join(dirpath, rpath)
+			else:
+				 yield os.path.join(dirpath, rpath)
 
 def dir_rnd_files(fullpath, file_num:int=1
 , attempts:int=5, **rules)->Iterator[str]:
@@ -798,18 +833,21 @@ def dir_size(fullpath, unit:str='b', skip_err:bool=True)->int:
 	*skip_err* - do not raise an exeption on non-existent files.
 	'''
 	fullpath = path_get(fullpath)
-	e = _SIZE_UNITS.get(unit.lower(), 1)
+	udiv = _SIZE_UNITS.get(unit.lower(), 1)
 	total_size = 0
 	for dirpath, _, filenames in os.walk(fullpath):
-		for fi in filenames:
-			fp = os.path.join(dirpath, fi)
-			if os.path.islink(fp): continue
+		for fn in filenames:
+			fpath = os.path.join(dirpath, fn)
+			if os.path.islink(fpath): continue
 			try:
-				total_size += os.path.getsize(fp)
+				total_size += os.path.getsize(fpath)
 			except Exception as e:
-				tdebug(f'skip {fp} ({e})')
-				continue
-	return total_size // e
+				if skip_err:
+					tdebug(f'skip {fpath} ({e})')
+					continue
+				else:
+					raise e
+	return total_size // udiv
 
 def dir_zip(fullpath, destination=None
 , do_cwd:bool=False)->str:
@@ -885,7 +923,7 @@ def file_zip(fullpath, destination=None)->str:
 			zipf.write(fullpath, arcname=os.path.basename(fullpath)
 				, compress_type=zipfile.ZIP_DEFLATED)
 		return destination
-	elif isinstance(fullpath, list):
+	elif isinstance(fullpath, (list, tuple)):
 		with zipfile.ZipFile(
 			destination, 'w'
 		) as zipf:
@@ -1007,9 +1045,10 @@ def file_date_a(fullpath)->datetime.datetime:
 
 def file_attr_set(fullpath
 , attribute:int=win32con.FILE_ATTRIBUTE_NORMAL):
-	'''	Sets file attribute.
-		Type 'win32con.FILE_' to get syntax hints for
-		constants.
+	'''
+	Sets file attribute.  
+	Type 'win32con.FILE_' to get syntax hints for
+	constants.
 	'''
 	win32api.SetFileAttributes(path_get(fullpath), attribute)
 
@@ -1167,20 +1206,24 @@ def _file_name_pe(filename:str):
 	return filename
 
 def _var_fpath(var)->str:
-	if not isinstance(var, str) and is_iter(var):
+	if is_iter(var):
 		return os.path.join(_VAR_DIR
 		, *map(_file_name_pe, var) )
 	else:
 		return os.path.join(_VAR_DIR, _file_name_pe(var) )
 
+def var_open(var:str)->None:
+	' Opens variable in default editor '
+	win32api.ShellExecute(None, 'open', _var_fpath(var)
+	, None, None, 0)
+
 
 def var_get(var:str, default=None, encoding:str='utf-8'
 , as_literal:bool=False):
 	'''
-	Gets the *disk variable*.
-
+	Gets the *disk variable*.  
 	*as_literal* - converts to a literal (dict, list, tuple etc).
-	Dangerous! - it's just **eval** and not **ast.literal_eval**
+	Dangerous! - it's just `eval`, not `ast.literal_eval`
 
 		var_set('test', 1)
 		tass( var_get('test'), '1')
@@ -1444,7 +1487,7 @@ def path_rule(
 	All rules are case-insensitive. All rules may be a string
 	or a tuple/list of strings:  
 	*ex_ext='py'*  
-	*ex_ext=('py', 'pyc')*
+	*ex_ext=('py', 'pyc')*  
 
 	*ex_ext*, *in_ext* - exclude/include by extension.  
 	*ex_path*, *in_path* - exclude/include by any part of file path.  
@@ -1521,7 +1564,7 @@ def path_filter(
 	, **rules
 )->Iterator[str]:
 	'''
-	Filters a list of files by criteria from `path_rule`
+	Filters a list of files by criteria from the `path_rule`
 
 		pf = path_filter
 		files = tuple(dir_files('plugins'))
@@ -1551,25 +1594,17 @@ class DirSync:
 		self
 		, src_dir:str
 		, dst_dir:str
-		, ex_ext:Iterable = ()
-		, ex_path:Iterable = ()
-		, ex_dir:Iterable = ()
 		, report:bool=False
 		, max_table_width:int=100
+		, **rules
 	):
 		'''
-		*ex_dir*, *ex_path*, *ex_ext* - substring
-		or tuple of substrings to exclude
-		in source directory file name, case insensetive.
-		*ex_dir* must be a relative path.  
 		*report* - print every file copy/del operation.
 		'''
 		self._src_dir = path_get(src_dir)
 		self._dst_dir = path_get(dst_dir)
 		self._report = report
-		self._ex_path = ex_path
-		self._ex_dir = ex_dir
-		self._ex_ext = ex_ext
+		self._rules = rules
 		self._src_files = set()
 		self._dst_files = set()
 		self._src_dirs = set()
@@ -1620,22 +1655,19 @@ class DirSync:
 		dlen = len(self._dst_dir.rstrip('\\')) + 1
 		self._src_files = set( (p[slen:].lower() for p in self._src_files) )
 		self._dst_files = set( (p[dlen:].lower() for p in self._dst_files) )
-		if any((self._ex_dir, self._ex_ext, self._ex_path)):
+		if self._rules:
 			self._src_files = set(path_filter(
 				paths=self._src_files
-				, ex_dir=self._ex_dir
-				, ex_ext=self._ex_ext
-				, ex_path=self._ex_path
+				, **self._rules
 			))
 		self._src_only_files = self._src_files - self._dst_files
 		self._dst_only_files = self._dst_files - self._src_files
 		self._src_dirs = set( (p[slen:].lower() for p in self._src_dirs) )
 		self._dst_dirs = set( (p[dlen:].lower() for p in self._dst_dirs) )
-		if any((self._ex_dir, self._ex_path)):
+		if self._rules:
 			self._src_dirs = set(path_filter(
 				paths=self._src_dirs
-				, ex_dir=self._ex_dir
-				, ex_path=self._ex_path
+				, **self._rules
 			))
 		self._dst_only_dirs = self._dst_dirs - self._src_dirs
 		self._get_new_files()
@@ -1781,17 +1813,17 @@ class DirSync:
 
 
 def dir_sync(src_dir, dst_dir, report:bool=False
-, **ex_args)->dict:
+, **rules)->dict:
 	'''
 	Syncrhonize two directories.  
-	For exclude arguments (*ex_args*) see `path_rule`.  
+	For *rules* see the `path_rule`.  
 	Returns dict with errors:  
 	
 		{'path\\file.exe': 'copy error', ...}
 
 	'''
 	sync = DirSync(src_dir=src_dir, dst_dir=dst_dir
-	, **ex_args)
+	, **rules)
 	sync.compare()
 	sync.sync()
 	if report: sync.print_diff()
