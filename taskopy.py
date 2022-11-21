@@ -198,7 +198,12 @@ def load_modules():
 		try:
 			tmp_mdl = importlib.import_module(mdl_name)
 		except PermissionError:
-			tprint(f'{mdl_name} permission error')
+			con_log(f'permission error: {mdl_name}')
+		except ModuleNotFoundError:
+			if traceback.format_exc().rstrip().endswith("_patch'"):
+				con_log(f'patch removed: {mdl_name}')
+			else:
+				raise
 		except:
 			trace_li = traceback.format_exc().splitlines()
 			trace_str = '\n'.join(trace_li[-3:])
@@ -905,8 +910,16 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 				, return_button=True
 			)[1] != lang.button_close:
 				return False
-		for task in tasks.task_list_exit:
-			tasks.run_task(task, caller=CALLER_EXIT)
+		if tasks.task_list_exit:
+			tprint(
+				lang.warn_on_exit + ': '
+				 + ', '.join(
+					t['task_name'] for t
+						in tasks.task_list_exit
+				 )
+			)
+			for task in tasks.task_list_exit:
+				tasks.run_task(task, caller=CALLER_EXIT)
 		con_log(lang.menu_exit)
 		tasks.close()
 		wx.CallAfter(self.Destroy)

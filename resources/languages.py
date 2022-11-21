@@ -33,6 +33,7 @@ class Language:
 		self.button_close = 'Close'
 		self.button_cancel = 'Cancel'
 		self.warn_no_run_tasks = 'No running tasks'
+		self.warn_on_exit = 'Waiting for tasks to complete on exit'
 
 		if not (di_str := getattr(
 			sys.modules[__name__]
@@ -61,7 +62,7 @@ class Language:
 			, *missed, sep='\n')
 	
 	def __getattr__(self, name):
-		return 'Language: unknown phrase — «{name}»'
+		return f'Language: unknown phrase — «{name}»'
 
 _dict_ru='''
 load_crontab=Загрузка кронтаба из папки
@@ -91,4 +92,5 @@ warn_event_format=Неправильный формат события в зад
 warn_too_many_win=Открыто слишком много окон {}: {}
 button_close=Закрыть
 button_cancel=Отмена
+warn_on_exit=Ожидаем завершения задач при выходе
 '''

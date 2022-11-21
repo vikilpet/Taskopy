@@ -21,7 +21,7 @@ import ctypes
 from ctypes import wintypes
 
 from .tools import DictToObj, dev_print, msgbox, tprint, patch_import
-from .plugin_filesystem import path_exists
+from .plugin_filesystem import path_exists, path_get
 from .plugin_system import win_list_top
 
 # https://psutil.readthedocs.io/en/latest/
@@ -30,21 +30,26 @@ _SIZE_UNITS = {'gb':1073741824, 'mb':1048576, 'kb':1024, 'b':1, 'percent':1}
 
 def file_open(fullpath:str, parameters:str=None, operation:str='open'
 , cwd:str=None, showcmd:int=win32con.SW_SHOWNORMAL):
-	''' Open file or URL in an associated application.
-		If 'file' is executable:
-			parameters - commandline parameters
-				to be passed to the application.
-		operation - operation to perform. With executable
-			use 'runas' for elevation.
-		cwd - working directory.
-		showcmd - how application should be
-			displayed. For example:
-			3 - maximized (win32con.SW_SHOWMAXIMIZED)
-			7 - minimized (win32con.SW_SHOWMINNOACTIVE)
-			0 - hidden (win32con.SW_HIDE)
 	'''
-	win32api.ShellExecute(None, operation.lower(), fullpath
-	, parameters, cwd, showcmd)
+	Opens file or URL in an associated program.  
+	*parameters* - command-line parameters
+	to be passed to a program.  
+	*operation* - operation to perform. With executable
+	use 'runas' for elevation (UAC).  
+	*cwd* - change working directory.  
+	*showcmd* - how window of a program should be
+	displayed. From `constants`: *WIN_MINIMIZED*
+	, *WIN_MAXIMIZED*, *WIN_HIDDEN*  
+
+	'''
+	win32api.ShellExecute(
+		None
+		, operation.lower()
+		, path_get(fullpath)
+		, parameters
+		, cwd
+		, showcmd
+	)
 
 def proc_get(process, cmd_filter:str=None)->int:
 	'''
@@ -218,7 +223,7 @@ def proc_start(
 		return r.pid
 
 def proc_exists(process, cmd_filter:str=None
-, user_filter:str=None)->bool:
+, user_filter:str=None)->int:
 	'''
 	Returns PID if the process with the specified name exists.  
 	*process* - image name or PID.  

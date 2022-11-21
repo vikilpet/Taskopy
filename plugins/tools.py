@@ -41,7 +41,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2022-11-05'
+APP_VERSION = 'v2022-11-21'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -1415,20 +1415,25 @@ def table_print(
 	return rows
 
 def patch_import():
-	' Import patch for current module if any '
+	'''
+	Import patch for current module if any.  
+	Works only at program (re)start.  
+	'''
+
+	mod_name = inspect.currentframe().f_back.f_globals['__name__']
+	patch = mod_name + '_patch'
 	try:
-		caller = inspect.currentframe().f_back
-		caller_name = caller.f_globals['__name__']
-		patch = '.'.join(
-			caller.f_globals['__file__'].split('\\')[-2:]
-		)[:-3] + '_patch'
 		mdl = importlib.import_module(patch)
-		names=[x for x in mdl.__dict__ if not x.startswith('_')]
-		sys.modules[caller_name].__dict__.update(
-			{k: getattr(mdl, k) for k in names} )
-		dev_print('patch loaded:', caller_name)
 	except ModuleNotFoundError:
-		pass
+		return
+	patch_items=[x for x in mdl.__dict__ if not x.startswith('__')]
+	sys.modules[mod_name].__dict__.update(
+		{k: getattr(mdl, k) for k in patch_items}
+	)
+	dev_print(
+		f'patched {mod_name}, items: '
+			+ ', '.join(patch_items)
+	)
 
 class DataHTTPReq(object):
 	'''
@@ -1867,15 +1872,21 @@ class lazy_property(object):
 
 def tass(value, expect, comparison:str='=='):
 	'''
-	Assertion showing the difference.
-	Example:
+	Assertion showing the difference.  
+	Examples:
 
 		tass(APP_NAME, 'Taskopy')
-		tass(APP_NAME, 'Tasko')
 
 	'''
 	if comparison == '==':
-		if str(value) == str(expect): return
+		if str(value) == str(expect):
+			if type(value) == type(expect):
+				return
+			else:
+				raise Exception(
+					f'types are different:'
+					+ f' {type(value)} vs {type(expect)}'
+				)
 	elif comparison == '>':
 		if value > expect: return
 	elif comparison == '<':
@@ -1884,10 +1895,9 @@ def tass(value, expect, comparison:str='=='):
 
 def exc_text(last_n:int=3):
 	'''
-	Get exception text.
-
-	*last_n* - the number of lines of the exception text from the end
-
+	Get exception text.  
+	*last_n* - the number of lines of the exception
+	text from the end.  
 	Example:
 
 		try:

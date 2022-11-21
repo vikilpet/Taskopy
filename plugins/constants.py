@@ -88,26 +88,84 @@ FILE_NOTIFY_CHANGE_DIR_NAME = win32con.FILE_NOTIFY_CHANGE_DIR_NAME
 FILE_NOTIFY_CHANGE_ATTRIBUTES = win32con.FILE_NOTIFY_CHANGE_ATTRIBUTES
 FILE_NOTIFY_CHANGE_LAST_WRITE = win32con.FILE_NOTIFY_CHANGE_LAST_WRITE
 FILE_NOTIFY_CHANGE_SECURITY = win32con.FILE_NOTIFY_CHANGE_SECURITY
-HTML_MINI = '''
+# For displaying small messages:
+HTML_MSG = '''
 <!doctype html>
-<style>
-	html, body {{
-		height: 100%;
-		font-size: calc((5vw + 5vh)/2);
-		overflow-wrap: anywhere;
-		margin: 0 1vw 0 1vw;
-	}}
-	.container {{
-		height: 100%;
-		display: flex;
-		justify-content: center;
-		flex-direction: column;
-		align-items: center;
-		gap: 0;
-	}}
-</style>
-<body><div class='container'>{}</div></body>
-'''.strip().replace('\t', '').replace('\r\n', '')
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>t</title>
+		<style>
+			html, body {{
+				height: 100%;
+				font-size: calc((5vw + 5vh)/2);
+				overflow-wrap: anywhere;
+				margin: 0 1vw 0 1vw;
+			}}
+			input[type='text'] {{
+				font-size: calc((5vw + 5vh)/2);
+			}}
+			.container {{
+				height: 100%;
+				display: flex;
+				justify-content: center;
+				flex-direction: column;
+				align-items: center;
+				gap: 0;
+			}}
+		</style>
+		<script></script>
+	</head>
+	<body>
+		<div class='container'>
+			{}
+		</div>
+	</body>
+</html>
+'''.replace('\t', '').replace('\n', '')
+# Empty tags: *title*, *style*, *div* to
+# ease optional replacement:
+# tcon.HTML_BASIC.replace('>t<', '>My Title<')
+HTML_BASIC = r'''
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>t</title>
+		<style></style>
+		<script></script>
+	</head>
+	<body>
+		{}
+	</body>
+</html>
+'''.replace('\t', '').replace('\n', '')
+HTML_CENTER = r'''
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>t</title>
+		<script></script>
+		<style>
+			body {{
+				font-family: Verdana, Arial, sans-serif;
+				font-size: calc((2vw + 2vh)/2);
+			}}
+			table {{
+				border: 1px solid #ccc;
+			}}
+		</style>
+	</head>
+	<body>
+		<div style="display: flex; justify-content: center;">
+			<div style="text-align: center;">
+				{}
+			</div>
+		</div>
+	</body>
+</html>
+'''.replace('\t', '').replace('\n', '')
 
 if __name__ != '__main__':
 	try:

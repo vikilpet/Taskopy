@@ -42,7 +42,7 @@ def demo_task_2(schedule='every().day.at("10:30")', menu=False):
 def demo_task_3(http=True, result=True, menu=False):
 	# Get a list of files and folders in application directory
 	# and return as a br-tag separated string:
-	return tcon.HTML_MINI.format(
+	return tcon.HTML_CENTER.format(
 		'<br>'.join( dir_files('.', subdirs=False) )
 	)
 

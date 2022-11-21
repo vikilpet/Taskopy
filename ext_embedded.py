@@ -21,7 +21,7 @@ def emb_app_update(caller:str):
 		if caller == tcon.CALLER_MENU:
 			dialog('No new version', timeout=1)
 		return
-	news = json_element(json_str, [0, 'body'])
+	news = json_element(json_str, (0, 'body'))
 	tprint(f'New version of the Taskopy: {new_ver}\n{news}')
 	choice = dialog(
 		f'New version of the Taskopy: {new_ver}'

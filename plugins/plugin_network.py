@@ -17,14 +17,14 @@ import random
 import warnings
 import threading
 import ftplib
-from typing import Iterator, Tuple
+from typing import Iterator, Tuple, Union
 import json2html
-from .tools import dev_print, time_sleep, tdebug \
+from .tools import dev_print, exc_text, time_sleep, tdebug \
 , locale_set, safe, patch_import, value_to_unit, time_diff \
 , median, is_iter
 from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:104.0) Gecko/20100101 Firefox/104.0'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 _PUB_SUF_LST = set()
 
@@ -389,27 +389,29 @@ def html_element(url:str, element
 	else:
 		return result
 
-def json_element(source:str, element:list=None
-, **kwargs):
-	''' Download JSON by url and get its nested element by
-			map of keys like ['list', 0, 'someitem', 1]
-		source - URL to download or string with JSON.
-		element - can be a None, list or list of lists so it will
-		get every element specified in nested list and return
-		list of values.
-		If None - just return serialized JSON.
-			examples:
-				element=['banks', 0, 'usd', 'sale']
-					result: 63.69
-				
-				element=[
-					['banks', 0, 'eur', 'sale']
-					, ['banks', 0, 'usd', 'sale']
-					, ['banks', 0, 'gbp', 'sale']
-				]
-					result = [71.99, 63.69, 83.0]
-		If nothing found then returns exception.
-		kwargs - additional arguments for http_req.
+def json_element(source:str, element:Union[list, tuple]=[]
+, **kwargs)->Union[str, list]:
+	'''
+	Download JSON from URL and get its nested element by
+	map of keys like ['list', 0, 'someitem', 1]  
+	*source* - URL to download or string with JSON.  
+	*element* - can be a None, list or list of lists so it will
+	get every element specified in nested list and return
+	list of values. If set to `None` - just return serialized JSON.  
+	Examples:
+
+		> element=['banks', 0, 'usd', 'sale']
+		> 63.69
+		
+		> element=[
+			['banks', 0, 'eur', 'sale']
+			, ['banks', 0, 'usd', 'sale']
+			, ['banks', 0, 'gbp', 'sale']
+		]
+		> result = [71.99, 63.69, 83.0]
+
+	If nothing found then return exception.  
+	*kwargs* - additional arguments for http_req.  
 	'''
 	if source[:4].lower().startswith('http'):
 		status, j = safe(http_req)(url=source, **kwargs)
@@ -417,8 +419,8 @@ def json_element(source:str, element:list=None
 	else:
 		j = source
 	data = json.loads(j)
-	if element is None: return data
-	if isinstance(element[0], (list, tuple)):
+	if not element: return data
+	if is_iter(element[0]):
 		li = []
 		try:
 			for elem in element:
@@ -555,12 +557,15 @@ def net_html_unescape(html_str:str)->str:
 
 
 
-def is_online(*sites, timeout:float=1)->int:
+def is_online(*sites, timeout:float=2)->int:
 	'''
-	Checks if there is an internet connection using HEAD
-	requests to the specified web sites.
+	Checks if there is an internet connection using *HEAD*
+	requests to the specified web sites.  
+	The function will not raise an exception.  
+	*timeout* - timeout in seconds.
 
-	*timeout* - timeout in seconds
+		tass( is_online(), 2 )
+		tass( is_online('https://non.existent.domain'), 0 )
 
 	'''
 	if not sites:
@@ -574,7 +579,8 @@ def is_online(*sites, timeout:float=1)->int:
 			requests.head(site, timeout=timeout
 				, headers={**_USER_AGENT})
 			r += 1
-		except: pass
+		except:
+			pass
 	return r
 def _file_hash(fullpath:str)->str:
 	hash_md5 = md5()
@@ -749,8 +755,7 @@ def ping_tcp(host:str, port:int, count:int=1, pause:int=100
 	'''
 	Measure loss and response time with a TCP connection.
 	Returns (True, (loss percentage, time in ms) )
-	or (False, 'error text').
-	
+	or (False, 'error text').  
 	*pause* - pause in milliseconds between attempts  
 	*timeout* - waiting time for a response in milliseconds.  
 
