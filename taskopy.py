@@ -1,3 +1,4 @@
+from pickle import APPEND
 import time
 import sys
 import os
@@ -30,12 +31,100 @@ from resources.languages import Language
 # https://docs.python.org/3/library/threading.html
 # https://github.com/boppreh/keyboard
 # https://schedule.readthedocs.io/en/stable/
+APP_SETTINGS = (
+	('dev', False)
+	, ('language', 'en')
+	, ('menu_hotkey', None)
+	, ('editor', 'notepad.exe')
+	, ('server_ip', '127.0.0.1')
+	, ('server_port', 8275)
+	, ('white_list', '127.0.0.1')
+	, ('server_silent', True)
+	, ('hide_console', False)
+	, ('kiosk', False)
+	, ('kiosk_key', 'shift')
+	, ('log_file_name', tcon.DATE_STR_FILE_SHORT)
+)
+TASK_OPTIONS = (
+	('task_name', None)
+	, ('task', True)
+	, ('menu', True)
+	, ('hotkey', None)
+	, ('hotkey_suppress', True)
+	, ('schedule', None)
+	, ('active', True)
+	, ('startup', False)
+	, ('sys_startup', False)
+	, ('left_click', False)
+	, ('log', True)
+	, ('single', True)
+	, ('running', False)
+	, ('submenu', None)
+	, ('result', False)
+	, ('http', False)
+	, ('timeout', 60)
+	, ('http_dir', None)
+	, ('http_white_list', None)
+	, ('err_threshold', 0)
+	, ('err_counter', False)
+	, ('no_print', False)
+	, ('idle', None)
+	, ('on_load', False)
+	, ('rule', None)
+	, ('thread', None)
+	, ('last_start', None)
+	, ('date', None)
+	, ('event_log', None)
+	, ('event_xpath', '*')
+	, ('on_exit', False)
+	, ('hyperactive', False)
+	, ('on_file_change', None)
+	, ('on_dir_change', None)
+	, (
+		'on_dir_change_flags'
+		, tcon.FILE_NOTIFY_CHANGE_LAST_WRITE
+			| tcon.FILE_NOTIFY_CHANGE_FILE_NAME
+	)
+	, ('on_file_change_flags', tcon.FILE_NOTIFY_CHANGE_LAST_WRITE)
+	, ('every', ())
+)
+_WEEKDAY_HUMAN = {
+	'day': 'day'
+	, 'sun': 'sunday'
+	, 'sunday': 'sunday'
+	, 'mon': 'monday'
+	, 'monday': 'monday'
+	, 'tue': 'tuesday'
+	, 'tuesday': 'tuesday'
+	, 'wed': 'wednesday'
+	, 'wednesday': 'wednesday'
+	, 'thu': 'thursday'
+	, 'thursday': 'thursday'
+	, 'fri': 'friday'
+	, 'friday': 'friday'
+	, 'sat': 'saturday'
+	, 'saturday': 'saturday'
+}
+_TIME_UNIT_HUMAN = {
+	's': 'seconds'
+	, 'sec': 'seconds'
+	, 'second': 'seconds'
+	, 'seconds': 'seconds'
+	, 'm': 'minutes'
+	, 'min': 'minutes'
+	, 'minute': 'minutes'
+	, 'minutes': 'minutes'
+	, 'h': 'hours'
+	, 'hr': 'hours'
+	, 'hour': 'hours'
+	, 'hours': 'hours'
+}
 
 set_title = win32api.SetConsoleTitle
 tasks = None
-crontab = None
+crontab:types.ModuleType = None
 sett = None
-lang = None
+lang:Language = None
 if getattr(sys, 'frozen', False):
 	APP_PATH = os.path.dirname(sys.executable)
 	os.chdir(APP_PATH)
@@ -45,8 +134,6 @@ else:
 
 APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
-TASK_DATE_FORMAT = \
-	r'^(\d\d\d\d|\*)\.(\d\d|\*)\.(\d\d|\*) (\d\d|\*):(\d\d|\*)$'
 PLUGIN_SOURCE = 'plugins\\*.py'
 class OVERLAPPED(ctypes.Structure):
 	_fields_ = [
@@ -94,22 +181,22 @@ class Settings:
 			create_default_ini_file()
 			config.read(r'settings.ini', encoding='utf-8-sig')
 		for section in config._sections.values():
-			for setting in section.items():
-				if setting[1].lower() in ('true', 'yes'):
-					self.__dict__[setting[0]] = True
-				elif setting[1].lower() in ('false', 'no'):
-					self.__dict__[setting[0]] = False
-				elif setting[1].isdigit():
-					self.__dict__[setting[0]] = int(setting[1])
-				elif setting[1].replace('.', '', 1).isdigit():
+			for sett_name, sett_val in section.items():
+				if sett_val.lower() in ('true', 'yes'):
+					self.__dict__[sett_name] = True
+				elif sett_val.lower() in ('false', 'no'):
+					self.__dict__[sett_name] = False
+				elif sett_val.isdigit():
+					self.__dict__[sett_name] = int(sett_val)
+				elif sett_val.replace('.', '', 1).isdigit():
 					try:
-						self.__dict__[setting[0]] = float(setting[1])
+						self.__dict__[sett_name] = float(sett_val)
 					except:
-						self.__dict__[setting[0]] = setting[1]
+						self.__dict__[sett_name] = sett_val
 				else:
-					self.__dict__[setting[0]] = setting[1]
-		for setting in APP_SETTINGS:
-			self.__dict__.setdefault(setting[0], setting[1])
+					self.__dict__[sett_name] = sett_val
+		for sett in APP_SETTINGS:
+			self.__dict__.setdefault(sett[0], sett[1])
 
 def load_crontab(event=None)->bool:
 	global tasks
@@ -121,19 +208,19 @@ def load_crontab(event=None)->bool:
 			crontab = importlib.import_module('crontab')
 		else:
 			prev_crontab = sys.modules.pop('crontab')
-			for a in range(100):
+			for attempt in range(100):
 				try:
 					tmp_crontab = importlib.import_module('crontab')
 					break
 				except PermissionError:
-					dev_print(f'permission error {a}')
+					dev_print(f'permission error {attempt=}')
 					time.sleep(.01)
 				except:
 					trace_li = traceback.format_exc().splitlines()
 					trace_str = '\n'.join(trace_li[-3:])
 					con_log(traceback.format_exc())
 					sys.modules['crontab'] = prev_crontab
-					msgbox_warning(
+					warning(
 						f'{lang.warn_crontab_reload}:\n\n{trace_str}'
 						, title=lang.menu_reload)
 					return False
@@ -165,7 +252,7 @@ def load_crontab(event=None)->bool:
 		trace_li = traceback.format_exc().splitlines()
 		trace_str = '\n'.join(trace_li[-3:])
 		con_log(traceback.format_exc())
-		msgbox_warning(
+		warning(
 			f'{lang.warn_crontab_reload}:\n\n{trace_str}'
 			, title=lang.menu_reload)
 		return False
@@ -209,7 +296,7 @@ def load_modules():
 			trace_str = '\n'.join(trace_li[-3:])
 			con_log(traceback.format_exc())
 			sys.modules[mdl_name] = prev_mdl
-			msgbox_warning(
+			warning(
 				'{}:\n\n{}'.format(
 					lang.warn_mod_reload.format(mdl_name)
 					, trace_str
@@ -224,8 +311,8 @@ def load_modules():
 		for obj_name, obj in mdl.__dict__.items():
 			if (
 				obj_name.startswith('_')
-				or inspect.ismodule(obj)
-				or not mdl_name in getattr(obj, '__module__', mdl_name)
+				or ( isinstance(object, types.ModuleType) )
+				or (mdl_name != getattr(obj, '__module__', mdl_name) )
 			):
 				continue
 			if not isinstance(obj, types.FunctionType):
@@ -247,6 +334,15 @@ class SuppressPrint:
 	def __exit__(self, exc_type, exc_val, exc_tb):
 		sys.stdout.close()
 		sys.stdout = self._original_stdout
+
+class Task:
+
+	def __init__(self):
+		self.name:str = ''
+		self.every:Union[str, tuple] = ''
+		self.func = None
+		self.menu:bool = True
+		self.submenu:str = ''
 
 class Tasks:
 	''' Tasks from the crontab and their properties '''
@@ -276,12 +372,12 @@ class Tasks:
 			
 			task_opts = {}
 			params = inspect.signature(task_obj).parameters
-			for opt in TASK_OPTIONS:
-				param = params.get(opt[0])
-				if param is None:
-					task_opts[opt[0]] = opt[1]
+			for opt, opt_def in TASK_OPTIONS:
+				param = params.get(opt)
+				if param == None:
+					task_opts[opt] = opt_def
 				else:
-					task_opts[opt[0]] = param.default
+					task_opts[opt] = param.default
 			if not task_opts['task']: continue
 			if not task_opts['active']: continue
 			task_opts['task_func'] = task_obj
@@ -291,8 +387,8 @@ class Tasks:
 			else:
 				task_opts['task_name'] = func_name_human(item)
 				task_opts['task_name_full'] = task_opts['task_name']
-			if task_opts['schedule']:
-				self.add_schedule(task_opts)
+			if task_opts['schedule']: self.add_schedule(task_opts)
+			if task_opts['every']: self.add_every(task_opts)
 			if task_opts['date']: self.add_schedule_date(task_opts)
 			if task_opts['hotkey']: self.add_hotkey(task_opts)
 			if task_opts['left_click']:
@@ -355,11 +451,11 @@ class Tasks:
 			subm[1].sort( key=lambda k: k['task_name'].lower() )
 		left_click_tasks_count = len(self.task_list_left_click)
 		if left_click_tasks_count > 1:
-			msgbox_warning(
+			warning(
 				lang.warn_left_click.format(
-					', '.join(
-						[t['task_name'] for t in self.task_list_left_click]
-					)
+					', '.join(tuple(
+						t['task_name'] for t in self.task_list_left_click
+					))
 				)
 			)
 		elif left_click_tasks_count == 0:
@@ -368,16 +464,17 @@ class Tasks:
 				, app.taskbaricon.on_left_down
 			)
 		if self.global_hk:
-			self.global_hk_thread_id = thread_start(self.global_hk.listen)
+			self.global_hk_thread_id = thread_start(
+				self.global_hk.listen, err_msg=True)
 		if self.task_list_http:
-			thread_start(http_server_start, args=(self,))
-		self.sched_thread_id = thread_start(self.run_scheduler)
+			thread_start(http_server_start, args=(self,), err_msg=True)
+		self.sched_thread_id = thread_start(self.run_scheduler, err_msg=True)
 		dev_print(f'Total number of tasks: {len(self.task_dict)}')
 	
 	def add_hotkey(self, task):
 		def hk_error(error):
 			con_log(error)
-			msgbox_warning(
+			warning(
 				lang.warn_hotkey.format(
 					task['task_name_full']
 				)
@@ -478,10 +575,65 @@ class Tasks:
 					, 'path': path
 					, 'is_file': is_file
 			}
+			, err_msg=True
 		)
 
+	def add_every(self, task:dict):
+
+		def exc_rep(e):
+			con_log(repr(e))
+			warning(
+				lang.warn_schedule.format(task['task_name_full'])
+			)
+			
+		status, data = every_parse(task['every'])
+		if not status:
+			warning(lang.warn_every.format(
+				task['task_name'], task['every']
+			))
+			return
+		for ev_type, ev_items in data:
+			if ev_type == 'time_int':
+				sched_unit = _TIME_UNIT_HUMAN[ev_items[1]]
+				try:
+					sched = schedule.every( int(ev_items[0]) )
+					getattr(sched, sched_unit).do(
+						self.run_task
+						, task=task
+						, caller=CALLER_SCHEDULER
+					)
+				except Exception as e:
+					exc_rep(e)
+			elif ev_type == 'day':
+				sched_unit = _WEEKDAY_HUMAN[ev_items[0]]
+				try:
+					sched = schedule.every()
+					getattr(sched, sched_unit).at(ev_items[1]).do(
+						self.run_task
+						, task=task
+						, caller=CALLER_SCHEDULER
+					)
+				except Exception as e:
+					exc_rep(e)
+			elif ev_type == 'time_day':
+				sched_unit = 'hour' if ev_items[0].startswith('h') else 'minute'
+				try:
+					sched = schedule.every()
+					getattr(sched, sched_unit).at(ev_items[1]).do(
+						self.run_task
+						, task=task
+						, caller=CALLER_SCHEDULER
+					)
+				except Exception as e:
+					exc_rep(e)
+			else:
+				warning(
+					lang.warn_schedule.format(task['task_name_full'])
+				)
+
 	def add_schedule(self, task):
-		''' task - dict with task options
+		'''
+		*task* - a dict with task options.  
 		'''
 		intervals = task['schedule']
 		if isinstance(intervals, str): intervals = (intervals,)
@@ -494,7 +646,7 @@ class Tasks:
 				eval(sched_rule)
 			except Exception as e:
 				con_log(repr(e))
-				msgbox_warning(
+				warning(
 					lang.warn_schedule.format(task['task_name_full'])
 					+ ':\n' + inter
 				)
@@ -502,32 +654,29 @@ class Tasks:
 	def add_schedule_date(self, task):
 		''' task - dict with task options '''
 		
-		def run_task_date(date:str, task:dict):
-			if time_now_str('%Y.%m.%d %H:%M') != \
-			date_fill(date):
+		def run_task_date(date_dic:dict, task:dict):
+			dt_now = datetime.datetime.now().replace(second=0, microsecond=0)
+			if dt_now != date_fill(date_dic):
 				return
-			if task['last_start']:
-				if time_diff(
-					task['last_start']
-					, time_now()
-					, unit='min'
-				) < 1:
-					return
 			self.run_task(task=task, caller=CALLER_SCHEDULER)
-
+		RE_DATE = r'^(\d\d\d\d|\*)\.(\d\d|\*)\.(\d\d|\*) (\d\d|\*)\:(\d\d|\*)$'
+		DATE_PARTS = ('year', 'month', 'day', 'hour', 'minute')
 		dates = task['date']
 		if isinstance(dates, str): dates = [dates]
 		for date in dates:
-			if not re_match(date, TASK_DATE_FORMAT):
-				msgbox_warning(
+			if not (matches := re_find(date, RE_DATE)):
+				warning(
 					lang.warn_date_format.format(
 						task['task_name_full']
 						, date
 					)
 				)
 				continue
-			schedule.every().second.do(
-				run_task_date, date=date, task=task)
+			dt_dic = {}
+			for num, part in enumerate(matches[0]):
+				dt_dic[ DATE_PARTS[num] ] = None if part == '*' else int(part)
+			schedule.every().minute.do(
+				run_task_date, date_dic=dt_dic, task=task)
 
 	def run_at_startup(self):
 		if sett.hide_console:
@@ -582,12 +731,12 @@ class Tasks:
 					self.task_opt_set(task['task_func_name']
 						, 'thread', threading.current_thread().name)
 					task_kwargs = {}
-					func_args = [
+					func_args = set(
 						k.lower()
 						for k in inspect.signature(
 							task['task_func']
 						).parameters.keys()
-					]
+					)
 					if 'caller' in func_args:
 						task_kwargs['caller'] = caller
 					if 'data' in func_args:
@@ -628,7 +777,7 @@ class Tasks:
 						dev_print(f'err_counter={err_counter}')
 						self.task_opt_set(task['task_func_name']
 							, 'err_counter', 0)
-						msgbox_warning(
+						warning(
 							lang.warn_task_error.format(task['task_name_full'])
 							+ f':\n{trace_str}'
 						)
@@ -672,7 +821,8 @@ class Tasks:
 				}
 		daemon = (caller != CALLER_EXIT)
 		if task['result'] and not result is None:
-			thread_start(run_task_inner, thr_daemon=daemon, args=(result,))
+			thread_start(run_task_inner, thr_daemon=daemon, args=(result,)
+				, err_msg=True)
 		else:
 			run_task_inner()
 
@@ -731,7 +881,7 @@ class Tasks:
 				)
 			)
 		except:
-			msgbox_warning(
+			warning(
 				lang.warn_event_format.format( task['task_name_full'] )
 			)
 
@@ -741,7 +891,7 @@ class Tasks:
 		afk = True
 		if self.task_list_idle:
 			afk = False
-			self.idle_min = min([t['idle_dur'] for t in self.task_list_idle])
+			self.idle_min = min((t['idle_dur'] for t in self.task_list_idle))
 		while (tasks.sched_thread_id == local_id):
 			schedule.run_pending()
 			if self.task_list_idle:
@@ -750,7 +900,8 @@ class Tasks:
 					if afk:
 						dev_print('user is back')
 						afk = False
-						for task in self.task_list_idle: task['idle_done'] = False
+						for task in self.task_list_idle:
+							task['idle_done'] = False
 				else:
 					afk = True
 					for task in self.task_list_idle:
@@ -867,17 +1018,11 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		elif isinstance(text, dict):
 			self.text_dic.update(text)
 			if del_text_key: self.text_dic.pop(del_text_key, None)
-			icon_text = '\n'.join(
-				[f'{k}{v}' for k, v in self.text_dic.items()])
+			icon_text = '\n'.join((
+				f'{k}{v}' for k, v in self.text_dic.items()
+			))
 		self.SetIcon(self.icon_dis if dis else self.icon, icon_text)
 	
-	def show_menu_wait(self, event=None):
-		print('show_menu 3 sec')
-		self.frame.Raise()
-		self.frame.SetFocus()
-		menu = self.CreatePopupMenu()
-		print(self.frame.PopupMenu(menu, pos=(0, 0)))
-		menu.Destroy()
 
 	def on_left_down(self, event=None):
 		''' Default action on left click to tray icon
@@ -892,30 +1037,35 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			else:
 				show_app_window()
 
-	def on_exit(self, event=None)->bool:
+	def on_exit(self, event=None, force:bool=False)->bool:
+		'''
+		*force* - do not wait for tasks.
+		'''
 		TASKS_MSG_MAX = 10
 		running_tasks = self.running_tasks(show_msg=False)
 		if running_tasks:
 			tasks_str = '\r\n'.join(
-				[t['task_name'] for t in running_tasks]
-				[:TASKS_MSG_MAX]
+				tuple(
+					t['task_name'] for t in running_tasks
+				)[:TASKS_MSG_MAX]
 			)
 			if len(running_tasks) > TASKS_MSG_MAX:
 				tasks_str += '\r\n...'
-			if dialog(
-				lang.warn_runn_tasks_msg.format( len(running_tasks) )
-				+ '\r\n\r\n' + tasks_str
-				, title=lang.menu_exit
-				, buttons=[lang.button_close, lang.button_cancel]
-				, return_button=True
-			)[1] != lang.button_close:
-				return False
+			if not force:
+				if dialog(
+					lang.warn_runn_tasks_msg.format( len(running_tasks) )
+					+ '\r\n\r\n' + tasks_str
+					, title=lang.menu_exit
+					, buttons=(lang.button_close, lang.button_cancel)
+					, return_button=True
+				)[1] != lang.button_close:
+					return False
 		if tasks.task_list_exit:
 			tprint(
 				lang.warn_on_exit + ': '
 				 + ', '.join(
 					t['task_name'] for t
-						in tasks.task_list_exit
+					in tasks.task_list_exit
 				 )
 			)
 			for task in tasks.task_list_exit:
@@ -934,7 +1084,9 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		Returns the list of running task names.
 		'''
 		TASKS_MSG_MAX = 10
-		running_tasks = [t for t in tasks.task_dict.values() if t['running'] ]
+		running_tasks = tuple(
+			t for t in tasks.task_dict.values() if t['running']
+		)
 		if is_dev(): app_threads_print()
 		if not running_tasks:
 			if show_msg:
@@ -973,12 +1125,11 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			table_print(table, use_headers=True)
 		if not show_msg: return running_tasks
 		tasks_str = '\r\n'.join(
-			[t['task_name'] for t in running_tasks]
-			[:TASKS_MSG_MAX]
+			tuple(t['task_name'] for t in running_tasks)[:TASKS_MSG_MAX]
 		)
 		if len(running_tasks) > TASKS_MSG_MAX:
 			tasks_str += '\r\n...'
-		dialog(tasks_str, timeout=10, wait=False)
+		dialog(tasks_str, timeout='10 sec', wait=False)
 
 	def on_edit_crontab(self, event=None):
 		proc_start(sett.editor, os.path.join(APP_PATH, 'crontab.py'))
@@ -999,7 +1150,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 	
 	def on_restart(self, event=None):
 		if not self.on_exit(): return
-		dev = None
+		dev = ''
 		if '--developer' in sys.argv: dev = '--developer'
 		if getattr(sys, 'frozen', False):
 			file_open(
@@ -1031,14 +1182,14 @@ class App(wx.App):
 		elif len(hwnd_list) > 1:
 			self.app_hwnd = hwnd_list[0]
 			if not sett.dev:
-				msgbox_warning(
+				warning(
 					lang.warn_too_many_win.format(
 					APP_NAME, len(hwnd_list) )
 				)
 		else:
 			self.app_hwnd = 0
 			if sett.dev:
-				msgbox_warning(f'None of {APP_NAME} windows was found')
+				warning(f'None of {APP_NAME} windows was found')
 		return True
 
 	def InitLocale(self):
@@ -1050,6 +1201,9 @@ class App(wx.App):
 		self.frame.SetFocus()
 		time.sleep(0.1)
 		self.frame.PopupMenu(self.taskbaricon.CreatePopupMenu())
+	
+	def exit(self, force:bool=False):
+		self.taskbaricon.on_exit(force=force)
 
 def show_app_window():
 	try:
@@ -1057,6 +1211,38 @@ def show_app_window():
 		win32gui.SetForegroundWindow(app.app_hwnd)
 	except Exception as e:
 		dev_print(f'show window exception: {e}')
+
+def every_parse(every:Union[str, list, tuple])->Tuple[bool, list]:
+	'''
+	Examples:
+		for es in ('5m', '5M', '5 m', '5 min', '5min'
+		, '5 minutes', 'mon 05:45', 'Mon 05:45'
+		, 'day 17:45', 'hour :30', 'h:30', ('5m', '5s')):
+			tass( every_parse(es)[0], True )
+		for es in ('5y', '5', '5 mins', '5mins', 5
+		, 'mon 5:45', 'hour 0:30', ('5m', 'hour')):
+			tass( every_parse(es)[0], False )
+		
+	'''
+	PATTERNS = {
+		rf'^(\d+)\s*({"|".join(_TIME_UNIT_HUMAN)})$': 'time_int'
+		, rf'^({"|".join(_WEEKDAY_HUMAN)})\s+(\d{{2}}:\d{{2}})$': 'day'
+		, r'^(m|min|minute|h|hr|hour)\s*(\:\d+)$': 'time_day'
+	}
+	if isinstance(every, str):
+		every = (every, )
+	elif not is_iter(every):
+		return False, []
+	result = []
+	for ev_str in every:
+		ev_str = ev_str.strip().lower()
+		for pat, pat_type in PATTERNS.items():
+			if (match := re.findall(pat, ev_str)):
+				result.append((pat_type, match[0]))
+				break
+		else:
+			return False, []
+	return True, result
 
 def main():
 	global app
@@ -1068,7 +1254,7 @@ def main():
 		sett = Settings()
 	except Exception as e:
 		print(f'Cannot load settings:\n{repr(e)}')
-		msgbox_warning(f'Cannot load settings:\n{repr(e)}')
+		warning(f'Cannot load settings:\n{repr(e)}')
 		return
 	__builtins__.sett = sett
 	lang = Language(sett.language)
@@ -1089,14 +1275,13 @@ def main():
 			tasks.run_at_startup()
 			tasks.run_at_sys_startup()
 			if sett.dev: app.taskbaricon.popup_menu_hk()
-		
 		app.MainLoop()
 	except Exception as e:
 		trace_li = traceback.format_exc().splitlines()
 		trace_str = '\n'.join(trace_li[-3:])
 		msg = f'\nGeneral exception:\n\n{repr(e)}\n\n{trace_str}'
 		print(msg)
-		msgbox_warning(msg)
+		warning(msg)
 		input('Press Enter to exit...')
 	except KeyboardInterrupt:
 		tprint('Interrupted by keyboard')

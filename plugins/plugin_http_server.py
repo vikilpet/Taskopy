@@ -19,9 +19,9 @@ except ModuleNotFoundError:
 _FAVICON = None
 
 if __name__ == '__main__':
-	from tools import msgbox_warning, random_str
+	from tools import warning, random_str
 else:
-	from .tools import msgbox_warning, random_str
+	from .tools import warning, random_str
 
 
 class HTTPHandlerTasks(BaseHTTPRequestHandler):
@@ -325,8 +325,8 @@ def http_server_start(tasks):
 		tasks.http_server = httpd
 		httpd.serve_forever()
 	except Exception as e:
-		print(f'HTTP Server error:\n{repr(e)}')
-		msgbox_warning(f'HTTP Server error:\n{repr(e)}')
+		print(f'HTTP server error:\n{repr(e)}')
+		warning(f'HTTP server error:\n{repr(e)}')
 def _file_hash(fullpath:str)->str:
 	hash_md5 = hashlib.md5()
 	with open(fullpath, 'rb') as fi:

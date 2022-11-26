@@ -24,7 +24,7 @@ def examp_autoruns(exe_path:str, caller:str
 
 		def examples__autoruns(
 			caller:str
-			, schedule='every().day.at("17:31")'
+			, every='day 17:31'
 		):
 			examp_autoruns(
 				exe_path='d:\\soft\\sysinternals\\autorunsc64.exe'

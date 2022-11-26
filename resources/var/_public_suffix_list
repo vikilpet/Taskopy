@@ -7372,6 +7372,7 @@ ltd.ua
 graphox.us
 *.devcdnaccesso.com
 *.on-acorn.io
+activetrail.biz
 adobeaemcloud.com
 *.dev.adobeaemcloud.com
 hlx.live
@@ -7646,8 +7647,11 @@ cloudaccess.net
 cloudcontrolled.com
 cloudcontrolapp.com
 *.cloudera.site
-pages.dev
+cf-ipfs.com
+cloudflare-ipfs.com
 trycloudflare.com
+pages.dev
+r2.dev
 workers.dev
 wnext.app
 co.ca
@@ -9265,6 +9269,8 @@ familyds.org
 vpnplus.to
 direct.quickconnect.to
 tabitorder.co.il
+mytabit.co.il
+mytabit.com
 taifun-dns.de
 beta.tailscale.net
 ts.net

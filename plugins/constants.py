@@ -89,7 +89,7 @@ FILE_NOTIFY_CHANGE_ATTRIBUTES = win32con.FILE_NOTIFY_CHANGE_ATTRIBUTES
 FILE_NOTIFY_CHANGE_LAST_WRITE = win32con.FILE_NOTIFY_CHANGE_LAST_WRITE
 FILE_NOTIFY_CHANGE_SECURITY = win32con.FILE_NOTIFY_CHANGE_SECURITY
 # For displaying small messages:
-HTML_MSG = '''
+HTML_MSG = r'''
 <!doctype html>
 <html>
 	<head>
@@ -102,7 +102,7 @@ HTML_MSG = '''
 				overflow-wrap: anywhere;
 				margin: 0 1vw 0 1vw;
 			}}
-			input[type='text'] {{
+			* {{
 				font-size: calc((5vw + 5vh)/2);
 			}}
 			.container {{
@@ -111,6 +111,7 @@ HTML_MSG = '''
 				justify-content: center;
 				flex-direction: column;
 				align-items: center;
+				text-align: center;
 				gap: 0;
 			}}
 		</style>
@@ -148,7 +149,7 @@ HTML_CENTER = r'''
 		<title>t</title>
 		<script></script>
 		<style>
-			body {{
+			* {{
 				font-family: Verdana, Arial, sans-serif;
 				font-size: calc((2vw + 2vh)/2);
 			}}

@@ -41,7 +41,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2022-11-21'
+APP_VERSION = 'v2022-11-26'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -50,64 +50,8 @@ if not __builtins__.get('gdic', None):
 	__builtins__['gdic'] = gdic
 	_app:wx.App = None
 	__builtins__['_app'] = _app
-TASK_OPTIONS = [
-	['task_name', None]
-	, ['task', True]
-	, ['menu', True]
-	, ['hotkey', None]
-	, ['hotkey_suppress', True]
-	, ['schedule', None]
-	, ['active', True]
-	, ['startup', False]
-	, ['sys_startup', False]
-	, ['left_click', False]
-	, ['log', True]
-	, ['single', True]
-	, ['running', False]
-	, ['submenu', None]
-	, ['result', False]
-	, ['http', False]
-	, ['http_dir', None]
-	, ['http_white_list', None]
-	, ['err_threshold', 0]
-	, ['err_counter', False]
-	, ['no_print', False]
-	, ['idle', None]
-	, ['on_load', False]
-	, ['rule', None]
-	, ['thread', None]
-	, ['last_start', None]
-	, ['date', None]
-	, ['event_log', None]
-	, ['event_xpath', '*']
-	, ['on_exit', False]
-	, ['hyperactive', False]
-	, ['on_file_change', None]
-	, ['on_dir_change', None]
-	, [
-		'on_dir_change_flags'
-		, tcon.FILE_NOTIFY_CHANGE_LAST_WRITE
-			| tcon.FILE_NOTIFY_CHANGE_FILE_NAME
-	]
-	, ['on_file_change_flags', tcon.FILE_NOTIFY_CHANGE_LAST_WRITE]
-	, ['timeout', 60]
-]
-APP_SETTINGS=[
-	['dev', False]
-	, ['language', 'en']
-	, ['menu_hotkey', None]
-	, ['editor', 'notepad.exe']
-	, ['server_ip', '127.0.0.1']
-	, ['server_port', 8275]
-	, ['white_list', '127.0.0.1']
-	, ['server_silent', True]
-	, ['hide_console', False]
-	, ['kiosk', False]
-	, ['kiosk_key', 'shift']
-	, ['log_file_name', tcon.DATE_STR_FILE_SHORT]
-]
 
-_DEFAULT_INI = '''[General]
+_DEFAULT_INI = r'''[General]
 language=en
 editor=notepad.exe
 hide_console=False
@@ -121,11 +65,10 @@ if getattr(sys, 'frozen', False):
 	_APP_PATH = os.path.dirname(sys.executable)
 else:
 	_APP_PATH = os.getcwd()
-_DB_FILE = os.path.join(_APP_PATH, 'resources', 'db.sqlite3')
 _TIME_UNITS = {
 	'millisecond': 1, 'milliseconds': 1, 'msec': 1, 'ms': 1
 	, 'second': 1000, 'seconds': 1000, 'sec': 1000, 's': 1000
-	, 'minute': 60_000, 'minutes': 60_000, 'min': 60_000, 'm':60_000
+	, 'minute': 60_000, 'minutes': 60_000, 'min': 60_000, 'm': 60_000
 	, 'hour': 3_600_000, 'hours': 3_600_000, 'h': 3_600_000
 	, 'day': 86_400_000, 'days': 86_400_000, 'd': 86_400_000
 	, 'week': 604_800_000, 'weeks': 604_800_000, 'w': 604_800_000
@@ -425,10 +368,36 @@ def date_weekday_num(date_val:datetime.datetime=None)->int:
 	if not date_val: date_val = datetime.date.today()
 	return date_val.weekday() + 1
 
-def date_fill(date_str:str)->str:
+def date_fill(date_dic:dict)->datetime.datetime:
+	'''
+	Fills `None` values in dictionary with current
+	datetime value.
+	Example:
+
+		dt_dic = {'year': None, 'month': 11
+		, 'day': 26, 'hour': 23, 'minute': 24}
+		date_fill(dt_dic)
+		tass( benchmark(date_fill, 1000, a=(dt_dic,)), 3.0, '<' )
+
+	'''
+	DATE_PARTS = ('year', 'month', 'day', 'hour', 'minute')
+	new_date_dic = {}
+	cur_date = datetime.datetime.now()
+	for part in DATE_PARTS:
+		if (pval := date_dic.get(part, None)) == None:
+			new_date_dic[part] = getattr(cur_date, part)
+		else:
+			new_date_dic[part] = pval
+	return datetime.datetime(**new_date_dic)
+
+def date_fill_str(date_str:str)->str:
 	'''
 	Replace asterisk to current datetime value:  
 	date_fill('*.*.01 12:30') -> '2020.10.01 12:30'
+
+		> benchmark(date_fill, 1000, a=('*.*.01 12:30',))
+		5.5 mcs
+
 	'''
 	if not '*' in date_str: return date_str
 	date_str = date_str.replace('.', ' ').replace(':', ' ')
@@ -636,9 +605,9 @@ def msgbox(msg:str, title:str=None
 			else:
 				thread_start(mb_func, args=mb_args)
 
-def msgbox_warning(msg:str, title:str=None):
+def warning(msg:str, title:str=None):
 	if sett.kiosk:
-		con_log(f'msgbox_warning: {msg}')
+		con_log(f'warning: {msg}')
 		return
 	if title:
 		title = f'{APP_NAME}: {title}'
@@ -851,34 +820,35 @@ class Job:
 
 def job_batch(jobs:list, timeout:int
 , sleep_timeout:float=0.001)->list:
-	''' Starts functions (they do not necessarily
-		have to be the same) in parallel and waits for
-		them to be executed or timeout.
-		Use this when you don't want to wait because
-		of one hung function.
+	'''
+	Starts functions (they do not necessarily
+	have to be the same) in parallel and waits for
+	them to be executed or timeout.
+	Use this when you don't want to wait because
+	of one hung function.
 
-		jobs - list of Job objects (see class Job for details).
-		
-		timeout - timeout in seconds.
+	jobs - list of Job objects (see class Job for details).
+	
+	timeout - timeout in seconds.
 
-		Returns same list of job objects.
-		Usage example:
-			
-			jobs = []
-			jobs.append(
-				Job(dialog, 'Test job 1')
-			)
-			jobs.append(
-				Job(dialog, ['Button 1', 'Button 2'])
-			)
-			for job in job_batch(jobs, timeout=5):
-				print(job.error, job.result, job.time)
+	Returns same list of job objects.
+	Usage example:
 		
+		jobs = []
+		jobs.append(
+			Job(dialog, 'Test job 1')
+		)
+		jobs.append(
+			Job(dialog, ['Button 1', 'Button 2'])
+		)
+		for job in job_batch(jobs, timeout=5):
+			print(job.error, job.result, job.time)
+	
 	'''
 	for job in jobs:
 		thread_start(job.run)
 	for _ in range(int(timeout / sleep_timeout)):
-		if all([j.finished for j in jobs]):
+		if all((j.finished for j in jobs)):
 			return jobs
 		time.sleep(sleep_timeout)
 	else:
@@ -1677,12 +1647,10 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 , thr_daemon:bool=True, err_msg:bool=False, ident:str=''
 , err_action=None)->int:
 	'''
-	Runs task in a thread. Returns thread id.
-
-	*ident* - user-defined identifier of stream
-
-	*err_action* - function to run if an exception occurs.
-	The text of exception will be passed to the function.
+	Runs task in a thread. Returns thread id.  
+	*ident* - user-defined identifier of stream.  
+	*err_action* - function to run if an exception occurs.  
+	The text of exception will be passed to the function.  
 
 	'''
 	def wrapper():
@@ -1695,8 +1663,9 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 				f'exception in {func.__name__}:\n{err_str}'
 			)
 			if err_msg:
-				msgbox_warning(
-					f'Exception in thread {func.__name__}:\n{err_str}')
+				warning(
+					f'Exception in thread {func.__name__}:\n{err_str}'
+				)
 			if err_action:
 				try:
 					err_action(err_str)
@@ -1775,22 +1744,30 @@ def app_tasks()->dict:
 	' Returns dictionary with tasks '
 	return app.tasks
 
+def app_exit(force:bool=False):
+	'''
+	Closes the program.  
+	*force* - do not wait for the completion
+	of working tasks.  
+	'''
+	app.exit(force=force)
+
 def benchmark(func, b_iter:int=1000
-, a:tuple=(), ka:dict={})->datetime.timedelta:
+, a:tuple=(), ka:dict={})->float:
 	'''
 	Run function `func` `b_iter` times and print time.
-	Returns the total time as a datetime.timedelta object.
+	Returns mircoseconds per operation.
 	Example:
 
 		benchmark(dir_size, b_iter=100, a=('logs',) )
 	
 	'''
-	start = time_now()
+	start = datetime.datetime.now()
 	for _ in range(b_iter):
 		func(*a, **ka)
-	dur = time_now() - start
-	tdebug(f'{dur}, iterations: {b_iter}')
-	return dur
+	dur = datetime.datetime.now() - start
+	tdebug(f'{dur.microseconds/b_iter} mcs, {dur=}, {b_iter=}')
+	return dur.microseconds/b_iter
 
 def median(source):
 	return statistics.median(source)

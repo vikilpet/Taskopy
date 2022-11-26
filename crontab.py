@@ -32,7 +32,7 @@ def demo__task_1(startup=True):
 # Another example — task with two options: scheduled task
 # that is hidden in the menu because there is no point in
 # launching it manually:
-def demo_task_2(schedule='every().day.at("10:30")', menu=False):
+def demo_task_2(every='day 10:30', menu=False):
 	# Show message box with exclamation point icon:
 	dialog('Take your pills!')
 
@@ -47,8 +47,8 @@ def demo_task_3(http=True, result=True, menu=False):
 	)
 
 def embedded__update(caller:str
-, schedule='every().sunday.at("15:30")'):
+, every='sunday 15:30'):
 	emb_app_update(caller=caller)
 
-def embedded__backup_and_purge(schedule='every().day.at("21:30")'):
+def embedded__backup_and_purge(every='day 21:30'):
 	emb_backup_and_purge()

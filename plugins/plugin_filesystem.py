@@ -543,14 +543,14 @@ def dir_rnd_files(fullpath, file_num:int=1
 	
 	Compared to `dir_list` with `random.choice`:
 
-		benchmark(lambda: random.choice( list(dir_files(temp_dir() ) ) ), b_iter=100)
-		> datetime.timedelta(seconds=18, microseconds=920000)
+		> benchmark(lambda: random.choice( list(dir_files(temp_dir() ) ) ), b_iter=1000)
+		533.5
 
-		benchmark(dir_rnd_file, a=(temp_dir(), ), b_iter=100)
-		> datetime.timedelta(microseconds=77500)
+		> benchmark(dir_rnd_files, a=(temp_dir(), ), b_iter=1000)
+		0.5
 
-		len( tuple( dir_list( temp_dir() ) ) )
-		> 494
+		> len( tuple( dir_list( temp_dir() ) ) )
+		2848
 		
 	'''
 	fullpath = path_get(fullpath)

@@ -23,11 +23,12 @@ class Language:
 		self.warn_mod_reload = 'Failed to reload module «{}»'
 		self.warn_hotkey = 'Wrong hotkey syntax in task «{}»'
 		self.warn_schedule = 'Wrong schedule syntax in task «{}»'
+		self.warn_every = 'Wrong time syntax in task «{}»: «{}»'
 		self.warn_task_error = 'Error when executing a task «{}»'
 		self.warn_left_click = 'Attempt to bind more than one task to left click: {}'
 		self.warn_runn_tasks_con = 'Running tasks'
 		self.warn_runn_tasks_msg = 'Some tasks ({}) are being performed now. Close anyway?'
-		self.warn_date_format = 'Wrong date format in task «{}»: {}'
+		self.warn_date_format = 'Wrong date format in task «{}»: «{}»'
 		self.warn_event_format = 'Wrong event specification in task «{}»'
 		self.warn_too_many_win = 'Too many {} windows was found: {}'
 		self.button_close = 'Close'
@@ -44,8 +45,8 @@ class Language:
 				print(f'Dictionary for language {language} not found')
 			return
 		new_trans = set()
-		for line in di_str.split('\n'):
-			if not line or not '=' in line: continue
+		for line in di_str.splitlines():
+			if (not line) or (not '=' in line): continue
 			item, trans = line.split('=')
 			item = item.strip(); trans = trans.strip()
 			if self.__dict__.get(item, None):
@@ -53,10 +54,10 @@ class Language:
 				new_trans.add(trans)
 			else:
 				print(f'Unknown item «{item}» in «{language}» language')
-		missed = [
+		missed = tuple(
 			i for i,t in self.__dict__.items()
 			if not t in new_trans
-		]
+		)
 		if missed:
 			print('No translation for this items:'
 			, *missed, sep='\n')
@@ -83,11 +84,12 @@ warn_crontab_reload=Не удалось перезагрузить кронта�
 warn_mod_reload=Не удалось загрузить модуль «{}»
 warn_hotkey=Неправильный формат горячей клавиши в задаче «{}»
 warn_schedule=Неправильный формат планировщика в задаче «{}»
+warn_every=Неправильный формат времени в задаче «{}»: «{}»
 warn_task_error=Ошибка при выполнении задачи «{}»
 warn_left_click=Попытка привязать левому клику больше одной задачи: {}
 warn_runn_tasks_con=Работающие задачи
 warn_runn_tasks_msg=Некоторые задачи ({} шт.) выполняются в текущий момент. Всё равно закрыть?
-warn_date_format=Неправильный формат даты в задаче «{}»: {}
+warn_date_format=Неправильный формат даты в задаче «{}»: «{}»
 warn_event_format=Неправильный формат события в задаче «{}»
 warn_too_many_win=Открыто слишком много окон {}: {}
 button_close=Закрыть

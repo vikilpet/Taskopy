@@ -3,9 +3,9 @@ import ctypes.wintypes
 import win32con
 import keyboard
 try:
-	from .tools import msgbox_warning, patch_import, time_sleep, tdebug
+	from .tools import warning, patch_import, time_sleep, tdebug
 except ImportError:
-	msgbox_warning = print
+	warning = print
 
 # Key codes https://docs.microsoft.com/en-us/windows/desktop/inputdev/virtual-key-codes
 # https://github.com/boppreh/keyboard
@@ -96,7 +96,7 @@ class GlobalHotKeys():
 				)
 
 				print(error)
-				msgbox_warning(error)
+				warning(error)
  
 		try:
 			msg = ctypes.wintypes.MSG()

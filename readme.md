@@ -16,7 +16,7 @@ Then press Ctrl+Shift+T or open in browser URL http://127.0.0.1:8275/my_task and
 
 Another example: show message box every day at 10:30 and hide this task from menu:
 
-	def my_another_task(schedule='every().day.at("10:30")', menu=False):
+	def my_another_task(every='day 10:30', menu=False):
 		dialog('Take the pills')
 
 An example using the extension for Firefox:
@@ -104,18 +104,27 @@ Format: **option name** (default value) — description.
 - **hotkey** (None) — assign to global hotkey. Example: *hotkey='alt+ctrl+m'*
 - **hotkey_suppress** (True) — if set to False hotkey will not supressed so active window ill still receive it.
 - **hyperactive** - run task even if the Taskopy is disabled.
-- **schedule** (None) — add to schedule. Functionality provided by [schedule project](https://github.com/dbader/schedule) so you better refer to their [documentation](https://schedule.readthedocs.io/en/stable/).
-	Run task every hour:
+- **every** ('') — run on schedule.  
+	Examples:  
+	Run task every 5 minutes:
 
-		schedule='every().hour'
+		every='5 min'
 
-	Run task every wednesday at 13:15:
+	Every hour at 30 minutes:
 
-		schedule='every().wednesday.at("13:15")'
+		every='hour :30'
+
+	Every wednesday at 13:15:
+
+		every='wed 13:15'
+	
+	Every day at 08:30:
+
+		every='day 08:30'
 
 	You can set multiple schedule at once with list:
 
-		schedule=['every().wednesday.at("18:00")', 'every().friday.at("17:00")']
+		every=('wed 18:00', 'fri 17:00')
 
 - **active** (True) — to enable-disable task.
 - **startup** (False) — run at taskopy startup.
@@ -772,10 +781,10 @@ Inside _virustotal\_demo_ you can see another way to pass a file name to a task 
 - Add IP-address to MikroTik router
 - Virustotal check
 
-Check the free space on all local discs. Scheduled for a random interval between 30 and 45 minutes:
+Check the free space on all local discs every 30 minutes:
  
 	def check_free_space_demo(submenu='demo'
-	, schedule='every(30).to(45).minutes'):
+	, every='30 minutes'):
 		for d in drive_list():
 			if drive_free(d) < 10:
 				dialog(f'low disk space: {d}')
