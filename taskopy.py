@@ -1,4 +1,3 @@
-from pickle import APPEND
 import time
 import sys
 import os
@@ -216,13 +215,13 @@ def load_crontab(event=None)->bool:
 					dev_print(f'permission error {attempt=}')
 					time.sleep(.01)
 				except:
-					trace_li = traceback.format_exc().splitlines()
-					trace_str = '\n'.join(trace_li[-3:])
-					con_log(traceback.format_exc())
 					sys.modules['crontab'] = prev_crontab
+					trace_full, trace_short = _exc_texts()
+					con_log(lang.warn_crontab_reload + str_indent(trace_full))
 					warning(
-						f'{lang.warn_crontab_reload}:\n\n{trace_str}'
-						, title=lang.menu_reload)
+						f'{lang.warn_crontab_reload}\n\n{trace_short}'
+						, title=lang.menu_reload
+					)
 					return False
 			else:
 				raise Exception('No more attempts to reload crontab')
@@ -249,12 +248,15 @@ def load_crontab(event=None)->bool:
 		tasks.enabled = app.enabled
 		return True
 	except:
-		trace_li = traceback.format_exc().splitlines()
-		trace_str = '\n'.join(trace_li[-3:])
-		con_log(traceback.format_exc())
+		trace_full, trace_short = _exc_texts()
+		con_log(
+			lang.warn_crontab_reload
+			, str_indent(trace_full)
+		)
 		warning(
-			f'{lang.warn_crontab_reload}:\n\n{trace_str}'
-			, title=lang.menu_reload)
+			f'{lang.warn_crontab_reload}\n\n{trace_short}'
+			, title=lang.menu_reload
+		)
 		return False
 	
 def load_modules():
@@ -292,14 +294,16 @@ def load_modules():
 			else:
 				raise
 		except:
-			trace_li = traceback.format_exc().splitlines()
-			trace_str = '\n'.join(trace_li[-3:])
-			con_log(traceback.format_exc())
 			sys.modules[mdl_name] = prev_mdl
+			trace_full, trace_short = _exc_texts()
+			con_log(
+				lang.warn_mod_reload.format(mdl_name)
+				+ str_indent(trace_full)
+			)
 			warning(
 				'{}:\n\n{}'.format(
 					lang.warn_mod_reload.format(mdl_name)
-					, trace_str
+					, trace_short
 				)
 				, title=lang.menu_reload
 			)
@@ -346,6 +350,8 @@ class Task:
 
 class Tasks:
 	''' Tasks from the crontab and their properties '''
+	REGEX_DATE = re.compile(r'^(\d\d\d\d|\*)\.(\d\d|\*)\.(\d\d|\*)\s+(\d\d|\*)\:(\d\d|\*)$')
+
 	def __init__(self):
 		self.enabled = True
 		self.task_dict = {}
@@ -544,7 +550,15 @@ class Tasks:
 						raise e
 				if prev_file[0]:
 					pfile, ptime = prev_file
-					cfile, ctime = results[-1][1], time.time()
+					try:
+						cfile, ctime = results[-1][1], time.time()
+					except:
+						if is_dev():
+							print(f'{prev_file=}, {results=}, exception:\n{exc_text()}\n')
+							dialog(
+								f'Exception in "dir_watch":\n\n{exc_text()}'
+								, timeout='5 min'
+							)
 					if cfile == pfile \
 					and ( (ctime - ptime) < WAIT_SEC ):
 						prev_file = (cfile, ctime)
@@ -659,12 +673,11 @@ class Tasks:
 			if dt_now != date_fill(date_dic):
 				return
 			self.run_task(task=task, caller=CALLER_SCHEDULER)
-		RE_DATE = r'^(\d\d\d\d|\*)\.(\d\d|\*)\.(\d\d|\*) (\d\d|\*)\:(\d\d|\*)$'
 		DATE_PARTS = ('year', 'month', 'day', 'hour', 'minute')
 		dates = task['date']
 		if isinstance(dates, str): dates = [dates]
 		for date in dates:
-			if not (matches := re_find(date, RE_DATE)):
+			if not (matches := self.REGEX_DATE.findall(date)):
 				warning(
 					lang.warn_date_format.format(
 						task['task_name_full']
@@ -762,11 +775,10 @@ class Tasks:
 						task['task_func_name']
 						, 'err_counter'
 					) + 1
-					trace_li = traceback.format_exc().splitlines()
-					trace_str = '\n'.join(trace_li[-3:])
+					trace_full, trace_short = _exc_texts()
 					con_log(
-						f'Error in task: {task["task_name_full"]}\n'
-						+ traceback.format_exc()
+						lang.warn_task_error.format(task['task_name_full'])
+						+ str_indent(trace_full)
 					)
 					if not result is None:
 						result.append('task error')
@@ -779,7 +791,7 @@ class Tasks:
 							, 'err_counter', 0)
 						warning(
 							lang.warn_task_error.format(task['task_name_full'])
-							+ f':\n{trace_str}'
+							+ f'\n\n{trace_short}'
 						)
 					else:
 						self.task_opt_set(task['task_func_name']
@@ -1244,6 +1256,12 @@ def every_parse(every:Union[str, list, tuple])->Tuple[bool, list]:
 			return False, []
 	return True, result
 
+def _exc_texts()->tuple:
+	' Get full and short text of exception '
+	trace_full = traceback.format_exc().strip()
+	trace_short = '\n'.join(trace_full.splitlines()[-3:])
+	return trace_full, trace_short
+
 def main():
 	global app
 	global tasks
@@ -1277,10 +1295,9 @@ def main():
 			if sett.dev: app.taskbaricon.popup_menu_hk()
 		app.MainLoop()
 	except Exception as e:
-		trace_li = traceback.format_exc().splitlines()
-		trace_str = '\n'.join(trace_li[-3:])
-		msg = f'\nGeneral exception:\n\n{repr(e)}\n\n{trace_str}'
-		print(msg)
+		trace_full, _ = _exc_texts()
+		msg = f'General exception:\n\n{trace_full}'
+		print('\n', msg)
 		warning(msg)
 		input('Press Enter to exit...')
 	except KeyboardInterrupt:

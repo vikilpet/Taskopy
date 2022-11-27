@@ -6,6 +6,7 @@ import statistics
 import pytz
 import threading
 import psutil
+import sqlite3
 import subprocess
 from multiprocessing.dummy import Pool as ThreadPool
 from operator import itemgetter
@@ -18,13 +19,11 @@ import getpass
 import traceback
 import inspect
 import ctypes
-import sqlite3
 import pyperclip
 import random
 import functools
 import importlib
 import string
-import win32api
 import win32gui
 import win32con
 import win32com.client
@@ -34,14 +33,13 @@ import wx
 from collections import defaultdict
 import lxml
 from xml.etree import ElementTree as _ElementTree
-import xml
 try:
 	import constants as tcon
 except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2022-11-26'
+APP_VERSION = 'v2022-11-27'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -95,9 +93,9 @@ def value_to_unit(value, unit:str='sec', unit_dict:dict=None
 	to the desired unit of measure.
 	Usage:
 
-		assert value_to_unit('1 min', 'sec') == 60
-		assert value_to_unit('2m', 'sec') == 120
-		assert value_to_unit(3, 'sec') == 3
+		tass( value_to_unit('1 min', 'sec'), 60.0)
+		tass( value_to_unit('2m', 'sec'), 120.0)
+		tass( value_to_unit(3, 'sec'), 3.0)
 
 	'''
 	if not unit_dict: unit_dict = _TIME_UNITS
@@ -368,7 +366,7 @@ def date_weekday_num(date_val:datetime.datetime=None)->int:
 	if not date_val: date_val = datetime.date.today()
 	return date_val.weekday() + 1
 
-def date_fill(date_dic:dict)->datetime.datetime:
+def date_fill(date_dic:dict, cur_date=None)->datetime.datetime:
 	'''
 	Fills `None` values in dictionary with current
 	datetime value.
@@ -377,26 +375,26 @@ def date_fill(date_dic:dict)->datetime.datetime:
 		dt_dic = {'year': None, 'month': 11
 		, 'day': 26, 'hour': 23, 'minute': 24}
 		date_fill(dt_dic)
-		tass( benchmark(date_fill, 1000, a=(dt_dic,)), 3.0, '<' )
+		tass( benchmark(date_fill, 1000, a=(dt_dic,)), 3000, '<' )
 
 	'''
-	DATE_PARTS = ('year', 'month', 'day', 'hour', 'minute')
-	new_date_dic = {}
-	cur_date = datetime.datetime.now()
-	for part in DATE_PARTS:
-		if (pval := date_dic.get(part, None)) == None:
+	new_date_dic = {'year': 0, 'month': 0
+	, 'day': 0, 'hour': 0, 'minute': 0}
+	if cur_date == None: cur_date = datetime.datetime.now()
+	for part in new_date_dic:
+		if date_dic[part] == None:
 			new_date_dic[part] = getattr(cur_date, part)
 		else:
-			new_date_dic[part] = pval
+			new_date_dic[part] = date_dic[part]
 	return datetime.datetime(**new_date_dic)
 
 def date_fill_str(date_str:str)->str:
 	'''
 	Replace asterisk to current datetime value:  
-	date_fill('*.*.01 12:30') -> '2020.10.01 12:30'
+	date_fill_str('*.*.01 12:30') -> '2020.10.01 12:30'
 
-		> benchmark(date_fill, 1000, a=('*.*.01 12:30',))
-		5.5 mcs
+		> benchmark(date_fill_str, 1000, a=('*.*.01 12:30',))
+		5 006 ns/loop
 
 	'''
 	if not '*' in date_str: return date_str
@@ -435,15 +433,15 @@ def re_find(source:str, re_pattern:str, sort:bool=False
 	r'''
 	Returns list with matches.  
 	re_flags:  
-		re.IGNORECASE	ignore case
-		re.MULTILINE	make begin/end {^, $} consider each line.
-		re.DOTALL	make . match newline too.
-		re.UNICODE	make {\w, \W, \b, \B} follow Unicode rules.
-		re.LOCALE	make {\w, \W, \b, \B} follow locale.
-		re.VERBOSE	allow comment in regex.
+	*re.IGNORECASE* - ignore case.  
+	*re.MULTILINE* - make begin/end {^, $} consider each line.  
+	*re.DOTALL* - make . match newline too.  
+	*re.UNICODE* - make {\w, \W, \b, \B} follow Unicode rules.  
+	*re.LOCALE* - make {\w, \W, \b, \B} follow locale.  
+	*re.VERBOSE* - allow comment in regex.  
 
-	Non-capturing group: (?:aaa)
-	Positive lookbehind: (?<=abc)
+	Non-capturing group: (?:aaa)  
+	Positive lookbehind: (?<=abc)  
 	'''
 	matches = re.findall(re_pattern, source, flags=re_flags)
 	if unique: matches = list(set(matches))
@@ -461,11 +459,11 @@ def re_replace(source:str, re_pattern:str, repl:str=''
 	)
 
 def re_split(source:str, re_pattern:str, maxsplit:int=0
-, re_flags:int=re.IGNORECASE)->str:
+, re_flags:int=re.IGNORECASE)->List[str]:
 	'''
-	Regexp split
+	Regexp split.
 	
-		assert re_split('abc', 'b') == ['a', 'c']
+		tass( re_split('abc', 'b'), ['a', 'c'] )
 	
 	'''
 	return re.split(
@@ -477,11 +475,11 @@ def re_split(source:str, re_pattern:str, maxsplit:int=0
 
 def re_match(source:str, re_pattern:str
 , re_flags:int=re.IGNORECASE)->bool:
-	'''
+	r'''
 	Regexp match.
 
-		assert re_match('C - 25.11.19.mp3', r'.+ - \d\d\.\d\d\.\d\d.+') == True
-		assert re_match('C - 25.11.19.mp3', r' - \d\d\.\d\d\.\d\d.+') == False
+		tass( re_match('C - 25.11.19.mp3', r'.+ - \d\d\.\d\d\.\d\d.+'), True )
+		tass( re_match('C - 25.11.19.mp3', r' - \d\d\.\d\d\.\d\d.+'), False)
 
 	'''
 	return bool(re.match(re_pattern, source, flags=re_flags))
@@ -1473,7 +1471,7 @@ def _etree_to_dict(tree: _ElementTree.ElementTree):
 
 def xml_to_dict(xml_str:str, remove_str:str=None)->tuple:
 	'''
-	Converts a XML to dictionary using xml.etree
+	Converts a XML to dictionary using lxml.etree
 	Returns (True, dict) or (False, 'exception text')
 	'''
 	try:
@@ -1485,11 +1483,12 @@ def xml_to_dict(xml_str:str, remove_str:str=None)->tuple:
 		dev_print(f'xml_str parsing error:\n\n{xml_str}\n\n')
 		return False, repr(e)
 _event_xmlns = ''
+_REGEX_EVENT = re.compile(r'''(xmlns=('|").+?('|"))''')
 def _xml_to_dict_event(event_xml:str)->tuple:
 	''' Returns (True, dict) or (False, 'exception text') '''
-	global _event_xmlns
+	global _event_xmlns, _REGEX_EVENT
 	if not _event_xmlns:
-		_event_xmlns = re_find(event_xml, r'''(xmlns=('|").+?('|"))''')[0][0]
+		_event_xmlns = _REGEX_EVENT.findall(event_xml)[0][0]
 	return xml_to_dict(event_xml, remove_str=_event_xmlns)
 
 def value_to_str(value, sep:str='\n')->str:
@@ -1660,7 +1659,7 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 		except Exception:
 			err_str = traceback.format_exc()
 			tprint(
-				f'exception in {func.__name__}:\n{err_str}'
+				f'exception in {func.__name__}:{str_indent(err_str)}'
 			)
 			if err_msg:
 				warning(
@@ -1753,21 +1752,23 @@ def app_exit(force:bool=False):
 	app.exit(force=force)
 
 def benchmark(func, b_iter:int=1000
-, a:tuple=(), ka:dict={})->float:
+, a:tuple=(), ka:dict={})->int:
 	'''
 	Run function `func` `b_iter` times and print time.
-	Returns mircoseconds per operation.
+	Returns nanoseconds per loop.
 	Example:
 
 		benchmark(dir_size, b_iter=100, a=('logs',) )
 	
 	'''
-	start = datetime.datetime.now()
+	start = time.perf_counter_ns()
 	for _ in range(b_iter):
 		func(*a, **ka)
-	dur = datetime.datetime.now() - start
-	tdebug(f'{dur.microseconds/b_iter} mcs, {dur=}, {b_iter=}')
-	return dur.microseconds/b_iter
+	total_ns = time.perf_counter_ns() - start
+	ns_loop_str = '{:,}'.format(total_ns // b_iter).replace(',', ' ')
+	ns_total_str = '{:,}'.format(total_ns).replace(',', ' ')
+	tdebug(f'{ns_loop_str} ns/loop, total={ns_total_str}, {b_iter=}')
+	return total_ns // b_iter
 
 def median(source):
 	return statistics.median(source)
@@ -1847,7 +1848,7 @@ class lazy_property(object):
 		setattr(obj, self.fget.__name__, value)
 		return value
 
-def tass(value, expect, comparison:str='=='):
+def tass(value, expect, comp:str='=='):
 	'''
 	Assertion showing the difference.  
 	Examples:
@@ -1855,7 +1856,7 @@ def tass(value, expect, comparison:str='=='):
 		tass(APP_NAME, 'Taskopy')
 
 	'''
-	if comparison == '==':
+	if comp == '==':
 		if str(value) == str(expect):
 			if type(value) == type(expect):
 				return
@@ -1864,11 +1865,11 @@ def tass(value, expect, comparison:str='=='):
 					f'types are different:'
 					+ f' {type(value)} vs {type(expect)}'
 				)
-	elif comparison == '>':
+	elif comp == '>':
 		if value > expect: return
-	elif comparison == '<':
+	elif comp == '<':
 		if value < expect: return
-	raise Exception(f'does not match:\n«{value}»\n«{expect}»')
+	raise Exception(f'does not match ({comp}):\n«{value}»\n«{expect}»')
 
 def exc_text(last_n:int=3):
 	'''
@@ -1885,5 +1886,20 @@ def exc_text(last_n:int=3):
 	'''
 	lines = traceback.format_exc().splitlines()
 	return '\n'.join(lines[-last_n:])
+
+def str_indent(src_str:str, indent:str='\t')->str:
+	'''
+	Adds an indent to each line of text.  
+	Example:
+
+		tass( str_indent('some\ntext'), '\n\n\tsome\n\ttext' )
+		try:
+			raise ZeroDivisionError
+		except:
+			tprint('we have an error:' + str_indent(exc_text()))
+
+	'''
+	lst = str(src_str).strip().splitlines()
+	return '\n\n\t' + '\n\t'.join(lst) + '\n'
 
 if __name__ != '__main__': patch_import()

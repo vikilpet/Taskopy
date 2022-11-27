@@ -541,16 +541,16 @@ def dir_rnd_files(fullpath, file_num:int=1
 		dir_rnd_files('.')
 		tuple(dir_rnd_files('.', ex_ext='py'))
 	
-	Compared to `dir_list` with `random.choice`:
+	Compared to `dir_files` with `random.choice`:
 
-		> benchmark(lambda: random.choice( list(dir_files(temp_dir() ) ) ), b_iter=1000)
-		533.5
+		> benchmark(lambda: random.choice( list(dir_files(temp_dir() ) ) ), b_iter=10)
+		benchmark: 113 367 113 ns/loop
 
-		> benchmark(dir_rnd_files, a=(temp_dir(), ), b_iter=1000)
-		0.5
+		> benchmark(dir_rnd_files, a=(temp_dir(), ), b_iter=10)
+		620
 
-		> len( tuple( dir_list( temp_dir() ) ) )
-		2848
+		> len( tuple( dir_files( temp_dir() ) ) )
+		1914
 		
 	'''
 	fullpath = path_get(fullpath)
