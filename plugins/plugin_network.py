@@ -557,12 +557,12 @@ def net_html_unescape(html_str:str)->str:
 
 
 
-def is_online(*sites, timeout:float=2)->int:
-	'''
+def is_online(*sites, timeout:float=2.0)->int:
+	r'''
 	Checks if there is an internet connection using *HEAD*
 	requests to the specified web sites.  
 	The function will not raise an exception.  
-	*timeout* - timeout in seconds.
+	*timeout* - timeout in seconds.  
 
 		tass( is_online(), 2 )
 		tass( is_online('https://non.existent.domain'), 0 )

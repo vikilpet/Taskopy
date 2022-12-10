@@ -224,7 +224,7 @@ def proc_start(
 
 def proc_exists(process, cmd_filter:str=None
 , user_filter:str=None)->int:
-	'''
+	r'''
 	Returns PID if the process with the specified name exists.  
 	*process* - image name or PID.  
 	*cmd_filter* - optional string to search in the
@@ -306,10 +306,10 @@ def proc_list(name:str='', cmd_filter:str=None
 	return proc_list
 
 def proc_cpu(process, interval:float=1.0)->float:
-	'''
+	r'''
 	Returns CPU usage of specified PID for specified interval
-	of time in seconds.
-	If a process not found then returns -1
+	of time in seconds.  
+	If a process not found then returns -1:
 
 		tass(proc_cpu('not existing process'), -1)
 		tass(proc_cpu(0), 1, '>')

@@ -304,12 +304,9 @@ def mail_check(server:str, login:str, password:str
 , headers:tuple=('subject', 'from', 'to', 'date')
 , silent:bool=True)->Tuple[ List[MailMsg], List[str] ]:
 	'''
-	Returns subjects of messages with *msg_status*
-	on the server in specified folder(s).
-	Returns list of MailMsg and list of errors.
-
+	Returns list of MailMsg and list of errors.  
 	*headers* - message headers to fetch. You can access them later
-	in MailMsg attributes.
+	in MailMsg attributes.  
 
 	'''
 	msgs:list = []

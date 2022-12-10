@@ -27,6 +27,12 @@ Use with Total Commander:
 
 [![Taskopy + Total Commander](https://img.youtube.com/vi/IAkXV_XJyfY/0.jpg)](https://www.youtube.com/watch?v=IAkXV_XJyfY)
 
+Tracking changes in the Windows startup:
+
+[![Taskopy + Autoruns vs Firefox browser agent](https://img.youtube.com/vi/bUIVBRI3hBg/0.jpg)](https://youtu.be/bUIVBRI3hBg)
+
+Telegram chat: https://t.me/taskopy_g
+
 ## Contents
 - [Installation](#installation)
 - [Usage](#usage)
@@ -103,7 +109,7 @@ Format: **option name** (default value) — description.
 - **menu** (True) — show in tray menu.
 - **hotkey** (None) — assign to global hotkey. Example: *hotkey='alt+ctrl+m'*
 - **hotkey_suppress** (True) — if set to False hotkey will not supressed so active window ill still receive it.
-- **hyperactive** - run task even if the Taskopy is disabled.
+- **hyperactive** — run task even if the Taskopy is disabled.
 - **every** ('') — run on schedule.  
 	Examples:  
 	Run task every 5 minutes:
@@ -156,24 +162,24 @@ Format: **option name** (default value) — description.
 	If a task has a *data* argument, it will be assigned query information in *DataHTTPReq* format.
 
 	See also [settings](#settings) section for IP and port bindings.
-- **http_dir** - folder where to save files sent via HTTP POST request. If not set then use system temporary folder.
-- **http_white_list** - white list of IP addresses for this task only. Example:
+- **http_dir** — folder where to save files sent via HTTP POST request. If not set then use system temporary folder.
+- **http_white_list** — white list of IP addresses for this task only. Example:
 	
 		http_white_list=['127.0.0.1', '192.168.0.*']
 
-- **on_dir_change** - run the task when changes are made in the folder.
+- **on_dir_change** — run the task when changes are made in the folder.
 
 		def demo__on_dir_change(on_dir_change=temp_dir()
 		, data:tuple=None, active=True):
 			fpath, action = data
 			tprint(f'{action}: {fpath}')
 
-- **on_exit** - start the task when you exit Taskopy. Notice that Taskopy will not be closed until these tasks are completed.
-- **on_file_change** - run task when the file changes.
-- **caller** - place this option before other options and in task body you will know who actually launched task this time. Possible values: http, menu, scheduler, hotkey. See *def check_free_space* in [Task Examples](#task-examples).
-- **data** - to pass any data to the task, e.g. *DataEvent* or *DataHTTPReq*.
-- **idle** - Perform the task when the user is idle for the specified time. For example, *idle='5 min'* - run when the user is idle for 5 minutes. The task is executed only once during the inactivity.
-- **err_threshold** - do not report any errors in the task until this threshold is exceeded.
+- **on_exit** — start the task when you exit Taskopy. Notice that Taskopy will not be closed until these tasks are completed.
+- **on_file_change** — run task when the file changes.
+- **caller** — place this option before other options and in task body you will know who actually launched task this time. Possible values: http, menu, scheduler, hotkey. See *def check_free_space* in [Task Examples](#task-examples).
+- **data** — to pass any data to the task, e.g. *DataEvent* or *DataHTTPReq*.
+- **idle** — Perform the task when the user is idle for the specified time. For example, *idle='5 min'* - run when the user is idle for 5 minutes. The task is executed only once during the inactivity.
+- **err_threshold** — do not report any errors in the task until this threshold is exceeded.
 
 ## Settings
 Global settings are stored in *settiings.ini* file.
@@ -182,7 +188,7 @@ Format: **setting** (default value) — description.
 
 - **language** (en) — language for menus and messages. Variants: en, ru.
 - **editor** (notepad) — text editor for «Edit crontab» menu command.
-- **hide_console** - hide the console window.
+- **hide_console** — hide the console window.
 - **server_ip** (127.0.0.1) — bind HTTP server to this local IP. For access from any address set to *0.0.0.0*.
 	**IT IS DANGEROUS TO ALLOW ACCESS FROM ANY IP!** Do not use *0.0.0.0* in public networks or limit access with firewall.
 - **white_list** (127.0.0.1) — a list of IP addresses separated by commas from which requests are received.
@@ -190,13 +196,13 @@ Format: **setting** (default value) — description.
 
 ## Keywords
 ### Miscelanneous
-- **balloon(msg:str, title:str=APP_NAME,timeout:int=None, icon:str=None)** - shows *baloon* message from tray icon. `title` - 63 symbols max, `msg` - 255 symbols. `icon` - 'info', 'warning' or 'error'.
-- **benchmark(func, b_iter:int=1000, a:tuple=(), ka:dict={})->datetime.timedelta** - run function `func` `b_iter` times and print time. Returns the total time as a datetime.timedelta object. Example:
+- **balloon(msg:str, title:str=APP_NAME,timeout:int=None, icon:str=None)** — shows *baloon* message from tray icon. `title` - 63 symbols max, `msg` - 255 symbols. `icon` - 'info', 'warning' or 'error'.
+- **benchmark(func, b_iter:int=1000, a:tuple=(), ka:dict={})->datetime.timedelta** — run function `func` `b_iter` times and print time. Returns the total time as a datetime.timedelta object. Example:
 
 		benchmark(dir_size, b_iter=100, a=('logs',) )
 
-- **crontab_reload()** - reloads the crontab.
-- **dialog(msg:str=None, buttons:list=None, title:str=None, content:str=None, default_button:int=0, timeout:int=None, return_button:bool=False)->int** - shows a dialog with many buttons. Returns ID of selected buttons starting with 1000.
+- **crontab_reload()** — reloads the crontab.
+- **dialog(msg:str=None, buttons:list=None, title:str=None, content:str=None, default_button:int=0, timeout:int=None, return_button:bool=False)->int** — shows a dialog with many buttons. Returns ID of selected buttons starting with 1000.
 	*buttons* - a list with text on the buttons. Number of strings = number of buttons.
 	*title* - dialog title.
 	*content* - supplementary text.
@@ -208,8 +214,8 @@ Format: **setting** (default value) — description.
 
 	![Dialog EN](https://user-images.githubusercontent.com/43970835/79643653-13d4d380-81b5-11ea-9548-eb28fc515d7b.png)
 
-- **hint(text:str, position:tuple=None)->int** - shows a small window with the specified text. Only for the *Python* version. *position* - a tuple with coordinates. If no coordinates are specified, it appears in the center of the screen. Returns the PID of the hint process.
-- **HTTPFile** - Use this class if your HTTP task returns a file:
+- **hint(text:str, position:tuple=None)->int** — shows a small window with the specified text. Only for the *Python* version. *position* - a tuple with coordinates. If no coordinates are specified, it appears in the center of the screen. Returns the PID of the hint process.
+- **HTTPFile** — Use this class if your HTTP task returns a file:
 
 		def http_file_demo(http=True, result=True
 		, submenu='demo'):
@@ -219,7 +225,7 @@ Format: **setting** (default value) — description.
 				, use_save_to=True
 			)
 
-- **Job(func, args, job_name:str='', kwargs)** - class for concurrent function execution in *job_batch* and *job_pool*. Properties:
+- **Job(func, args, job_name:str='', kwargs)** — class for concurrent function execution in *job_batch* and *job_pool*. Properties:
 	- *result* - functional result
 	- *time* - time in seconds
 	- *error* - there was an error
@@ -237,7 +243,7 @@ Format: **setting** (default value) — description.
 		for job in job_batch(jobs, timeout=5):
 			print(job.error, job.result, job.time)
 
-- **job_pool(jobs:list, pool_size:int, args:tuple)->list** - Launches 'pool_size' functions at a time for all the 'args'. 'args' may be a tuple of tuples or tuple of values. If 'pool_size' not specified, then pool_size = number of CPU.
+- **job_pool(jobs:list, pool_size:int, args:tuple)->list** — Launches 'pool_size' functions at a time for all the 'args'. 'args' may be a tuple of tuples or tuple of values. If 'pool_size' not specified, then pool_size = number of CPU.
 
 	Example:
 
@@ -257,7 +263,7 @@ Format: **setting** (default value) — description.
 	Difference between `job_batch` and `job_pool`:
 	- `job_batch` - all *jobs* are started simultaneously. If some *job* is not finished during specified *timeout*, it returns error (job.error = True, job.result = 'timeout').
 	- `job_pool` - only the specified number of jobs is executed simultaneously.
-- **msgbox(msg:str, title:str=APP_NAME, ui:int=None, wait:bool=True, timeout=None)->int** - show messagebox and return user choice.
+- **msgbox(msg:str, title:str=APP_NAME, ui:int=None, wait:bool=True, timeout=None)->int** — show messagebox and return user choice.
 	Arguments:
 	*msg* — text
 	*title* — messagebox title
@@ -276,7 +282,7 @@ Format: **setting** (default value) — description.
 	
 	If you need a message with many buttons see **dialog**.
 
-- **safe** - function wrapper for safe execution.
+- **safe** — function wrapper for safe execution.
 	Example:
 
 		func(arg) -> result
@@ -287,16 +293,16 @@ Format: **setting** (default value) — description.
 		OR
 		safe(func)(arg) -> False, Exception
 
-- **sound_play (fullpath:str, wait:bool)->str** - play .wav file. *wait* — do not pause task execution. If fullpath is a folder then pick random file.
-- **time_diff(start, end, unit:str='sec')->int** - returns difference between dates in units. *start* and *end* should be in datetime format.
-- **time_diff_str(start, end)->str** - returns difference between dates in string like that: '3:01:35'.	*start* and *end* should be in datetime format.
-- **time_now(\*\*delta)->datetime.datetime** - returns datetime object. Use `datetime.timedelta` keywords to get different time. Yesterday:
+- **sound_play (fullpath:str, wait:bool)->str** — play .wav file. *wait* — do not pause task execution. If fullpath is a folder then pick random file.
+- **time_diff(start, end, unit:str='sec')->int** — returns difference between dates in units. *start* and *end* should be in datetime format.
+- **time_diff_str(start, end)->str** — returns difference between dates in string like that: '3:01:35'.	*start* and *end* should be in datetime format.
+- **time_now(\*\*delta)->datetime.datetime** — returns datetime object. Use `datetime.timedelta` keywords to get different time. Yesterday:
 
 		time_now(days=-1)
 
-- **time_now_str(template:str='%Y-%m-%d_%H-%M-%S')->str** - string with current time.
-- **pause(sec:float)** - pause the execution of the task for the specified number of seconds. *interval* - time in seconds or a string specifying a unit like '5 ms' or '6 sec' or '7 min'.
-- **var_lst_get(var:str, default=[], encoding:str='utf-8', com_str:str='#')->list** - returns list with the text lines. Excludes empty lines and lines that begin with *com_str*
+- **time_now_str(template:str='%Y-%m-%d_%H-%M-%S')->str** — string with current time.
+- **pause(sec:float)** — pause the execution of the task for the specified number of seconds. *interval* - time in seconds or a string specifying a unit like '5 ms' or '6 sec' or '7 min'.
+- **var_lst_get(var:str, default=[], encoding:str='utf-8', com_str:str='#')->list** — returns list with the text lines. Excludes empty lines and lines that begin with *com_str*
 
 		var_lst_set('test', ['a', 'b'])
 		assert var_lst_get('test') == ['a', 'b']
@@ -304,14 +310,14 @@ Format: **setting** (default value) — description.
 		assert var_lst_get('test') == ['1', '2']
 		assert var_del('test') == True
 
-- **var_lst_set(var, value, encoding:str='utf-8')** - sets the *disk list variable*.
+- **var_lst_set(var, value, encoding:str='utf-8')** — sets the *disk list variable*.
 
 		# Note that the number has become a string:
 		var_lst_set('test', ['a', 'b', 1])
 		assert var_lst_get('test') == ['a', 'b', '1']
 		assert var_del('test')
 
-- **var_set(var_name:str, value:str)** - save *value* of variable *var_name* to disk so it will persist between program starts.
+- **var_set(var_name:str, value:str)** — save *value* of variable *var_name* to disk so it will persist between program starts.
 
 		var_set('test', 5)
 		assert var_get('test') == '5'
@@ -324,7 +330,7 @@ Format: **setting** (default value) — description.
 		assert var_get(var, 1) == '1'
 		assert var_del(var) == True
 
-- **var_get(var_name:str)->str** - retrieve *disk variable* value.
+- **var_get(var_name:str)->str** — retrieve *disk variable* value.
 
 	*as_literal* - converts to a literal (dict, list, tuple etc).
 	Dangerous! - it's just **eval** and not **ast.literal_eval**
@@ -334,25 +340,25 @@ Format: **setting** (default value) — description.
 		assert var_get('test', as_literal=True) == 1
 		assert var_del('test') == True
 
-- **clip_set(txt:str)->** - copy text to clipboard.
-- **clip_get()->str->** - get text from clipboard.
-- **re_find(source:str, re_pattern:str, sort:bool=True)->list** - search in *source* with regular expression.
-- **re_match(source:str, re_pattern:str, re_flags:int=re.IGNORECASE)->bool** - regexp match.
-- **re_replace(source:str, re_pattern:str, repl:str='')** - replace in *source* all matches with *repl* string.
-- **re_split(source:str, re_pattern:str, maxsplit:int=0, re_flags:int=re.IGNORECASE)->str** - regexp split:
+- **clip_set(txt:str)->** — copy text to clipboard.
+- **clip_get()->str->** — get text from clipboard.
+- **re_find(source:str, re_pattern:str, sort:bool=True)->list** — search in *source* with regular expression.
+- **re_match(source:str, re_pattern:str, re_flags:int=re.IGNORECASE)->bool** — regexp match.
+- **re_replace(source:str, re_pattern:str, repl:str='')** — replace in *source* all matches with *repl* string.
+- **re_split(source:str, re_pattern:str, maxsplit:int=0, re_flags:int=re.IGNORECASE)->List[str]** — regexp split:
 	
-		assert re_split('abc', 'b') == ['a', 'c']
-
-- **inputbox(message:str, title:str, is_pwd:bool=False)->str** - show a message with an input request. Returns the entered line or empty string if user pressed cancel.
+		tass( re_split('abc', 'b'), ['a', 'c'] )
+	
+- **inputbox(message:str, title:str, is_pwd:bool=False)->str** — show a message with an input request. Returns the entered line or empty string if user pressed cancel.
 	*is_pwd* — hide the typed text.
-- **random_num(a, b)->int** - return a random integer in the range from a to b, including a and b.
-- **random_str(string_len:int=10, string_source:str=None)->str** - generate a string of random characters with a given length.
+- **random_num(a, b)->int** — return a random integer in the range from a to b, including a and b.
+- **random_str(string_len:int=10, string_source:str=None)->str** — generate a string of random characters with a given length.
 
 ### Keyboard
 
-- **key_pressed(hotkey:str)->bool** - is the key pressed?
-- **key_send(hotkey:str)** - press the key combination.
-- **key_write(text:str)** - write a text.
+- **key_pressed(hotkey:str)->bool** — is the key pressed?
+- **key_send(hotkey:str)** — press the key combination.
+- **key_write(text:str)** — write a text.
 
 ### Filesystem
 
@@ -360,8 +366,8 @@ Format: **setting** (default value) — description.
 
 **IMPORTANT: always use double backslash "\\\" in paths!**
 
-- **csv_read(fullpath:str, encoding:str='utf-8', fieldnames=None, delimiter:str=';', quotechar:str='"')->list** - read a CSV file and return the contents as a list of dictionaries.
-- **csv_write(fullpath:str, content:list, fieldnames:tuple=None, encoding:str='utf-8', delimiter:str=';', quotechar:str='"', quoting:int=csv.QUOTE_MINIMAL)->str** - writes the list of dictionaries as a CSV file. If *fieldnames* is not specified - it takes the keys of the first dictionary as headers. Returns the full path to the file. *content* example:
+- **csv_read(fullpath:str, encoding:str='utf-8', fieldnames=None, delimiter:str=';', quotechar:str='"')->list** — read a CSV file and return the contents as a list of dictionaries.
+- **csv_write(fullpath:str, content:list, fieldnames:tuple=None, encoding:str='utf-8', delimiter:str=';', quotechar:str='"', quoting:int=csv.QUOTE_MINIMAL)->str** — writes the list of dictionaries as a CSV file. If *fieldnames* is not specified - it takes the keys of the first dictionary as headers. Returns the full path to the file. *content* example:
 
 		[
 			{'name': 'some name',
@@ -370,13 +376,26 @@ Format: **setting** (default value) — description.
 			'number': 2}
 			...	
 		]
-- **dir_copy(fullpath:str, destination:str)->int** - copy the folder and all its contents. Returns the number of errors.
-- **dir_delete(fullpath:str)** - delete directory.
-- **dir_dialog(title:str=None, default_dir:str='', on_top:bool=True, must_exist:bool=True)->str** - directory selection dialog.
-- **dir_dirs(fullpath, subdirs:bool=True)->list** - returns list of full paths of all directories in this directory and its subdirectories.
-- **dir_exists(fullpath:str)->bool** - directory exists?
-- **dir_files(fullpath)->list** - Returns list of full filenames of all files in the given directory and its subdirectories.
-- **dir_find(fullpath, only_files:bool=False)->list** - returns list of paths in specified folder.
+- **dir_copy(fullpath:str, destination:str)->int** — copy the folder and all its contents. Returns the number of errors.
+- **dir_delete(fullpath:str)** — delete directory.
+- **dir_dialog(title:str=None, default_dir:str='', on_top:bool=True, must_exist:bool=True)->str** — directory selection dialog.
+- **dir_dirs(fullpath, subdirs:bool=True)->list** — returns list of full paths of all directories in this directory and its subdirectories.
+- **dir_exists(fullpath:str)->bool** — directory exists?
+- **dir_files(fullpath, subdirs:bool=True, \*\*rules)->Iterator[str]** — returns list of full filenames of all files in the given directory and its subdirectories.  
+	*subdirs* - including files from subfolders.  
+	*rules* - rules for the `path_rule` function  
+
+		tass( tuple(dir_files('plugins', in_ext='jpg') ), tuple() )
+		tass(
+			tuple(dir_files('plugins', in_ext='py'))[0]
+			, 'plugins\\constants.py'
+		)
+		tass(
+			tuple( dir_files('plugins', ex_ext='pyc') )
+			, tuple( dir_files('plugins', in_ext='py') )
+		)
+
+- **dir_find(fullpath, only_files:bool=False)->list** — returns list of paths in specified folder.
 
 	*fullpath* passed to the **glob.glob**
 
@@ -390,15 +409,22 @@ Format: **setting** (default value) — description.
 		# with subdirectories:
 		dir_list('d:\\folder\\**\\*.jpg')
 
-- **dir_list(fullpath)->Iterator[str]** - returns all directory content (dirs and files).
+- **dir_list(fullpath)->Iterator[str]** — returns all directory content (dirs and files).
 
 		assert 'resources\\icon.png' in dir_list('resources')
 
-- **dir_size(fullpath:str, unit:str='b')->int** - folder size in specified units.
-- **dir_zip(source:str, destination:str)->str** - zip the folder return the path to the archive.
-- **dir_user_desktop()->str** - current user's *desktop* folder.
-- **dir_user_startup()->str** - *startup* folder of the current user*.
-- **drive_io(drive_num:int=None)->dict** - returns physical drive (not partition!) i/o generator that returns a named tuples with counters. example:
+- **dir_size(fullpath:str, unit:str='b')->int** — folder size in specified units.
+- **dir_sync(src_dir, dst_dir, report:bool=False, \*\*rules)->dict** — syncrhonize two directories.  
+	For *rules* see the `path_rule`.  
+	Returns dict with errors:  
+	
+		{'path\\file.exe': 'copy error', ...}
+
+	
+- **dir_zip(source:str, destination:str)->str** — zip the folder return the path to the archive.
+- **dir_user_desktop()->str** — current user's *desktop* folder.
+- **dir_user_startup()->str** — *startup* folder of the current user*.
+- **drive_io(drive_num:int=None)->dict** — returns physical drive (not partition!) i/o generator that returns a named tuples with counters. example:
 
 		dio = drive_io()
 		print(next(dio)[0].read_bytes)
@@ -407,76 +433,83 @@ Format: **setting** (default value) — description.
 			file_size_str(next(dio)[0].total_bytes_delta)
 		)
 
-- **drive_list(exclude:str='')->str** - string of logical drives letters.
-- **file_append(fullpath:str, content:str)->str** - appends *content* to a file. Creates fullpath if not specified. Returns fullpath.
-- **file_attr_set(fullpath, attribute:int=win32con.FILE_ATTRIBUTE_NORMAL)** - sets file attribute.
-- **file_backup(fullpath:str, dest_dir:str='', suffix_format:str='_%y-%m-%d_%H-%M-%S')->str** - copy 'somefile.txt' to 'somefile_2019-05-19_21-23-02.txt'. *dest_dir* - destination directory. If not specified - current folder. Returns full path of new file.
-- **file_basename(fullpath:str)->str** - returns basename: file name without parent folder and extension.
-- **file_backup(fullpath, folder:str=None)** - make copy of file with added timestamp.
+- **drive_list(exclude:str='')->str** — string of logical drives letters.
+- **file_append(fullpath:str, content:str)->str** — appends *content* to a file. Creates fullpath if not specified. Returns fullpath.
+- **file_attr_set(fullpath, attribute:int=win32con.FILE_ATTRIBUTE_NORMAL)** — sets file attribute.
+- **file_backup(fullpath:str, dest_dir:str='', suffix_format:str='_%y-%m-%d_%H-%M-%S')->str** — copy 'somefile.txt' to 'somefile_2019-05-19_21-23-02.txt'. *dest_dir* - destination directory. If not specified - current folder. Returns full path of new file.
+- **file_basename(fullpath:str)->str** — returns basename: file name without parent folder and extension.
+- **file_backup(fullpath, folder:str=None)** — make copy of file with added timestamp.
 	*folder* — place copy to this folder. If omitted — place in original folder.
-- **file_copy(fullpath, destination:str, copy_metadata:bool=False)** - copy file to destination (fullpath or just folder).
-- **file_date_a(fullpath)** - file access date .
-- **file_date_c(fullpath)** - file creation date.
-- **file_date_m(fullpath)** - file modification date.
-- **file_delete(fullpath:str)** - delete file. See also *file_recycle*.
-- **file_dialog(title:str=None, multiple:bool=False, default_dir:str='', default_file:str='', wildcard:str='', on_top:bool=True)** - Shows standard file dialog and returns fullpath or list of fullpaths if _multiple_ == True.
-- **file_dir(fullpath:str)->str:** - get parent directory name of file.
-- **file_dir_repl(fullpath, new_dir:str)->str** - changes the directory of the file (in full path)
-- **file_drive(fullpath)->str** - returns a drive letter in lowercase from a file name:
+- **file_copy(fullpath, destination:str, copy_metadata:bool=False)** — copy file to destination (fullpath or just folder).
+- **file_date_a(fullpath)** — file access date .
+- **file_date_c(fullpath)** — file creation date.
+- **file_date_m(fullpath)** — file modification date.
+- **file_delete(fullpath:str)** — delete file. See also *file_recycle*.
+- **file_dialog(title:str=None, multiple:bool=False, default_dir:str='', default_file:str='', wildcard:str='', on_top:bool=True)** — Shows standard file dialog and returns fullpath or list of fullpaths if _multiple_ == True.
+- **file_dir(fullpath:str)->str:** — get parent directory name of file.
+- **file_dir_repl(fullpath, new_dir:str)->str** — changes the directory of the file (in full path)
+- **file_drive(fullpath)->str** — returns a drive letter in lowercase from a file name:
 
 		assert file_drive(r'c:\\pagefile.sys') == 'c'
 
-- **file_exists(fullpath:str)->bool** - file exists?
-- **file_ext(fullpath:str)->str** - file extension in lower case without dot.
-- **file_hash(fullpath:str, algorithm:str='crc32')->str** - returns hash of file. *algorithm* - 'crc32' or any algorithm from hashlib ('md5', 'sha512' etc)
-- **file_lock_wait(fullpath, wait_interval:str='100 ms')->bool** - blocks execution until the file is available. Usage - wait for another process to stop writing to the file.
-- **file_log(fullpath:str, message:str, encoding:str='utf-8', time_format:str='%Y.%m.%d %H:%M:%S')** - log *message* to *fullpath* file.
-- **file_move(fullpath:str, destination:str)** - move file to destination folder or file.
-- **file_name(fullpath:str)->str** - get file name without directory.
-- **file_name_add(fullpath, suffix:str='', prefix:str='')->str** - adds a string (prefix or suffix) to the file name before the extension (or from beginning). Example:
+- **file_exists(fullpath:str)->bool** — file exists?
+- **file_ext(fullpath:str)->str** — file extension in lower case without dot.
+- **file_hash(fullpath:str, algorithm:str='crc32')->str** — returns hash of file. *algorithm* - 'crc32' or any algorithm from hashlib ('md5', 'sha512' etc)
+- **file_lock_wait(fullpath, wait_interval:str='100 ms')->bool** — blocks execution until the file is available. Usage - wait for another process to stop writing to the file.
+- **file_log(fullpath:str, message:str, encoding:str='utf-8', time_format:str='%Y.%m.%d %H:%M:%S')** — log *message* to *fullpath* file.
+- **file_move(fullpath:str, destination:str)** — move file to destination folder or file.
+- **file_name(fullpath:str)->str** — get file name without directory.
+- **file_name_add(fullpath, suffix:str='', prefix:str='')->str** — adds a string (prefix or suffix) to the file name before the extension (or from beginning). Example:
 	
 		file_name_add('my_file.txt', suffix='_1')
 		'my_file_1.txt'
 
-- **file_name_fix(filename:str, repl_char:str='\_')->str** - replaces forbidden characters with _repl_char_. Removes leading and trailing spaces. Adds '\\\\?\\' for long paths.
-- **file_name_rem(fullpath, suffix:str='', prefix:str='')->str** - removes a suffix or prefix from a filename.
-- **file_print(fullpath, printer:str=None, use_alternative:bool=False)->bool** - prints the file on the specified printer.
-- **file_read(fullpath:str)->str:** - get content of file.
-- **file_recycle(fullpath:str, silent:bool=True)->bool** - move file to the recycle bin. *silent* - do not show standard windows dialog to confirm deletion. Returns True on successful operation.
-- **file_relpath(fullpath, start)->str** - relative file name.
-- **file_rename(fullpath:str, dest:str)->str** - rename the file. *dest* is the full path or just a new file name without a folder.
-- **file_size(fullpath:str, unit:str='b')->bool:** - get size of file in units (gb, mb, kb, b).
-- **file_write(fullpath:str, content=str, encoding:str='utf-8')->str** - saves *content* to a file. Creates file if the fullpath doesn't exist. If fullpath is '' or None - uses temp_file(). Returns fullpath.
-- **file_zip(fullpath, destination:str)->str** - compress a file or files into an archive.
+- **file_name_fix(filename:str, repl_char:str='\_')->str** — replaces forbidden characters with _repl_char_. Removes leading and trailing spaces. Adds '\\\\?\\' for long paths.
+- **file_name_rem(fullpath, suffix:str='', prefix:str='')->str** — removes a suffix or prefix from a filename.
+- **file_print(fullpath, printer:str=None, use_alternative:bool=False)->bool** — prints the file on the specified printer.
+- **file_read(fullpath:str)->str:** — get content of file.
+- **file_recycle(fullpath:str, silent:bool=True)->bool** — move file to the recycle bin. *silent* - do not show standard windows dialog to confirm deletion. Returns True on successful operation.
+- **file_relpath(fullpath, start)->str** — relative file name.
+- **file_rename(fullpath:str, dest:str)->str** — rename the file. *dest* is the full path or just a new file name without a folder.
+- **file_size(fullpath:str, unit:str='b')->bool:** — get size of file in units (gb, mb, kb, b).
+- **file_write(fullpath:str, content=str, encoding:str='utf-8')->str** — saves *content* to a file. Creates file if the fullpath doesn't exist. If fullpath is '' or None - uses temp_file(). Returns fullpath.
+- **file_zip(fullpath, destination:str)->str** — compress a file or files into an archive.
 	*fullpath* — a string with a full file name or a list of files.
 	*destiniation* — full path to the archive.
-- **drive_free(letter:str, unit:str='GB')->int:** - get drive free space in units (gb, mb, kb, b).
-- **is_directory(fullpath:str)->bool:** - fullpath is directory?
-- **path_exists(fullpath:str)->bool:** - fullpath exists (no matter is it folder or file)?
-- **dir_purge(fullpath:str, days:int=0, recursive=False, creation:bool=False, test:bool=False)** - delete files from folder *fullpath* older than n *days*.
+- **drive_free(letter:str, unit:str='GB')->int:** — get drive free space in units (gb, mb, kb, b).
+- **is_directory(fullpath:str)->bool:** — fullpath is directory?
+- **path_exists(fullpath:str)->bool:** — fullpath exists (no matter is it folder or file)?
+- **path_short(fullpath, max_len:int=100)->str** — shortens a long file name to display.
+
+		path = r'c:\Windows\System32\msiexec.exe'
+		tass(path_short(path, 22), 'c:\Windo...msiexec.exe')
+		tass(path_short(path, 23), 'c:\Window...msiexec.exe')
+
+	
+- **dir_purge(fullpath:str, days:int=0, recursive=False, creation:bool=False, test:bool=False)** — delete files from folder *fullpath* older than n *days*.
 	If *days* == 0 then delete all files.
 	*creation* — use date of creation, otherwise use last modification date.
 	*recursive* — delete from subfolders too.
 	*test* — do not actually delete files, only print them.
 	*rule* - function that gets the full file name and returns True if the file is to be deleted.
-- **shortcut_create(fullpath, dest:str=None, descr:str=None, icon_fullpath:str=None, icon_index:int=None, win_style:int=win32con.SW_SHOWNORMAL, cwd:str=None)->str** - creates a shortcut for a file. Returns full path of shortcut.
+- **shortcut_create(fullpath, dest:str=None, descr:str=None, icon_fullpath:str=None, icon_index:int=None, win_style:int=win32con.SW_SHOWNORMAL, cwd:str=None)->str** — creates a shortcut for a file. Returns full path of shortcut.
 	- dest - full name of the shortcut file. If not specified, the desktop folder of the current user is used.
 	- descr - shortcut description.
 	- icon_fullpath - source file for icon.
 	- icon_index - icon index. If *icon_fullpath* not specified then uses *fullpath* as source.
 
-- **temp_dir(new_dir:str=None)->str** - returns the path to the temporary folder. If *new_dir* is specified, it creates a subfolder in the temporary folder and returns its path.
-- **temp_file(prefix:str='', suffix:str='')->str** - returns the name for the temporary file.
+- **temp_dir(new_dir:str=None)->str** — returns the path to the temporary folder. If *new_dir* is specified, it creates a subfolder in the temporary folder and returns its path.
+- **temp_file(prefix:str='', suffix:str='')->str** — returns the name for the temporary file.
 
 ### Network
-- **domain_ip(domain:str)->list** - get a list of IP-addresses by domain name.
-- **file_download(url:str, destination:str=None)->str:** - download file and return fullpath.
+- **domain_ip(domain:str)->list** — get a list of IP-addresses by domain name.
+- **file_download(url:str, destination:str=None)->str:** — download file and return fullpath.
 	*destination* — it may be None, fullpath or folder. If None then download to temporary folder with random name.
-- **ftp_upload(fullpath, server:str, user:str, pwd:str, dst_dir:str='/', port:int=21, active:bool=True, debug_lvl:int=0, attempts:int=3, timeout:int=10, secure:bool=False, encoding:str='utf-8')->tuple** - uploads file(s) to an FTP server. Returns (True, None) or (False, ('error1', 'error2'...))
+- **ftp_upload(fullpath, server:str, user:str, pwd:str, dst_dir:str='/', port:int=21, active:bool=True, debug_lvl:int=0, attempts:int=3, timeout:int=10, secure:bool=False, encoding:str='utf-8')->tuple** — uploads file(s) to an FTP server. Returns (True, None) or (False, ('error1', 'error2'...))
 
 	*debug_lvl* - set to 1 to see the commands.
 	
-- **html_element(url:str, element, element_num:int=0)->str:** - download page and retrieve value of html element.
+- **html_element(url:str, element, element_num:int=0)->str:** — download page and retrieve value of html element.
 	*element* — dictionary that contain element information such as name or attributes, or list with such dictionaries or string with xpath.
 	*element_num* - item number, if there are several of them found.
 	Example:
@@ -490,31 +523,37 @@ Format: **setting** (default value) — description.
 
 	See *get_current_ip* in [task examples](#task-examples)
 
-- **html_clean(html_str:str, separator=' ')->str** - removes HTML tags from string.
-- **is_online(*sites, timeout:int=2)->int:** - checks if you have access to the Internet using HEAD queries to specified sites. If sites are not specified, then use google and yandex.
-- **json_element(url:str, element:list)** - same as **html_element** but for JSON.
+- **html_clean(html_str:str, separator=' ')->str** — removes HTML tags from string.
+- **is_online(\*sites, timeout:float=2.0)->int** — checks if there is an internet connection using *HEAD* requests to the specified web sites.  
+	The function will not raise an exception.  
+	*timeout* - timeout in seconds.  
+
+		tass( is_online(), 2 )
+		tass( is_online('https://non.existent.domain'), 0 )
+
+- **json_element(url:str, element:list)** — same as **html_element** but for JSON.
 	*element* — a list with a map to desired item.
 	Example: *element=['usd', 2, 'value']*
-- **http_req(url:str, encoding:str='utf-8', post_file:str=None, post_hash:bool=False)->str:** - download page by url and return it's html as a string. *post_file* - send this file with POST request. *post_hash* - add the checksum of the file to request headers to check the integrity (see [Task Options](#task-options)).
-- **http_req_status(url:str, method='HEAD')->int** - returns just a status of HTTP request:
+- **http_req(url:str, encoding:str='utf-8', post_file:str=None, post_hash:bool=False)->str:** — download page by url and return it's html as a string. *post_file* - send this file with POST request. *post_hash* - add the checksum of the file to request headers to check the integrity (see [Task Options](#task-options)).
+- **http_req_status(url:str, method='HEAD')->int** — returns just a status of HTTP request:
 
 		assert http_req_status('https://github.com') == 200
 	
-- **net_html_unescape(html_str:str)->str** - decodes HTML escaped symbols:
+- **net_html_unescape(html_str:str)->str** — decodes HTML escaped symbols:
 		
 		"That&#039;s an example" -> "That's an example"
 
-- **net_url_decode(url:str, encoding:str='utf-8')->str** - decodes URL.
-- **net_url_encode(url:str, encoding:str='utf-8')->str** - encodes URL.
-- **pc_name()->str** - computer name.
-- **ping_icmp(host:str, count:int=3, timeout:int=500, encoding:str='cp866')->tuple** - Returns (True, (loss %, aver. time) ) or (False, 'cause of failure'). Examples:
+- **net_url_decode(url:str, encoding:str='utf-8')->str** — decodes URL.
+- **net_url_encode(url:str, encoding:str='utf-8')->str** — encodes URL.
+- **pc_name()->str** — computer name.
+- **ping_icmp(host:str, count:int=3, timeout:int=500, encoding:str='cp866')->tuple** — Returns (True, (loss %, aver. time) ) or (False, 'cause of failure'). Examples:
 	
 		ping_icmp('8.8.8.8')
 		> (True, (0, 47))
 		ping_icmp('domain.does.not.exist')
 		> (False, 'host unreachable (1)')
 
-- **ping_tcp(host:str, port:int, count:int=1, pause:int=100, timeout:int=500)->tuple** - measure loss and response time with a tcp connection. Returns (True, (loss percentage, time in ms) ) or (False, 'error text').
+- **ping_tcp(host:str, port:int, count:int=1, pause:int=100, timeout:int=500)->tuple** — measure loss and response time with a tcp connection. Returns (True, (loss percentage, time in ms) ) or (False, 'error text').
 	
 	*pause* - pause in milliseconds between attempts 
 	
@@ -527,7 +566,7 @@ Format: **setting** (default value) — description.
 		ping_tcp('domain.does.not.exist', 80)
 		> (false, '[errno 11004] getaddrinfo failed')
 
-- **table_html(table:list, headers:bool=True , empty_str:str='-', consider_empty:tuple=(None, '') , table_class:str='')->str** - converts list of tuples/lists to a html table.List example:
+- **table_html(table:list, headers:bool=True , empty_str:str='-', consider_empty:tuple=(None, '') , table_class:str='')->str** — converts list of tuples/lists to a html table.List example:
 
 		[
 			('name', 'age'),
@@ -535,7 +574,7 @@ Format: **setting** (default value) — description.
 			('jane', '24'),
 		]
 
-- **url_hostname(url:str, , sld:bool=True)->str** - extract the domain name from the URL.
+- **url_hostname(url:str, , sld:bool=True)->str** — extract the domain name from the URL.
 
 	*sld* - if True then return the second level domain otherwise return the full domain.
 
@@ -549,7 +588,7 @@ Format: **setting** (default value) — description.
 		assert url_hostname('http://user:pwd@192.168.0.1:80/api') \
 		== '192.168.0.1'
 
-- **xml_element(url:str, element:str, element_num:int=0, encoding:str='utf-8', \*\*kwargs)** - downloads the document from URL and returns the value by the specified XPath e.g:
+- **xml_element(url:str, element:str, element_num:int=0, encoding:str='utf-8', \*\*kwargs)** — downloads the document from URL and returns the value by the specified XPath e.g:
 
 	element='/result/array/msgContact[1]/msgCtnt'
 
@@ -557,41 +596,42 @@ Format: **setting** (default value) — description.
 ### System
 In the functions for working with windows, the *window* argument can be either a string with the window title or a number representing the window handle.
 
-- **free_ram(unit:str='percent')** - amount of free memory. *unit* — 'kb', 'mb'... or 'percent'.
-- **idle_duration(unit:str='msec')->int** - how much time has passed since user's last activity.
-- **monitor_off()** - turn off the monitor.
-- **monitor_on()** - turns on the monitor.
-- **registry_get(fullpath:str)** - get value from Windows Registry.
+- **free_ram(unit:str='percent')** — amount of free memory. *unit* — 'kb', 'mb'... or 'percent'.
+- **idle_duration(unit:str='msec')->int** — how much time has passed since user's last activity.
+- **monitor_off()** — turn off the monitor.
+- **monitor_on()** — turns on the monitor.
+- **registry_get(fullpath:str)** — get value from Windows Registry.
 	*fullpath* — string like 'HKEY_CURRENT_USER\\Software\\Microsoft\\Calc\\layout'
-- **win_activate(window=None)->int** - bring window to front. *window* may be a string with title or integer with window handle.
-- **win_by_pid(process)->tuple** - returns top window of a process as a tuple `(hwnd:int, title:str)`.
-- **win_close(window=None, wait:bool=True)->bool** - closes window and returns True on success.
-- **win_find(title:str)->list** - find window by title. Returns list of all found windows.
-- **win_hide(window=None)->int** - hide window.
-- **win_list(title_filter:str=None, class_filter:str=None, case_sensitive:bool=False)->list** - list of titles of all windows. *title_filter* - optional filter for titles.
-**- win_on_top(window=None, on_top:bool=True)->int** - makes the window to stay always on top.
-- **win_show(window=None)->int** - show window.
-- **win_title_set(window=None, new_title:str='')->int** - change window title from *cur_title* to *new_title*
+- **win_activate(window=None)->int** — bring window to front. *window* may be a string with title or integer with window handle.
+- **win_by_pid(process)->tuple** — returns top window of a process as a tuple `(hwnd:int, title:str)`.
+- **win_close(window=None, wait:bool=True)->bool** — closes window and returns True on success.
+- **win_find(title:str)->list** — find window by title. Returns list of all found windows.
+- **win_hide(window=None)->int** — hide window.
+- **win_list(title_filter:str=None, class_filter:str=None, case_sensitive:bool=False)->list** — list of titles of all windows. *title_filter* - optional filter for titles.
+**- win_on_top(window=None, on_top:bool=True)->int** — makes the window to stay always on top.
+- **win_show(window=None)->int** — show window.
+- **win_title_set(window=None, new_title:str='')->int** — change window title from *cur_title* to *new_title*
 
 ### Mail
-- **mail_check(server:str, login:str, password:str, folders:list=['inbox'], msg_status:str='UNSEEN')->tuple** - counts the number of messages with *msg_status* on the server. Returns (msg_num:int, errors:list). 
-
-		>(5, [])
-		or
-		>(0, ['login failed'])
-
-- **mail_download(server:str, login:str, password:str, output_dir:str, folders:list=['inbox'], trash_folder:str='Trash')->tuple** - downloads all messages to the specified folder. Successfully downloaded messages are moved to the IMAP *trash_folder* folder on the server. Returns a tuple of two lists: a list with decoded mail subjects and a list with errors.
-- **mail_send(recipient:str, subject:str, message:str, smtp_server:str, smtp_port:int, smtp_user:str, smtp_password:str)** - send email.
+- **mail_check(server:str, login:str, password:str, folders:list=['inbox'], msg_status:str='UNSEEN', headers:tuple=('subject', 'from', 'to', 'date'), silent:bool=True)->Tuple[ List[MailMsg], List[str] ]** — returns list of MailMsg and list of errors.  
+	*headers* - message headers to fetch. You can access them later
+	in MailMsg attributes.  
+		
+- **mail_download(server:str, login:str, password:str, output_dir:str, folders:list=['inbox'], trash_folder:str='Trash')->tuple** — downloads all messages to the specified folder. Successfully downloaded messages are moved to the IMAP *trash_folder* folder on the server. Returns a tuple of two lists: a list with decoded mail subjects and a list with errors.
+- **mail_send(recipient:str, subject:str, message:str, smtp_server:str, smtp_port:int, smtp_user:str, smtp_password:str)** — send email.
 
 ### Process
-- **proc_start(proc_path:str, args:str='', wait:bool=False)** - start application. If *wait=True* — returns process return code, if *False* — returns PID of created process.
+- **proc_start(proc_path:str, args:str='', wait:bool=False)** — start application. If *wait=True* — returns process return code, if *False* — returns PID of created process.
 	*proc_path* — path to executable file.
 	*args* — command-line arguments.
 	*wait* — wait until application will be closed.
-- **file_open(fullpath:str)** - open file or URL in default application.
-- **proc_close(process, timeout:int=10, cmd_filter:str=None)** - soft completion of the process: first all windows belonging to the specified process are closed, and after the timeout (in seconds) the process itself is killed, if still exists. *cmd_filter* - kill only processes with that string in command line.
-- **proc_exist(process, cmd_filter:str=None, user_filter:str=None)->bool** - checks whether the process exists and returns a PID or False. *cmd* is an optional command line search. This way you can distinguish between processes with the same executable but different command lines.
-- **proc_list(name:str='', cmd_filter:str=None)->list** - get list of processes with that name. Item in list is a *DictToObj* object with this attributes:
+- **file_open(fullpath:str)** — open file or URL in default application.
+- **proc_close(process, timeout:int=10, cmd_filter:str=None)** — soft completion of the process: first all windows belonging to the specified process are closed, and after the timeout (in seconds) the process itself is killed, if still exists. *cmd_filter* - kill only processes with that string in command line.
+- **proc_exists(process, cmd_filter:str=None, user_filter:str=None)->int** — returns PID if the process with the specified name exists.  
+	*process* - image name or PID.  
+	*cmd_filter* - optional string to search in the command line of the process.  
+	*user_filter* - only search within processes of specified user. Format: pc\\username  
+- **proc_list(name:str='', cmd_filter:str=None)->list** — get list of processes with that name. Item in list is a *DictToObj* object with this attributes:
 	*pid* — PID of found process.
 	*name* — short name of executable.
 	*username* — username.
@@ -605,27 +645,32 @@ In the functions for working with windows, the *window* argument can be either a
 		for proc in proc_list('firefox.exe'):
 			print(proc.pid)
 
-- **proc_cpu(pid:int, interval:int=1)->float** - CPU usage of process with specified PID. *interval* in seconds - how long to measure.
-- **proc_kill(process, cmd_filter:str=None)** - kill process or processes. *process* may be an integer so only process with this PID will be terminated. If *process* is a string then kill every process with that name. *cmd_filter* - kill only processes with that string in command line.
-- **screen_width()->int** - width of screen.
-- **screen_height()->int** - height of screen.
-- **service_start(service:str, args:tuple=None)** - starts the service.
-- **service_stop(service:str)->tuple** - stops the service.
-- **service_running(service:str)->bool** - the service is up and running?
-- **wts_message(sessionid:int, msg:str, title:str, style:int=0, timeout:int=0, wait:bool=False)** - sends message to WTS session. *style* - styles like in msgbox (0 - MB_OK). *timeout* - timeout in seconds (0 - no timeout). Returns same values as msgbox.
-- **wts_cur_sessionid()->int** - returns SessionID of current process
-- **wts_logoff(sessionid:int, wait:bool=False)->int** - logoffs session. *wait* - wait for completion.
-- **wts_proc_list(process:str=None)->list** - returns list of DictToObj objects with properties: *.sessionid:int*, *.pid:int*, *.process:str* (name of exe file), *.pysid:obj*, *.username:str*, *.cmdline:list*. *process* - filter by process name.
-- **wts_user_sessionid(users, only_active:bool=True)->list** - converts list of users to a list of session ID's. *only_active* - return only WTSActive sessions.
+- **proc_cpu(process, interval:float=1.0)->float** — returns CPU usage of specified PID for specified interval of time in seconds.  
+	If a process not found then returns -1:
+
+		tass(proc_cpu('not existing process'), -1)
+		tass(proc_cpu(0), 1, '>')
+		
+- **proc_kill(process, cmd_filter:str=None)** — kill process or processes. *process* may be an integer so only process with this PID will be terminated. If *process* is a string then kill every process with that name. *cmd_filter* - kill only processes with that string in command line.
+- **screen_width()->int** — width of screen.
+- **screen_height()->int** — height of screen.
+- **service_start(service:str, args:tuple=None)** — starts the service.
+- **service_stop(service:str)->tuple** — stops the service.
+- **service_running(service:str)->bool** — the service is up and running?
+- **wts_message(sessionid:int, msg:str, title:str, style:int=0, timeout:int=0, wait:bool=False)** — sends message to WTS session. *style* - styles like in msgbox (0 - MB_OK). *timeout* - timeout in seconds (0 - no timeout). Returns same values as msgbox.
+- **wts_cur_sessionid()->int** — returns SessionID of current process
+- **wts_logoff(sessionid:int, wait:bool=False)->int** — logoffs session. *wait* - wait for completion.
+- **wts_proc_list(process:str=None)->list** — returns list of DictToObj objects with properties: *.sessionid:int*, *.pid:int*, *.process:str* (name of exe file), *.pysid:obj*, *.username:str*, *.cmdline:list*. *process* - filter by process name.
+- **wts_user_sessionid(users, only_active:bool=True)->list** — converts list of users to a list of session ID's. *only_active* - return only WTSActive sessions.
 
 ### Cryptography
 - **file_enc_write(fullpath:str, content:str, password:str, encoding:str='utf-8')->tuple**: — encrypts content with password and writes to a file. Adds salt as file extension. Returns status, fullpath/error.
-- **file_enc_read(fullpath:str, password:str, encoding:str='utf-8')->tuple** - decrypts the contents of the file and returns status, content/error
-- **file_encrypt(fullpath:str, password:str)->tuple** - encrypts file with password. Returns status, fullpath/error. Adds salt as file extension.
-- **file_decrypt(fullpath:str, password:str)->tuple** - decrypts file with password. Returns status, fullpath/or error.
+- **file_enc_read(fullpath:str, password:str, encoding:str='utf-8')->tuple** — decrypts the contents of the file and returns status, content/error
+- **file_encrypt(fullpath:str, password:str)->tuple** — encrypts file with password. Returns status, fullpath/error. Adds salt as file extension.
+- **file_decrypt(fullpath:str, password:str)->tuple** — decrypts file with password. Returns status, fullpath/or error.
 
 ### Mikrotik RouterOS
-- **routeros_query(query:list, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** - send query to router and get status and data. Please read wiki [wiki](https://wiki.mikrotik.com/wiki/Manual:API) about query syntax.
+- **routeros_query(query:list, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — send query to router and get status and data. Please read wiki [wiki](https://wiki.mikrotik.com/wiki/Manual:API) about query syntax.
 	Example — get information about interface 'bridge1':
 
 		status, data = routeros_query(
@@ -667,7 +712,7 @@ In the functions for working with windows, the *window* argument can be either a
 		'=disabled': 'false',
 		'=comment': 'lan'}]
 
-- **routeros_send(cmd:str, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** - send command to router and get status and error.
+- **routeros_send(cmd:str, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — send command to router and get status and error.
 	Example: get list of static items from specified address-list then delete them all:
 
 		status, data = routeros_query(
@@ -703,7 +748,7 @@ In the functions for working with windows, the *window* argument can be either a
 			, device_pwd='PaSsWorD'
 		)	
 
-- **routeros_find_send(cmd_find:list, cmd_send:list, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** - find all id's and perform some action on them.
+- **routeros_find_send(cmd_find:list, cmd_send:list, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — find all id's and perform some action on them.
 	*cmd_find* — list with API *print* command to find what we need.
 	*cmd_send* — list with action to perform.
 	Example — remove all static entries from address-list *my_list*:

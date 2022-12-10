@@ -27,6 +27,12 @@
 
 [![Taskopy + Total Commander](https://img.youtube.com/vi/IAkXV_XJyfY/0.jpg)](https://www.youtube.com/watch?v=IAkXV_XJyfY)
 
+Отслеживание изменений в автозагрузке Windows:
+
+[![Taskopy + Autoruns vs Firefox browser agent](https://img.youtube.com/vi/bUIVBRI3hBg/0.jpg)](https://youtu.be/bUIVBRI3hBg)
+
+Чат в Телеграме: https://t.me/taskopy_g
+
 ## Содержание
 - [Установка](#установка)
 - [Использование](#использование)
@@ -103,7 +109,7 @@
 - **menu** (True) — показывать в меню у иконки в трее.
 - **hotkey** (None) — привязать к глобальной горячей клавише. Например: _hotkey='alt+ctrl+m'_
 - **hotkey_suppress** (True) — не _съедать_ горячую клавишу, т.е. активное окно всё равно её получит.
-- **hyperactive** - запуск задачи, даже если Taskopy отключен.
+- **hyperactive** — запуск задачи, даже если Taskopy отключен.
 - **every** ('') — запускать по расписанию.  
 	Примеры:  
 	Запускать задачу каждые 5 минут:
@@ -156,24 +162,24 @@
 	Если у задачи есть *data* аргумент, то в него будет передана информация о запросе в формате *DataHTTPReq*.
 
 	Смотрите в разделе [Настройки](#settings) про привязывание HTTP-сервера к IP и порту.
-- **http_dir** - папка, куда сохранять файлы, отправленные через HTTP POST запрос. Если не указано - временная папка.
-- **http_white_list** - белый список IP адресов только для этой задачи. Пример:
+- **http_dir** — папка, куда сохранять файлы, отправленные через HTTP POST запрос. Если не указано - временная папка.
+- **http_white_list** — белый список IP адресов только для этой задачи. Пример:
 	
 		http_white_list=['127.0.0.1', '192.168.0.*']
 
-- **on_dir_change** - запускать задачу при появлении изменений в папке:
+- **on_dir_change** — запускать задачу при появлении изменений в папке:
 
 		def demo__on_dir_change(on_dir_change=temp_dir()
 		, data:tuple=None, active=True):
 			fpath, action = data
 			tprint(f'{action}: {fpath}')
 
-- **on_exit** - запускать задачу при выходе из Taskopy. Обратите внимание, что Taskopy не будет закрыт, пока эти задачи не будут выполнены.
-- **on_file_change** - запускать задачу при изменении файла.
-- **caller** - при указании в свойствах, в эту переменную будет записано, кто именно запустил задачу. Возможные варианты: 'http', 'menu', 'scheduler', 'hotkey' и т.д. caller следует указывать перед другими свойствами задачи.
-- **data** - для того, чтобы передать в задачу какие-либо данные, например *DataEvent* или *DataHTTPReq*.
-- **idle** - выполнить задачу, когда пользователь бездействует указанное время. Например *idle='5 min'* — выполнить при бездействии в 5 минут. Задача выполняется только один раз в течении бездействия.
-- **err_threshold** - не сообщать об ошибках в задаче, пока данный порог не будет превышен.
+- **on_exit** — запускать задачу при выходе из Taskopy. Обратите внимание, что Taskopy не будет закрыт, пока эти задачи не будут выполнены.
+- **on_file_change** — запускать задачу при изменении файла.
+- **caller** — при указании в свойствах, в эту переменную будет записано, кто именно запустил задачу. Возможные варианты: 'http', 'menu', 'scheduler', 'hotkey' и т.д. caller следует указывать перед другими свойствами задачи.
+- **data** — для того, чтобы передать в задачу какие-либо данные, например *DataEvent* или *DataHTTPReq*.
+- **idle** — выполнить задачу, когда пользователь бездействует указанное время. Например *idle='5 min'* — выполнить при бездействии в 5 минут. Задача выполняется только один раз в течении бездействия.
+- **err_threshold** — не сообщать об ошибках в задаче, пока данный порог не будет превышен.
 
 ## Настройки
 Глобальные настройки приложения хранятся в файле *settiings.ini*.
@@ -182,7 +188,7 @@
 
 - **language** (en) — язык приложения. Варианты: en, ru.
 - **editor** (notepad) — text editor for «Edit crontab» menu command.
-- **hide_console** - скрыть окно консоли.
+- **hide_console** — скрыть окно консоли.
 - **server_ip** (127.0.0.1) — привязать HTTP к этому локальному IP-адресу. Для разрешения ответа на запросы с любого адреса нужно указать *0.0.0.0*.
 	**РАЗРЕШАТЬ ДОСТУП С ЛЮБОГО IP-АДРЕСА ПОТЕНЦИАЛЬНО ОПАСНО!** Не рекомендуется использовать *0.0.0.0* при подключении к публичным сетям, или ограничивайте доступ с помощью фаервола.
 - **white_list** (127.0.0.1) — список IP-адресов через запятую, от которых принимаются запросы.
@@ -190,13 +196,13 @@
 
 ## Ключевые слова
 ### Общие
-- **balloon(msg:str, title:str=APP_NAME,timeout:int=None, icon:str=None)** - показывает сообщение у иконки в трее. `title` - 63 символа максимум, `msg` - 255 символов. `icon` - 'info', 'warning' или 'error'.
-- **benchmark(func, b_iter:int=1000, a:tuple=(), ka:dict={})->datetime.timedelta** - выполняет футкцию `func` `b_iter` раз и выводит время выполнения. Пример:
+- **balloon(msg:str, title:str=APP_NAME,timeout:int=None, icon:str=None)** — показывает сообщение у иконки в трее. `title` - 63 символа максимум, `msg` - 255 символов. `icon` - 'info', 'warning' или 'error'.
+- **benchmark(func, b_iter:int=1000, a:tuple=(), ka:dict={})->datetime.timedelta** — выполняет футкцию `func` `b_iter` раз и выводит время выполнения. Пример:
 
 		benchmark(dir_size, b_iter=100, a=('logs',) )
 
-- **crontab_reload()** - перезагружает кронтаб.
-- **dialog(msg:str=None, buttons:list=None, title:str=None, content:str=None, default_button:int=0, timeout:int=None, return_button:bool=False)->int** - показывает сообщение с несколькими кнопками. Возвращает ID нажатой кнопки, начиная с 1000.
+- **crontab_reload()** — перезагружает кронтаб.
+- **dialog(msg:str=None, buttons:list=None, title:str=None, content:str=None, default_button:int=0, timeout:int=None, return_button:bool=False)->int** — показывает сообщение с несколькими кнопками. Возвращает ID нажатой кнопки, начиная с 1000.
 	*buttons* - список строк с текстом на кнопках. Сколько строк, столько и кнопок.
 	*title* - заголовок.
 	*content* - дополнительный текст.
@@ -208,8 +214,8 @@
 
 	![Dialog RU](https://user-images.githubusercontent.com/43970835/79643801-bc833300-81b5-11ea-8a2e-ea6baa045480.png)
 
-- **hint(text:str, position:tuple=None)->int** - показывает небольшое окошко с указанным текстом. Только для *Python* версии. *position* - кортеж с координатами. Если координаты не указаны - появится в центре экрана. Возвращает PID процесса с окошком.
-- **HTTPFile** - Используйте этот класс, если ваша HTTP задача возвращает файл:
+- **hint(text:str, position:tuple=None)->int** — показывает небольшое окошко с указанным текстом. Только для *Python* версии. *position* - кортеж с координатами. Если координаты не указаны - появится в центре экрана. Возвращает PID процесса с окошком.
+- **HTTPFile** — Используйте этот класс, если ваша HTTP задача возвращает файл:
 
 		def http_file_demo(http=True, result=True
 		, submenu='demo'):
@@ -219,7 +225,7 @@
 				, use_save_to=True
 			)
 
-- **Job(func, args, job_name:str='', kwargs)** - класс для параллельного запуска функций в *job_batch* и *job_pool*. Свойства:
+- **Job(func, args, job_name:str='', kwargs)** — класс для параллельного запуска функций в *job_batch* и *job_pool*. Свойства:
 	- *result* - результат выполнения функции
 	- *time* - время в секундах
 	- *error* - произошла ошибка
@@ -237,7 +243,7 @@
 		for job in job_batch(jobs, timeout=5):
 			print(job.error, job.result, job.time)
 
-- **job_pool(jobs:list, pool_size:int, args:tuple)->list** - запускает задания (Job) по очереди, так чтобы одновременно выполнялось только `pool_size` заданий. Если `pool_size` не указан, то он равен количеству процессоров в системе.
+- **job_pool(jobs:list, pool_size:int, args:tuple)->list** — запускает задания (Job) по очереди, так чтобы одновременно выполнялось только `pool_size` заданий. Если `pool_size` не указан, то он равен количеству процессоров в системе.
 
 	Пример:
 
@@ -257,7 +263,7 @@
 	Разница между `job_batch` и `job_pool`:
 	- `job_batch` - все задания запускаются одновременно. Если какое-то задание не выполняется за указанный таймаут, оно возвращается с ошибкой (job.error = True, job.result = 'timeout').
 	- `job_pool` - одновременно выполняется только указанное количество заданий.
-- **msgbox(msg:str, title:str=APP_NAME, ui:int=None, wait:bool=True, timeout=None)->int** - показать сообщение и вернуть код нажатой кнопки.
+- **msgbox(msg:str, title:str=APP_NAME, ui:int=None, wait:bool=True, timeout=None)->int** — показать сообщение и вернуть код нажатой кнопки.
 	Аргументы:
 	*msg* — сообщение
 	*title* — заголовок
@@ -276,7 +282,7 @@
 
 	Если вам нужно сообщение с несколькими кнопками, смотрите **dialog**.
 
-- **safe** - function wrapper for safe execution.
+- **safe** — function wrapper for safe execution.
 	Пример:
 
 		func(arg) -> result
@@ -287,16 +293,16 @@
 		OR
 		safe(func)(arg) -> False, Exception
 
-- **sound_play (fullpath:str, wait:bool)->str** - воспроизвести .wav файл. *wait* — ждать конца воспроизведения. Если *fullpath* это папка, значит проиграть случайный файл из неё.
-- **time_diff(start, end, unit:str='sec')->int** - возвращает разницу между датами в выбранных единицах. *start* и *end* должны быть в формате datetime.
-- **time_diff_str(start, end)->str** - возвращает разницу между датами в виде строки типа: '3:01:35'. *start* и *end* должны быть в формате datetime.
-- **time_now(\*\*delta)->datetime.datetime** - возвращает объект datetime. Используйте ключевые слова `datetime.timedelta` для получения другого времени. Вчера:
+- **sound_play (fullpath:str, wait:bool)->str** — воспроизвести .wav файл. *wait* — ждать конца воспроизведения. Если *fullpath* это папка, значит проиграть случайный файл из неё.
+- **time_diff(start, end, unit:str='sec')->int** — возвращает разницу между датами в выбранных единицах. *start* и *end* должны быть в формате datetime.
+- **time_diff_str(start, end)->str** — возвращает разницу между датами в виде строки типа: '3:01:35'. *start* и *end* должны быть в формате datetime.
+- **time_now(\*\*delta)->datetime.datetime** — возвращает объект datetime. Используйте ключевые слова `datetime.timedelta` для получения другого времени. Вчера:
 
 		time_now(days=-1)
 		
-- **time_now_str(template:str='%Y-%m-%d\_%H-%M-%S')->str** - строка с текущей датой и временем.
-- **pause(interval)** - приостановить выполнение задачи на указанное кол-во секунд. *interval* — время в секундах или строка с указанием единицы вроде '5 ms' или '6 sec' или '7 min'.
-- **var_lst_get(var:str, default=[], encoding:str='utf-8', com_str:str='#')->list** - возвращает список со строками. Исключает пустые строки и строки, начинающиеся с *com_str*
+- **time_now_str(template:str='%Y-%m-%d\_%H-%M-%S')->str** — строка с текущей датой и временем.
+- **pause(interval)** — приостановить выполнение задачи на указанное кол-во секунд. *interval* — время в секундах или строка с указанием единицы вроде '5 ms' или '6 sec' или '7 min'.
+- **var_lst_get(var:str, default=[], encoding:str='utf-8', com_str:str='#')->list** — возвращает список со строками. Исключает пустые строки и строки, начинающиеся с *com_str*
 
 		var_lst_set('test', ['a', 'b'])
 		assert var_lst_get('test') == ['a', 'b']
@@ -304,14 +310,14 @@
 		assert var_lst_get('test') == ['1', '2']
 		assert var_del('test') == True
 
-- **var_lst_set(var, value, encoding:str='utf-8')** - устанавливает переменную *дисковую переменную со списком*.
+- **var_lst_set(var, value, encoding:str='utf-8')** — устанавливает переменную *дисковую переменную со списком*.
 
 		# Обратите внимание на то, что число стало строкой:
 		var_lst_set('test', ['a', 'b', 1])
 		assert var_lst_get('test') == ['a', 'b', '1']
 		assert var_del('test')
 
-- **var_set(var_name:str, value:str)** - сохранить _значение_ переменной на диск. Таким образом можно хранить данные между запусками Taskopy.
+- **var_set(var_name:str, value:str)** — сохранить _значение_ переменной на диск. Таким образом можно хранить данные между запусками Taskopy.
 	
 		var_set('test', 5)
 		assert var_get('test') == '5'
@@ -324,7 +330,7 @@
 		assert var_get(var, 1) == '1'
 		assert var_del(var) == True
 
-- **var_get(var_name:str)->str** - получить значение переменной.
+- **var_get(var_name:str)->str** — получить значение переменной.
 
 	*as_literal* - преобразуется в литерал (dict, list, tuple и т.д.).
 	Опасно! - это просто **eval**, а не **ast.literal_eval**
@@ -334,25 +340,25 @@
 		assert var_get('test', as_literal=True) == 1
 		assert var_del('test') == True
 
-- **clip_set(txt:str)->** - поместить текст в буфер обмена.
-- **clip_get()->str->** - получить текст из буфера обмена.
-- **re_find(source:str, re_pattern:str, sort:bool=True)->list** - поиск в строке с помощью регулярного выражения. Возвращает список найденных значений.
-- **re_match(source:str, re_pattern:str, re_flags:int=re.IGNORECASE)->bool** - соответствие регулярному выражению.
-- **re_replace(source:str, re_pattern:str, repl:str='')** - заменить в строке всё найденное с помощью регулярного выражения на _repl._
-- **re_split(source:str, re_pattern:str, maxsplit:int=0, re_flags:int=re.IGNORECASE)->str** - разделение по регулярному выражению:
+- **clip_set(txt:str)->** — поместить текст в буфер обмена.
+- **clip_get()->str->** — получить текст из буфера обмена.
+- **re_find(source:str, re_pattern:str, sort:bool=True)->list** — поиск в строке с помощью регулярного выражения. Возвращает список найденных значений.
+- **re_match(source:str, re_pattern:str, re_flags:int=re.IGNORECASE)->bool** — соответствие регулярному выражению.
+- **re_replace(source:str, re_pattern:str, repl:str='')** — заменить в строке всё найденное с помощью регулярного выражения на _repl._
+- **re_split(source:str, re_pattern:str, maxsplit:int=0, re_flags:int=re.IGNORECASE)->List[str]** — разделение по регулярному выражению:
 	
-		assert re_split('abc', 'b') == ['a', 'c']
-
-- **inputbox(message:str, title:str, is_pwd:bool=False)->str** - показать сообщение с вводом текста. Возвращает введённую строку или пустую строку, если пользователь нажал отмену.
+		tass( re_split('abc', 'b'), ['a', 'c'] )
+	
+- **inputbox(message:str, title:str, is_pwd:bool=False)->str** — показать сообщение с вводом текста. Возвращает введённую строку или пустую строку, если пользователь нажал отмену.
 	*is_pwd* — скрыть вводимый текст.
-- **random_num(a, b)->int** - вернуть случайное целое число в диапазоне от a до b, включая a и b.
-- **random_str(string_len:int=10, string_source:str=None)->str** - сгенерировать строку из случайных символов заданной длины.
+- **random_num(a, b)->int** — вернуть случайное целое число в диапазоне от a до b, включая a и b.
+- **random_str(string_len:int=10, string_source:str=None)->str** — сгенерировать строку из случайных символов заданной длины.
 
 ### Клавиатура
 
-- **key_pressed(hotkey:str)->bool** - нажата ли клавиша.
-- **key_send(hotkey:str)** - нажать сочетание клавиш.
-- **key_write(text:str)** - написать текст.
+- **key_pressed(hotkey:str)->bool** — нажата ли клавиша.
+- **key_send(hotkey:str)** — нажать сочетание клавиш.
+- **key_write(text:str)** — написать текст.
 
 ### Файловая система
 
@@ -360,8 +366,8 @@
 
 **ВАЖНО: всегда используйте двойной обратный слеш "\\\" в путях!**
 
-- **csv_read(fullpath:str, encoding:str='utf-8', fieldnames=None, delimiter:str=';', quotechar:str='"')->list** - прочитать CSV файл и вернуть содержимое в виде списка со словарями.
-- **csv_write(fullpath:str, content:list, fieldnames:tuple=None, encoding:str='utf-8', delimiter:str=';', quotechar:str='"', quoting:int=csv.QUOTE_MINIMAL)->str** - записывает список словарей как CSV файл. Если *fieldnames* не указан - берёт ключи первого словаря в качестве заголовков. Возвращает полный путь к файлу. Пример *content*:
+- **csv_read(fullpath:str, encoding:str='utf-8', fieldnames=None, delimiter:str=';', quotechar:str='"')->list** — прочитать CSV файл и вернуть содержимое в виде списка со словарями.
+- **csv_write(fullpath:str, content:list, fieldnames:tuple=None, encoding:str='utf-8', delimiter:str=';', quotechar:str='"', quoting:int=csv.QUOTE_MINIMAL)->str** — записывает список словарей как CSV файл. Если *fieldnames* не указан - берёт ключи первого словаря в качестве заголовков. Возвращает полный путь к файлу. Пример *content*:
 
 		[
 			{'name': 'some name',
@@ -370,13 +376,13 @@
 			'number': 2}
 			...	
 		]
-- **dir_copy(fullpath:str, destination:str)->int** - копировать папку и всё её содержимое. Возвращает количество ошибок при копировании.
-- **dir_delete(fullpath:str)** - удалить папку.
-- **dir_dialog(title:str=None, default_dir:str='', on_top:bool=True, must_exist:bool=True)->str** - диалог выбора папки.
-- **dir_dirs(fullpath, subdirs:bool=True)->list** - возвращает список полных путей всех каталогов в данном каталоге и его подкаталогах.
-- **dir_exists(fullpath:str)->bool** - папка существует?
-- **dir_files(fullpath)->list** - возвращает список полных путей всех файлов в указанной папке и её подпапках.
-- **dir_find(fullpath, only_files:bool=False)->list** - возвращает список путей в указанной папке.
+- **dir_copy(fullpath:str, destination:str)->int** — копировать папку и всё её содержимое. Возвращает количество ошибок при копировании.
+- **dir_delete(fullpath:str)** — удалить папку.
+- **dir_dialog(title:str=None, default_dir:str='', on_top:bool=True, must_exist:bool=True)->str** — диалог выбора папки.
+- **dir_dirs(fullpath, subdirs:bool=True)->list** — возвращает список полных путей всех каталогов в данном каталоге и его подкаталогах.
+- **dir_exists(fullpath:str)->bool** — папка существует?
+- **dir_files(fullpath, subdirs:bool=True, \*\*rules)->Iterator[str]** — возвращает список полных путей всех файлов в указанной папке и её подпапках.
+- **dir_find(fullpath, only_files:bool=False)->list** — возвращает список путей в указанной папке.
 
 	*fullpath* передается в **glob.glob**
 
@@ -390,15 +396,22 @@
 		# с подкаталогами:
 		dir_list('d:\\folder\\**\\*.jpg')
 
-- **dir_list(fullpath)->Iterator[str]** - возвращает все содержимое каталога (файлы и папки).
+- **dir_list(fullpath)->Iterator[str]** — возвращает все содержимое каталога (файлы и папки).
 
 		assert 'resources\\icon.png' in dir_list('resources')
 
-- **dir_size(fullpath:str, unit:str='b')->int** - размер папки в указанных единицах.
-- **dir_zip(source:str, destination:str)->str** - упаковать папку в архив и вернуть путь к архиву.
-- **dir_user_desktop()->str** - папка *рабочего стола* текущего пользователя.
-- **dir_user_startup()->str** - папка *автозагрузки* текущего пользователя.
-- **drive_io(drive_num:int=None)->dict** - возвращает генератор счетчиков физического диска (не раздела!) который возвращает именованные кортежи со счетчиками. пример:
+- **dir_size(fullpath:str, unit:str='b')->int** — размер папки в указанных единицах.
+- **dir_sync(src_dir, dst_dir, report:bool=False, \*\*rules)->dict** — синхронизировать два каталога.  
+	*rules* смотреть в `path_rule`.  
+	Возвращает словарь с ошибками:  
+	
+		{'path\\file.exe': 'copy error', ...}
+
+	
+- **dir_zip(source:str, destination:str)->str** — упаковать папку в архив и вернуть путь к архиву.
+- **dir_user_desktop()->str** — папка *рабочего стола* текущего пользователя.
+- **dir_user_startup()->str** — папка *автозагрузки* текущего пользователя.
+- **drive_io(drive_num:int=None)->dict** — возвращает генератор счетчиков физического диска (не раздела!) который возвращает именованные кортежи со счетчиками. пример:
 
 		dio = drive_io()
 		print(next(dio)[0].read_bytes)
@@ -407,76 +420,83 @@
 			file_size_str(next(dio)[0].total_bytes_delta)
 		)
 		
-- **drive_list(exclude:str='')->str** - строка с буквами логических дисков.
-- **file_append(fullpath:str, content:str)->str** - дописывает *content* к файлу. Создаёт файл, если он не существует. Возвращает полное имя файла.
-- **file_attr_set(fullpath, attribute:int=win32con.FILE_ATTRIBUTE_NORMAL)** - изменение атрибутов файла.
-- **file_backup(fullpath:str, dest_dir:str='', suffix_format:str='_%y-%m-%d_%H-%M-%S')->str** - копировать 'somefile.txt' в 'somefile_2019-05-19_21-23-02.txt'. *dest_dir* - папка назначения. Если не указана - текущая папка файла. Возвращает полное имя нового файла.
-- **file_basename(fullpath:str)->str** - возвращает *базовое* имя файла - без папки и расширения.
-- **file_backup(fullpath, folder:str=None)** - сделать копию файла, дописав в имя текущую дату и время.
+- **drive_list(exclude:str='')->str** — строка с буквами логических дисков.
+- **file_append(fullpath:str, content:str)->str** — дописывает *content* к файлу. Создаёт файл, если он не существует. Возвращает полное имя файла.
+- **file_attr_set(fullpath, attribute:int=win32con.FILE_ATTRIBUTE_NORMAL)** — изменение атрибутов файла.
+- **file_backup(fullpath:str, dest_dir:str='', suffix_format:str='_%y-%m-%d_%H-%M-%S')->str** — копировать 'somefile.txt' в 'somefile_2019-05-19_21-23-02.txt'. *dest_dir* - папка назначения. Если не указана - текущая папка файла. Возвращает полное имя нового файла.
+- **file_basename(fullpath:str)->str** — возвращает *базовое* имя файла - без папки и расширения.
+- **file_backup(fullpath, folder:str=None)** — сделать копию файла, дописав в имя текущую дату и время.
 	*folder* — папка, куда следует поместить копию. Если не указано — поместить в папке оригинального файла.
-- **file_copy(fullpath, destination:str, copy_metadata:bool=False)** - копировать файл. *destination* может быть папкой или полным путём к копии файла.
-- **file_date_a(fullpath)** - дата открытия файла.
-- **file_date_c(fullpath)** - дата создания файла.
-- **file_date_m(fullpath)** - дата изменения файла.
-- **file_delete(fullpath:str)** - удалить файл. Смотрите так же *file_recycle*.
-- **file_dialog(title:str=None, multiple:bool=False, default_dir:str='', default_file:str='', wildcard:str='', on_top:bool=True)** - открывает стандартный диалог выбора файла. Возвращает полный путь или список полных путей, если _multiple_ == True.
-- **file_dir(fullpath:str)->str:** - получить полное имя папки, в которой файл лежит.
-- **file_dir_repl(fullpath, new_dir:str)->str** - изменяет каталог файла (в полном пути)
-- **file_drive(fullpath)->str** - возвращает букву диска в нижнем регистре из имени файла:
+- **file_copy(fullpath, destination:str, copy_metadata:bool=False)** — копировать файл. *destination* может быть папкой или полным путём к копии файла.
+- **file_date_a(fullpath)** — дата открытия файла.
+- **file_date_c(fullpath)** — дата создания файла.
+- **file_date_m(fullpath)** — дата изменения файла.
+- **file_delete(fullpath:str)** — удалить файл. Смотрите так же *file_recycle*.
+- **file_dialog(title:str=None, multiple:bool=False, default_dir:str='', default_file:str='', wildcard:str='', on_top:bool=True)** — открывает стандартный диалог выбора файла. Возвращает полный путь или список полных путей, если _multiple_ == True.
+- **file_dir(fullpath:str)->str:** — получить полное имя папки, в которой файл лежит.
+- **file_dir_repl(fullpath, new_dir:str)->str** — изменяет каталог файла (в полном пути)
+- **file_drive(fullpath)->str** — возвращает букву диска в нижнем регистре из имени файла:
 
 		assert file_drive(r'c:\\pagefile.sys') == 'c'
 
-- **file_exists(fullpath:str)->bool** - файл существует?
-- **file_ext(fullpath:str)->str** - расширение файла без точки.
+- **file_exists(fullpath:str)->bool** — файл существует?
+- **file_ext(fullpath:str)->str** — расширение файла без точки.
 - **file_hash(fullpath:str, algorithm:str='crc32')->str**: - возвращает хэш файла. *algorithm* - 'crc32' или любой алгоритм из hashlib ('md5', 'sha512' и т.д.)
-- **file_log(fullpath:str, message:str, encoding:str='utf-8', time_format:str='%Y.%m.%d %H:%M:%S')** - записать *message* в файл *fullpath*.
-**file_lock_wait(fullpath, wait_interval:str='100 ms')->bool** - блокирует выполнение до тех пор, пока файл не станет доступен. Использование - подождать, пока другой процесс не прекратит запись в файл.
-- **file_move(fullpath:str, destination:str)** - переместить файл.
-- **file_name(fullpath:str)->str** - получить имя файла без папки.
-- **file_name_add(fullpath, suffix:str='', prefix:str='')->str** - добавляет строку (префикс или суффикс) к файлу перед расширением. Пример: 
+- **file_log(fullpath:str, message:str, encoding:str='utf-8', time_format:str='%Y.%m.%d %H:%M:%S')** — записать *message* в файл *fullpath*.
+**file_lock_wait(fullpath, wait_interval:str='100 ms')->bool** — блокирует выполнение до тех пор, пока файл не станет доступен. Использование - подождать, пока другой процесс не прекратит запись в файл.
+- **file_move(fullpath:str, destination:str)** — переместить файл.
+- **file_name(fullpath:str)->str** — получить имя файла без папки.
+- **file_name_add(fullpath, suffix:str='', prefix:str='')->str** — добавляет строку (префикс или суффикс) к файлу перед расширением. Пример: 
 	
 		file_name_add('my_file.txt', suffix='_1')
 		'my_file_1.txt'
 
-- **file_name_fix(filename:str, repl_char:str='\_')->str** - заменяет запрещённые символы на _repl_char_. Удаляет пробелы в начале и в конце. Добавляет '\\\\?\\' к длинным путям.
-- **file_name_rem(fullpath, suffix:str='', prefix:str='')->str** - удаляет суффикс или префикс из имени файла.
-- **file_print(fullpath, printer:str=None, use_alternative:bool=False)->bool** - распечатывает файл на указанном принтере.
-- **file_read(fullpath:str)->str:** - получить содержимое файла.
-- **file_recycle(fullpath:str, silent:bool=True)->bool** - переместить файл в корзину. *silent* - не показывать стандартный системный диалог подтверждения удаления в корзину. Возвращает True в случае успешного удаления.
-- **file_relpath(fullpath, start)->str** - относительное имя файла.
-- **file_rename(fullpath:str, dest:str)->str** - переименовать файл. *dest* — полный путь или просто новое имя файла без папки.
-- **file_size(fullpath:str, unit:str='b')->bool:** - получить размер файла (gb, mb, kb, b).
-- **file_write(fullpath:str, content=str, encoding:str='utf-8')->str** - сохраняет *content* в файл. Создаёт файл, если он не существует. Если fullpath = '' или None, используется temp_file(). Возвращает полное имя файла.
-- **file_zip(fullpath, destination:str)->str** - сжать файл или файлы в архив.
+- **file_name_fix(filename:str, repl_char:str='\_')->str** — заменяет запрещённые символы на _repl_char_. Удаляет пробелы в начале и в конце. Добавляет '\\\\?\\' к длинным путям.
+- **file_name_rem(fullpath, suffix:str='', prefix:str='')->str** — удаляет суффикс или префикс из имени файла.
+- **file_print(fullpath, printer:str=None, use_alternative:bool=False)->bool** — распечатывает файл на указанном принтере.
+- **file_read(fullpath:str)->str:** — получить содержимое файла.
+- **file_recycle(fullpath:str, silent:bool=True)->bool** — переместить файл в корзину. *silent* - не показывать стандартный системный диалог подтверждения удаления в корзину. Возвращает True в случае успешного удаления.
+- **file_relpath(fullpath, start)->str** — относительное имя файла.
+- **file_rename(fullpath:str, dest:str)->str** — переименовать файл. *dest* — полный путь или просто новое имя файла без папки.
+- **file_size(fullpath:str, unit:str='b')->bool:** — получить размер файла (gb, mb, kb, b).
+- **file_write(fullpath:str, content=str, encoding:str='utf-8')->str** — сохраняет *content* в файл. Создаёт файл, если он не существует. Если fullpath = '' или None, используется temp_file(). Возвращает полное имя файла.
+- **file_zip(fullpath, destination:str)->str** — сжать файл или файлы в архив.
 	*fullpath* — строка с полным именем файла или список с файлами.
 	*destiniation* — полный путь к архиву.
-- **drive_free(letter:str, unit:str='GB')->int:** - размер свободного места на диске (gb, mb, kb, b).
-- **is_directory(fullpath:str)->bool:** - указанный путь является папкой?
-- **path_exists(fullpath:str)->bool:** - указанный путь существует (не важно файл это или папка)?
-- **dir_purge(fullpath:str, days:int=0, recursive=False, creation:bool=False, test:bool=False, rule=None)** - удалить файлы из папки старше указанного числа дней.
+- **drive_free(letter:str, unit:str='GB')->int:** — размер свободного места на диске (gb, mb, kb, b).
+- **is_directory(fullpath:str)->bool:** — указанный путь является папкой?
+- **path_exists(fullpath:str)->bool:** — указанный путь существует (не важно файл это или папка)?
+- **path_short(fullpath, max_len:int=100)->str** — сокращает длинное имя файла для отображения.
+
+		path = r'c:\Windows\System32\msiexec.exe'
+		tass(path_short(path, 22), 'c:\Windo...msiexec.exe')
+		tass(path_short(path, 23), 'c:\Window...msiexec.exe')
+
+
+- **dir_purge(fullpath:str, days:int=0, recursive=False, creation:bool=False, test:bool=False, rule=None)** — удалить файлы из папки старше указанного числа дней.
 	Если *days* == 0 значит удалить вообще все файлы в папке.
 	*creation* — использовать дату создания, иначе использовать дату последнего изменения.
 	*recursive* — включая подпапки.
 	*test* — не удалять на самом деле, а просто вывести в консоль список файлов, которые должны быть удалены.
 	*rule* - функция, получающая полное имя файла и возвращающая True, если файл должен быть удалён.
-- **shortcut_create(fullpath, dest:str=None, descr:str=None, icon_fullpath:str=None, icon_index:int=None, win_style:int=win32con.SW_SHOWNORMAL, cwd:str=None)->str** - создаёт ярлык для файла. Возвращает полный путь к файлу ярлыка.
+- **shortcut_create(fullpath, dest:str=None, descr:str=None, icon_fullpath:str=None, icon_index:int=None, win_style:int=win32con.SW_SHOWNORMAL, cwd:str=None)->str** — создаёт ярлык для файла. Возвращает полный путь к файлу ярлыка.
 	- dest - полное имя файла ярлыка. Если не указано, используется папка рабочего стола текущего пользователя.
 	- descr - описание
 	- icon_fullpath - файл-источник для иконки.
 	- icon_index - номер иконки в файле. Если *icon_fullpath* не указан, используется *fullpath*.
 
-- **temp_dir(new_dir:str=None)->str** - возвращает путь ко временной папке. Если указана *new_dir* - создаёт подпапку во временной папке и возвращает её путь.
-- **temp_file(prefix:str='', suffix:str='')->str** - возвращает имя для временного файла.
+- **temp_dir(new_dir:str=None)->str** — возвращает путь ко временной папке. Если указана *new_dir* - создаёт подпапку во временной папке и возвращает её путь.
+- **temp_file(prefix:str='', suffix:str='')->str** — возвращает имя для временного файла.
 
 ### Сеть
-- **domain_ip(domain:str)->list** - получить список IP-адресов по имени домена.
-- **file_download(url:str, destination:str=None)->str:** - скачать файл и вернуть полный путь.
+- **domain_ip(domain:str)->list** — получить список IP-адресов по имени домена.
+- **file_download(url:str, destination:str=None)->str:** — скачать файл и вернуть полный путь.
 	*destination* — может быть *None*, полным путём к файлу или папкой. Если *None*, то скачать во временную папку и вернуть полное имя.
-- **ftp_upload(fullpath, server:str, user:str, pwd:str, dst_dir:str='/', port:int=21, active:bool=True, debug_lvl:int=0, attempts:int=3, timeout:int=10, secure:bool=False, encoding:str='utf-8')->tuple** - загружает файл(ы) на FTP-сервер. Возвращает (True, None) или (False, ('error1', 'error2'...)).
+- **ftp_upload(fullpath, server:str, user:str, pwd:str, dst_dir:str='/', port:int=21, active:bool=True, debug_lvl:int=0, attempts:int=3, timeout:int=10, secure:bool=False, encoding:str='utf-8')->tuple** — загружает файл(ы) на FTP-сервер. Возвращает (True, None) или (False, ('error1', 'error2'...)).
   
 	*debug_lvl* - установите в 1, чтобы увидеть команды.
 
-- **html_element(url:str, element, element_num:int=0)->str:** - получить текст HTML-элемента по указанной ссылке.
+- **html_element(url:str, element, element_num:int=0)->str:** — получить текст HTML-элемента по указанной ссылке.
 	*element* — словарь, который содержит информацию о нужном элементе (его имя, атрибуты); или список таких словарей; или строка с xpath.
 	*element_num* - номер элемента, если таких находится несколько.
 	Пример со словарём:
@@ -490,31 +510,37 @@
 	
 	Посмотрите на задачу *get_current_ip* в [Примеры задач](#task-examples)
 
-- **html_clean(html_str:str, separator=' ')->str** - очищает строку от HTML тэгов.
-- **is_online(*sites, timeout:int=2)->int:** - проверяет, есть ли доступ в Интернет, используя HEAD запросы к указанным сайтам. Если сайты не указаны, то использует google и yandex.
-- **json_element(url:str, element:list)** - аналог **html_element** для JSON.
+- **html_clean(html_str:str, separator=' ')->str** — очищает строку от HTML тэгов.
+- **is_online(\*sites, timeout:float=2.0)->int** — проверяет наличие интернет-соединения, используя *HEAD* запросы к указанным веб-сайтам.  
+	Функция не вызовет исключения.  
+	*timeout* - тайм-аут в секундах.  
+
+		tass( is_online(), 2 )
+		tass( is_online('https://non.existent.domain'), 0 )
+
+- **json_element(url:str, element:list)** — аналог **html_element** для JSON.
 	*element* — список с картой для нахождения нужного элемента в структуре json.
 	Пример: *element=['usd', 2, 'value']*
-- **http_req(url:str, encoding:str='utf-8', post_file:str=None, post_hash:bool=False)->str:** - скачать указанную страницу и вернуть её содержимое. *post_file* - отправить указанный файл POST запросом. *post_hash* - в запросе указать хэш файла для проверки целостности (смотрите [Свойства задачи](#свойства-задачи)).
-- **http_req_status(url:str, method='HEAD')->int** - возвращает статус HTTP-запроса:
+- **http_req(url:str, encoding:str='utf-8', post_file:str=None, post_hash:bool=False)->str:** — скачать указанную страницу и вернуть её содержимое. *post_file* - отправить указанный файл POST запросом. *post_hash* - в запросе указать хэш файла для проверки целостности (смотрите [Свойства задачи](#свойства-задачи)).
+- **http_req_status(url:str, method='HEAD')->int** — возвращает статус HTTP-запроса:
 
 		assert http_req_status('https://github.com') == 200
 	
-- **net_html_unescape(html_str:str)->str** - декодирует экранированные символы (HTML):
+- **net_html_unescape(html_str:str)->str** — декодирует экранированные символы (HTML):
 		
 		"That&#039;s an example" -> "That's an example"
 
-- **net_url_decode(url:str, encoding:str='utf-8')->str** - декодирует URL.
-- **net_url_encode(url:str, encoding:str='utf-8')->str** - кодирует URL.
-- **pc_name()->str** - имя компьютера.
-- **ping_icmp(host:str, count:int=3, timeout:int=500, encoding:str='cp866')->tuple** - возвращает (True, (% потерь, среднее время) ) или (False, 'текст ошибки'). Примеры:
+- **net_url_decode(url:str, encoding:str='utf-8')->str** — декодирует URL.
+- **net_url_encode(url:str, encoding:str='utf-8')->str** — кодирует URL.
+- **pc_name()->str** — имя компьютера.
+- **ping_icmp(host:str, count:int=3, timeout:int=500, encoding:str='cp866')->tuple** — возвращает (True, (% потерь, среднее время) ) или (False, 'текст ошибки'). Примеры:
 	
 		ping_icmp('8.8.8.8')
 		> (True, (0, 47))
 		ping_icmp('domain.does.not.exist')
 		> (False, 'host unreachable (1)')
 
-- **ping_tcp(host:str, port:int, count:int=1, pause:int=100, timeout:int=500)->tuple** - измерение потерь и времени отклика при tcp-соединении. Возвращает (True, (% потерь, время в мс) ) или (False, 'текст ошибки').
+- **ping_tcp(host:str, port:int, count:int=1, pause:int=100, timeout:int=500)->tuple** — измерение потерь и времени отклика при tcp-соединении. Возвращает (True, (% потерь, время в мс) ) или (False, 'текст ошибки').
 	
 	*pause* - пауза в миллисекундах между попытками 
 	
@@ -527,7 +553,7 @@
 		ping_tcp('domain.does.not.exist', 80)
 		> (false, '[errno 11004] getaddrinfo failed')
 
-- **table_html(table:list, headers:bool=True , empty_str:str='-', consider_empty:tuple=(None, '') , table_class:str='')->str** - преобразует список кортежей в HTML таблицу. Пример списка:
+- **table_html(table:list, headers:bool=True , empty_str:str='-', consider_empty:tuple=(None, '') , table_class:str='')->str** — преобразует список кортежей в HTML таблицу. Пример списка:
 
 		[
 			('name', 'age'),
@@ -535,7 +561,7 @@
 			('jane', '24'),
 		]
 
-- **url_hostname(url:str, , sld:bool=True)->str** - извлечь имя домена из URL.
+- **url_hostname(url:str, , sld:bool=True)->str** — извлечь имя домена из URL.
 
 	*sld* - если True, то вернуть домен второго уровня, иначе вернуть полный.
 
@@ -549,7 +575,7 @@
 		assert url_hostname('http://user:pwd@192.168.0.1:80/api') \
 		== '192.168.0.1'
 
-- **xml_element(url:str, element:str, element_num:int=0, encoding:str='utf-8', \*\*kwargs)** - скачивает документ по ссылке и возвращает значение по указанному XPath. Например:
+- **xml_element(url:str, element:str, element_num:int=0, encoding:str='utf-8', \*\*kwargs)** — скачивает документ по ссылке и возвращает значение по указанному XPath. Например:
 
 	element='/result/array/msgContact[1]/msgCtnt'
 
@@ -557,40 +583,40 @@
 ### Система
 В функциях для работы с окнами аргумент *window* может быть или строкой с заголовком окна или числом, представляющим handle окна.
 
-- **free_ram(unit:str='percent')** - количество свободной памяти. *unit* — 'kb', 'mb'... или 'percent'.
-- **idle_duration(unit:str='msec')->int** - сколько прошло времени с последней активности пользователя.
-- **monitor_off()** - выключает монитор.
-- **monitor_on()** - включает монитор.
-- **registry_get(fullpath:str)** - получить значение ключа из реестра Windows.
+- **free_ram(unit:str='percent')** — количество свободной памяти. *unit* — 'kb', 'mb'... или 'percent'.
+- **idle_duration(unit:str='msec')->int** — сколько прошло времени с последней активности пользователя.
+- **monitor_off()** — выключает монитор.
+- **monitor_on()** — включает монитор.
+- **registry_get(fullpath:str)** — получить значение ключа из реестра Windows.
 	*fullpath* — строка вида 'HKEY_CURRENT_USER\\\Software\\\Microsoft\\\Calc\\\layout'
-- **win_activate(window=None)->int** - вывести указанное окно на передний план. *window* может строкой с заголовком или числовым хэндлом нужного окна.
-- **win_by_pid(process)->tuple** - возвращает главное окно процесса в виде кортежа `(hwnd:int, title:str)`.
-- **win_close(window=None, wait:bool=True)->bool** - закрывает окно и возвращает True при успехе.
-- **win_find(title:str)->list** - вернуть список хэндлов окон, с указанным заголовком.
-- **win_hide(window=None)->int** - скрыть окно.
-- **win_list(title_filter:str=None, class_filter:str=None, case_sensitive:bool=False)->list** - список заголовков всех окон. *title_filter* - вернуть только заголовки с этой подстрокой.
-**- win_on_top(window=None, on_top:bool=True)->int** - делает указанное окно поверх других окон.
-- **win_show(window=None)->int** - показать окно.
-- **win_title_set(window=None, new_title:str='')->int** -  найти окно по заголовку *cur_title* и поменять на *new_title*.
+- **win_activate(window=None)->int** — вывести указанное окно на передний план. *window* может строкой с заголовком или числовым хэндлом нужного окна.
+- **win_by_pid(process)->tuple** — возвращает главное окно процесса в виде кортежа `(hwnd:int, title:str)`.
+- **win_close(window=None, wait:bool=True)->bool** — закрывает окно и возвращает True при успехе.
+- **win_find(title:str)->list** — вернуть список хэндлов окон, с указанным заголовком.
+- **win_hide(window=None)->int** — скрыть окно.
+- **win_list(title_filter:str=None, class_filter:str=None, case_sensitive:bool=False)->list** — список заголовков всех окон. *title_filter* - вернуть только заголовки с этой подстрокой.
+**- win_on_top(window=None, on_top:bool=True)->int** — делает указанное окно поверх других окон.
+- **win_show(window=None)->int** — показать окно.
+- **win_title_set(window=None, new_title:str='')->int** —  найти окно по заголовку *cur_title* и поменять на *new_title*.
 
 ### Почта
-- **mail_check(server:str, login:str, password:str, folders:list=['inbox'], msg_status:str='UNSEEN')->tuple** - подсчитывает количество сообщений со статусом *msg_status* на сервере. Returns (msg_num:int, errors:list). 
+- **mail_check(server:str, login:str, password:str, folders:list=['inbox'], msg_status:str='UNSEEN', headers:tuple=('subject', 'from', 'to', 'date'), silent:bool=True)->Tuple[ List[MailMsg], List[str] ]** — возвращает список объектов MailMsg и список ошибок.  
+	*headers* - заголовки сообщений для получения. Вы можете получить к ним доступ позже в атрибутах MailMsg.  
 
-		>(5, [])
-		or
-		>(0, ['login failed'])
-
-- **mail_download(server:str, login:str, password:str, output_dir:str, folders:list=['inbox'], trash_folder:str='Trash')->tuple** - скачивает все письма в указанную папку. Успешно скачанные письма перемещаются в IMAP *trash_folder* папку на сервере. Возвращает кортеж из двух списков: список с декодированными заголовками писем и список с ошибками.
-- **mail_send(recipient:str, subject:str, message:str, smtp_server:str, smtp_port:int, smtp_user:str, smtp_password:str)** - отправить письмо. Поддерживает отправку с русским заголовком и русским текстом.
+- **mail_download(server:str, login:str, password:str, output_dir:str, folders:list=['inbox'], trash_folder:str='Trash')->tuple** — скачивает все письма в указанную папку. Успешно скачанные письма перемещаются в IMAP *trash_folder* папку на сервере. Возвращает кортеж из двух списков: список с декодированными заголовками писем и список с ошибками.
+- **mail_send(recipient:str, subject:str, message:str, smtp_server:str, smtp_port:int, smtp_user:str, smtp_password:str)** — отправить письмо. Поддерживает отправку с русским заголовком и русским текстом.
 
 ### Процессы
-- **proc_start(proc_path:str, args:str, wait:bool=False)** - запустить приложение. Если *wait=True* — возвращает код возврата, а если *False*, то возвращает PID созданного процесса.
+- **proc_start(proc_path:str, args:str, wait:bool=False)** — запустить приложение. Если *wait=True* — возвращает код возврата, а если *False*, то возвращает PID созданного процесса.
 	*proc_path* — полный путь к исполняемому файлу.
 	*args* — аргументы командной строки.
 	*wait* — приостановить выполнение задачи, пока не завершится запущенный процесс.
-- **file_open(fullpath:str)** - открыть файл или URL в приложении по умолчанию.
-- **proc_close(process, timeout:int=10, cmd_filter:str=None)** - мягкое завершение процесса: сначала закрываются все окна, принадлежащие указанному процессу, а по истечении таймаута (в секундах) убивается сам процесс, если ещё существует. *cmd_filter* - убивать только процессы, содержащие эту строку в командной строке.
-- **proc_exist(process, cmd_filter:str=None, user_filter:str=None)->bool** - проверяет, существует ли процесс и возвращает PID или False. *cmd* - необязательная строка для поиска в командной строке. Таким образом можно различать процессы с одинаковым исполняемым файлом но разной командной строкой.
+- **file_open(fullpath:str)** — открыть файл или URL в приложении по умолчанию.
+- **proc_close(process, timeout:int=10, cmd_filter:str=None)** — мягкое завершение процесса: сначала закрываются все окна, принадлежащие указанному процессу, а по истечении таймаута (в секундах) убивается сам процесс, если ещё существует. *cmd_filter* - убивать только процессы, содержащие эту строку в командной строке.
+- **proc_exists(process, cmd_filter:str=None, user_filter:str=None)->int** — проверяет, существует ли процесс и возвращает PID.
+	*process* - имя файла или PID.  
+	*cmd_filter* - необязательная строка для поиска в	командной строке процесса.  
+	*user_filter* - поиск только в процессах	указанного пользователя. Формат: pc\\username  
 - **proc_list(name:str='', cmd_filter:str=None)->list —** получить список процессов. Список содержит объекты *DictToObj*, у которых есть следующие свойства:
 	*pid* — числовой идентификатор.
 	*name* — имя файла.
@@ -605,27 +631,32 @@
 		for proc in proc_list('firefox.exe'):
 			print(proc.pid)
 
-- **proc_cpu(pid:int, interval:int=1)->float** - процент загрузки процессора указанным PID. *interval* — время замера в секундах.
-- **proc_kill(process, cmd_filter:str=None)** - убить указанный процесс. *process* может быть строкой с именем исполняемого файла, тогда будут завершены все процессы с таким названием, либо это может быть числовой PID, и тогда будет завершён только указанный процесс. *cmd_filter* - убивать только процессы, содержащие эту строку в командной строке.
-- **screen_width()->int** - ширина экрана.
-- **screen_height()->int** - высота экрана.
-- **service_start(service:str, args:tuple=None)** - запускает службу.
-- **service_stop(service:str)->tuple** - останавливает службу.
-- **service_running(service:str)->bool** - служба запущена?
-- **wts_message(sessionid:int, msg:str, title:str, style:int=0, timeout:int=0, wait:bool=False)->int** - отправляет сообщение терминальной сессии. *style* - стили как в msgbox (0 - MB_OK). *timeout* - таймаут в секундах (0 - без таймаута). Возвращает то же, что и msgbox.
-- **wts_cur_sessionid()->int** - возвращает SessionID текущего процесса.
-- **wts_logoff(sessionid:int, wait:bool=False)->int** - завершает терминальную сессию. *wait* - ждать завершения работы.
-- **wts_proc_list(process:str=None)->list** - возвращает список объектов *DictToObj* с такими свойствами: *.sessionid:int*, *.pid:int*, *.process:str* (имя исполняемого файла), *.pysid:obj*, *.username:str*, *.cmdline:list*. *process* - фильтровать выдачу по имени процесса.
-- **wts_user_sessionid(users, only_active:bool=True)->list** - преобразует список пользователей в список Session ID. *only_active* - вернуть только  WTSActive сессии.
+- **proc_cpu(process, interval:float=1.0)->float** — возвращает использование ЦП указанного PID за указанный интервал времени в секундах.  
+	Если процесс не найден, то возвращается -1:
+
+		tass(proc_cpu('not existing process'), -1)
+		tass(proc_cpu(0), 1, '>')
+		
+- **proc_kill(process, cmd_filter:str=None)** — убить указанный процесс. *process* может быть строкой с именем исполняемого файла, тогда будут завершены все процессы с таким названием, либо это может быть числовой PID, и тогда будет завершён только указанный процесс. *cmd_filter* - убивать только процессы, содержащие эту строку в командной строке.
+- **screen_width()->int** — ширина экрана.
+- **screen_height()->int** — высота экрана.
+- **service_start(service:str, args:tuple=None)** — запускает службу.
+- **service_stop(service:str)->tuple** — останавливает службу.
+- **service_running(service:str)->bool** — служба запущена?
+- **wts_message(sessionid:int, msg:str, title:str, style:int=0, timeout:int=0, wait:bool=False)->int** — отправляет сообщение терминальной сессии. *style* - стили как в msgbox (0 - MB_OK). *timeout* - таймаут в секундах (0 - без таймаута). Возвращает то же, что и msgbox.
+- **wts_cur_sessionid()->int** — возвращает SessionID текущего процесса.
+- **wts_logoff(sessionid:int, wait:bool=False)->int** — завершает терминальную сессию. *wait* - ждать завершения работы.
+- **wts_proc_list(process:str=None)->list** — возвращает список объектов *DictToObj* с такими свойствами: *.sessionid:int*, *.pid:int*, *.process:str* (имя исполняемого файла), *.pysid:obj*, *.username:str*, *.cmdline:list*. *process* - фильтровать выдачу по имени процесса.
+- **wts_user_sessionid(users, only_active:bool=True)->list** — преобразует список пользователей в список Session ID. *only_active* - вернуть только  WTSActive сессии.
 
 ### Шифрование
 - **file_enc_write(fullpath:str, content:str, password:str, encoding:str='utf-8')**: — зашифровывает *content* и записывает в файл. Соль добавляется в виде расширения файла. Возвращает статус и полный путь/ошибку.
 - **file_enc_read(fullpath:str, password:str, encoding:str='utf-8')->tuple**: — расшифровывает содержимое файла. Возвращает статус и содержимое/ошибку.
-- **file_encrypt(fullpath:str, password:str)->tuple** - зашифровывает файл. Добавляет соль в виде расширения. Возвращает статус, полный путь/ошибку.
-- **file_decrypt(fullpath:str, password:str)->tuple** - расшифровывает файл, возвращает статус и полный путь/ошибку.
+- **file_encrypt(fullpath:str, password:str)->tuple** — зашифровывает файл. Добавляет соль в виде расширения. Возвращает статус, полный путь/ошибку.
+- **file_decrypt(fullpath:str, password:str)->tuple** — расшифровывает файл, возвращает статус и полный путь/ошибку.
 
 ### Mikrotik RouterOS
-- **routeros_query(query:list, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** - послать запрос на указанный маршрутизатор и вернуть результат. Запросы в API имеют специфический синтаксис, отличающийся от комманд для терминала, так что смотрите в [wiki](https://wiki.mikrotik.com/wiki/Manual:API).
+- **routeros_query(query:list, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — послать запрос на указанный маршрутизатор и вернуть результат. Запросы в API имеют специфический синтаксис, отличающийся от комманд для терминала, так что смотрите в [wiki](https://wiki.mikrotik.com/wiki/Manual:API).
 	Пример — получить информацию об интерфейсе bridge1:
 
 		status, data = routeros_query(
@@ -667,7 +698,7 @@
 		'=disabled': 'false',
 		'=comment': 'lan'}]
 
-- **routeros_send(cmd:str, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** - отправить команду на указанный маршрутизатор и получить статус выполнения и ошибку, если есть.
+- **routeros_send(cmd:str, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — отправить команду на указанный маршрутизатор и получить статус выполнения и ошибку, если есть.
 	Пример: сначала получаем список постоянных («dynamic=false») записей в списке адресов «my_list», а затем удаляем все найденные записи:
 
 		status, data = routeros_query(
@@ -703,7 +734,7 @@
 			, device_pwd='PaSsWorD'
 		)
 	
-- **routeros_find_send(cmd_find:list, cmd_send:list, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** - комбинированное слово для операций, требующих предварительного поиска номеров (*find* в терминале)
+- **routeros_find_send(cmd_find:list, cmd_send:list, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — комбинированное слово для операций, требующих предварительного поиска номеров (*find* в терминале)
 	*cmd_find* — список с командами для поиска значений.
 	*cmd_send* — команда, которая будет выполняться для найденных элементов.
 	Пример — удаление всех статических адресов из address-list:

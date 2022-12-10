@@ -463,11 +463,11 @@ def file_name_rem(fullpath, suffix:str='', prefix:str='')->str:
 	return os.path.join(par_dir, basename + ext)
 
 def file_name_fix(filename:str, repl_char:str='_')->str:
-	'''
-	Replaces forbidden characters with *repl_char*.
+	r'''
+	Replaces forbidden characters with the *repl_char*.  
 	Don't use it with a full path or it will replace
-	all backslashes.
-	Removes the leading and trailing spaces and dots.
+	all backslashes.  
+	Removes the leading and trailing spaces and dots.  
 	'''
 	new_fn = ''
 	for char in filename.strip(' .'):
@@ -494,7 +494,7 @@ def dir_dirs(fullpath, subdirs:bool=True)->Iterator[str]:
 
 def dir_files(fullpath, subdirs:bool=True
 , **rules)->Iterator[str]:
-	'''
+	r'''
 	Returns list of full filenames of all files
 	in the given directory and its subdirectories.  
 	*subdirs* - including files from subfolders.  
@@ -1205,7 +1205,7 @@ def _file_name_pe(filename:str):
 		filename = filename.replace(char, repl)
 	return filename
 
-def _var_fpath(var)->str:
+def var_fpath(var)->str:
 	if is_iter(var):
 		return os.path.join(_VAR_DIR
 		, *map(_file_name_pe, var) )
@@ -1214,7 +1214,7 @@ def _var_fpath(var)->str:
 
 def var_open(var:str)->None:
 	' Opens variable in default editor '
-	win32api.ShellExecute(None, 'open', _var_fpath(var)
+	win32api.ShellExecute(None, 'open', var_fpath(var)
 	, None, None, 0)
 
 
@@ -1225,13 +1225,13 @@ def var_get(var:str, default=None, encoding:str='utf-8'
 	*as_literal* - converts to a literal (dict, list, tuple etc).
 	Dangerous! - it's just `eval`, not `ast.literal_eval`
 
-		var_set('test', 1)
-		tass( var_get('test'), '1')
-		assert var_get('test', as_literal=True) == 1
-		tass( var_del('test'), True)
+		var_set('_test', 1)
+		tass( var_get('_test'), '1')
+		tass( var_get('_test', as_literal=True), 1 )
+		tass( var_del('_test'), True)
 
 	'''
-	fpath = _var_fpath(var)
+	fpath = var_fpath(var)
 	try:
 		content = file_read(fpath, encoding=encoding)
 	except FileNotFoundError:
@@ -1245,16 +1245,16 @@ def var_set(var, value, encoding:str='utf-8'):
 	'''
 	Sets the disk variable.
 
-		var_set('test', 5)
-		assert var_get('test') == '5'
-		assert var_del('test') == True
+		var_set('_test', 5)
+		tass( var_get('_test'), '5')
+		tass( var_del('_test'), True)
 		var = ('file', 'c:\\pagefile.sys')
 		var_set(var, 1)
-		assert var_get(var, 1) == '1'
-		assert var_del(var) == True
+		tass( var_get(var, 1), '1' )
+		tass( var_del(var), True )
 
 	'''
-	fpath = _var_fpath(var)
+	fpath = var_fpath(var)
 	value = str(value)
 	try:
 		file_write(fpath, value, encoding=encoding)
@@ -1266,11 +1266,11 @@ def var_del(var:str):
 	'''
 	Deletes variable. Returns True if var exists.
 
-		var_set('test', 'a')
-		assert var_del('test') == True
+		var_set('_test', 'a')
+		tass( var_del('_test'), True)
 		
 	'''
-	fpath = _var_fpath(var)
+	fpath = var_fpath(var)
 	try:
 		os.remove(fpath)
 		return True
@@ -1282,9 +1282,9 @@ def var_add(var:str, value, var_type=None
 	'''
 	Adds the value to the previous value and returns the new value.
 
-		assert var_add('test', 5, var_type=int) == 5
-		assert var_add('test', 3) == 8
-		assert var_del('test') == True
+		tass(var_add('_test', 5, var_type=int), 5)
+		tass(var_add('_test', 3),  8)
+		tass(var_del('_test'), True)
 
 	'''
 	prev = var_get(var, encoding=encoding, as_literal=True)
@@ -1315,11 +1315,11 @@ def var_lst_get(var:str, default=[]
 	Returns list with the text lines. Excludes empty lines
 	and lines that begin with *com_str*
 
-		var_lst_set('test', ['a', 'b'])
-		assert var_lst_get('test') == ['a', 'b']
-		var_lst_set('test', map(str, (1, 2)))
-		assert var_lst_get('test') == ['1', '2']
-		assert var_del('test') == True
+		var_lst_set('_test', ['a', 'b'])
+		tass(var_lst_get('_test'), ['a', 'b'])
+		var_lst_set('_test', map(str, (1, 2)))
+		tass(var_lst_get('_test'), ['1', '2'])
+		tass(var_del('_test'), True)
 
 	'''
 	cont = var_get(var, default=default
@@ -1335,7 +1335,7 @@ def var_mod(var)->datetime.datetime:
 	'''
 	Returns the date of the last modification.
 	'''
-	fpath = _var_fpath(var)
+	fpath = var_fpath(var)
 	return file_date_m(fpath)
 
 def var_mod_dif(var, unit:str='sec')->int:
@@ -1343,7 +1343,7 @@ def var_mod_dif(var, unit:str='sec')->int:
 	Returns how many time units have passed
 	since the last change.
 
-		assert var_mod_dif('_public_suffix_list', 'month') < 2
+		tass(var_mod_dif('_public_suffix_list', 'month'), 2, '<')
 
 	'''
 	return time_diff(var_mod(var), unit=unit)
@@ -1351,9 +1351,9 @@ def var_mod_dif(var, unit:str='sec')->int:
 def var_lst_set(var, value, encoding:str='utf-8'):
 	'''
 	Sets the disk list variable.
-		var_lst_set('test', ['a', 'b', 1])
-		assert var_lst_get('test') == ['a', 'b', '1']
-		assert var_del('test')
+		var_lst_set('_test', ['a', 'b', 1])
+		tass( var_lst_get('_test'), ['a', 'b', '1'])
+		tass( var_del('_test'), True)
 
 	'''
 	var_set(var, '\n'.join(map(str, value))
@@ -1364,9 +1364,9 @@ def var_lst_add(var, value, encoding:str='utf-8')->list:
 	Adds the value to the list
 	and returns the list.
 
-		var_lst_set('test', 'ab')
-		assert var_lst_add('test', 'c') == ['a', 'b', 'c']
-		assert var_del('test')
+		var_lst_set('_test', 'ab')
+		tass( var_lst_add('_test', 'c'), ['a', 'b', 'c'] )
+		tass( var_del('_test'), True)
 
 	'''
 	lst = var_lst_get(var, encoding=encoding)
@@ -1379,9 +1379,9 @@ def var_lst_ext(var, value, encoding:str='utf-8')->list:
 	Expands the list with the values of *value*. Returns
 	new list.
 
-		var_lst_set('test', 'ab')
-		assert var_lst_upd('test', 'cd') == ['a', 'b', 'c', 'd']
-		assert var_del('test')
+		var_lst_set('_test_ext', 'ab')
+		tass( var_lst_ext('_test_ext', 'cd'), ['a', 'b', 'c', 'd'] )
+		tass( var_del('_test_ext'), True)
 
 	'''
 	lst = var_lst_get(var, encoding=encoding)
@@ -1393,7 +1393,7 @@ def file_drive(fullpath)->str:
 	'''
 	Returns a drive letter in lowercase from a file name:
 
-		assert file_drive(r'c:\\pagefile.sys') == 'c'
+		tass( file_drive(r'c:\\pagefile.sys'), 'c' )
 
 	'''
 	fullpath = path_get(fullpath)
@@ -1563,7 +1563,7 @@ def path_filter(
 	paths:Iterable
 	, **rules
 )->Iterator[str]:
-	'''
+	r'''
 	Filters a list of files by criteria from the `path_rule`
 
 		pf = path_filter

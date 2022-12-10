@@ -39,7 +39,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2022-11-27'
+APP_VERSION = 'v2022-12-10'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -375,7 +375,7 @@ def date_fill(date_dic:dict, cur_date=None)->datetime.datetime:
 		dt_dic = {'year': None, 'month': 11
 		, 'day': 26, 'hour': 23, 'minute': 24}
 		date_fill(dt_dic)
-		tass( benchmark(date_fill, 1000, a=(dt_dic,)), 3000, '<' )
+		tass( benchmark(date_fill, 1000, a=(dt_dic,)), 3500, '<' )
 
 	'''
 	new_date_dic = {'year': 0, 'month': 0
@@ -1869,6 +1869,8 @@ def tass(value, expect, comp:str='=='):
 		if value > expect: return
 	elif comp == '<':
 		if value < expect: return
+	else:
+		raise Exception('Unknown comp')
 	raise Exception(f'does not match ({comp}):\n«{value}»\n«{expect}»')
 
 def exc_text(last_n:int=3):
@@ -1888,11 +1890,11 @@ def exc_text(last_n:int=3):
 	return '\n'.join(lines[-last_n:])
 
 def str_indent(src_str:str, indent:str='\t')->str:
-	'''
+	r'''
 	Adds an indent to each line of text.  
 	Example:
 
-		tass( str_indent('some\ntext'), '\n\n\tsome\n\ttext' )
+		tass( str_indent('some\ntext'), '\n\n\tsome\n\ttext\n' )
 		try:
 			raise ZeroDivisionError
 		except:
