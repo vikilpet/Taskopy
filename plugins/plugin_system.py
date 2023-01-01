@@ -24,10 +24,10 @@ def win_get(window=None, class_name:str=None)->int:
 	'''
 	Returns window handle. If window is not specified then
 	finds foreground window.
-	You can use atherisk for an imprecise search:
+	You can use asterisk for imprecise search:
 
-		>win_get('Total Commander*')
-		132940
+		tass( win_get('Total Commander*'), 0, '>' )
+		tass( win_get('Non-existent window'), 0 )
 
 	'''
 	if isinstance(window, int):
@@ -35,7 +35,7 @@ def win_get(window=None, class_name:str=None)->int:
 	elif isinstance(window, str):
 		if '*' in window:
 			if not (li := win_find(title=window.strip('*'), exact=False) ):
-				return
+				return 0
 			return li[0]
 		else:
 			return win32gui.FindWindow(class_name, window)

@@ -20,8 +20,8 @@ import ftplib
 from typing import Iterator, Tuple, Union
 import json2html
 from .tools import dev_print, exc_text, time_sleep, tdebug \
-, locale_set, safe, patch_import, value_to_unit, time_diff \
-, median, is_iter
+, locale_set, safe, patch_import, time_diff \
+, median, is_iter, str_indent
 from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 
 _USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36'}
@@ -802,9 +802,10 @@ def ping_icmp(host:str, count:int=3
 	
 	Examples:
 	
-		tass( ping_icmp('8.8.8.8')[0], True)
-		tass( ping_icmp('non.existent.domain'), (False, 'host unreachable (1)') )
-		tass( ping_icmp('127.0.0.1'), (True, (0, 0)) )
+		tass( ping_icmp('8.8.8.8', 1)[0], True)
+		tass( ping_icmp('non.existent.domain', 1), (False, 'host unreachable (1)') )
+		tass( ping_icmp('100.100.100.100', 1), (False, 'host unreachable (2)') )
+		tass( ping_icmp('127.0.0.1', 1), (True, (0, 0)) )
 
 	'''
 	proc = subprocess.Popen(
@@ -814,7 +815,7 @@ def ping_icmp(host:str, count:int=3
 		, encoding=encoding
 	)
 	out, ret = proc.communicate()[0], proc.returncode
-	tdebug(ret, out)
+	tdebug(ret, str_indent(out))
 	if ret == 1: return False, 'host unreachable (1)'
 	loss = re.findall(r'\((\d+)%', out)
 	if not re.findall(r' \d+\.\d+\.\d+\.\d+: .+?=\d+\D+[<=]\d+\D+=\d+', out):

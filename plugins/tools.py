@@ -39,7 +39,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2022-12-10'
+APP_VERSION = 'v2023-01-02'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -1873,7 +1873,7 @@ def tass(value, expect, comp:str='=='):
 		raise Exception('Unknown comp')
 	raise Exception(f'does not match ({comp}):\n«{value}»\n«{expect}»')
 
-def exc_text(last_n:int=3):
+def exc_text(last_n:int=3, indent:bool=False):
 	'''
 	Get exception text.  
 	*last_n* - the number of lines of the exception
@@ -1887,7 +1887,10 @@ def exc_text(last_n:int=3):
 
 	'''
 	lines = traceback.format_exc().splitlines()
-	return '\n'.join(lines[-last_n:])
+	if indent:
+		return str_indent( '\n'.join(lines[-last_n:]) )
+	else:
+		return '\n'.join(lines[-last_n:])
 
 def str_indent(src_str:str, indent:str='\t')->str:
 	r'''

@@ -14,7 +14,7 @@ import imaplib
 import mimetypes
 from .tools import Job, job_batch, tdebug \
 , patch_import, dev_print, lazy_property \
-, table_print, time_diff_str
+, table_print, time_diff_str, exc_text
 from .plugin_filesystem import file_name_fix, file_size_str \
 , var_get, var_set, path_get
 from .plugin_network import html_clean
@@ -23,6 +23,7 @@ _MAX_FILE_LEN = 200
 _FILE_EXT = 'eml'
 _MAX_ERR_STR_LEN = 200
 _LAST_NUM_VAR = 'last_mail_msg_num_in_'
+_MAX_BODY_AS_SUBJ = 20
 
 class MailMsg:
 	'''
@@ -32,7 +33,7 @@ class MailMsg:
 	def __init__(self, login:str, server:str
 	, check_only:bool=False, raw_bytes:bytes=b''
 	, error:str='', exception:Exception=None
-	, sub_rule:Callable=lambda m: ''):
+	, sub_rule:Callable=None):
 		self.raw_bytes:bytes = raw_bytes
 		self.error:str = error
 		self.exception:Exception = exception 
@@ -44,7 +45,7 @@ class MailMsg:
 			self.size:int = len(raw_bytes)
 			self.size_str:str = file_size_str(self.size)
 		self.check_only:bool = check_only
-		self.sub_rule:Callable = sub_rule
+		self.sub_rule:Callable = sub_rule if sub_rule else lambda m: ''
 	
 	@lazy_property
 	def as_str(self)->str:
@@ -96,31 +97,32 @@ class MailMsg:
 		body = body.strip()
 		return body
 
-	def _get_header(self, header:str)->str:
+	def _get_header(self, header:str)->Tuple[bool, str]:
 		'''
-		Returns decoded header as string.
+		Returns decoded header as a string.
 		'''
-		hdr_str = ''
+		status, hdr_str = False, ''
 		try:
 			hdr_str = str(
 				make_header(
 					decode_header( self._message.get(header) )
 				)
 			)
+			status = True
 		except LookupError:
 			dev_print(hdr_str := f'header "{header}" LookupError')
 		except TypeError:
 			dev_print(hdr_str := f'header "{header}" not found')
 		except Exception as e:
 			dev_print(hdr_str := f'header "{header}" error: {repr(e)}')
-		return hdr_str
+		return status, hdr_str
 
 	@lazy_property
 	def h_date(self)->str:
 		'''
 		Returns decoded *Date* header.
 		'''
-		return self._get_header('Date')
+		return self._get_header('Date')[1]
 	
 	@property
 	def date_dif(self)->str:
@@ -135,23 +137,29 @@ class MailMsg:
 	@lazy_property
 	def h_subject(self)->str:
 		'''
-		Returns decoded *Subject* header.
+		Returns decoded *Subject* header.  
+		If there is no "Subject" header, it returns
+		the first characters of the message body
 		'''
-		return self._get_header('Subject')
+		status, header = self._get_header('Subject')
+		if status: return header
+		body = self.body_text
+		if not body: return 'empty'
+		return body[:_MAX_BODY_AS_SUBJ] + '...'
 
 	@lazy_property
 	def h_to(self)->str:
 		'''
 		Returns decoded *To* header.
 		'''
-		return self._get_header('To')
+		return self._get_header('To')[1]
 
 	@lazy_property
 	def h_from(self)->str:
 		'''
 		Returns decoded *From* header.
 		'''
-		return self._get_header('From')
+		return self._get_header('From')[1]
 
 	@lazy_property
 	def body_text(self)->str:
@@ -178,7 +186,7 @@ class MailMsg:
 			raise Exception(f'MailMsg unknown attribute: {name}')
 		name = name[2:]
 		dev_print(f'get: unknown header: "{name}"')
-		hdr_str = self._get_header(name)
+		hdr_str = self._get_header(name)[1]
 		setattr(self, 'h_' + name, hdr_str)
 		return hdr_str
 
@@ -223,13 +231,10 @@ def mail_send(
 )->Tuple[bool, str]:
 	'''
 	Send mail. Returns (True, None) on success or
-	(False, 'error text').
-
-	*recipient* - emails separated with commas.
-
+	(False, 'error text').  
+	*recipient* - emails separated with commas. 
 	*attachment* - the full path to a file or
-	a list of such paths.
-
+	a list of such paths.  
 	'''
 	
 	context = ssl.create_default_context()
@@ -270,7 +275,7 @@ def mail_send(
 	except smtplib.SMTPResponseException as e:
 		return False, e.smtp_error.decode()
 	except Exception as e:
-		tdebug(repr(e))
+		tdebug(exc_text(indent=True))
 		return False, repr(e)
 	return True, 'ok'
 	
@@ -355,7 +360,7 @@ def mail_check(server:str, login:str, password:str
 		log(imap.close())
 		log(imap.logout())
 	except Exception as e:
-		log(e)
+		log(f'general error:{exc_text(indent=True)}')
 	return msgs, errors
 
 def _get_last_index(folder:str)->int:
@@ -373,7 +378,7 @@ def _get_last_index(folder:str)->int:
 		else:
 			num = 0
 	except Exception as e:
-		dev_print(f'last index error: {repr(e)}')
+		dev_print(f'last index error:{exc_text(indent=True)}')
 		num = 0
 	return num
 	
@@ -381,17 +386,17 @@ def mail_download(server:str, login:str, password:str
 , dst_dir:str, folders:list=['inbox']
 , trash_folder:str='Trash', silent:bool=True
 , attempts:int=3
-, sub_rule:Callable=lambda m: '')->Tuple[List[MailMsg], List[str] ]:
+, sub_rule:Callable=None)->Tuple[List[MailMsg], List[str] ]:
 	'''
 	Downloads all messages from the server to the
 	specified directory (*dst_dir*).
 	Returns tuple with messages (MailMsg) and errors (str).
 
 	*trash_folder* - IMAP folder where deleted messages
-	are moved. For GMail use `None`.
-
+	are moved. For GMail use `None`.  
 	*folders* - list of IMAP folders to check.
-
+	Set to ['*'] to download from all folders
+	except the *trash_folder*  
 	*sub_rule* is a function that accepts *MailMsg* instance
 	and which returns the name of the subfolder. Example:
 
@@ -406,6 +411,7 @@ def mail_download(server:str, login:str, password:str
 	msgs = []
 	log = _MailLog(prefix='downl', login=login, server=server
 	, silent=silent, err_lst=errors).log
+	get_sub:bool = (folders == ['*'])
 	
 	try:
 		log('connect to server')
@@ -413,18 +419,27 @@ def mail_download(server:str, login:str, password:str
 		try:
 			imap.login(login, password)
 		except Exception as e:
-			log(f'login error: {repr(e)}')
+			log(f'login error:{exc_text(indent=True)}')
 			return [], errors
 		log('login OK')
+		if get_sub:
+			folders = []
+			for fld in imap.list()[1]:
+				fld = fld.decode()
+				fld = fld.split(' "|" ')[1]
+				if fld != trash_folder:
+					folders.append(fld)
+			log(f'folders: {folders}')
 		for folder in folders:
 			log(f'select folder «{folder}»')
 			status, mail_count = imap.select(folder, readonly=False)
 			if status != 'OK':
 				log(f'select error («{folder}»): {status} {mail_count}')
 				continue
-			log('select is OK')
-			cnt = int(mail_count[0].decode('utf-8'))
-			log(f'found {cnt} messages in «{folder}» folder')
+			log('select OK')
+			dst_sdir:list = [ *folder.split('|') ]
+			msg_cnt = int(mail_count[0].decode('utf-8'))
+			log(f'found {msg_cnt} messages in «{folder}» folder')
 			status, search_data = imap.search(None, 'ALL')
 			if status != 'OK':
 				log(f'search error: {status} {search_data}')
@@ -438,53 +453,72 @@ def mail_download(server:str, login:str, password:str
 				else:
 					log(f'fetch error ({status}): {fetch_data}')
 					continue
-				msg = MailMsg(login=login, server=server
-				, raw_bytes=fetch_data[0][1], sub_rule=sub_rule)
-				log(f'message fetched ({msg_id}): «{msg.h_subject}»')
+				try:
+					raw_bytes = fetch_data[0][1]
+				except:
+					log(f'{msg_id=} error, wrong data: «{fetch_data}»')
+					continue
+				msg:MailMsg = MailMsg(login=login, server=server
+				, raw_bytes=raw_bytes, sub_rule=sub_rule)
+				log(f'msg fetched ({msg_id}/{msg_cnt}): «{msg.h_subject}»')
 				if last_index == 0:
 					last_index = _get_last_index(dst_dir) + 1
 				else:
 					last_index += 1
-				msg.dst_dir = dst_dir
-				msg.file_index = last_index
-				try:
-					with open(msg.fullpath, 'bw') as f:
-						f.write(msg.raw_bytes)
-					file_ok = True
-				except Exception as e:
-					file_ok = False
-					log(f'file write error: {repr(e)}')
-					try:
-						os.remove(msg.fullpath)
-					except:
-						log(f'file deletion error')
-				msgs.append(msg)
-				if file_ok:
-					var_set(_LAST_NUM_VAR + dst_dir, last_index)
-					if trash_folder:
-						status, data = imap.copy(msg_id, trash_folder)
-						if status == 'OK':
-							imap.store(msg_id, '+FLAGS', '\\Deleted')
-						else:
-							log(f'message move error ({status}): {data}')
+				if not sub_rule:
+					if get_sub:
+						msg.dst_dir = os.path.join(dst_dir, *dst_sdir)
 					else:
+						msg.dst_dir = dst_dir
+				else:
+					msg.dst_dir = dst_dir
+				msg.file_index = last_index
+				file_ok:bool = False
+				while True:
+					try:
+						with open(msg.fullpath, 'bw') as f:
+							f.write(msg.raw_bytes)
+						file_ok = True
+						log(f'  file saved: {os.path.basename(msg.fullpath)}')
+					except FileNotFoundError:
+						os.makedirs(msg.dst_dir)
+						continue
+					except Exception as e:
+						log(f'  file write error:{exc_text(indent=True)}')
+						try:
+							os.remove(msg.fullpath)
+						except:
+							log(f'  file deletion error: {repr(e)}')
+					break
+				if not file_ok: continue
+				msgs.append(msg)
+				var_set(_LAST_NUM_VAR + dst_dir, last_index)
+				if trash_folder:
+					status, data = imap.copy(msg_id, trash_folder)
+					if status == 'OK':
 						imap.store(msg_id, '+FLAGS', '\\Deleted')
-			log(imap.expunge())
-			log(imap.close())
-			log(imap.logout())
+						log(f'  moved to "{trash_folder}"')
+					else:
+						log(f'  move error ({status}): {data}')
+				else:
+					imap.store(msg_id, '+FLAGS', '\\Deleted')
+		log(f'expunge: {imap.expunge()}')
+		log(f'close: {imap.close()}')
+		log(f'logout: {imap.logout()}')
 	except Exception as e:
-		log(e)
+		log(f'general error:{exc_text(indent=True)}')
 	return msgs, errors
 
 def mail_download_batch(mailboxes:list, dst_dir:str, timeout:int=60
 , log_file:str=r'mail_errors.log', err_thr:int=8
 , silent:bool=True)->Tuple[ List[MailMsg], List[str] ]:
-	''' Downloads (or checks) all mailboxes in list of dictionaries
-		with parameters for mail_download or mail_check.
-		In mailboxes 'check_only' - do not download, only count the number
-		of unread messages.
-		Returns a list with subjects and boolean warning if too many errors
-		detected.
+	'''
+	Downloads (or checks) all mailboxes in list of dictionaries
+	with parameters for mail_download or mail_check.  
+	In mailboxes *check_only* argument - do not download body
+	, only get headers with **mail_check**.  
+	Returns a list with subjects and boolean warning if too many errors
+	detected.
 	'''
 	def write_log()->tuple:
 		'''
@@ -565,9 +599,8 @@ def mail_download_batch(mailboxes:list, dst_dir:str, timeout:int=60
 				f'Too many errors! The last one: {last_error}'
 			)
 	except Exception as e:
-		dev_print( m := f'mail_download_batch exception: {repr(e)}'
-		+ f' at line {e.__traceback__.tb_lineno}')
-		errors.append(m)
+		dev_print(f'exception:{exc_text(indent=True)}')
+		errors.append(repr(e))
 	return msgs, errors
 	
 if __name__ != '__main__': patch_import()

@@ -1,3 +1,9 @@
+r'''
+Name conventions:
+fullpath, fpath - full path of file (r'd:\soft\taskopy\crontab.py')
+fname - file name only ('crontab.py')
+relpath - relative path ('taskopy\crontab.py')
+'''
 from ctypes import WinError
 import os
 import stat
@@ -445,11 +451,14 @@ def file_name_add(fullpath, suffix:str='', prefix:str='')->str:
 	return os.path.join(par_dir, prefix + basename + suffix + ext)
 
 def file_name_rem(fullpath, suffix:str='', prefix:str='')->str:
-	''' Removes a suffix or prefix from a filename.
-		Example:
+	r'''
+	Removes a suffix or prefix from a filename.  
+	Example:
 
-			file_name_rem('my_file_1.txt', suffix='_1')
-			> 'my_file.txt'
+		tass( file_name_rem('my_file_1.txt', suffix='_1'), 'my_file.txt')
+		tass( file_name_rem('my_file_1.txt', suffix='_'), 'my_file_1.txt')
+		tass( file_name_rem('tmp_foo.txt', prefix='tmp_'), 'foo.txt')
+	
 	'''
 	fullpath = path_get(fullpath)
 	if suffix: suffix = str(suffix)
@@ -690,7 +699,7 @@ def dir_purge(fullpath, days:int=0, recursive:bool=False
 	return counter
 
 def file_name(fullpath)->str:
-	''' Returns only name from fullpath '''
+	''' Returns only file name from fullpath '''
 	return os.path.basename( path_get(fullpath) )
 
 def file_name_wo_ext(fullpath)->str:
@@ -754,11 +763,10 @@ def dir_list(fullpath)->Iterator[str]:
 
 def dir_find(fullpath, only_files:bool=False)->list:
 	'''
-	Returns list of paths in specified folder.
-	*fullpath* passed to **glob.glob**
-
+	Returns list of paths in specified folder.  
+	*fullpath* passed to **glob.glob**  
 	*only_files* - return only files and not
-	files and directories.
+	files and directories  
 
 	Examples:
 		dir_list('d:\\folder\\*.jpg')
@@ -1475,11 +1483,13 @@ def drive_io(drive_num:int=None)->Iterator[namedtuple]:
 
 def path_rule(
 	ex_ext:Iterable = ()
-	, ex_path:Iterable = ()
-	, ex_dir:Iterable = ()
 	, in_ext:Iterable = ()
+	, ex_path:Iterable = ()
 	, in_path:Iterable = ()
+	, ex_dir:Iterable = ()
 	, in_dir:Iterable = ()
+	, ex_name_part:Iterable = ()
+	, in_name_part:Iterable = ()
 )->Tuple[ List[Callable], List[Callable] ]:
 	'''
 	Creates a list of rules (functions) to check
@@ -1523,6 +1533,20 @@ def path_rule(
 		in_rules.append(lambda p: any(
 			e in p.lower()
 			for e in in_path
+		))
+	if ex_name_part:
+		if isinstance(ex_name_part, str): ex_name_part = (ex_name_part, )
+		ex_name_part = set((np.lower() for np in ex_name_part))
+		ex_rules.append(lambda p: any(
+			np in os.path.basename(p).lower()
+			for np in ex_name_part
+		))
+	if in_name_part:
+		if isinstance(in_name_part, str): in_name_part = (in_name_part, )
+		in_name_part = set((np.lower() for np in in_name_part))
+		in_rules.append(lambda p: any(
+			np in os.path.basename(p).lower()
+			for np in in_name_part
 		))
 	if ex_dir:
 		if isinstance(ex_dir, str): ex_dir = (ex_dir, )
@@ -1576,6 +1600,8 @@ def path_filter(
 		tass( tuple( pf(files, in_ext='py', ex_path='_TOOLS_patc'))[-1], 'plugins\\tools.py')
 		tass( tuple( pf(files, in_path='constants.py'))[0], 'plugins\\constants.py')
 		tass( tuple( pf(files, in_dir='\\plugins\\', ex_ext='pyc', ex_path='paTch'))[-1], 'plugins\\tools.py')
+		tass( tuple( pf(files, in_name_part='crypt') )[0], 'plugins\plugin_crypt.py')
+		tass( tuple( pf(files, in_ext='py', ex_name_part=('plug', 'const')) )[0], r'plugins\tools.py')
 
 	'''
 	in_rules, ex_rules = path_rule(**rules)
