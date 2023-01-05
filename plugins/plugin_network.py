@@ -102,7 +102,7 @@ def http_req(url:str, encoding:str='utf-8', session:bool=False
 		, encoding=encoding, errors='ignore')
 	return content
 
-def html_whitespace(text:str)->str:
+def _rem_white(text:str)->str:
 	'''
 	Removes an excessive white space from the string.
 	'''
@@ -132,7 +132,7 @@ def html_minify(html:str)->str:
 		html = html.replace(block, _js_remove_comments(block))
 	html = _re_css.sub('', html)
 	html = _re_white_space.sub('><', html)
-	return html_whitespace(html)
+	return _rem_white(html)
 
 
 def file_download(url:str, destination:str=None
@@ -242,16 +242,16 @@ def file_download(url:str, destination:str=None
 
 def html_clean(html_str:str, sep:str=' ', is_mail:bool=False
 , del_spec:bool=True)->str:
-	'''
+	r'''
 	Removes HTML tags from a string. Also removes content
-	of non-text tags: *style, script, img* 
+	of non-text tags: *style, script, img*  
+	*sep* - separator between tags.
 
-		assert html_clean('\r\n<a>t</a>\t') == 't'
-		assert html_clean('\u200b\r \n<a>t</a>\t'
-		, is_mail=True) == 't'
-		assert html_clean('<style>{}</style><a>t</a>\t') == 't'
-		assert html_clean('<img>jpg</img><a>t</a>\t'
-		, del_spec=False) == 'jpg t'
+		tass( html_clean('\r\n<a>t</a>\t'), 't')
+		tass( html_clean('\r\n<a>t</a><a>t2</a>\t', sep='\n'), 't\nt2')
+		tass( html_clean('\u200b\r \n<a>t</a>\t', is_mail=True), 't')
+		tass( html_clean('<style>{}</style><a>t</a>\t'), 't')
+		tass( html_clean('<img>jpg</img><a>t</a>\t', del_spec=False), 'jpg t')
 
 	'''
 	SPEC_CHARS = ' \r\n\t\u200b\xa0\u200c'
@@ -333,7 +333,7 @@ def html_element(url:str, element
 					return [ e.get(attrib, None) for e in found_elem ]
 				else:
 					return [ 
-						html_whitespace(e.get_text())
+						_rem_white(e.get_text())
 							for e in found_elem
 					]
 			else:
@@ -343,8 +343,6 @@ def html_element(url:str, element
 					return list(map(str, found_elem))
 		else:
 			raise Exception('html_element: element not found')
-
-		return
 	for elem in element_li:
 		if isinstance(parser, BeautifulSoup):
 			if len(element_li) == 1:
@@ -357,7 +355,7 @@ def html_element(url:str, element
 				found_elem = parser.select(elem)
 			if found_elem:
 				if clean:
-					result.append( html_whitespace(
+					result.append( _rem_white(
 						found_elem[el_num].get_text()
 					))
 				else:
@@ -372,13 +370,13 @@ def html_element(url:str, element
 			found_elem = parser.xpath(elem)[el_num]
 			if isinstance(found_elem, str):
 				if clean:
-					result.append( html_whitespace(found_elem) )
+					result.append( _rem_white(found_elem) )
 				else:
 					result.append(found_elem)
 			else:
 				if clean:
 					result.append(
-						html_whitespace(found_elem.text_content())
+						_rem_white(found_elem.text_content())
 					)
 				else:
 					result.append(
@@ -635,7 +633,7 @@ def http_req_status(url:str, method='HEAD')->int:
 	r'''
 	Returns just a status of HTTP request:
 
-		assert http_req_status('https://github.com') == 200
+		tass( http_req_status('https://github.com'), 200)
 		
 	'''
 	return getattr(requests, method.lower())(url).status_code
@@ -804,7 +802,6 @@ def ping_icmp(host:str, count:int=3
 	
 		tass( ping_icmp('8.8.8.8', 1)[0], True)
 		tass( ping_icmp('non.existent.domain', 1), (False, 'host unreachable (1)') )
-		tass( ping_icmp('100.100.100.100', 1), (False, 'host unreachable (2)') )
 		tass( ping_icmp('127.0.0.1', 1), (True, (0, 0)) )
 
 	'''

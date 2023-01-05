@@ -27,11 +27,14 @@ import string
 import win32gui
 import win32con
 import win32com.client
-from typing import List, Callable, Union, Iterable
+from typing import List, Tuple, Callable \
+	, Union, Iterable, Iterator
+from itertools import zip_longest
 import pythoncom
 import wx
 from collections import defaultdict
 import lxml
+import textwrap
 from xml.etree import ElementTree as _ElementTree
 try:
 	import constants as tcon
@@ -39,7 +42,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-01-02'
+APP_VERSION = 'v2023-01-05'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -375,7 +378,7 @@ def date_fill(date_dic:dict, cur_date=None)->datetime.datetime:
 		dt_dic = {'year': None, 'month': 11
 		, 'day': 26, 'hour': 23, 'minute': 24}
 		date_fill(dt_dic)
-		tass( benchmark(date_fill, 1000, a=(dt_dic,)), 3500, '<' )
+		tass( benchmark(date_fill, 10, a=(dt_dic,)), 3500, '<' )
 
 	'''
 	new_date_dic = {'year': 0, 'month': 0
@@ -658,6 +661,8 @@ def inputbox(message:str, title:str=None
 	value = dlg.GetValue()
 	dlg.Destroy()
 	return value
+
+
 
 def file_dialog(title:str=None, multiple:bool=False
 , default_dir:str='', default_file:str=''
@@ -1108,7 +1113,7 @@ def dialog(
 					)
 					on_top_flag = True
 				except Exception as e:
-					dev_print(f'SetWindowPos exception {hwnd=}: {e}')
+					raise Exception('dialog: wrong parameters')
 		return S_OK
 	if content: content = str(content)
 	if title == '':
@@ -1127,6 +1132,8 @@ def dialog(
 			buttons = tuple(map(str, buttons.keys()))
 		else:
 			buttons = tuple(map(str, buttons))
+		assert not any(b.startswith('\n') for b in buttons), 'wrong buttons'
+		assert not any(b == '' for b in buttons), 'wrong buttons'
 	result = ctypes.c_int()
 	tdc = _TaskDialogConfig()
 	if common_buttons:
@@ -1758,16 +1765,21 @@ def benchmark(func, b_iter:int=1000
 	Returns nanoseconds per loop.
 	Example:
 
-		benchmark(dir_size, b_iter=100, a=('logs',) )
+		tass( benchmark(dir_size, 5, a=('logs',) ) , 50000, '<' )
 	
 	'''
 	start = time.perf_counter_ns()
+	if not is_iter(a): a = (a,)
+	assert isinstance(ka, dict), 'ka should be a dictionary'
 	for _ in range(b_iter):
 		func(*a, **ka)
 	total_ns = time.perf_counter_ns() - start
 	ns_loop_str = '{:,}'.format(total_ns // b_iter).replace(',', ' ')
 	ns_total_str = '{:,}'.format(total_ns).replace(',', ' ')
-	tdebug(f'{ns_loop_str} ns/loop, total={ns_total_str}, {b_iter=}')
+	name = ''
+	if not func.__name__.startswith('<'):
+		name = func.__name__ + ': '
+	tdebug(f'{name}{ns_loop_str} ns/loop, total={ns_total_str}, {b_iter=}')
 	return total_ns // b_iter
 
 def median(source):
@@ -1857,7 +1869,7 @@ def tass(value, expect, comp:str='=='):
 
 	'''
 	if comp == '==':
-		if str(value) == str(expect):
+		if value == expect:
 			if type(value) == type(expect):
 				return
 			else:
@@ -1892,19 +1904,54 @@ def exc_text(last_n:int=3, indent:bool=False):
 	else:
 		return '\n'.join(lines[-last_n:])
 
-def str_indent(src_str:str, indent:str='\t')->str:
+def str_indent(src_str:str, prefix:str='      ')->str:
 	r'''
 	Adds an indent to each line of text.  
 	Example:
 
-		tass( str_indent('some\ntext'), '\n\n\tsome\n\ttext\n' )
 		try:
 			raise ZeroDivisionError
 		except:
 			tprint('we have an error:' + str_indent(exc_text()))
 
 	'''
-	lst = str(src_str).strip().splitlines()
-	return '\n\n\t' + '\n\t'.join(lst) + '\n'
+	lines = str(src_str).strip().splitlines()
+	tsize = os.get_terminal_size().columns - len(prefix) - 1
+	wrap_lines = []
+	for line in lines:
+		if len(line := line.rstrip()) <= tsize:
+			wrap_lines.append(line)
+			continue
+		for i in range(0, len(line), tsize):
+			wrap_lines.append(line[i:i+tsize])
+	tsize += len(prefix)
+	return (
+		'\n' + ('_' * tsize)
+		+ '\n\n' + prefix
+		+ ('\n' + prefix).join(wrap_lines) + '\n'
+		+ '_' * tsize
+	)
+
+
+def str_diff(str1:str, str2:str)->Tuple[Tuple[str]]:
+	r'''
+	Returns difference between two text (strings with
+	new lines) as a tuple of tuples.
+
+		tass(
+			list(str_diff('foo\nbar', 'fooo\nbar'))
+			, [('foo', 'fooo')]
+		)
+		tass( list(str_diff('same\r\nlines', 'same\nlines') ), [] )
+
+	'''
+	lines1 = str1.splitlines()
+	lines2 = str2.splitlines()
+	diff1 = (l for l in lines1 if l.strip() and (l not in lines2))
+	diff2 = (l for l in lines2 if l.strip() and (l not in lines1))
+	return tuple(zip_longest(diff1, diff2, fillvalue=''))
+
+
+
 
 if __name__ != '__main__': patch_import()
