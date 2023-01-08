@@ -381,19 +381,37 @@ def _get_last_index(folder:str)->int:
 		dev_print(f'last index error:{exc_text(indent=True)}')
 		num = 0
 	return num
+
+def _mail_get_folders(imap:imaplib.IMAP4_SSL)->list:
+	r'''
+	Gets list of server folders.  
+	Returns [('folder', 'non-ascii alias'), ...]  
+	Imap folder: (\Spam) "/" "&BCEEPwQwBDw-"
+
+	'''
+	folders = []
+	imap_lst = tuple(f.decode() for f in imap.list()[1])
+	sep = ' "|" ' if ' "|" ' in imap_lst[0] else ' "/" '
+	for fld in imap_lst:
+		fld, flda = fld.split(sep)
+		fld = fld.strip('()')
+		flda = flda.strip('"')
+		folders.append((fld, flda))
+	return folders
 	
 def mail_download(server:str, login:str, password:str
 , dst_dir:str, folders:list=['inbox']
 , trash_folder:str='Trash', silent:bool=True
 , attempts:int=3
 , sub_rule:Callable=None)->Tuple[List[MailMsg], List[str] ]:
-	'''
+	r'''
 	Downloads all messages from the server to the
 	specified directory (*dst_dir*).
 	Returns tuple with messages (MailMsg) and errors (str).
 
 	*trash_folder* - IMAP folder where deleted messages
-	are moved. For GMail use `None`.  
+	are moved. For GMail use `None`. Sometimes it needs
+	a leading slash ('\Trash')  
 	*folders* - list of IMAP folders to check.
 	Set to ['*'] to download from all folders
 	except the *trash_folder*  
@@ -424,9 +442,7 @@ def mail_download(server:str, login:str, password:str
 		log('login OK')
 		if get_sub:
 			folders = []
-			for fld in imap.list()[1]:
-				fld = fld.decode()
-				fld = fld.split(' "|" ')[1]
+			for fld, fld_al in _mail_get_folders(imap=imap):
 				if fld != trash_folder:
 					folders.append(fld)
 			log(f'folders: {folders}')
@@ -499,7 +515,15 @@ def mail_download(server:str, login:str, password:str
 						imap.store(msg_id, '+FLAGS', '\\Deleted')
 						log(f'  moved to "{trash_folder}"')
 					else:
-						log(f'  move error ({status}): {data}')
+						log(f'  move to {trash_folder} error ({status}): {data}')
+						if 'does not exists' in str(data):
+							log(f'    wrong trash folder name, check your settings!')
+							all_flds = _mail_get_folders(imap=imap)
+							all_flds = '\n    '.join(
+								', '.join(f) for f in all_flds
+							)
+							log(f'    folders:\n    {all_flds}\n')
+							return msgs, errors
 				else:
 					imap.store(msg_id, '+FLAGS', '\\Deleted')
 		log(f'expunge: {imap.expunge()}')
