@@ -411,7 +411,8 @@ def mail_download(server:str, login:str, password:str
 
 	*trash_folder* - IMAP folder where deleted messages
 	are moved. For GMail use `None`. Sometimes it needs
-	a leading slash ('\Trash')  
+	a leading slash ('\\Trash') sometimes you should
+	use non-ASCII (UTF-7) alias, see message in console.  
 	*folders* - list of IMAP folders to check.
 	Set to ['*'] to download from all folders
 	except the *trash_folder*  
@@ -492,12 +493,12 @@ def mail_download(server:str, login:str, password:str
 				file_ok:bool = False
 				while True:
 					try:
-						with open(msg.fullpath, 'bw') as f:
+						with open(msg.fullpath, 'wb+') as f:
 							f.write(msg.raw_bytes)
 						file_ok = True
 						log(f'  file saved: {os.path.basename(msg.fullpath)}')
 					except FileNotFoundError:
-						os.makedirs(msg.dst_dir)
+						os.makedirs(os.path.dirname(msg.fullpath))
 						continue
 					except Exception as e:
 						log(f'  file write error:{exc_text(indent=True)}')
@@ -516,7 +517,11 @@ def mail_download(server:str, login:str, password:str
 						log(f'  moved to "{trash_folder}"')
 					else:
 						log(f'  move to {trash_folder} error ({status}): {data}')
-						if 'does not exists' in str(data):
+						data = str(data).lower()
+						if (
+							'does not exists' in data
+							or 'no such folder' in data
+						):
 							log(f'    wrong trash folder name, check your settings!')
 							all_flds = _mail_get_folders(imap=imap)
 							all_flds = '\n    '.join(
@@ -530,7 +535,7 @@ def mail_download(server:str, login:str, password:str
 		log(f'close: {imap.close()}')
 		log(f'logout: {imap.logout()}')
 	except Exception as e:
-		log(f'general error:{exc_text(indent=True)}')
+		log(f'general error:{exc_text(last_n=0, indent=True)}')
 	return msgs, errors
 
 def mail_download_batch(mailboxes:list, dst_dir:str, timeout:int=60

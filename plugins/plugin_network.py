@@ -531,7 +531,6 @@ def url_hostname(url:str, sld:bool=True)->str:
 	variants = []
 	for i in range(domain.count('.') + 1):
 		variants.append( '.'.join(domain.split('.')[-(i+1):]) )
-	tdebug(variants)
 	for var in variants:
 		if var in _PUB_SUF_LST: continue
 		return var

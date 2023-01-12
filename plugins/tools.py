@@ -8,6 +8,7 @@ import threading
 import psutil
 import sqlite3
 import subprocess
+import pywintypes
 from multiprocessing.dummy import Pool as ThreadPool
 from operator import itemgetter
 import re
@@ -42,7 +43,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-01-08'
+APP_VERSION = 'v2023-01-12'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -370,7 +371,7 @@ def date_weekday_num(date_val:datetime.datetime=None)->int:
 	return date_val.weekday() + 1
 
 def date_fill(date_dic:dict, cur_date=None)->datetime.datetime:
-	'''
+	r'''
 	Fills `None` values in dictionary with current
 	datetime value.
 	Example:
@@ -392,12 +393,15 @@ def date_fill(date_dic:dict, cur_date=None)->datetime.datetime:
 	return datetime.datetime(**new_date_dic)
 
 def date_fill_str(date_str:str)->str:
-	'''
+	r'''
 	Replace asterisk to current datetime value:  
 	date_fill_str('*.*.01 12:30') -> '2020.10.01 12:30'
 
-		> benchmark(date_fill_str, 1000, a=('*.*.01 12:30',))
-		5 006 ns/loop
+		tass(
+			benchmark(date_fill_str, 100, a=('*.*.01 12:30',))
+			, 7000
+			, '<'
+		)
 
 	'''
 	if not '*' in date_str: return date_str
@@ -1765,7 +1769,7 @@ def benchmark(func, b_iter:int=1000
 	Returns nanoseconds per loop.
 	Example:
 
-		tass( benchmark(dir_size, 5, a=('logs',) ) , 50000, '<' )
+		tass( benchmark(dir_size, 5, a=('logs',) ) , 70000, '<' )
 	
 	'''
 	start = time.perf_counter_ns()
@@ -1785,16 +1789,21 @@ def benchmark(func, b_iter:int=1000
 def median(source):
 	return statistics.median(source)
 
+
 def speak(text:str, wait:bool=False):
 	'''
 	Pronouns text using the Windows built-in speech engine.
 	'''
 
+
 	def _speak():
 		nonlocal text
 		pythoncom.CoInitialize()
 		speaker = win32com.client.Dispatch('SAPI.SpVoice')
-		speaker.Speak(text)
+		try:
+			speaker.Speak(text)
+		except pywintypes.com_error as e:
+			dev_print(f'speaker error: {e}')
 		pythoncom.CoUninitialize()
 	
 	if wait:
@@ -1883,13 +1892,13 @@ def tass(value, expect, comp:str='=='):
 		if value < expect: return
 	else:
 		raise Exception('Unknown comp')
-	raise Exception(f'does not match ({comp}):\n«{value}»\n«{expect}»')
+	raise Exception(f'does not match ({comp}):\nval: «{value}»\nexp: «{expect}»')
 
 def exc_text(last_n:int=3, indent:bool=False):
 	'''
 	Get exception text.  
 	*last_n* - the number of lines of the exception
-	text from the end.  
+	text from the end. *0* - get all.  
 	Example:
 
 		try:
@@ -1904,7 +1913,8 @@ def exc_text(last_n:int=3, indent:bool=False):
 	else:
 		return '\n'.join(lines[-last_n:])
 
-def str_indent(src_str:str, prefix:str='      ')->str:
+def str_indent(src_str:str, prefix:str='    '
+, borders:bool=True)->str:
 	r'''
 	Adds an indent to each line of text.  
 	Example:
@@ -1926,32 +1936,55 @@ def str_indent(src_str:str, prefix:str='      ')->str:
 			wrap_lines.append(line[i:i+tsize])
 	tsize += len(prefix)
 	return (
-		'\n' + ('_' * tsize)
+		('\n' + ('_' * tsize) if borders else '')
 		+ '\n\n' + prefix
 		+ ('\n' + prefix).join(wrap_lines) + '\n'
-		+ '_' * tsize
+		+ ('_' * tsize if borders else '')
 	)
 
 
-def str_diff(str1:str, str2:str)->Tuple[Tuple[str]]:
+def str_diff(text1:str, text2:str)->Tuple[Tuple[str]]:
 	r'''
-	Returns difference between two text (strings with
-	new lines) as a tuple of tuples.
+	Returns the different lines between two texts (strings with
+	**line breaks**) as a tuple of tuples.
 
 		tass(
-			list(str_diff('foo\nbar', 'fooo\nbar'))
-			, [('foo', 'fooo')]
+			tuple(str_diff('foo\nbar', 'fooo\nbar'))
+			, (('foo', 'fooo'),)
 		)
-		tass( list(str_diff('same\r\nlines', 'same\nlines') ), [] )
+		tass( tuple(str_diff('same\r\nlines', 'same\nlines') ), () )
+		tass( tuple(str_diff('same\nlines', 'lines\nsame') ), () )
 
 	'''
-	lines1 = str1.splitlines()
-	lines2 = str2.splitlines()
-	diff1 = (l for l in lines1 if l.strip() and (l not in lines2))
-	diff2 = (l for l in lines2 if l.strip() and (l not in lines1))
+	lines1 = tuple(l.strip() for l in text1.splitlines() )
+	lines2 = tuple(l.strip() for l in text2.splitlines() )
+	diff1 = []
+	diff2 = []
+	for line in lines1:
+		if not line or (line in lines2): continue
+		diff1.append(line)
+	for line in lines2:
+		if not line or (line in lines1): continue
+		diff2.append(line)
 	return tuple(zip_longest(diff1, diff2, fillvalue=''))
 
+def str_short(text:str, width:int=0, placeholder:str='...')->str:
+	r'''
+	Collapse and truncate the given text to fit in the given width.
+	The text first has its whitespace collapsed.  If it then fits in
+	the *width*, it is returned as is.  Otherwise, as many words
+	as possible are joined and then the placeholder is appended.  
+	If *width* is not specified, the current terminal width is used.
 
+		tass( str_short('Hello,  world! ', 13), 'Hello, world!' )
+		tass( str_short('Hello,  world! ', 12), 'Hello,...' )
+		tass( str_short('Hello\nworld! ', 12), 'Hello world!' )
+		tass( str_short('Hello\nworld! ', 11), 'Hello...' )
+		tass( benchmark(str_short, 100, 'Hello,  world! '), 60_000, '<')
 
+	'''
+	if width == 0: width = os.get_terminal_size().columns - 1
+	return textwrap.shorten(text=text, width=width
+	, placeholder=placeholder)
 
 if __name__ != '__main__': patch_import()

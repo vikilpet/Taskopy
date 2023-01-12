@@ -1,6 +1,6 @@
 r'''
-Name conventions:
-fullpath, fpath - full path of file (r'd:\soft\taskopy\crontab.py')
+Naming convention:
+fullpath, fpath, fp - full path of a file (r'd:\soft\taskopy\crontab.py')
 fname - file name only ('crontab.py')
 relpath - relative path ('taskopy\crontab.py')
 '''
@@ -135,10 +135,12 @@ def file_read(fullpath, encoding:str='utf-8', errors:str=None)->str:
 
 def file_write(fullpath, content:str
 , encoding:str='utf-8')->str:
-	''' Saves content to a file.
-		Creates file if the fullpath doesn't exist.
-		If fullpath is '' or None - uses temp_file().
-		Returns fullpath.
+	r'''
+	Saves content to a file.  
+	Creates file if the fullpath doesn't exist
+	and creates intermediate directories  
+	If fullpath is '' or None - uses `temp_file()`.  
+	Returns the fullpath.  
 	'''
 	if encoding == 'binary':
 		open_args = {'mode': 'wb+'}
@@ -147,8 +149,8 @@ def file_write(fullpath, content:str
 		, 'errors': 'ignore'}
 	if fullpath:
 		fullpath = path_get(fullpath)
-		if not os.path.exists(os.path.dirname(fullpath)):
-			os.makedirs(os.path.dirname(fullpath))
+		if not os.path.exists( d := os.path.dirname(fullpath)):
+			os.makedirs(d)
 	else:
 		fullpath = temp_file()
 	with open(fullpath, **open_args) as f:
@@ -269,7 +271,7 @@ def file_copy(fullpath, destination)->str:
 def file_append(fullpath, content:str, encoding:str='utf-8')->str:
 	''' Append content to a file. Creates fullpath
 		if not specified.
-		Returns fullpath.
+		Returns the fullpath.
 	'''
 	if fullpath:
 		fullpath = path_get(fullpath)
@@ -518,22 +520,27 @@ def dir_files(fullpath, subdirs:bool=True
 			tuple( dir_files('plugins', ex_ext='pyc') )
 			, tuple( dir_files('plugins', in_ext='py') )
 		)
+		tass(
+			tuple( dir_files('plugins', ex_path='plugins\\') )
+			, tuple()
+		)
 
 	'''
 	fullpath = path_get(fullpath)
 	if rules: in_rules, ex_rules = path_rule(**rules)
 	for dirpath, dirs, filenames in os.walk(fullpath, topdown=True):
 		if not subdirs: dirs.clear()
-		for rpath in filenames:
+		for fname in filenames:
 			if rules:
+				fpath = dirpath + '\\' + fname
 				if _path_match(
-					path=rpath
+					path=fpath
 					, in_rules=in_rules
 					, ex_rules=ex_rules
 				):
-					yield os.path.join(dirpath, rpath)
+					yield fpath
 			else:
-				 yield os.path.join(dirpath, rpath)
+				 yield dirpath + '\\' + fname
 
 def dir_rnd_files(fullpath, file_num:int=1
 , attempts:int=5, **rules)->Iterator[str]:
@@ -750,16 +757,21 @@ def drive_free(letter:str, unit:str='GB')->int:
 		return -1
 
 def dir_list(fullpath)->Iterator[str]:
-	'''
+	r'''
 	Returns all directory content (dirs and files).
 
 		tass( 'resources\\icon.png' in dir_list('resources'), True)
+		tass(
+			benchmark(lambda d: tuple(dir_list(d)), 10, 'log')
+			, 100_000
+			, '<'
+		)
 
 	'''
 	fullpath = path_get(fullpath)
 	for dirpath, dirnames, filenames in os.walk(fullpath):
-		for d in dirnames: yield os.path.join(dirpath, d)
-		for f in filenames: yield os.path.join(dirpath, f)
+		for d in dirnames: yield dirpath + '\\' + d
+		for f in filenames: yield dirpath + '\\' + f
 
 def dir_find(fullpath, only_files:bool=False)->list:
 	'''
@@ -809,7 +821,7 @@ def csv_write(fullpath, content:list, fieldnames:tuple=None
 	''' Writes list of dictionaries as CSV file.
 		If fieldnames is None then takes keys() from
 		first list item as field names.
-		Returns fullpath.
+		Returns the fullpath.
 		content example:
 		[
 			{'name': 'some name',
@@ -1574,6 +1586,8 @@ def _path_match(path:str, in_rules:list, ex_rules:list)->bool:
 
 		inr, exr = path_rule(in_ext='py', ex_ext='pyc')
 		tass( _path_match(r'crontab.py', inr, exr), True )
+		tass( _path_match(r'crontab.pyc', inr, exr), False )
+		inr, exr = path_rule(ex_path='.pyc')
 		tass( _path_match(r'crontab.pyc', inr, exr), False )
 
 	'''
