@@ -131,4 +131,30 @@ def examp_autoruns(exe_path:str, caller:str
 	elif choice == 's':
 		var_set(VAR_NAME, json.dumps(new_dct))
 
+def examp_file_encrypt():
+	' Choose a file and encrypt it '
+	fpath = file_dialog()
+	if not fpath: return
+	pwd = inputbox('Password:', is_pwd=True)
+	if not pwd: return
+	status, fullpath = file_encrypt(fpath, pwd)
+	if not status:
+		tprint(str_indent(fullpath))
+		dialog('File encryption error')
+		return
+	dialog(f'Done:\n{fullpath}')
+
+def examp_file_decrypt():
+	' Choose a file and decrypt it '
+	fpath = file_dialog()
+	if not fpath: return
+	pwd = inputbox('Password:', is_pwd=True)
+	if not pwd: return
+	status, fullpath = file_decrypt(fpath, pwd)
+	if not status:
+		tprint(str_indent(fullpath))
+		dialog('File decryption error')
+		return
+	dialog(f'Done:\n{fullpath}')
+
 if __name__ != '__main__': patch_import()

@@ -541,7 +541,7 @@ def mail_download(server:str, login:str, password:str
 def mail_download_batch(mailboxes:list, dst_dir:str, timeout:int=60
 , log_file:str=r'mail_errors.log', err_thr:int=8
 , silent:bool=True)->Tuple[ List[MailMsg], List[str] ]:
-	'''
+	r'''
 	Downloads (or checks) all mailboxes in list of dictionaries
 	with parameters for mail_download or mail_check.  
 	In mailboxes *check_only* argument - do not download body
@@ -592,7 +592,8 @@ def mail_download_batch(mailboxes:list, dst_dir:str, timeout:int=60
 			if box.get('check_only'):
 				target = mail_check
 			else:
-				box['dst_dir'] = dst_dir
+				if not box.get('dst_dir'):
+					box['dst_dir'] = dst_dir
 			jobs.append( Job(
 				target
 				, **{k:box[k] for k in box if k!='check_only'}

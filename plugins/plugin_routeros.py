@@ -269,7 +269,7 @@ def routeros_find_send(
 			if info: print(f'routeros_find_send bad query:\n{api_data}')
 			return False, 'bad query'
 		id_list = [tup[1]['=.id'] for tup in api_data[:-1]]
-		if info: print(f'routeros_find_send: len(id_list)={len(id_list)}')
+		if info: print(f'routeros_find_send: {id_list=}')
 		apiros.talk(cmd_send + [f'=numbers=' + ','.join(id_list)])
 	except Exception as e:
 		if info: print(f'routeros_find_send exception:\n{repr(e)}'

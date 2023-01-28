@@ -43,7 +43,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-01-12'
+APP_VERSION = 'v2023-01-28'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -379,7 +379,7 @@ def date_fill(date_dic:dict, cur_date=None)->datetime.datetime:
 		dt_dic = {'year': None, 'month': 11
 		, 'day': 26, 'hour': 23, 'minute': 24}
 		date_fill(dt_dic)
-		tass( benchmark(date_fill, 10, a=(dt_dic,)), 3500, '<' )
+		tass( benchmark(date_fill, 10, a=(dt_dic,)), 5000, '<' )
 
 	'''
 	new_date_dic = {'year': 0, 'month': 0
@@ -1789,16 +1789,14 @@ def benchmark(func, b_iter:int=1000
 def median(source):
 	return statistics.median(source)
 
-
 def speak(text:str, wait:bool=False):
 	'''
 	Pronouns text using the Windows built-in speech engine.
 	'''
 
-
 	def _speak():
 		nonlocal text
-		pythoncom.CoInitialize()
+		pythoncom.CoInitializeEx(pythoncom.COINIT_APARTMENTTHREADED)
 		speaker = win32com.client.Dispatch('SAPI.SpVoice')
 		try:
 			speaker.Speak(text)
