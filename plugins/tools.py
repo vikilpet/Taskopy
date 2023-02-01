@@ -43,7 +43,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-01-28'
+APP_VERSION = 'v2023-02-01'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 
@@ -245,9 +245,8 @@ def time_str(template:str=tcon.DATE_STR_FILE
 , time_val:datetime.datetime=None
 , use_locale:str='C', timezone=None)->str:
 	'''
-	Returns time in the form of a string in specified locale.
-	
-	Use datetime in `time_val`. How to get yesterday's date:
+	Returns time in the form of a string in specified locale.  
+	Use datetime in `time_val`. How to get yesterday's date:  
 
 		time_val = datetime.date.today() - datetime.timedelta(days=1)
 
@@ -377,9 +376,9 @@ def date_fill(date_dic:dict, cur_date=None)->datetime.datetime:
 	Example:
 
 		dt_dic = {'year': None, 'month': 11
-		, 'day': 26, 'hour': 23, 'minute': 24}
+		, 'day': 31, 'hour': 23, 'minute': 24}
 		date_fill(dt_dic)
-		tass( benchmark(date_fill, 10, a=(dt_dic,)), 5000, '<' )
+		tass( benchmark(date_fill, 10, a=(dt_dic,)), 7000, '<' )
 
 	'''
 	new_date_dic = {'year': 0, 'month': 0
@@ -390,7 +389,11 @@ def date_fill(date_dic:dict, cur_date=None)->datetime.datetime:
 			new_date_dic[part] = getattr(cur_date, part)
 		else:
 			new_date_dic[part] = date_dic[part]
-	return datetime.datetime(**new_date_dic)
+	try:
+		return datetime.datetime(**new_date_dic)
+	except ValueError:
+		new_date_dic['day'] = 28 
+		return datetime.datetime(**new_date_dic)
 
 def date_fill_str(date_str:str)->str:
 	r'''
@@ -1762,11 +1765,11 @@ def app_exit(force:bool=False):
 	'''
 	app.exit(force=force)
 
-def benchmark(func, b_iter:int=1000
+def benchmark(func, b_iter:int=100
 , a:tuple=(), ka:dict={})->int:
-	'''
-	Run function `func` `b_iter` times and print time.
-	Returns nanoseconds per loop.
+	r'''
+	Run function `func` `b_iter` times and print time.  
+	Returns nanoseconds per loop.  
 	Example:
 
 		tass( benchmark(dir_size, 5, a=('logs',) ) , 70000, '<' )

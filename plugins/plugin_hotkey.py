@@ -116,6 +116,7 @@ key_write = keyboard.write
 
 key_press = keyboard.press
 key_release = keyboard.release
+key_wait = keyboard.wait
 
 def key_release_wait(keys:str, timeout='10 ms'):
 	'''

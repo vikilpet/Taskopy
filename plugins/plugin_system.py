@@ -1,3 +1,9 @@
+r'''
+A *window* argument in function can be a
+- *int* - it's the hwnd;
+- *str* - it will find hwnd of window with that title;
+- *None* - it will find hwnd of a foreground window.
+'''
 import ctypes
 import win32api
 import win32gui
@@ -21,7 +27,7 @@ _APPCOMMAND_VOLUME_DOWN = 0x90000
 _APPCOMMAND_VOLUME_UP = 0xA0000
 
 def win_get(window=None, class_name:str=None)->int:
-	'''
+	r'''
 	Returns window handle. If window is not specified then
 	finds foreground window.
 	You can use asterisk for imprecise search:
