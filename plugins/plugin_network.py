@@ -24,7 +24,7 @@ from .tools import dev_print, exc_text, time_sleep, tdebug \
 , median, is_iter, str_indent
 from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 _PUB_SUF_LST = set()
 
@@ -143,35 +143,34 @@ def file_download(url:str, destination:str=None
 , overwrite:bool=False
 , chunk_size:int=1_048_576
 , **kwargs)->str:
-	''' Download file from url to destination and return fullpath.
-		Returns a full path to the downloaded file.
+	r'''
+	Download file from url to destination and return fullpath.  
+	Returns a full path to the downloaded file.  
+	
+	*attempts* - how many times to retry download if failed.  
+	*destination* - file, directory or None. If the latter,
+	download to a temporary folder. If it is 'devnull'
+	then do not write the file.  
+	*overwrite* - overwrite file if exists.  
+	*stop_event* - `threading` event to stop download.  
+	*kwargs* - additional arguments for the `requests.get`  
+	In case of an exception, the exception object has a *fullpath* attribute
+	, so it is possible to do something with it. Example:
+
+		status, data = safe(file_download)('https://...')
+		if status:
+			tprint('successfull download:', data)
+		else:
+			tprint(
+				'all that we got:', data.fullpath
+				, 'due to error:', repr(data)
+			)
 		
-		*attempts* - how many times to retry download if failed.
-		*destination* - file, directory or None. If the latter,
-		download to a temporary folder. If it is 'devnull'
-		then do not write the file.
 
-		*overwrite* - overwrite file if exists.
+	Use 'Range' header to download first n bytes (server should
+	support this header):
 
-		*stop_event* - `threading` event to stop download.
-
-		In case of an exception, the exception object has a *fullpath* attribute
-		, so it is possible to do something with it. Example:
-
-			status, data = safe(file_download)('https://...')
-			if status:
-				tprint('successfull download:', data)
-			else:
-				tprint(
-					'all that we got:', data.fullpath
-					, 'due to error:', repr(data)
-				)
-			
-
-		Use 'Range' header to download first n bytes (server should
-		support this header):
-
-			headers = {'Range': 'bytes=0-1024'}
+		headers = {'Range': 'bytes=0-1024'}
 
 	'''
 	if isinstance(destination, (list, tuple)):
@@ -409,7 +408,8 @@ def json_element(source:str, element:Union[list, tuple]=[]
 		> result = [71.99, 63.69, 83.0]
 
 	If nothing found then return exception.  
-	*kwargs* - additional arguments for http_req.  
+	*kwargs* - additional arguments for `http_req`  
+
 	'''
 	if source[:4].lower().startswith('http'):
 		status, j = safe(http_req)(url=source, **kwargs)

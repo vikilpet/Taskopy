@@ -7,8 +7,45 @@ try:
 except ImportError:
 	warning = print
 
-# Key codes https://docs.microsoft.com/en-us/windows/desktop/inputdev/virtual-key-codes
-# https://github.com/boppreh/keyboard
+r'''
+Key codes: https://docs.microsoft.com/en-us/windows/desktop/inputdev/virtual-key-codes
+https://github.com/boppreh/keyboard
+
+from keyboard._canonical_names import canonical_names
+sorted(set(canonical_names.values()))
+
+Special keys:
+ 'alt',
+ 'alt gr',
+ 'backspace',
+ 'caps lock',
+ 'ctrl',
+ 'delete',
+ 'down',
+ 'enter',
+ 'esc',
+ 'insert',
+ 'left',
+ 'left alt',
+ 'left ctrl',
+ 'left windows',
+ 'menu',
+ 'num lock',
+ 'page down',
+ 'page up',
+ 'pause',
+ 'play/pause media',
+ 'print screen',
+ 'right',
+ 'right ctrl',
+ 'right windows',
+ 'scroll lock',
+ 'space',
+ 'tab',
+ 'up',
+ 'windows'
+
+'''
 
 _user32 = ctypes.windll.user32
 _kernel32 = ctypes.windll.kernel32

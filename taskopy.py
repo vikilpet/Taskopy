@@ -118,6 +118,12 @@ _TIME_UNIT_HUMAN = {
 	, 'hour': 'hours'
 	, 'hours': 'hours'
 }
+_EVERY_PATTERNS = {
+	re.compile(rf'^(\d+)\s*({"|".join(_TIME_UNIT_HUMAN)})$'): 'time_int'
+	, re.compile(rf'^(\d+)\s*(to)\s*(\d+)\s*({"|".join(_TIME_UNIT_HUMAN)})$'): 'time_int_rnd'
+	, re.compile(rf'^({"|".join(_WEEKDAY_HUMAN)})\s+(\d{{2}}:\d{{2}})$'): 'day'
+	, re.compile(r'^(m|min|minute|h|hr|hour)\s*(\:\d+)$'): 'time_day'
+}
 
 set_title = win32api.SetConsoleTitle
 tasks = None
@@ -611,6 +617,19 @@ class Tasks:
 				sched_unit = _TIME_UNIT_HUMAN[ev_items[1]]
 				try:
 					sched = schedule.every( int(ev_items[0]) )
+					getattr(sched, sched_unit).do(
+						self.run_task
+						, task=task
+						, caller=CALLER_SCHEDULER
+					)
+				except Exception as e:
+					exc_rep(e)
+			elif ev_type == 'time_int_rnd':
+				sched_unit = _TIME_UNIT_HUMAN[ev_items[3]]
+				try:
+					sched = schedule.every(
+						int(ev_items[0])
+					).to( int(ev_items[2]) )
 					getattr(sched, sched_unit).do(
 						self.run_task
 						, task=task
@@ -1225,22 +1244,20 @@ def show_app_window():
 		dev_print(f'show window exception: {e}')
 
 def every_parse(every:Union[str, list, tuple])->Tuple[bool, list]:
-	'''
+	r'''
 	Examples:
+
+		from taskopy import every_parse
 		for es in ('5m', '5M', '5 m', '5 min', '5min'
 		, '5 minutes', 'mon 05:45', 'Mon 05:45'
-		, 'day 17:45', 'hour :30', 'h:30', ('5m', '5s')):
+		, 'day 17:45', 'hour :30', 'h:30', ('5m', '5s')
+		, '5 to 6 min', '5to6min'):
 			tass( every_parse(es)[0], True )
 		for es in ('5y', '5', '5 mins', '5mins', 5
 		, 'mon 5:45', 'hour 0:30', ('5m', 'hour')):
 			tass( every_parse(es)[0], False )
 		
 	'''
-	PATTERNS = {
-		rf'^(\d+)\s*({"|".join(_TIME_UNIT_HUMAN)})$': 'time_int'
-		, rf'^({"|".join(_WEEKDAY_HUMAN)})\s+(\d{{2}}:\d{{2}})$': 'day'
-		, r'^(m|min|minute|h|hr|hour)\s*(\:\d+)$': 'time_day'
-	}
 	if isinstance(every, str):
 		every = (every, )
 	elif not is_iter(every):
@@ -1248,8 +1265,8 @@ def every_parse(every:Union[str, list, tuple])->Tuple[bool, list]:
 	result = []
 	for ev_str in every:
 		ev_str = ev_str.strip().lower()
-		for pat, pat_type in PATTERNS.items():
-			if (match := re.findall(pat, ev_str)):
+		for pat, pat_type in _EVERY_PATTERNS.items():
+			if (match := pat.findall(ev_str)):
 				result.append((pat_type, match[0]))
 				break
 		else:

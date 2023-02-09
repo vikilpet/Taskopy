@@ -7392,6 +7392,8 @@ hlx.live
 adobeaemcloud.net
 hlx.page
 hlx3.page
+adobeio-static.net
+adobeioruntime.net
 beep.pl
 airkitapps.com
 airkitapps-au.com
@@ -7549,6 +7551,7 @@ sweetpepper.org
 myasustor.com
 cdn.prod.atlassian-dev.net
 translated.page
+autocode.dev
 myfritz.net
 onavstack.net
 *.awdev.ca
@@ -7595,6 +7598,8 @@ dh.bytemark.co.uk
 vm.bytemark.co.uk
 cafjs.com
 mycd.eu
+canva-apps.cn
+canva-apps.com
 drr.ac
 uwu.ai
 carrd.co
@@ -8237,6 +8242,7 @@ vologda.su
 channelsdvr.net
 u.channelsdvr.net
 edgecompute.app
+fastly-edge.com
 fastly-terrarium.com
 fastlylb.net
 map.fastlylb.net
@@ -9214,6 +9220,9 @@ alpha.bounty-full.com
 beta.bounty-full.com
 small-web.org
 vp4.me
+snowflake.app
+privatelink.snowflake.app
+streamlit.app
 streamlitapp.com
 try-snowplow.com
 srht.site
@@ -9362,6 +9371,7 @@ hk.com
 hk.org
 ltd.hk
 inc.hk
+it.com
 name.pm
 sch.tf
 biz.wf

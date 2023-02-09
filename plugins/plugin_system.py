@@ -138,9 +138,9 @@ def win_title_set(window=None, new_title:str='')->int:
 def win_list(title_filter:str=None
 , class_filter:str=None
 , case_sensitive:bool=False)->list:
-	''' List titles of all the windows.
-		title_filter and class_filter - optional filter
-		class_filter - filter by window class name.
+	'''
+	List titles of all the windows.  
+	*title_filter* and *class_filter* - optional filters  
 	'''
 	
 	def get_title(hwnd, _):
