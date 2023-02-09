@@ -9,7 +9,7 @@ keyboard==0.13.4
 pytz==2019.3
 wxPython==4.1.1
 schedule==0.6.0
-cryptography==3.4.6
+cryptography==39.0.1
 lxml==4.9.1
 beautifulsoup4==4.11.2
 win32gui==221.6
