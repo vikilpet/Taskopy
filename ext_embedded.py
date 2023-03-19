@@ -2,11 +2,12 @@ from plugins.plugin_network import *
 from plugins.plugin_filesystem import *
 from plugins.plugin_process import *
 from plugins.plugin_system import *
-def emb_backup_and_purge():
+def emb_backup_and_purge(log_days:int=30, backup_days:int=30):
+	' Make backup of crontab and extensions to the *backup* directory '
 	for fpath in dir_files(app_dir(), in_ext='py', subdirs=False):
 		tprint(file_backup(fpath, 'backup'))
-	dir_purge('log', days=10)
-	dir_purge('backup', days=20)
+	dir_purge('log', days=log_days)
+	dir_purge('backup', days=backup_days)
 def emb_app_update(caller:str):
 	VARNAME = '_taskopy_version'
 	DST_DIR = temp_dir()

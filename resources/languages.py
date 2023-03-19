@@ -24,7 +24,7 @@ class Language:
 		self.warn_hotkey = 'Wrong hotkey syntax in task «{}»'
 		self.warn_schedule = 'Wrong schedule syntax in task «{}»'
 		self.warn_every = 'Wrong time syntax in task «{}»: «{}»'
-		self.warn_task_error = 'Error when executing a task «{}»:'
+		self.warn_task_error = 'Exception when executing the task «{}»:'
 		self.warn_left_click = 'Attempt to bind more than one task to left click: {}'
 		self.warn_runn_tasks_con = 'Running tasks'
 		self.warn_runn_tasks_msg = 'Some tasks ({}) are being performed now. Close anyway?'
@@ -85,7 +85,7 @@ warn_mod_reload=Не удалось загрузить модуль «{}»
 warn_hotkey=Неправильный формат горячей клавиши в задаче «{}»
 warn_schedule=Неправильный формат планировщика в задаче «{}»
 warn_every=Неправильный формат времени в задаче «{}»: «{}»
-warn_task_error=Ошибка при выполнении задачи «{}»
+warn_task_error=Исключение при выполнении задачи «{}»
 warn_left_click=Попытка привязать левому клику больше одной задачи: {}
 warn_runn_tasks_con=Работающие задачи
 warn_runn_tasks_msg=Некоторые задачи ({} шт.) выполняются в текущий момент. Всё равно закрыть?

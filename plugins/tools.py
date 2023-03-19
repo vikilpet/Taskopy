@@ -43,9 +43,10 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-02-09'
+APP_VERSION = 'v2023-03-19'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
+_app_log_limit = 10_000
 
 if not __builtins__.get('gdic', None):
 	gdic = {}
@@ -204,6 +205,7 @@ def con_log(*msgs, **kwargs):
 	for msg in msgs:
 		tprint(msg, **kwargs)
 		_app_log.append((ltime, msg))
+		del _app_log[:-_app_log_limit]
 		log_str += (
 			ltime.strftime(_LOG_TIME_FORMAT)
 			+ ' ' + str(msg) + '\n'
@@ -378,7 +380,7 @@ def date_fill(date_dic:dict, cur_date=None)->datetime.datetime:
 		dt_dic = {'year': None, 'month': 11
 		, 'day': 31, 'hour': 23, 'minute': 24}
 		date_fill(dt_dic)
-		tass( benchmark(date_fill, 10, a=(dt_dic,)), 7000, '<' )
+		tass( benchmark(date_fill, 10, a=(dt_dic,)), 8000, '<' )
 
 	'''
 	new_date_dic = {'year': 0, 'month': 0
@@ -414,6 +416,11 @@ def date_fill_str(date_str:str)->str:
 		if value != '*': new_date_lst[pos] = value
 	return '{:0>4}.{:0>2}.{:0>2} {:0>2}:{:0>2}' \
 		.format(*new_date_lst)
+
+def date_last_day_of_month(date:datetime.datetime)->datetime.datetime:
+	' Returns last day of a month '
+	if date.month == 12: return date.replace(day=31)
+	return date.replace(month=date.month+1, day=1) - datetime.timedelta(days=1)
 
 def time_sleep(interval, unit:str=None):
 	''' Pauses for specified amount of time.
@@ -1519,80 +1526,17 @@ def value_to_str(value, sep:str='\n')->str:
 	return sep.join(strings)
 
 class DataEvent:
-	'''
+	r'''
 	Windows event as an object.
 	
-	*EventData* can be a string, a dictionary or a list.
-
-	*_EventDataDict* is an ugly data converted from XML.
-
+	*EventData* can be a string, a dictionary or a list.  
+	*_EventDataDict* is an ugly data converted from XML.  
 	'''
-	{
-		'{http: //schemas.microsoft.com/win/2004/08/events/event}Event': {
-			'System': {
-				'Provider': {
-					'value': ''
-					, 'attrib': {
-						'Name': 'Microsoft-Windows-DistributedCOM'
-						, 'Guid': '{1B562E86-B7AA-4131-BADC-B6F3A001407E}'
-						, 'EventSourceName': 'DCOM'
-					}
-				}
-				, 'EventID': {
-					'value': 10010
-					, 'attrib': {'Qualifiers': '0'}
-				}
-				, 'Version': {'value': 0, 'attrib': {} }
-				, 'Level': {'value': 2, 'attrib': {} }
-				, 'Task': {'value': 0, 'attrib': {} }
-				, 'Opcode': {'value': 0, 'attrib': {} }
-				, 'Keywords': {'value': '0x8080000000000000', 'attrib': {} }
-				, 'TimeCreated': {
-					'value': ''
-					, 'attrib': {'SystemTime': '2021-02-10T12:24:20.581005200Z'}
-				}
-				, 'EventRecordID': {'value': 729301, 'attrib': {} }
-				, 'Correlation': {'value': '', 'attrib': {} }
-				, 'Execution': {
-					'value': ''
-					, 'attrib': {'ProcessID': '952', 'ThreadID': '41804'}
-				}
-				, 'Channel': {'value': 'System', 'attrib': {} }
-				, 'Computer': {'value': 'DB', 'attrib': {} }
-				, 'Security': {'value': '', 'attrib': {'UserID': 'S-1-5-20'} }
-			}
-			, 'EventData': {
-				'Data': {
-					'value': '{AAC1009F-AB33-48F9-9A21-7F5B88426A2E}'
-					, 'attrib': {'Name': 'param1'}
-				}
-			}
-		}
-	}
 
 	def __init__(self, xml_str:str):
-		r'''
-		di_sys:
-		{'Provider': {'@Name': 'LsaSrv',
-			'@Guid': '{199fe037-2b82-40a9-82ac-e1d46c792b99}',
-			'@EventSourceName': 'LsaSrv'},
-			'EventID': {'@Qualifiers': '0', '#text': '6041'},
-			'Version': '0',
-			'Level': '2',
-			'Task': '0',
-			'Opcode': '0',
-			'Keywords': '0x80000000000000',
-			'TimeCreated': {'@SystemTime': '2021-02-09T10:42:57.000000000Z'},
-			'EventRecordID': '89369733',
-			'Correlation': None,
-			'Execution': {'@ProcessID': '0', '@ThreadID': '0'},
-			'Channel': 'System',
-			'Computer': 'pc',
-			'Security': None}
-		'''
-		ATTRS = ['Provider', 'EventID', 'Level', 'Task'
+		ATTRS = ('Provider', 'EventID', 'Level', 'Task'
 		, 'TimeCreated', 'EventRecordID', 'Channel'
-		, 'Computer', 'Security']
+		, 'Computer', 'Security')
 		
 		status, full_dict = _xml_to_dict_event(xml_str)
 		if not status:

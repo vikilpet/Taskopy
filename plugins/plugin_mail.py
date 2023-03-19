@@ -239,7 +239,7 @@ def mail_send(
 	
 	context = ssl.create_default_context()
 	msg = EmailMessage()
-	msg['Subject'] = subject
+	msg['Subject'] = ' '.join( subject.strip().splitlines() )
 	if from_name:
 		msg['From'] = f'{from_name} <{login}>'
 	else:
@@ -281,15 +281,13 @@ def mail_send(
 	
 def mail_send_batch(recipients:str=''
 , cc_limit:int=_CC_LIMIT, **mail_send_args)->List[str]:
-	'''
+	r'''
 	Send email to many recipients.
 	Returns list of errors if any.
 	
 	*recipients* - list of emails or
-	a string with comma separated emails.
-
-	*cc_limit* - carbon copy limit of the server.
-
+	a string with comma separated emails.  
+	*cc_limit* - carbon copy limit of the server.  
 	'''
 	
 	errors = []

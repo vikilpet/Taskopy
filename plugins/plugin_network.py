@@ -769,26 +769,27 @@ def ping_tcp(host:str, port:int, count:int=1, pause:int=100
 		ip = random.choice( domain_ip(host) )
 	except Exception as e:
 		return False, str(e)
-	full_start = datetime.datetime.now()
+	full_start = time.perf_counter_ns()
 	for _ in range(count):
 		with socket.socket( socket.AF_INET, socket.SOCK_STREAM ) as soc:
 			soc.settimeout(timeout/1000)
-			tstart = datetime.datetime.now()
+			tstart = time.perf_counter_ns()
 			try:
 				soc.connect((ip, port))
-				timings.append(time_diff(tstart, unit='ms'))
+				timings.append(
+					(time.perf_counter_ns() - tstart) // 1_000_000
+				)
 				soc.shutdown(socket.SHUT_RD)
 			except Exception as e:
 				last_err = str(e)
 				tdebug(last_err)
 		time.sleep(pause / 1000)
-	tdebug(ip, timings)
-	tdebug('full time', time_diff(full_start, unit='ms'))
-	if timings:
-		perc = int( (count - len(timings)) / count * 100 )
-		return True, ( perc, int(median(timings)))
-	else:
-		return False, last_err
+	full_time = (time.perf_counter_ns() - full_start) // 1_000_000
+	tdebug(f'{ip=}, {full_time=}, {timings=}')
+	if not timings: return False, last_err
+	loss = (count - len(timings)) * 100 // count
+	return True, ( loss, int(median(timings)))
+		
 
 def ping_icmp(host:str, count:int=3
 , timeout:int=500, encoding:str='cp866')->tuple:

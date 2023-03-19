@@ -342,15 +342,16 @@ def proc_kill(process, cmd_filter:str=None):
 			f'Unknown type of "process" argument: {type(process)}'
 		)
 
-def free_ram(unit:str='percent'):
-	'''	Returns free RAM size.
-		unit - gb, mb... or 'percent'
+def free_ram(unit:str='percent')->float:
+	'''
+	Returns free RAM size.  
+	*unit* - 'gb', 'mb'... or 'percent'  
 	'''
 	e = _SIZE_UNITS.get(unit.lower(), 1)
 	if unit == 'percent':
 		return round(100 - psutil.virtual_memory()[2], 1)
 	else:
-		return psutil.virtual_memory()[4] // e
+		return round(psutil.virtual_memory()[4] / e, 1)
 
 def proc_threads_num(process):
 	if (pid := proc_get(process)) == -1: return -1

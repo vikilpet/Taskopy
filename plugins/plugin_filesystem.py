@@ -28,6 +28,7 @@ import base64
 from typing import Callable, Iterator, List, Union \
 , Iterable, Tuple
 import psutil
+import win32file
 
 import win32api
 from win32com.shell import shell, shellcon
@@ -35,7 +36,7 @@ from pathlib import Path
 import shutil
 import configparser
 from .tools import _APP_PATH, APP_NAME, exc_text, random_str, table_print, tdebug, patch_import, time_diff_str, time_now \
-, time_sleep, dev_print, tprint, is_iter, time_diff
+, time_sleep, dev_print, tprint, is_iter, time_diff, time_from_str
 try:
 	import constants as tcon
 except ModuleNotFoundError:
@@ -617,33 +618,27 @@ def dir_rnd_dir(fullpath, attempts:int=5
 				break
 	return None
 
-def dir_purge(fullpath, days:int=0, recursive:bool=False
-, creation:bool=False, test:bool=False, rule=None
-, print_del:bool=False)->int:
-	'''
-	Deletes files older than x days.
+def dir_purge(fullpath, days:int=0, subdirs:bool=False
+, creation:bool=False, test:bool=False
+, print_del:bool=False, **rules)->int:
+	r'''
+	Deletes files older than *x* days.
 	Returns number of deleted files and folders. 
 	
-	days=0 - delete everything
-	creation - use date of creation, otherwise use last
-		modification date.
-	recursive - delete in subfolders too. Empty subfolders 
-		will be deleted.
-	test - only print files and folders that should be removed.
-	print_del - print path when deleting.
-	rule - function that gets a file name and returns True
-		if the file is to be deleted. Example:
-			rule=lambda f: file_size(f) == 0
-			rule=lambda f: file_ext(f) == 'log'
-			
+	*days=0* - delete everything  
+	*creation* - use date of creation, otherwise use last
+	modification date.  
+	*subdirs* - delete in subfolders too. Empty subfolders 
+	will be deleted.  
+	*test* - only print files and folders that should be removed.  
+	*print_del* - print path when deleting.  
+	*rules* - rules for the `path_rule` function  
 	'''
 	def print_d(fn:str, reason:str):
-		if print_del: print(reason, os.path.relpath(fn, fullpath))
+		if print_del: print('dir_purge:', reason, os.path.relpath(fn, fullpath))
 
 	def robust_remove_file(fn):
 		nonlocal counter
-		if rule:
-			if not rule(fn): return
 		try:
 			print_d(fn, 'file')
 			file_delete(fn)
@@ -653,8 +648,6 @@ def dir_purge(fullpath, days:int=0, recursive:bool=False
 		
 	def robust_remove_dir(fn):
 		nonlocal counter
-		if rule:
-			if not rule(fn): return
 		try:
 			print_d(fn, 'dir')
 			shutil.rmtree(fn)
@@ -669,40 +662,26 @@ def dir_purge(fullpath, days:int=0, recursive:bool=False
 
 	fullpath = path_get(fullpath)
 	counter = 0
-	if days: delta = 24 * 3600 * days
-	if creation:
-		date_func = os.path.getctime
+	dirs, files = (), ()
+	if subdirs:
+		files = dir_files(fullpath, subdirs=True)
+		dirs = dir_dirs(fullpath, subdirs=True)
 	else:
-		date_func = os.path.getmtime
-	if '*' in fullpath:
-		pass
-	elif fullpath.endswith('\\'):
-		fullpath += '*'
-	else:
-		fullpath += '\\*'
-	if recursive:
-		fullpath = fullpath.replace('*', r'**\*')
-	files = glob.glob(fullpath, recursive=recursive)
-	current_time = time.time()
+		files = dir_files(fullpath, subdirs=False)
+	if days < 0: days = -days
+	drule = 'in_datec_bef' if creation else 'in_datem_bef'
+	rules[drule] = datetime.timedelta(days=days)
+	files = path_filter(files, **rules)
 	if test:
 		file_func = fn_print
 		dir_func = fn_print
 	else:
 		file_func = robust_remove_file
 		dir_func = robust_remove_dir
-	for fi in files:
-		if os.path.isdir(fi):
-			if not any( len(t[2]) for t in os.walk(fi) ):
-				dir_func(fi)
-		else:
-			if days:
-				try:
-					if (current_time - date_func(fi)) > delta:
-						file_func(fi)
-				except FileNotFoundError:
-					pass
-			else:
-				file_func(fi)
+	for fpath in files: file_func(fpath)
+	for fpath in dirs:
+		if not any( len(t[2]) for t in os.walk(fpath) ):
+			dir_func(fpath)
 	return counter
 
 def file_name(fullpath)->str:
@@ -726,13 +705,12 @@ def file_dir_repl(fullpath, new_dir:str)->str:
 def file_backup(fullpath, dest_dir:str=''
 , suffix_format:str='_%y-%m-%d_%H-%M-%S')->str:
 	r'''
-	Copy *somefile.txt* to *backup_dir\somefile_2019-05-19_21-23-02.txt*
+	Copy *somefile.txt* to *backup_dir\somefile_2019-05-19_21-23-02.txt*  
+	Returns full path of the new file.  
+	Does not change the date of the file.  
 
-	*dest_dir* - destination. If not specified - current folder.
-
-	Returns full path of the new file.
-
-	It will preserve the date of the file.
+	*dest_dir* - destination directory.
+	If not specified - current folder.  
 	'''
 	fullpath = path_get(fullpath)
 	if not dest_dir: dest_dir = os.path.dirname(fullpath)
@@ -787,9 +765,9 @@ def dir_find(fullpath, only_files:bool=False)->list:
 	'''
 	fullpath = path_get(fullpath)
 	if not '*' in fullpath: fullpath = os.path.join(fullpath, '*')
-	recursive = ('**' in fullpath)
+	subdirs = ('**' in fullpath)
 	fullpath = fullpath.replace('[', '[[]')
-	paths = glob.glob(fullpath, recursive=recursive)
+	paths = glob.glob(fullpath, recursive=subdirs)
 	if fullpath.endswith('\\**'):
 		try:
 			paths.remove(fullpath.replace('**', ''))
@@ -986,7 +964,7 @@ def temp_dir(new_dir:str=None)->str:
 def temp_file(prefix:str='', suffix:str=''
 , content=None, encoding='utf-8')->str:
 	'''
-	Returns the name for the temporary file.  
+	Returns the full name for the temporary file.  
 	If *content* is specified then writes content to the file.
 	'''
 	fname = os.path.join(tempfile.gettempdir()
@@ -1500,20 +1478,42 @@ def path_rule(
 	, in_path:Iterable = ()
 	, ex_dir:Iterable = ()
 	, in_dir:Iterable = ()
-	, ex_name_part:Iterable = ()
-	, in_name_part:Iterable = ()
+	, ex_name:Iterable = ()
+	, in_name:Iterable = ()
+	, in_datem_aft:datetime.datetime = None
+	, ex_datem_aft:datetime.datetime = None
+	, in_datem_bef:datetime.datetime = None
+	, ex_datem_bef:datetime.datetime = None
+	, in_datec_aft:datetime.datetime = None
+	, ex_datec_aft:datetime.datetime = None
+	, in_datec_bef:datetime.datetime = None
+	, ex_datec_bef:datetime.datetime = None
+	, in_datea_aft:datetime.datetime = None
+	, ex_datea_aft:datetime.datetime = None
+	, in_datea_bef:datetime.datetime = None
+	, ex_datea_bef:datetime.datetime = None
 )->Tuple[ List[Callable], List[Callable] ]:
-	'''
+	r'''
 	Creates a list of rules (functions) to check
 	a file or directory.  
+	*in_\** - rule to include, *ex_\** - rule to exclude.  
 	All rules are case-insensitive. All rules may be a string
 	or a tuple/list of strings:  
 	*ex_ext='py'*  
 	*ex_ext=('py', 'pyc')*  
 
-	*ex_ext*, *in_ext* - exclude/include by extension.  
-	*ex_path*, *in_path* - exclude/include by any part of file path.  
-	*ex_dir*, *in_dir* - exclude/include by beginning of a file path.  
+	*ex_ext*, *in_ext* - by extension.  
+	*ex_path*, *in_path* - by any part of a full file path  
+	*in_name*, *ex_name* - by part of file name.  
+	*ex_dir*, *in_dir* - by beginning of a file path  
+
+	File date variables.  
+	Date value is a `datetime.datetime` or `datetime.timedelta`
+	or a string based on `tcon.DATE_STR_HUMAN` pattern
+	like that: '2023.02.12 0:0:0'  
+	*datem*, *datea*, *datec* - date of modification, access, creation.  
+	*in_datem_aft* - by date of modification (greater or equal)  
+	*ex_datem_aft* - by date of modification (greater or equal)  
 
 	'''
 	ex_rules = list()
@@ -1546,19 +1546,19 @@ def path_rule(
 			e in p.lower()
 			for e in in_path
 		))
-	if ex_name_part:
-		if isinstance(ex_name_part, str): ex_name_part = (ex_name_part, )
-		ex_name_part = set((np.lower() for np in ex_name_part))
+	if ex_name:
+		if isinstance(ex_name, str): ex_name = (ex_name, )
+		ex_name = set((np.lower() for np in ex_name))
 		ex_rules.append(lambda p: any(
 			np in os.path.basename(p).lower()
-			for np in ex_name_part
+			for np in ex_name
 		))
-	if in_name_part:
-		if isinstance(in_name_part, str): in_name_part = (in_name_part, )
-		in_name_part = set((np.lower() for np in in_name_part))
+	if in_name:
+		if isinstance(in_name, str): in_name = (in_name, )
+		in_name = set((np.lower() for np in in_name))
 		in_rules.append(lambda p: any(
 			np in os.path.basename(p).lower()
-			for np in in_name_part
+			for np in in_name
 		))
 	if ex_dir:
 		if isinstance(ex_dir, str): ex_dir = (ex_dir, )
@@ -1578,21 +1578,60 @@ def path_rule(
 			p.lower().startswith(e)
 			for e in in_dir
 		))
+	for val, time_att, is_inc, is_bef in (
+		(ex_datem_aft, 'st_mtime', False, False)
+		, (ex_datem_bef, 'st_mtime', False, True)
+		, (in_datem_aft, 'st_mtime', True, False)
+		, (in_datem_bef, 'st_mtime', True, True)
+		, (ex_datec_aft, 'st_ctime', False, False)
+		, (ex_datec_bef, 'st_ctime', False, True)
+		, (in_datec_aft, 'st_ctime', True, False)
+		, (in_datec_bef, 'st_ctime', True, True)
+		, (ex_datea_aft, 'st_atime', False, False)
+		, (ex_datea_bef, 'st_atime', False, True)
+		, (in_datea_aft, 'st_atime', True, False)
+		, (in_datea_bef, 'st_atime', True, True)
+	):
+		if not val: continue
+		lst = in_rules if is_inc else ex_rules
+		assert isinstance(val, (str, datetime.datetime,  datetime.timedelta)) \
+			, 'file time must be a string or datetime or timedelta'
+		if isinstance(val, str):
+			val = time_from_str(val, template=tcon.DATE_STR_HUMAN)
+		elif isinstance(val, datetime.datetime):
+			pass
+		elif isinstance(val, datetime.timedelta):
+			val = datetime.datetime.now() - val
+		else:
+			raise Exception('wrong date rule')
+		tstamp = val.timestamp()
+		tdebug(time_att, ('<=' if is_bef else '>=')
+		, f'{tstamp} ({val})')
+		if is_bef:
+			lst.append(
+				lambda p, a=time_att, t=tstamp: getattr(os.stat(p), a) <= t
+			)
+		else:
+			lst.append(
+				lambda p, a=time_att, t=tstamp: getattr(os.stat(p), a) >= t
+			)
 	return in_rules, ex_rules
 
 def _path_match(path:str, in_rules:list, ex_rules:list)->bool:
 	'''
 	Returns True if path matches rules from the `path_rule`.
 
+		from plugins.plugin_filesystem import _path_match
 		inr, exr = path_rule(in_ext='py', ex_ext='pyc')
 		tass( _path_match(r'crontab.py', inr, exr), True )
 		tass( _path_match(r'crontab.pyc', inr, exr), False )
 		inr, exr = path_rule(ex_path='.pyc')
 		tass( _path_match(r'crontab.pyc', inr, exr), False )
+		latest = tuple(dir_files('plugins'))
 
 	'''
 	return (
-		(any(r(path) for r in in_rules) if in_rules else True)
+		(all(r(path) for r in in_rules) if in_rules else True)
 		and
 		not (any(r(path) for r in ex_rules) if ex_rules else False)
 	)
@@ -1614,8 +1653,28 @@ def path_filter(
 		tass( tuple( pf(files, in_ext='py', ex_path='_TOOLS_patc'))[-1], 'plugins\\tools.py')
 		tass( tuple( pf(files, in_path='constants.py'))[0], 'plugins\\constants.py')
 		tass( tuple( pf(files, in_dir='\\plugins\\', ex_ext='pyc', ex_path='paTch'))[-1], 'plugins\\tools.py')
-		tass( tuple( pf(files, in_name_part='crypt') )[0], 'plugins\plugin_crypt.py')
-		tass( tuple( pf(files, in_ext='py', ex_name_part=('plug', 'const')) )[0], r'plugins\tools.py')
+		tass( tuple( pf(files, in_name='crypt') )[0], 'plugins\plugin_crypt.py')
+		tass( tuple( pf(files, in_ext='py', ex_name=('plug', 'const')) )[0], r'plugins\tools.py')
+		tass(
+			tuple( pf(files, in_datem_aft=datetime.datetime(2024, 1, 1), ) )
+			, ()
+		)
+		tass(
+			tuple( pf(files, ex_datem_aft=datetime.datetime(2020, 12, 24), ) )
+			, ()
+		)
+		tass(
+			tuple( pf(files, in_datem_aft='2024.1.1 0:0:0', ) )
+			, ()
+		)
+		tass(
+			tuple( pf(files, ex_datem_aft='2020.12.24 0:0:0', ) )
+			, ()
+		)
+		tass(
+			tuple( pf(files, in_ext='py', in_datem_bef='2020.12.24 0:0:0', ) )
+			, ()
+		)
 
 	'''
 	in_rules, ex_rules = path_rule(**rules)
@@ -1881,5 +1940,6 @@ def path_short(fullpath, max_len:int=100)->str:
 	'''
 	if len(fp := fullpath) <= max_len: return fullpath
 	return fp[:( -(-max_len // 2 ) )-3] + '...' + fp[-(max_len//2):]
+
 
 if __name__ != '__main__': patch_import()

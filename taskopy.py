@@ -167,7 +167,7 @@ def _close_directory_handle(handle):
 	try:
 		CancelIoEx(handle, None)
 	except WindowsError as e:
-		tprint(f'expected error: {e}')
+		pass
 	except Exception as e:
 		tprint(f'unexpected error: {e}')
 
@@ -241,6 +241,7 @@ def load_crontab(event=None)->bool:
 			del crontab
 			crontab = importlib.import_module('crontab')
 		load_modules()
+		if is_dev(): del tasks
 		tasks = Tasks()
 		app.tasks = tasks
 		for rtask in run_bef_reload:
@@ -442,7 +443,7 @@ class Tasks:
 							break
 					else:
 						self.task_list_submenus.append(
-							[submenu, [task_opts]]
+							(submenu, [task_opts])
 						)
 				else:
 					self.task_list_menu.append(task_opts)
@@ -457,6 +458,8 @@ class Tasks:
 							task_opts['http_white_list'].append(ip.strip())
 			if task_opts['idle']: self.add_idle_task(task_opts)
 			if task_opts['event_log']: self.add_event_handler(task_opts)
+			if task_opts['rule'] and not is_iter(task_opts['rule']):
+				task_opts['rule'] = (task_opts['rule'], )
 		self.task_list_menu.sort( key=lambda k: k['task_name'].lower() )
 		self.task_list_submenus.sort( key=lambda k: k[0].lower() )
 		for subm in self.task_list_submenus:
@@ -522,24 +525,26 @@ class Tasks:
 		BUFFER_LENGTH = 1024
 
 		def dir_watch(task:dict, path:str, is_file:bool=False):
-			hDir = win32file.CreateFile (
-				file_dir(path) if is_file else path
-				, FILE_LIST_DIRECTORY
-				, win32con.FILE_SHARE_READ | win32con.FILE_SHARE_WRITE | win32con.FILE_SHARE_DELETE
-				, None
-				, win32con.OPEN_EXISTING
-				, win32con.FILE_FLAG_BACKUP_SEMANTICS
-				, None
-			)
-			self.dir_change_stop.append(hDir)
-			filename = file_name(path)
-			prev_file = ('', time.time())
-			if is_file:
-				flags = task['on_file_change_flags']
-			else:
-				flags = task['on_dir_change_flags']
 			while True:
 				try:
+					hDir = win32file.CreateFile (
+						file_dir(path) if is_file else path
+						, FILE_LIST_DIRECTORY
+						, win32con.FILE_SHARE_READ
+							| win32con.FILE_SHARE_WRITE
+							| win32con.FILE_SHARE_DELETE
+						, None
+						, win32con.OPEN_EXISTING
+						, win32con.FILE_FLAG_BACKUP_SEMANTICS
+						, None
+					)
+					self.dir_change_stop.append(hDir)
+					filename = file_name(path)
+					prev_file = ('', time.time())
+					if is_file:
+						flags = task['on_file_change_flags']
+					else:
+						flags = task['on_dir_change_flags']
 					results = win32file.ReadDirectoryChangesW(
 						hDir,
 						BUFFER_LENGTH,
@@ -551,6 +556,20 @@ class Tasks:
 				except pywintypes.error as e:
 					if e.winerror == 995:
 						return
+					elif e.winerror in (6, 53, 64):
+						dev_print(f'disconnected ({e.winerror}) from {path}')
+						if e.winerror != 53:
+							try:
+								_close_directory_handle(hDir)
+							except Exception as e2:
+								dev_print(f'_close_directory_handle exception: {e2}')
+						try:
+							self.dir_change_stop.remove(hDir)
+							del hDir
+						except Exception as e:
+							dev_print(f'hDir not exists ({e})')
+						time.sleep(13.0)
+						continue
 					else:
 						tprint(f'pywintypes error: {e.args}')
 						raise e
@@ -780,16 +799,23 @@ class Tasks:
 					else:
 						r = task['task_func'](**task_kwargs)
 					if result != None: result.append(r)
-					if ( t := tasks.task_dict.get(task['task_func_name']) ):
-						t['running'] = False
-						t['thread'] = None
+					try:
+						if ( t := tasks.task_dict.get(task['task_func_name'], {}) ):
+							t['running'] = False
+							t['thread'] = None
+					except NameError:
+						dev_print(f'"tasks" not exists for the task {task["task_func_name"]}')
 					self.task_opt_set(task['task_func_name']
 						, 'err_counter', 0)
 					if wait_event: wait_event.set()
 				except Exception:
-					if ( t := tasks.task_dict.get(task['task_func_name']) ):
-						t['running'] = False
-						t['thread'] = None
+					try:
+						if ( t := tasks.task_dict.get(task['task_func_name'], {}) ):
+							t['running'] = False
+							t['thread'] = None
+					except NameError:
+						dev_print('task stopped after reload: '
+						+ task['task_func_name'])
 					err_counter = self.task_opt_get(
 						task['task_func_name']
 						, 'err_counter'
@@ -821,14 +847,13 @@ class Tasks:
 				and caller != tcon.CALLER_MENU
 			): return
 			if task['single'] and task['running']: return
-			if callable(task['rule']):
-				r = False
-				try:
-					r = task['rule']()
-				except Exception as e:
-					dev_print(f'{task["task_name"]} rule exception: {e}')
-				if not r:
-					return
+			if task['rule']:
+				for rule in task['rule']:
+					try:
+						if not rule(): return
+					except Exception as e:
+						dev_print(f'{task["task_name"]} rule exception: {e}')
+						return
 			if task['log']:
 				cs = f' ({caller})' if caller else ''
 				con_log(f'task{cs}: {task["task_name_full"]}')
@@ -923,13 +948,13 @@ class Tasks:
 		if self.task_list_idle:
 			afk = False
 			self.idle_min = min((t['idle_dur'] for t in self.task_list_idle))
-		while (tasks.sched_thread_id == local_id):
+		cur_thread_id = local_id
+		while (cur_thread_id == local_id):
 			schedule.run_pending()
 			if self.task_list_idle:
 				ms = int(uptime.uptime() * 1000) - win32api.GetLastInputInfo()
 				if ms < self.idle_min:
 					if afk:
-						dev_print('user is back')
 						afk = False
 						for task in self.task_list_idle:
 							task['idle_done'] = False
@@ -941,6 +966,11 @@ class Tasks:
 							self.run_task(task, caller=CALLER_IDLE)
 							task['idle_done'] = True
 			time.sleep(1)
+			try:
+				cur_thread_id = tasks.sched_thread_id
+			except NameError:
+				dev_print('tasks not exists')
+				break
 
 	def close(self):
 		''' Destructor.
@@ -1145,12 +1175,12 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 				duration = str(
 					time_now() - t['last_start']
 				).split('.')[0]
-			table.append([
+			table.append((
 				t['task_func_name']
 				, thread
 				, last_start
 				, duration
-			])
+			))
 		if len(table) > 1:
 			print(lang.warn_runn_tasks_con + ':')
 			table_print(table, use_headers=True)
