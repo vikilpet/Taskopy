@@ -1847,6 +1847,7 @@ class DirSync:
 		Print a table with the difference between
 		the directories.
 		'''
+		print('\nDirSync:', self._src_dir, '->', self._dst_dir)
 		table = [('Diff', 'Path')]
 		table.extend( (('src only', p) for p in self._src_only_files) )
 		table.extend( (('dst only', p) for p in self._dst_only_files) )

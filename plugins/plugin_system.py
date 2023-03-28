@@ -193,7 +193,7 @@ def win_find(title:str, exact:bool=True)->list:
 def win_activate(window=None)->int:
 	''' Brings window to front, returns hwnd.'''
 	hwnd = win_get(window)
-	if not hwnd: return
+	if not hwnd: return 0
 	try:
 		win32gui.SetForegroundWindow(hwnd)
 	except pywintypes.error:
@@ -202,7 +202,8 @@ def win_activate(window=None)->int:
 		try:
 			win32gui.SetForegroundWindow(hwnd)
 		except:
-			pass
+			mouse_pos_set(cur_pos)
+			return 0
 		mouse_pos_set(cur_pos)
 	return hwnd
 

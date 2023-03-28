@@ -33,16 +33,13 @@ def http_req(url:str, encoding:str='utf-8', session:bool=False
 , http_method:str='get', json_data:str=None
 , post_file:str=None, post_hash:bool=False
 , post_form_data:dict=None, post_file_capt:str='file'
-, timeout:int=3, attempts:int=3, **kwargs)->str:
+, timeout:float=3.0, attempts:int=3, **kwargs)->str:
 	'''
 	Gets content of the specified URL
 	
-	**Kwargs tips:**
-	
-	Skip SSL verification: `verify=False`
-	
-	Follow redirects: `allow_redirects=True`
-
+	**Kwargs tips:**  
+	Skip SSL verification: `verify=False`  
+	Follow redirects: `allow_redirects=True`  
 	'''
 	if (post_file or post_form_data): http_method = 'POST'
 	if http_method: http_method = http_method.lower()
@@ -136,7 +133,7 @@ def html_minify(html:str)->str:
 
 
 def file_download(url:str, destination:str=None
-, attempts:int=3, timeout:int=1
+, attempts:int=3, timeout:float=3.0
 , del_bad_file:bool=False, headers:dict={}
 , size_limit:int=None
 , stop_event:threading.Event=None
@@ -596,13 +593,15 @@ def json_to_html(json_data, **kwargs)->str:
 	return json2html.json2html.convert(
 		json=json_data, **kwargs)
 
-def http_header(url:str, header:str, **kwargs)->str:
+def http_header(url:str, header:str
+, timeout:float=2.0, **kwargs)->str:
 	'''
 	Get HTTP header of URL or get them all (as a dictionary)
 	if header=='all'.
 	'''
 	headers={**_USER_AGENT, **kwargs.get('headers', {}) }
-	req = requests.head(url, headers=headers, **kwargs)
+	req = requests.head(url, timeout=timeout
+	, headers=headers, **kwargs)
 	if header == 'all': return req.headers
 	return req.headers.get(header)
 
@@ -617,8 +616,8 @@ def http_h_last_modified(url:str, **kwargs):
 def port_scan(host:str, port:int
 , timeout:int=500)->bool:
 	'''
-	Scan TCP port.
-	*timeout* - timeout in milliseconds.
+	Scan a TCP port.  
+	*timeout* - timeout in milliseconds.  
 	'''
 	SUCCESS = 0
 	sock = socket.socket()
@@ -628,14 +627,14 @@ def port_scan(host:str, port:int
 	sock.close()
 	return connected
 
-def http_req_status(url:str, method='HEAD')->int:
+def http_req_status(url:str, method='HEAD', timeout:float=1.0)->int:
 	r'''
 	Returns just a status of HTTP request:
 
 		tass( http_req_status('https://github.com'), 200)
 		
 	'''
-	return getattr(requests, method.lower())(url).status_code
+	return getattr(requests, method.lower())(url, timeout=timeout).status_code
 
 if __name__ == '__main__':
 	html = r'''

@@ -8,6 +8,8 @@ import select
 import hashlib
 from .tools import patch_import
 
+_DEF_TIMEOUT = 180.0 # seconds
+
 class _ApiRos:
 	"Routeros api"
 	def __init__(s, sk, info:bool=False):
@@ -186,7 +188,8 @@ def routeros_send(
 	):
 		af, socktype, proto, canonname, sa = res
 		try:
-			 soc = socket.socket(af, socktype, proto)
+			soc = socket.socket(af, socktype, proto)
+			soc.settimeout(_DEF_TIMEOUT) # seconds
 		except socket.error:
 			soc = None
 			continue
@@ -246,7 +249,8 @@ def routeros_find_send(
 	):
 		af, socktype, proto, canonname, sa = res
 		try:
-			 soc = socket.socket(af, socktype, proto)
+			soc = socket.socket(af, socktype, proto)
+			soc.settimeout(_DEF_TIMEOUT) # seconds
 		except socket.error:
 			soc = None
 			continue
@@ -323,6 +327,7 @@ def routeros_query(
 		af, socktype, proto, canonname, sa = res
 		try:
 			soc = socket.socket(af, socktype, proto)
+			soc.settimeout(_DEF_TIMEOUT) # seconds
 		except socket.error:
 			soc = None
 			continue

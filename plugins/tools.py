@@ -43,7 +43,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-03-19'
+APP_VERSION = 'v2023-03-28'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 _app_log_limit = 10_000
@@ -1725,12 +1725,15 @@ def benchmark(func, b_iter:int=100
 	for _ in range(b_iter):
 		func(*a, **ka)
 	total_ns = time.perf_counter_ns() - start
-	ns_loop_str = '{:,}'.format(total_ns // b_iter).replace(',', ' ')
+	ns_loop = total_ns // b_iter
+	ns_loop_str = '{:,}'.format(ns_loop).replace(',', ' ')
 	ns_total_str = '{:,}'.format(total_ns).replace(',', ' ')
 	name = ''
 	if not func.__name__.startswith('<'):
 		name = func.__name__ + ': '
 	tdebug(f'{name}{ns_loop_str} ns/loop, total={ns_total_str}, {b_iter=}')
+	if name and tdebug():
+		print(f'tass( benchmark({name[:-2]}), {int(ns_loop * 1.3)}, "<" )')
 	return total_ns // b_iter
 
 def median(source):
