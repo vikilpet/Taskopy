@@ -1079,10 +1079,10 @@ def shortcut_create(fullpath, dest:str=None, descr:str=None
 	if icon_fullpath and icon_index == None: icon_index = 0
 	pythoncom.CoInitialize()
 	shortcut = pythoncom.CoCreateInstance (
-		win32com.shell.shell.CLSID_ShellLink
+		shell.CLSID_ShellLink
 		, None
 		, pythoncom.CLSCTX_INPROC_SERVER
-		, win32com.shell.shell.IID_IShellLink
+		, shell.IID_IShellLink
 	)
 	shortcut.SetPath( os.path.abspath(fullpath) )
 	shortcut.SetDescription(descr)
@@ -1127,13 +1127,12 @@ def file_print(fullpath, printer:str=None
 
 def dir_user_desktop()->str:
 	' Returns full path to the desktop directory of current user '
-	return win32com.shell.shell.SHGetFolderPath(
+	return shell.SHGetFolderPath(
 		0, shellcon.CSIDL_DESKTOP, 0, 0)
 
 def dir_user_startup()->str:
 	' Returns full path to the startup directory of current user '
-	return win32com.shell.shell.SHGetFolderPath(
-		0, win32com.shell.shellcon.CSIDL_STARTUP, 0, 0)
+	return shell.SHGetFolderPath(0, shellcon.CSIDL_STARTUP, 0, 0)
 
 def file_b64_enc(fullpath:str)->str:
 	'''
@@ -1942,5 +1941,25 @@ def path_short(fullpath, max_len:int=100)->str:
 	if len(fp := fullpath) <= max_len: return fullpath
 	return fp[:( -(-max_len // 2 ) )-3] + '...' + fp[-(max_len//2):]
 
+
+
+def rec_bin_purge(drive:str=None, progress:bool=False, sound:bool=True):
+	r'''
+	Clears the recycle bin.
+		rec_bin_purge('c')
+		rec_bin_purge()
+
+	'''
+	flags = shellcon.SHERB_NOCONFIRMATION
+	if not progress: flags |= shellcon.SHERB_NOPROGRESSUI
+	if not sound: flags |= shellcon.SHERB_NOSOUND
+	if drive: drive = drive[0] + ':'
+	try:
+		shell.SHEmptyRecycleBin(None, drive, flags)
+	except shell.error as e:
+		if e.args[0] == -2147418113:
+			tdebug(f'recycle bin is empty')
+		else:
+			raise
 
 if __name__ != '__main__': patch_import()

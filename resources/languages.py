@@ -35,6 +35,7 @@ class Language:
 		self.button_cancel = 'Cancel'
 		self.warn_no_run_tasks = 'No running tasks'
 		self.warn_on_exit = 'Waiting for tasks to complete on exit'
+		self.warn_rule_exc = 'Exception in a rule in the task «{}»: {}'
 
 		if not (di_str := getattr(
 			sys.modules[__name__]
@@ -95,4 +96,5 @@ warn_too_many_win=Открыто слишком много окон {}: {}
 button_close=Закрыть
 button_cancel=Отмена
 warn_on_exit=Ожидаем завершения задач при выходе
+warn_rule_exc=Исключение в правиле у задачи «{}»: {}
 '''

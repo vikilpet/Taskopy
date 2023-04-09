@@ -43,7 +43,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-03-28'
+APP_VERSION = 'v2023-04-09'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 _app_log_limit = 10_000
@@ -824,10 +824,10 @@ class Job:
 			self.result = self.func(*self.args, **self.kwargs)
 			if isinstance(self.result, Exception):
 				self.error = True
-				self.result = f'Exception: {repr(self.result)}' \
+				self.result = f'exception: {repr(self.result)}' \
 				+ f'\nat line {self.result.__traceback__.tb_lineno}'
 		except Exception as e:
-			self.result = f'Exception: {repr(e)}' \
+			self.result = f'exception: {repr(e)}' \
 				+ f'\nat line {e.__traceback__.tb_lineno}'
 			self.error = True
 		self.finished = True

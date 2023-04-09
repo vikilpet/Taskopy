@@ -319,6 +319,14 @@ def proc_cpu(process, interval:float=1.0)->float:
 	proc = psutil.Process(pid)
 	return proc.cpu_percent(interval)
 
+def proc_uptime(process)->float:
+	r'''
+	Returns process uptime in seconds.
+	'''
+	if (pid := proc_get(process)) == -1: return -1.0
+	return time.time() - psutil.Process(pid).create_time()
+
+
 def proc_kill(process, cmd_filter:str=None):
 	''' Kills the prosess.
 	'''

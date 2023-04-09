@@ -852,7 +852,8 @@ class Tasks:
 					try:
 						if not rule(): return
 					except Exception as e:
-						dev_print(f'{task["task_name"]} rule exception: {e}')
+						con_log(f'{task["task_name"]} rule exception: {e}')
+						warning(lang.warn_rule_exc.format(task["task_name"], e))
 						return
 			if task['log']:
 				cs = f' ({caller})' if caller else ''
