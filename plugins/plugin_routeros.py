@@ -1,10 +1,8 @@
 # source: https://wiki.mikrotik.com/wiki/Manual:API_Python3
 
 import sys
-import time
 import binascii
 import socket
-import select
 import hashlib
 from .tools import patch_import
 
@@ -196,8 +194,7 @@ def routeros_send(
 		try:
 			soc.connect(sa)
 		except socket.error:
-			soc.close()
-			soc = None
+			soc.close(); soc = None
 			continue
 		break
 	
@@ -214,7 +211,9 @@ def routeros_send(
 	except Exception as e:
 		if info: print(f'routeros_send exception:\n{repr(e)}'
 		+ f'\nat line {e.__traceback__.tb_lineno}')
+		soc.close(); soc = None
 		return False, repr(e)[:200]
+	soc.close(); soc = None
 	return True, None
 
 def routeros_find_send(
@@ -257,8 +256,7 @@ def routeros_find_send(
 		try:
 			soc.connect(sa)
 		except socket.error:
-			soc.close()
-			soc = None
+			soc.close(); soc = None
 			continue
 		break
 	
@@ -271,6 +269,7 @@ def routeros_find_send(
 		api_data = apiros.talk(cmd_find)
 		if api_data[0][0] == '!trap':
 			if info: print(f'routeros_find_send bad query:\n{api_data}')
+			soc.close(); soc = None
 			return False, 'bad query'
 		id_list = [tup[1]['=.id'] for tup in api_data[:-1]]
 		if info: print(f'routeros_find_send: {id_list=}')
@@ -278,7 +277,9 @@ def routeros_find_send(
 	except Exception as e:
 		if info: print(f'routeros_find_send exception:\n{repr(e)}'
 		+ f'\nat line {e.__traceback__.tb_lineno}')
+		soc.close(); soc = None
 		return False, repr(e)[:200]
+	soc.close(); soc = None
 	return True, None
 
 def routeros_query(
@@ -334,8 +335,7 @@ def routeros_query(
 		try:
 			soc.connect(sa)
 		except socket.error:
-			soc.close()
-			soc = None
+			soc.close(); soc = None
 			continue
 		break
 
@@ -364,7 +364,8 @@ def routeros_query(
 					)
 			else:
 				results.append( (True, []) )
-	
+		
+		soc.close(); soc = None
 		if isinstance(query[0], list):
 			return True, results
 		else:
@@ -372,7 +373,7 @@ def routeros_query(
 	except Exception as e:
 		if info: print(f'routeros_query exception:\n{repr(e)}'
 		+ f'\nat line {e.__traceback__.tb_lineno}')
+		soc.close(); soc = None
 		return False, repr(e)[:200]
-	return False, 'something went wrong'
 
 if __name__ != '__main__': patch_import()

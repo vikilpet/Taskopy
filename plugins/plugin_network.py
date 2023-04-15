@@ -82,6 +82,7 @@ def http_req(url:str, encoding:str='utf-8', session:bool=False
 			else:
 			 	break
 		except Exception as e:
+			if session: req_obj.close()
 			if isinstance(e, requests.exceptions.SSLError):
 				return e
 			if isinstance(e, requests.exceptions.InvalidHeader):
@@ -92,8 +93,10 @@ def http_req(url:str, encoding:str='utf-8', session:bool=False
 				,  f'Error: {repr(e)}\nurl={url}')
 			pass
 	else:
+		if session: req_obj.close()
 		raise Exception(
 			f'no more attempts ({attempts}) {url[:100]}')
+	if session: req_obj.close()
 	if file_obj: file_obj.close()
 	content = str(req.content
 		, encoding=encoding, errors='ignore')

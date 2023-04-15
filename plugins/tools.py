@@ -43,7 +43,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-04-09'
+APP_VERSION = 'v2023-04-16'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 _app_log_limit = 10_000
@@ -1741,7 +1741,8 @@ def median(source):
 
 def speak(text:str, wait:bool=False):
 	'''
-	Pronouns text using the Windows built-in speech engine.
+	Pronouns text using the Windows built-in speech engine.  
+	If *wait* then returns *text*.  
 	'''
 
 	def _speak():
@@ -1754,9 +1755,10 @@ def speak(text:str, wait:bool=False):
 			dev_print(f'speaker error: {e}')
 		pythoncom.CoUninitialize()
 	
+	text = str(text)
 	if wait:
 		_speak()
-		return
+		return text
 	thread_start(_speak)
 
 def func_name_human(func_name:str)->str:

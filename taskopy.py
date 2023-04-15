@@ -487,6 +487,7 @@ class Tasks:
 		dev_print(f'Total number of tasks: {len(self.task_dict)}')
 	
 	def add_hotkey(self, task):
+		
 		def hk_error(error):
 			con_log(error)
 			warning(
