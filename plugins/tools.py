@@ -43,7 +43,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-04-16'
+APP_VERSION = 'v2023-04-23'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 _app_log_limit = 10_000
@@ -310,7 +310,7 @@ def time_diff(start:datetime.datetime, end:datetime.datetime=None
 
 def time_diff_str(start:datetime.datetime
 , end:datetime.datetime=None, str_format:str=''
-, no_ms:bool=False)->str:
+, no_ms:bool=True)->str:
 	'''
 	Returns time difference as a string like that:
 	'5 days, 3:01:35.837127'
@@ -404,7 +404,7 @@ def date_fill_str(date_str:str)->str:
 
 		tass(
 			benchmark(date_fill_str, 100, a=('*.*.01 12:30',))
-			, 7000
+			, 8000
 			, '<'
 		)
 

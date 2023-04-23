@@ -21,6 +21,7 @@ except ModuleNotFoundError:
 LockWorkStation = ctypes.windll.user32.LockWorkStation
 _GetAncestor = ctypes.windll.user32.GetAncestor
 _SendNotifyMessage = ctypes.windll.user32.SendNotifyMessageA
+_GetACP = ctypes.cdll.kernel32.GetACP
 _WM_APPCOMMAND = 0x319
 _APPCOMMAND_VOLUME_MUTE = 0x80000
 _APPCOMMAND_VOLUME_DOWN = 0x90000
@@ -410,6 +411,16 @@ def screen_width()->int:
 def screen_height()->int:
 	' Returns screen height in pixels '
 	return win32api.GetSystemMetrics(win32con.SM_CYSCREEN)
+
+def sys_codepage():
+	r'''
+	Returns current Windows code page for non-unicode programs.
+
+		tass( sys_codepage(), 'cp1251' )
+		tass( benchmark(sys_codepage), 2056, "<" )
+
+	'''
+	return 'cp' + str(_GetACP())
 if __name__ == '__main__':
 	_test_reg_key()
 else:

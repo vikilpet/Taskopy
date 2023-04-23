@@ -241,7 +241,6 @@ def load_crontab(event=None)->bool:
 			del crontab
 			crontab = importlib.import_module('crontab')
 		load_modules()
-		if is_dev(): del tasks
 		tasks = Tasks()
 		app.tasks = tasks
 		for rtask in run_bef_reload:
@@ -431,12 +430,12 @@ class Tasks:
 				if '__' in task_opts['task_func_name']:
 					submenu, sm_name = task_opts['task_func_name'].split('__', maxsplit=1)
 					submenu = submenu.replace('_', ' ')
-					sm_name = sm_name.replace('_', ' ').capitalize()
+					sm_name = sm_name.replace('_', ' ')
+					if not sm_name[0].isupper(): sm_name = sm_name.capitalize()
 					task_opts['task_name_submenu'] = sm_name
 				if s := task_opts.get('submenu'): submenu = s
 				if submenu:
-					if not submenu[0].isupper():
-						submenu = submenu.capitalize()
+					if not submenu[0].isupper(): submenu = submenu.capitalize()
 					for m in self.task_list_submenus:
 						if m[0] == submenu:
 							m[1].append(task_opts)

@@ -157,4 +157,74 @@ def examp_file_decrypt():
 		return
 	dialog(f'Done:\n{fullpath}')
 
+def examp_cert_check(caller:str, codepage:str=''
+, stores:tuple=('Root', 'AuthRoot')):
+	r'''
+	Find the difference in the PC root certificate list and the similar
+	list from Windows Update.
+
+	Links:
+	
+	- https://justinparrtech.com/JustinParr-Tech/windows-certutil-list-certificate-stores/
+	- https://www.computerworld.com/article/3008113/dell-installs-self-signed-root-certificate-on-laptops-endangers-users-privacy.html
+	- https://support.microsoft.com/en-us/topic/an-automatic-updater-of-untrusted-certificates-is-available-for-windows-vista-windows-server-2008-windows-7-and-windows-server-2008-r2-117bc163-d9e0-63ad-5a79-e61f38be8b77
+	
+	'''
+
+	def parser(dump:str)->dict:
+		dct = {}
+		# There is difference between pc and wu dump
+		for sect in dump.split('================'):
+			hsh = re_find(sect, r'(?:\):\s)([0-9a-z\s]{32,})')
+			if not hsh: continue
+			name = re_find(sect, r'(?:\s(?:CN=|OU=|O=))(.+?)[,\r\n]', re_flags=0)
+			if caller == tcon.CALLER_MENU:
+				if not name: tprint(f'no name: {hsh}')
+			dct[hsh[0].strip()] = name[0].strip() if name else '?'
+		return dct
+
+	if not codepage: codepage = sys_codepage()
+	dump_file = temp_file(suffix=".sst")
+	ret, out, _ = proc_start('certutil', f'-generateSSTFromWU {dump_file}'
+	, capture=True)
+	if ret:
+		dialog(f'certutil wu download error: {out}')
+		return
+	ret, out, _ = proc_start('certutil', dump_file, capture=True)
+	if ret:
+		dialog(f'certutil wu read error: {out}')
+		return
+	file_recycle(dump_file)
+	hashes_wu = parser(out)
+	hashes_pc = {}
+	for store in stores:
+		ret, out, _ = proc_start('certutil', f'-store {store}'
+		, capture=True, encoding=codepage)
+		if ret:
+			dialog(f'certutil store {store} error: {out}')
+			return
+		hashes_pc.update(parser(out))
+	table = [('Src', 'Name', 'Hash')]
+	hashes_pc_only, diff = {}, set()
+	for hsh, name in hashes_pc.items():
+		if not hsh in hashes_wu:
+			hashes_pc_only[hsh] = name
+			diff.add(hsh)
+			table.append(('pc', name, hsh))
+	if caller == tcon.CALLER_MENU or diff:
+		tprint(f'{len(hashes_pc)=}, {len(hashes_wu)=}')
+		table_print(table, sorting=(0, 1))
+	if not set(
+		var_get('cert_check_diff', as_literal=True, default=())
+	).symmetric_difference(diff):
+		if caller == tcon.CALLER_MENU:
+			dialog('No new PC-only certificates', timeout='2 sec')
+		return
+	if len(hashes_pc_only) == 0:
+		return
+	# Show application window and dialog only if there is a difference:
+	app_win_show()
+	if dialog('Save the new difference?', ('No', 'Yes')) == 1001:
+		var_set('cert_check_diff', diff)
+
 if __name__ != '__main__': patch_import()

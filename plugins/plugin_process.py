@@ -482,11 +482,15 @@ def service_restart(service:str):
 
 def service_list()->List[psutil._pswindows.WindowsService]:
 	'''
-	Returns the list (generator) of services
+	Returns the list (generator) of services.  
+	Object `WindowsService` methods: as_dict, binpath, description
+	, display_name, name, pid, start_type, status, username.
 
 		for s in service_list():
 			if 'Microsoft' in s.description():
 				print(s)
+
+		benchmark(lambda: tuple(service_list()))
 
 	'''
 	return psutil.win_service_iter()
@@ -752,5 +756,10 @@ def win_by_pid(process)->tuple:
 	for hwnd, title in win_lst:
 		if win32process.GetWindowThreadProcessId(hwnd)[1] == pid:
 			return (hwnd, title)
+
+def cmd_elev(cmd:str):
+	' Run application via task sceduler'
+	tprint(proc_start('schtasks', '/run /tn taskopy_cmd_elev'
+	, env={'CMD_ELEV': cmd}, capture=True))
 
 if __name__ != '__main__': patch_import()

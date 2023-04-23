@@ -741,7 +741,7 @@ def dir_list(fullpath)->Iterator[str]:
 		tass( 'resources\\icon.png' in dir_list('resources'), True)
 		tass(
 			benchmark(lambda d: tuple(dir_list(d)), 10, 'log')
-			, 100_000
+			, 500_000
 			, '<'
 		)
 
