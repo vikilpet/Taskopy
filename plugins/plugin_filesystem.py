@@ -734,22 +734,45 @@ def drive_free(letter:str, unit:str='GB')->int:
 	except:
 		return -1
 
-def dir_list(fullpath)->Iterator[str]:
+def dir_list(fullpath, **rules)->Iterator[str]:
 	r'''
-	Returns all directory content (dirs and files).
+	Returns all directory content (dirs and files).  
+	*rules* - rules for the `path_rule` function.  
 
 		tass( 'resources\\icon.png' in dir_list('resources'), True)
+		tass( 'resources\\icon.png' in dir_list('resources', ex_ext='png'), False)
 		tass(
-			benchmark(lambda d: tuple(dir_list(d)), 10, 'log')
+			benchmark(lambda d: tuple(dir_list(d)), 'log', b_iter=5)
 			, 500_000
 			, '<'
 		)
 
 	'''
 	fullpath = path_get(fullpath)
+	if rules: in_rules, ex_rules = path_rule(**rules)
 	for dirpath, dirnames, filenames in os.walk(fullpath):
-		for d in dirnames: yield dirpath + '\\' + d
-		for f in filenames: yield dirpath + '\\' + f
+		for d in dirnames:
+			fpath = dirpath + '\\' + d
+			if rules:
+				if _path_match(
+					path=fpath
+					, in_rules=in_rules
+					, ex_rules=ex_rules
+				):
+					yield fpath
+			else:
+				yield fpath
+		for f in filenames:
+			fpath = dirpath + '\\' + f
+			if rules:
+				if _path_match(
+					path=fpath
+					, in_rules=in_rules
+					, ex_rules=ex_rules
+				):
+					yield fpath
+			else:
+				yield fpath
 
 def dir_find(fullpath, only_files:bool=False)->list:
 	'''
@@ -1192,7 +1215,15 @@ def file_lock_wait(fullpath, wait_interval:str='100 ms'
 			return False
 
 def file_relpath(fullpath, start)->str:
-	''' Returns a relative path '''
+	r'''
+	Returns a relative path.  
+
+		tass(
+			file_relpath(r'c:\Windows\System32\calc.exe', r'c:\Windows')
+			, 'System32\\calc.exe'
+		)
+
+	'''
 	fullpath = path_get(fullpath)
 	start = path_get(start)
 	return os.path.relpath(fullpath, start=start)

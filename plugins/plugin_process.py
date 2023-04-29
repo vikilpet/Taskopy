@@ -422,13 +422,16 @@ def wts_user_sessionid(users, only_active:bool=True)->list:
 
 def wts_message(sessionid:int, msg:str, title:str, style:int=0
 , timeout:int=0, wait:bool=False)->int:
-	''' Sends message to WTS session.
-		style - styles like in MessageBox (0 - MB_OK).
-		timeout - timeout in seconds (0 - no timeout).
-		Returns same values as the MessageBox.
+	r'''
+	Sends a message to a WTS session.  
+	It is best not to put more than 50 characters
+	in the *title*.  
+	*style* - styles like in `MessageBox` (0 - MB_OK).  
+	*timeout* - timeout in seconds (0 - no timeout).  
+	Returns same values as the `MessageBox`.
 	'''
 	return win32ts.WTSSendMessage(0, sessionid
-	, msg, title, style, timeout, wait)
+	, title, msg, style, timeout, wait)
 	
 def wts_cur_sessionid()->int:
 	''' Returns SessionID of current process.

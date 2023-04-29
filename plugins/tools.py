@@ -43,7 +43,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-04-23'
+APP_VERSION = 'v2023-04-28'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 _app_log_limit = 10_000
@@ -380,7 +380,7 @@ def date_fill(date_dic:dict, cur_date=None)->datetime.datetime:
 		dt_dic = {'year': None, 'month': 11
 		, 'day': 31, 'hour': 23, 'minute': 24}
 		date_fill(dt_dic)
-		tass( benchmark(date_fill, 10, a=(dt_dic,)), 8000, '<' )
+		tass( benchmark(date_fill, a=(dt_dic,)), 8000, '<' )
 
 	'''
 	new_date_dic = {'year': 0, 'month': 0
@@ -403,7 +403,7 @@ def date_fill_str(date_str:str)->str:
 	date_fill_str('*.*.01 12:30') -> '2020.10.01 12:30'
 
 		tass(
-			benchmark(date_fill_str, 100, a=('*.*.01 12:30',))
+			benchmark(date_fill_str, a=('*.*.01 12:30',))
 			, 8000
 			, '<'
 		)
@@ -1609,6 +1609,8 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 	*err_action* - function to run if an exception occurs.  
 	The text of exception will be passed to the function.  
 
+		tass( benchmark(thread_start, (lambda: None,)), 179634, '<' )
+
 	'''
 	def wrapper():
 		nonlocal func, args, kwargs
@@ -1709,14 +1711,13 @@ def app_exit(force:bool=False):
 	'''
 	app.exit(force=force)
 
-def benchmark(func, b_iter:int=100
-, a:tuple=(), ka:dict={})->int:
+def benchmark(func, a:tuple=(), ka:dict={}, b_iter:int=100)->int:
 	r'''
 	Run function `func` `b_iter` times and print time.  
 	Returns nanoseconds per loop.  
 	Example:
 
-		tass( benchmark(dir_size, 5, a=('logs',) ) , 70000, '<' )
+		tass( benchmark(dir_size, a=('logs',), b_iter=3 ) , 70000, '<' )
 	
 	'''
 	start = time.perf_counter_ns()
@@ -1930,7 +1931,7 @@ def str_short(text:str, width:int=0, placeholder:str='...')->str:
 		tass( str_short('Hello,  world! ', 12), 'Hello,...' )
 		tass( str_short('Hello\nworld! ', 12), 'Hello world!' )
 		tass( str_short('Hello\nworld! ', 11), 'Hello...' )
-		tass( benchmark(str_short, 100, 'Hello,  world! '), 60_000, '<')
+		tass( benchmark(str_short, ('Hello,  world! ',)), 60_000, '<')
 
 	'''
 	if width == 0: width = os.get_terminal_size().columns - 1
