@@ -434,21 +434,24 @@ def wts_message(sessionid:int, msg:str, title:str, style:int=0
 	, title, msg, style, timeout, wait)
 	
 def wts_cur_sessionid()->int:
-	''' Returns SessionID of current process.
+	'''
+	Returns *SessionID* of the current process.
 	'''
 	return win32ts.ProcessIdToSessionId(win32api.GetCurrentProcessId())
 
 def wts_logoff(sessionid:int, wait:bool=False)->int:
-	''' Logoffs session. wait - wait for completion.
-		If the function fails, the return value is zero.
+	r'''
+	Logoffs session. *wait* - wait for completion.  
+	If the function fails, the return value is zero.
 	'''
 	return win32ts.WTSLogoffSession(0, sessionid, wait)
 	
 def wts_proc_list(process:str=None)->list:
-	''' Returns list of DictToObj objects with properties:
-		.sessionid:int, .pid:int, .process:str (name of exe file)
-		, .pysid:obj, .username:str, .cmdline:list
-		process - filter by process name.
+	'''
+	Returns list of DictToObj objects with properties:
+	.sessionid:int, .pid:int, .process:str (name of exe file)
+	, .pysid:obj, .username:str, .cmdline:list  
+	*process* - filter by process name.
 	'''
 	if process: process = process.lower()
 	proc_tup = win32ts.WTSEnumerateProcesses()

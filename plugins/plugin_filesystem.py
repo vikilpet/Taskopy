@@ -392,9 +392,17 @@ def path_exists(fullpath)->bool:
 	return p.exists()
 
 def file_size(fullpath, unit:str='b')->int:
+	r'''
+	Gets the file size in the specified units.  
+
+		fpath = r'c:\Windows\System32\notepad.exe' # on SSD
+		benchmark(win32file.GetFileAttributesEx, fpath)
+		benchmark(os.stat, fpath)
+
+	'''
 	fullpath = path_get(fullpath)
 	e = _SIZE_UNITS.get(unit.lower(), 1)
-	return os.stat(fullpath).st_size // e
+	return win32file.GetFileAttributesEx(fullpath)[4] // e
 
 def file_size_str(fullpath)->str:
 	'''
@@ -1972,6 +1980,132 @@ def path_short(fullpath, max_len:int=100)->str:
 	if len(fp := fullpath) <= max_len: return fullpath
 	return fp[:( -(-max_len // 2 ) )-3] + '...' + fp[-(max_len//2):]
 
+
+
+class DirDup:
+	r'''
+	First we find groups of files with the same size
+	, then we look for unique ones within those groups.
+	'''
+	ALGO_SIZE = 'Size'
+	ALGO_MDATE = 'Modification date'
+	ALGO_CDATE = 'Creation date'
+	ALGO_HASH_BEG = 'Hash of the beginning'
+	ALGO_HASH_FULL = 'Hash of the whole'
+
+	def __init__(self, src_dir:Union[str, tuple, list], algo:str
+	, hash_size_limit_perc:int=5, **rules)->None:
+		assert algo in (self.ALGO_SIZE, self.ALGO_HASH_BEG
+		, self.ALGO_HASH_FULL, self.ALGO_MDATE, self.ALGO_CDATE), 'unknown algorithm'
+		self._src_dirs:tuple = (src_dir,) if isinstance(src_dir, str) else src_dir
+		self._algo:str = algo
+		self._dtype = 'mdate' if self._algo == self.ALGO_MDATE else 'cdate'
+		self._hash_size_limit_perc:int = hash_size_limit_perc
+		self._rules:dict = rules
+		self._files:dict = dict()
+		self._dups:tuple = tuple()
+		self._buf_size:int = 4096
+
+	def _file_md5(self, fpath:str, fsize:int)->str:
+		hsh = hashlib.md5()
+		chunk_limit = 0
+		if self._algo == self.ALGO_HASH_BEG:
+			chunk_limit = fsize * self._hash_size_limit_perc / 100 / self._buf_size
+		chunk_cnt = 0.0
+		with open(fpath, 'rb') as fd:
+			for chunk in iter(lambda: fd.read(self._buf_size), b''):
+				chunk_cnt += 1.0
+				hsh.update(chunk)
+				if chunk_limit and (chunk_cnt >= chunk_limit): break
+		return hsh.hexdigest()
+
+	def scan(self):
+		self._files = dict()
+		for d in self._src_dirs:
+			for fpath in dir_files(d, **self._rules):
+				self._files[fpath] = {'unique': True}
+				att = win32file.GetFileAttributesEx(fpath)
+				self._files[fpath]['size'] = att[4]
+				self._files[fpath]['mdate'] = att[3]
+				self._files[fpath]['cdate'] = att[1]
+
+	def find_dup(self):
+		if not self._files: self.scan()
+		self._sizes = dict()
+		self._dates = dict()
+		tstart = time_now()
+		for fpath, props in self._files.items():
+			if props['size'] in self._sizes:
+				self._sizes[props['size']].append(fpath)
+			else:
+				self._sizes[props['size']] = [fpath]
+			if self._algo in (self.ALGO_MDATE, self.ALGO_CDATE):
+				if props[self._dtype] in self._dates:
+					self._dates[props[self._dtype]].append(fpath)
+				else:
+					self._dates[props[self._dtype]] = [fpath]
+		if self._algo == self.ALGO_SIZE:
+			for fpaths in self._sizes.values():
+				if len(fpaths) == 1: continue
+				for fpath in fpaths:
+					self._files[fpath]['unique'] = False
+			self._dups = tuple(f for f,p in self._files.items() if not p['unique'])
+			tdebug(f'done in {time_diff_str(tstart)}')
+			return
+		for size, fpaths in self._sizes.items():
+			if len(fpaths) == 1: continue
+			if self._algo in (self.ALGO_MDATE, self.ALGO_CDATE):
+				dates = tuple(self._files[f][self._dtype].timestamp() for f in fpaths)
+				for fpath in fpaths:
+					self._files[fpath]['unique'] = dates.count(
+						self._files[fpath][self._dtype].timestamp()
+					) == 1
+			else:
+				hashes = list()
+				for fpath in fpaths:
+					hsh = self._file_md5(fpath, fsize=size)
+					self._files[fpath]['hash'] = hsh
+					hashes.append(hsh)
+				for fpath in fpaths:
+					self._files[fpath]['unique'] = hashes.count(
+						self._files[fpath]['hash']
+					) == 1
+		self._dups = tuple(f for f,p in self._files.items() if not p['unique'])
+		tdebug(f'done in {time_diff_str(tstart)}')
+	
+	def print_all(self, fullname:bool=False):
+		' Print all files '
+		table = [('File', 'Unique', self._algo)]
+		for fpath, props in self._files.items():
+			name = fpath if fullname else file_name(fpath)
+			if self._algo == self.ALGO_SIZE:
+				sign = props['size']
+			elif self._algo in (self.ALGO_MDATE, self.ALGO_CDATE):
+				sign = props[self._dtype].strftime(tcon.DATE_STR_HUMAN)
+			else:
+				sign = props.get('hash', None)
+			table.append((name, str(props['unique']), sign))
+		table_print(table, max_table_width=(100, 0), trim_func=path_short
+		, sorting=(1, 0))
+
+	def print_dup(self, fullname:bool=False):
+		' Print duplicates only '
+		table = [('File', self._algo)]
+		for size, fpaths in self._sizes.items():
+			if len(fpaths) == 1: continue
+			for fpath in fpaths:
+				name = fpath if fullname else file_name(fpath)
+				props = self._files[fpath]
+				if props['unique']: continue
+				if self._algo == self.ALGO_SIZE:
+					sign = size
+				elif self._algo in (self.ALGO_MDATE, self.ALGO_CDATE):
+					sign = props[self._dtype].strftime(tcon.DATE_STR_HUMAN)
+				else:
+					sign = props['hash']
+				table.append((name, sign))
+		table_print(table, max_table_width=(100, 0), trim_func=path_short
+		, sorting=(1, 0))
 
 
 def rec_bin_purge(drive:str=None, progress:bool=False, sound:bool=True):
