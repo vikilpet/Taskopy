@@ -446,7 +446,10 @@ class Tasks:
 						)
 				else:
 					self.task_list_menu.append(task_opts)
-			if task_opts['http']:
+			if task_opts['http'] != False:
+				if task_opts['http'] != True:
+					if not is_iter(task_opts['http']):
+						task_opts['http'] = (task_opts['http'],)
 				if not task_opts['http_dir']:
 					task_opts['http_dir'] = temp_dir()
 				self.task_list_http.append(task_opts)

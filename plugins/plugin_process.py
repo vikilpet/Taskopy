@@ -428,7 +428,8 @@ def wts_message(sessionid:int, msg:str, title:str, style:int=0
 	in the *title*.  
 	*style* - styles like in `MessageBox` (0 - MB_OK).  
 	*timeout* - timeout in seconds (0 - no timeout).  
-	Returns same values as the `MessageBox`.
+	Returns same values as the `MessageBox`.  
+	If `wait=False` returns *32001*  
 	'''
 	return win32ts.WTSSendMessage(0, sessionid
 	, title, msg, style, timeout, wait)

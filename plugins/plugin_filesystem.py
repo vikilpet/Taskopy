@@ -21,6 +21,7 @@ import tempfile
 import datetime
 import win32con
 import win32com
+from operator import itemgetter
 import win32print
 import hashlib
 import pythoncom
@@ -318,10 +319,11 @@ def file_delete(fullpath):
 		pass
 
 def file_recycle(fullpath, silent:bool=True)->bool:
-	''' Move file to the recycle bin
-		silent - do not show standard windows
-		dialog to confirm deletion.
-		Returns True on successful operation.
+	'''
+	Move file to the recycle bin.  
+	*silent* - do not show standard windows
+	dialog to confirm deletion.  
+	Returns True on successful operation.  
 	'''
 	fullpath = path_get(fullpath)
 	flags = shellcon.FOF_ALLOWUNDO
@@ -507,7 +509,6 @@ def dir_dirs(fullpath, subdirs:bool=True)->Iterator[str]:
 
 	'''
 	fullpath = path_get(fullpath)
-
 	for dirpath, dirs, _ in os.walk(fullpath, topdown=True):
 		for d in dirs: yield os.path.join(dirpath, d)
 		if not subdirs: return
@@ -1986,6 +1987,32 @@ class DirDup:
 	r'''
 	First we find groups of files with the same size
 	, then we look for unique ones within those groups.
+
+	Example:
+
+		ddup = DirDup(r'c:\folder', DirDup.ALGO_SIZE, in_ext='jpg')
+		ddup.find_dup()
+		ddup.print_dup()
+	
+	If you choose to search by hash (or mdate, cdate) of the beginning
+	or the whole file the files are grouped by size first (it's cheap)
+	and hashing is performed only within this group of files with the
+	same size.
+
+	The result of work is the `dups` attribute, which is a list of tuples
+	with property dictionaries of found duplicates.  
+	For example, you can loop through this tuple list and delete (recycle)
+	files that are not the oldest or newest:
+
+		for dups in ddup.dups:
+			for dup in dups:
+				if dup['is_cnewest']: continue
+				file_recycle(dup['fpath'])
+
+	or just use `clean` method:
+
+		ddup.clean(leave='coldest')
+
 	'''
 	ALGO_SIZE = 'Size'
 	ALGO_MDATE = 'Modification date'
@@ -1999,7 +2026,7 @@ class DirDup:
 		, self.ALGO_HASH_FULL, self.ALGO_MDATE, self.ALGO_CDATE), 'unknown algorithm'
 		self._src_dirs:tuple = (src_dir,) if isinstance(src_dir, str) else src_dir
 		self._algo:str = algo
-		self._dtype = 'mdate' if self._algo == self.ALGO_MDATE else 'cdate'
+		self._dtype = 'cdate' if self._algo == self.ALGO_CDATE else 'mdate'
 		self._hash_size_limit_perc:int = hash_size_limit_perc
 		self._rules:dict = rules
 		self._files:dict = dict()
@@ -2021,13 +2048,17 @@ class DirDup:
 
 	def scan(self):
 		self._files = dict()
+		tstart = time_now()
 		for d in self._src_dirs:
 			for fpath in dir_files(d, **self._rules):
-				self._files[fpath] = {'unique': True}
+				self._files[fpath] = {'is_unique': True, 'is_cnewest': False
+				, 'is_coldest': False, 'is_mnewest': False, 'is_moldest': False}
 				att = win32file.GetFileAttributesEx(fpath)
+				self._files[fpath]['fpath'] = fpath
 				self._files[fpath]['size'] = att[4]
 				self._files[fpath]['mdate'] = att[3]
 				self._files[fpath]['cdate'] = att[1]
+		tdebug(f'done in {time_diff_str(tstart)}')
 
 	def find_dup(self):
 		if not self._files: self.scan()
@@ -2048,8 +2079,8 @@ class DirDup:
 			for fpaths in self._sizes.values():
 				if len(fpaths) == 1: continue
 				for fpath in fpaths:
-					self._files[fpath]['unique'] = False
-			self._dups = tuple(f for f,p in self._files.items() if not p['unique'])
+					self._files[fpath]['is_unique'] = False
+			self._collect_dups()
 			tdebug(f'done in {time_diff_str(tstart)}')
 			return
 		for size, fpaths in self._sizes.items():
@@ -2057,7 +2088,7 @@ class DirDup:
 			if self._algo in (self.ALGO_MDATE, self.ALGO_CDATE):
 				dates = tuple(self._files[f][self._dtype].timestamp() for f in fpaths)
 				for fpath in fpaths:
-					self._files[fpath]['unique'] = dates.count(
+					self._files[fpath]['is_unique'] = dates.count(
 						self._files[fpath][self._dtype].timestamp()
 					) == 1
 			else:
@@ -2067,11 +2098,32 @@ class DirDup:
 					self._files[fpath]['hash'] = hsh
 					hashes.append(hsh)
 				for fpath in fpaths:
-					self._files[fpath]['unique'] = hashes.count(
+					self._files[fpath]['is_unique'] = hashes.count(
 						self._files[fpath]['hash']
 					) == 1
-		self._dups = tuple(f for f,p in self._files.items() if not p['unique'])
+		self._collect_dups()
 		tdebug(f'done in {time_diff_str(tstart)}')
+	
+	def _collect_dups(self):
+		r'''
+		Makes a convient dictionary with duplicates for further user actions.  
+		Finds newest and oldest files.  
+		'''
+		self.dups = []
+		for fpaths in self._sizes.values():
+			if len(fpaths) == 1: continue
+			dups:list = []
+			for fpath in fpaths:
+				props = self._files[fpath]
+				if not props['is_unique']: dups.append(props)
+			if not dups: continue
+			dups.sort(key=itemgetter('cdate'))
+			dups[0]['is_cnewest'] = True
+			dups[-1]['is_coldest'] = True
+			dups.sort(key=itemgetter('mdate'))
+			dups[0]['is_mnewest'] = True
+			dups[-1]['is_moldest'] = True
+			self.dups.append(tuple(d for d in dups))
 	
 	def print_all(self, fullname:bool=False):
 		' Print all files '
@@ -2084,29 +2136,74 @@ class DirDup:
 				sign = props[self._dtype].strftime(tcon.DATE_STR_HUMAN)
 			else:
 				sign = props.get('hash', None)
-			table.append((name, str(props['unique']), sign))
-		table_print(table, max_table_width=(100, 0), trim_func=path_short
-		, sorting=(1, 0))
+			table.append((name, str(props['is_unique']), sign))
+		table_print(table, use_headers=True, max_table_width=(100, 0)
+		, trim_func=path_short, sorting=(1, 0))
 
 	def print_dup(self, fullname:bool=False):
 		' Print duplicates only '
-		table = [('File', self._algo)]
+		dtype = 'c' if self._dtype == 'cdate' else 'm'
+		table = [('File', f'Is {dtype}New', f'Is {dtype}Old', self._algo)]
 		for size, fpaths in self._sizes.items():
 			if len(fpaths) == 1: continue
 			for fpath in fpaths:
 				name = fpath if fullname else file_name(fpath)
 				props = self._files[fpath]
-				if props['unique']: continue
+				if props['is_unique']: continue
 				if self._algo == self.ALGO_SIZE:
 					sign = size
 				elif self._algo in (self.ALGO_MDATE, self.ALGO_CDATE):
 					sign = props[self._dtype].strftime(tcon.DATE_STR_HUMAN)
 				else:
 					sign = props['hash']
-				table.append((name, sign))
-		table_print(table, max_table_width=(100, 0), trim_func=path_short
-		, sorting=(1, 0))
+				table.append((
+					name
+					, str(props[f'is_{dtype}newest'])
+					, str(props[f'is_{dtype}oldest'])
+					, sign
+				))
+		table_print(table, use_headers=True, max_table_width=(100, 0)
+		, trim_func=path_short, sorting=(-1, 0))
+		size, count = 0, 0
+		for dups in self.dups:
+			for dup in dups:
+				size += dup['size']
+				count += 1
+		print(f'Total: {count} duplicates, {file_size_str(size)}\n')
 
+	def clean(self, leave:str, recycle:bool=True)->tuple:
+		r'''
+		Deletes all but one duplicate.  
+		Returns (count, size) of deleted files.  
+		*leave* - parameter determines which file should
+		not be deleted. Examples: 'cnewest', 'mnewest'
+		, 'coldest', 'moldest' (like in `scan` method).  
+		'''
+		dfunc = file_recycle if recycle else file_delete
+		count, size = 0, 0
+		for dups in self.dups:
+			for dup in dups:
+				if dup[f'is_{leave}']: continue
+				count += 1
+				size += dup['size']
+				dfunc(dup['fpath'])
+		tdebug(f'cleaned: {count}, {file_size_str(size)}')
+		return count, size
+
+def dir_dedup(src_dir:Union[str, tuple, list], leave:str
+, algo:str=DirDup.ALGO_HASH_BEG, print_dup:bool=True
+, recycle:bool=True, **rules)->tuple:
+	r'''
+	Deletes duplicate files from the specified folder(s).  
+	A wrapper for the `DirDup` class.  
+	Returns the number of deleted files and their size.  
+	*leave* - 'cnewest', 'mnewest', 'coldest', 'moldest'  
+	*rules* - rules for the `path_rule` function  
+	'''
+	ddup = DirDup(src_dir=src_dir, algo=algo, **rules)
+	ddup.find_dup()
+	if print_dup: ddup.print_dup()
+	return ddup.clean(leave=leave, recycle=recycle)
 
 def rec_bin_purge(drive:str=None, progress:bool=False, sound:bool=True):
 	r'''

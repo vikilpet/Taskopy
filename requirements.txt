@@ -8,7 +8,7 @@ pyodbc==4.0.38
 pyperclip==1.7.0
 pytz==2019.3
 pywin32==303
-Requests==2.29.0
+Requests==2.30.0
 schedule==0.6.0
 uptime==3.0.1
 wxPython==4.1.1
