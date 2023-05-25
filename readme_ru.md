@@ -1,4 +1,5 @@
 
+
 ### Платформа для запуска скриптов под Windows на основе Python с горячими клавишами, меню в трее, HTTP-сервером и многим другим.
 
 <p align="center">
@@ -39,7 +40,7 @@
 - [Свойства задачи](#свойства-задачи)
 - [Настройки](#настройки)
 - [Ключевые слова](#ключевые-слова)
-	- [Общие](#общие)
+	- [Разное](#разное)
 	- [Клавиатура](#клавиатура)
 	- [Файловая система](#файловая-система)
 	- [Сеть](#сеть)
@@ -55,12 +56,14 @@
 - [Примеры задач](#примеры-задач)
 
 ## Установка
+
 ### Вариант 1: архив с исполняемым файлом.
 
 **Требования:** Windows 7 и выше.
 Вы можете [скачать](https://github.com/vikilpet/Taskopy/releases) zip архив (taskopy.zip), но многие не особо качественные антивирусы не любят Python, упакованный в exe, так что VirusTotal покажет примерно 7 срабатываний.
 
 ### Вариант 2: Python
+
 **Требования:** Python 3.7+; Windows 7 и выше.
 
 Скачайте проект, установите зависимости:
@@ -140,7 +143,17 @@
 - **single** (True) — одновременно может выполняться только одна копия задачи.
 - **submenu** (None) — разместить в подменю.
 - **result** (False) — задача должна вернуть какое-то значение. Используется вместе с **http** опцией для выдачи результатов задачи.
-- **http** (False) — запускать задачу через HTTP запрос. Синтаксис запроса: *http://127.0.0.1:8275/имя_задачи* где «имя_задачи» это название функции-задачи из crontab.
+- **http** (False) — запускать задачу через HTTP запрос. Синтаксис запроса: *http://127.0.0.1:8275/имя_задачи* где «имя_задачи» это название функции-задачи из *crontab*, *8275* - порт по умолчанию.
+
+	Этот параметр так же может принимать строку с паттерном регулярного выражения или кортеж таких строк.
+
+		http=(r'task_\w+', r'task_\d+')
+
+	Таким образом, задача отображения текста при переходе в корень *сайта* будет выглядеть следующим образом:
+
+		def http_root(http='^$', result=True):
+			return 'Это корень'
+
 	Если свойство **result** также включено, то HTTP-запрос покажет то, что вернула задача или 'OK' если ничего не было возвращено.
 	Пример:
 
@@ -195,7 +208,9 @@
 - **server_port** (8275) — порт HTTP-сервера.
 
 ## Ключевые слова
-### Общие
+
+### Разное
+
 - **balloon(msg:str, title:str=APP_NAME,timeout:int=None, icon:str=None)** — показывает сообщение у иконки в трее. `title` - 63 символа максимум, `msg` - 255 символов. `icon` - 'info', 'warning' или 'error'.
 - **benchmark(func, b_iter:int=1000, a:tuple=(), ka:dict={})->datetime.timedelta** — выполняет футкцию `func` `b_iter` раз и выводит время выполнения. Пример:
 
@@ -294,6 +309,27 @@
 		safe(func)(arg) -> False, Exception
 
 - **sound_play (fullpath:str, wait:bool)->str** — воспроизвести .wav файл. *wait* — ждать конца воспроизведения. Если *fullpath* это папка, значит проиграть случайный файл из неё.
+- **str_diff(text1:str, text2:str)->tuple[tuple[str]]** — возвращает различные строки между двумя текстами (т.е. строки с **переносами**) в виде кортежа кортежей.
+
+		tass(
+			tuple(str_diff('foo\nbar', 'fooo\nbar'))
+			, (('foo', 'fooo'),)
+		)
+		# Different new line symbols are ok:
+		tass( tuple(str_diff('same\r\nlines', 'same\nlines') ), () )
+		# Note no difference here:
+		tass( tuple(str_diff('same\nlines', 'lines\nsame') ), () )
+
+- **str_short(text:str, width:int=0, placeholder:str='...')->str** — свернуть и усечь заданный текст, чтобы он поместился в заданную ширину.  
+	Сначала удаляются непечатные символы. Если после этого строка укладывается в указанную ширину, она возвращается. В противном случае, как можно больше слов соединяется , а затем добавляется заполнитель.  
+	Если *ширина* не указана, используется текущая ширина терминала.
+
+		tass( str_short('Hello,  world! ', 13), 'Hello, world!' )
+		tass( str_short('Hello,  world! ', 12), 'Hello,...' )
+		tass( str_short('Hello\nworld! ', 12), 'Hello world!' )
+		tass( str_short('Hello\nworld! ', 11), 'Hello...' )
+		tass( benchmark(str_short, ('Hello,  world! ',)), 60_000, '<')
+
 - **time_diff(start, end, unit:str='sec')->int** — возвращает разницу между датами в выбранных единицах. *start* и *end* должны быть в формате datetime.
 - **time_diff_str(start, end)->str** — возвращает разницу между датами в виде строки типа: '3:01:35'. *start* и *end* должны быть в формате datetime.
 - **time_now(\*\*delta)->datetime.datetime** — возвращает объект datetime. Используйте ключевые слова `datetime.timedelta` для получения другого времени. Вчера:
@@ -364,7 +400,7 @@
 
 **fullpath** означает полное имя файла, например 'c:\\\Windows\\\System32\\\calc.exe'
 
-**ВАЖНО: всегда используйте двойной обратный слеш "\\\" в путях!**
+**ВАЖНО: всегда используйте двойной обратный слеш "\\\\" в путях!**
 
 - **csv_read(fullpath:str, encoding:str='utf-8', fieldnames=None, delimiter:str=';', quotechar:str='"')->list** — прочитать CSV файл и вернуть содержимое в виде списка со словарями.
 - **csv_write(fullpath:str, content:list, fieldnames:tuple=None, encoding:str='utf-8', delimiter:str=';', quotechar:str='"', quoting:int=csv.QUOTE_MINIMAL)->str** — записывает список словарей как CSV файл. Если *fieldnames* не указан - берёт ключи первого словаря в качестве заголовков. Возвращает полный путь к файлу. Пример *content*:
@@ -382,6 +418,19 @@
 - **dir_dirs(fullpath, subdirs:bool=True)->list** — возвращает список полных путей всех каталогов в данном каталоге и его подкаталогах.
 - **dir_exists(fullpath:str)->bool** — папка существует?
 - **dir_files(fullpath, subdirs:bool=True, \*\*rules)->Iterator[str]** — возвращает список полных путей всех файлов в указанной папке и её подпапках.
+	*subdirs* - включая файлы из вложенных папок.  
+	*rules* - правила для функции `path_rule`  
+
+		tass( tuple(dir_files('plugins', in_ext='jpg') ), tuple() )
+		tass(
+			tuple(dir_files('plugins', in_ext='py'))[0]
+			, 'plugins\\constants.py'
+		)
+		tass(
+			tuple( dir_files('plugins', ex_ext='pyc') )
+			, tuple( dir_files('plugins', in_ext='py') )
+		)
+
 - **dir_find(fullpath, only_files:bool=False)->list** — возвращает список путей в указанной папке.
 
 	*fullpath* передается в **glob.glob**
@@ -391,14 +440,31 @@
 	Примеры:
 		
 		# Только файлы в текущем каталоге:
-		dir_list('d:\\folder\\*.jpg')
+		dir_find('d:\\folder\\*.jpg')
 
 		# с подкаталогами:
-		dir_list('d:\\folder\\**\\*.jpg')
+		dir_find('d:\\folder\\**\\*.jpg')
 
-- **dir_list(fullpath)->Iterator[str]** — возвращает все содержимое каталога (файлы и папки).
+- **dir_list(fullpath, \*\*rules)->Iterator[str]** — возвращает все содержимое каталога (файлы и папки).  
+	*rules* - правила для функции `path_rule`  
 
-		assert 'resources\\icon.png' in dir_list('resources')
+		tass( 'resources\\icon.png' in dir_list('resources'), True)
+		tass( 'resources\\icon.png' in dir_list('resources', ex_ext='png'), False)
+		tass(
+			benchmark(lambda d: tuple(dir_list(d)), 'log', b_iter=5)
+			, 500_000
+			, '<'
+		)
+
+- **dir_purge(fullpath, days:int=0, subdirs:bool=False, creation:bool=False, test:bool=False, print_del:bool=False, \*\*rules)->int** — удаляет файлы старше *x* дней.  
+	Возвращает количество удаленных файлов и папок.
+	
+	*days=0* - удалить всё  
+	*creation* - использовать дату создания, в противном случае использовать дату последней модификации.  
+	*subdirs* - удалять и во вложенных папках. Пустые вложенные папки будут удалены.  
+	*test* - только вывести те файлы и папки, которые следует удалить, без фактического удаления.  
+	*print_del* - вывести путь при удалении.  
+	*rules* - правила для функции `path_rule`  
 
 - **dir_size(fullpath:str, unit:str='b')->int** — размер папки в указанных единицах.
 - **dir_sync(src_dir, dst_dir, report:bool=False, \*\*rules)->dict** — синхронизировать два каталога.  
@@ -472,13 +538,13 @@
 		tass(path_short(path, 22), 'c:\Windo...msiexec.exe')
 		tass(path_short(path, 23), 'c:\Window...msiexec.exe')
 
+- **rec_bin_purge(drive:str=None, progress:bool=False, sound:bool=True)** — очищает корзину.
 
-- **dir_purge(fullpath:str, days:int=0, recursive=False, creation:bool=False, test:bool=False, rule=None)** — удалить файлы из папки старше указанного числа дней.
-	Если *days* == 0 значит удалить вообще все файлы в папке.
-	*creation* — использовать дату создания, иначе использовать дату последнего изменения.
-	*recursive* — включая подпапки.
-	*test* — не удалять на самом деле, а просто вывести в консоль список файлов, которые должны быть удалены.
-	*rule* - функция, получающая полное имя файла и возвращающая True, если файл должен быть удалён.
+		# One drive:
+		rec_bin_purge('c')
+		# All drives:
+		rec_bin_purge()
+
 - **shortcut_create(fullpath, dest:str=None, descr:str=None, icon_fullpath:str=None, icon_index:int=None, win_style:int=win32con.SW_SHOWNORMAL, cwd:str=None)->str** — создаёт ярлык для файла. Возвращает полный путь к файлу ярлыка.
 	- dest - полное имя файла ярлыка. Если не указано, используется папка рабочего стола текущего пользователя.
 	- descr - описание
@@ -489,6 +555,7 @@
 - **temp_file(prefix:str='', suffix:str='')->str** — возвращает имя для временного файла.
 
 ### Сеть
+
 - **domain_ip(domain:str)->list** — получить список IP-адресов по имени домена.
 - **file_download(url:str, destination:str=None)->str:** — скачать файл и вернуть полный путь.
 	*destination* — может быть *None*, полным путём к файлу или папкой. Если *None*, то скачать во временную папку и вернуть полное имя.
@@ -581,6 +648,7 @@
 
 
 ### Система
+
 В функциях для работы с окнами аргумент *window* может быть или строкой с заголовком окна или числом, представляющим handle окна.
 
 - **free_ram(unit:str='percent')** — количество свободной памяти. *unit* — 'kb', 'mb'... или 'percent'.
@@ -600,6 +668,7 @@
 - **win_title_set(window=None, new_title:str='')->int** —  найти окно по заголовку *cur_title* и поменять на *new_title*.
 
 ### Почта
+
 - **mail_check(server:str, login:str, password:str, folders:list=['inbox'], msg_status:str='UNSEEN', headers:tuple=('subject', 'from', 'to', 'date'), silent:bool=True)->Tuple[ List[MailMsg], List[str] ]** — возвращает список объектов MailMsg и список ошибок.  
 	*headers* - заголовки сообщений для получения. Вы можете получить к ним доступ позже в атрибутах MailMsg.  
 
@@ -607,6 +676,7 @@
 - **mail_send(recipient:str, subject:str, message:str, smtp_server:str, smtp_port:int, smtp_user:str, smtp_password:str)** — отправить письмо. Поддерживает отправку с русским заголовком и русским текстом.
 
 ### Процессы
+
 - **proc_start(proc_path:str, args:str, wait:bool=False)** — запустить приложение. Если *wait=True* — возвращает код возврата, а если *False*, то возвращает PID созданного процесса.
 	*proc_path* — полный путь к исполняемому файлу.
 	*args* — аргументы командной строки.
@@ -638,6 +708,7 @@
 		tass(proc_cpu(0), 1, '>')
 		
 - **proc_kill(process, cmd_filter:str=None)** — убить указанный процесс. *process* может быть строкой с именем исполняемого файла, тогда будут завершены все процессы с таким названием, либо это может быть числовой PID, и тогда будет завершён только указанный процесс. *cmd_filter* - убивать только процессы, содержащие эту строку в командной строке.
+- **proc_uptime(process)->float** — возвращает время работы процесса в секундах или -1.0, если процесс не найден.
 - **screen_width()->int** — ширина экрана.
 - **screen_height()->int** — высота экрана.
 - **service_start(service:str, args:tuple=None)** — запускает службу.
@@ -650,12 +721,14 @@
 - **wts_user_sessionid(users, only_active:bool=True)->list** — преобразует список пользователей в список Session ID. *only_active* - вернуть только  WTSActive сессии.
 
 ### Шифрование
+
 - **file_enc_write(fullpath:str, content:str, password:str, encoding:str='utf-8')**: — зашифровывает *content* и записывает в файл. Соль добавляется в виде расширения файла. Возвращает статус и полный путь/ошибку.
 - **file_enc_read(fullpath:str, password:str, encoding:str='utf-8')->tuple**: — расшифровывает содержимое файла. Возвращает статус и содержимое/ошибку.
 - **file_encrypt(fullpath:str, password:str)->tuple** — зашифровывает файл. Добавляет соль в виде расширения. Возвращает статус, полный путь/ошибку.
 - **file_decrypt(fullpath:str, password:str)->tuple** — расшифровывает файл, возвращает статус и полный путь/ошибку.
 
 ### Mikrotik RouterOS
+
 - **routeros_query(query:list, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — послать запрос на указанный маршрутизатор и вернуть результат. Запросы в API имеют специфический синтаксис, отличающийся от комманд для терминала, так что смотрите в [wiki](https://wiki.mikrotik.com/wiki/Manual:API).
 	Пример — получить информацию об интерфейсе bridge1:
 

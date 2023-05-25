@@ -29,7 +29,7 @@ import win32gui
 import win32con
 import win32com.client
 from typing import List, Tuple, Callable \
-	, Union, Iterable, Iterator
+	, Union, Iterable, Iterator, Generator
 from itertools import zip_longest
 import pythoncom
 import wx
@@ -43,7 +43,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-05-18'
+APP_VERSION = 'v2023-05-25'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 _app_log_limit = 10_000
@@ -309,19 +309,15 @@ def time_diff(start:datetime.datetime, end:datetime.datetime=None
 	return int(seconds // coef)
 
 def time_diff_str(start:datetime.datetime
-, end:datetime.datetime=None, str_format:str=''
+, end:datetime.datetime|None=None, str_format:str=''
 , no_ms:bool=True)->str:
-	'''
+	r'''
 	Returns time difference as a string like that:
-	'5 days, 3:01:35.837127'
-	
-	*start* and *end* should be in _datetime_ format.
-	
+	'5 days, 3:01:35.837127'  
+	*start* and *end* should be in _datetime_ format.  
 	*str_format* - standard time formating like '%y.%m.%d %H:%M:%S'
-	(see tcon.DATE_FORMAT)
-
-	*no_ms* - do not show microseconds.
-
+	(see tcon.DATE_FORMAT)  
+	*no_ms* - do not show microseconds.  
 	'''
 	if isinstance(start, float):
 		start = datetime.datetime.fromtimestamp(start)
@@ -443,6 +439,12 @@ def clip_set(txt:str):
 	pyperclip.copy(str(txt))
 
 def clip_get()->str:
+	r'''
+	Returns the text from the clipboard, if any.
+
+		tass( benchmark(clip_get), 13031, "<" )
+
+	'''
 	return pyperclip.paste()
 
 def re_find(source:str, re_pattern:str, sort:bool=False
@@ -459,6 +461,7 @@ def re_find(source:str, re_pattern:str, sort:bool=False
 
 	Non-capturing group: (?:aaa)  
 	Positive lookbehind: (?<=abc)  
+	Negative lookbehind: (?<!abc)  
 	'''
 	matches = re.findall(re_pattern, source, flags=re_flags)
 	if unique: matches = list(set(matches))
@@ -467,7 +470,10 @@ def re_find(source:str, re_pattern:str, sort:bool=False
 
 def re_replace(source:str, re_pattern:str, repl:str=''
 , re_flags:int=re.IGNORECASE)->str:
-	''' Regexp replace substring'''
+	r'''
+	Regexp replace substring.  
+	To use first group in `repl` use `\1`  
+	'''
 	return re.sub(
 		pattern=re_pattern
 		, repl=repl
@@ -975,10 +981,14 @@ def decor_except_status(func):
 decor_except_status.homemade = True
 
 def safe(func:Callable)->Callable:
-	'''
+	r'''
 	Evaluate function inside 'try... except'
 	and return (True, <function result>)
-	or (False, Exception)
+	or (False, <Exception object>)
+
+		tass( benchmark(lambda: None), 240, "<" )
+		tass( benchmark(safe(lambda: None)), 650, "<" )
+
 	'''
 	@functools.wraps(func)
 	def wrapper(*args, **kwargs):
@@ -1065,16 +1075,15 @@ def dialog(
 	, timeout:Union[str, int]=0
 	, return_button:bool=False
 	, wait:bool=True
-)->Union[int, str]:
-	'''
-	Shows dialog with multiple optional buttons.
+)->int|str:
+	r'''
+	Shows dialog with multiple optional buttons.  
 	Returns ID of selected button starting with 1000
-	or 0 if timeout is over.
-	return_button - returns (status, selected button value).
+	or 0 if timeout is over.  
+	*return_button* - returns (status, selected button value).  
 		Status == True if some of button was selected and
 		False if no button was selected (timeout or escape).
-
-	wait - non-blocking mode. It returns c_long object
+	*wait* - non-blocking mode. It returns c_long object
 	so it is possible to get user responce later with
 	'.value' property (=2 before user makes any choice)
 	
@@ -1609,7 +1618,7 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 	*err_action* - function to run if an exception occurs.  
 	The text of exception will be passed to the function.  
 
-		tass( benchmark(thread_start, (lambda: None,)), 179634, '<' )
+		tass( benchmark(thread_start, (lambda: None,)), 300_000, '<' )
 
 	'''
 	def wrapper():
@@ -1717,7 +1726,7 @@ def benchmark(func, a:tuple=(), ka:dict={}, b_iter:int=100)->int:
 	Returns nanoseconds per loop.  
 	Example:
 
-		tass( benchmark(dir_size, a=('logs',), b_iter=3 ) , 70000, '<' )
+		tass( benchmark(lambda i: i+1, a=(1,), b_iter=10 ) , 1000, '<' )
 	
 	'''
 	start = time.perf_counter_ns()
@@ -1729,12 +1738,10 @@ def benchmark(func, a:tuple=(), ka:dict={}, b_iter:int=100)->int:
 	ns_loop = total_ns // b_iter
 	ns_loop_str = '{:,}'.format(ns_loop).replace(',', ' ')
 	ns_total_str = '{:,}'.format(total_ns).replace(',', ' ')
-	name = ''
-	if not func.__name__.startswith('<'):
-		name = func.__name__ + ': '
-	tdebug(f'{name}{ns_loop_str} ns/loop, total={ns_total_str}, {b_iter=}')
-	if name and tdebug():
-		print(f'tass( benchmark({name[:-2]}), {int(ns_loop * 1.3)}, "<" )')
+	name = func.__name__
+	tdebug(f'{name}: {ns_loop_str} ns/loop, total={ns_total_str}, {b_iter=}')
+	if tdebug():
+		print(f'tass( benchmark({name}), {int(ns_loop * 1.3)}, "<" )')
 	return total_ns // b_iter
 
 def median(source):
@@ -1894,7 +1901,7 @@ def str_indent(src_str:str, prefix:str='    '
 	)
 
 
-def str_diff(text1:str, text2:str)->Tuple[Tuple[str]]:
+def str_diff(text1:str, text2:str)->tuple[tuple[str]]:
 	r'''
 	Returns the different lines between two texts (strings with
 	**line breaks**) as a tuple of tuples.
@@ -1921,9 +1928,9 @@ def str_diff(text1:str, text2:str)->Tuple[Tuple[str]]:
 
 def str_short(text:str, width:int=0, placeholder:str='...')->str:
 	r'''
-	Collapse and truncate the given text to fit in the given width.
-	The text first has its whitespace collapsed.  If it then fits in
-	the *width*, it is returned as is.  Otherwise, as many words
+	Collapse and truncate the given text to fit in the given width.  
+	Non-printing characters are removed first. If after that the
+	line fits in the specified width, it is returned. Otherwise, as many words
 	as possible are joined and then the placeholder is appended.  
 	If *width* is not specified, the current terminal width is used.
 
@@ -1931,7 +1938,7 @@ def str_short(text:str, width:int=0, placeholder:str='...')->str:
 		tass( str_short('Hello,  world! ', 12), 'Hello,...' )
 		tass( str_short('Hello\nworld! ', 12), 'Hello world!' )
 		tass( str_short('Hello\nworld! ', 11), 'Hello...' )
-		tass( benchmark(str_short, ('Hello,  world! ',)), 60_000, '<')
+		tass( benchmark(str_short, ('Hello,  world! ',)), 100_000, '<')
 
 	'''
 	if width == 0: width = os.get_terminal_size().columns - 1

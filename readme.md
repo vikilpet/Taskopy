@@ -1,4 +1,5 @@
 # Taskopy
+
 ### Platform for running Python-based scripts on Windows with hotkeys, tray menu, HTTP server and many more.
 
 <p align="center">
@@ -55,12 +56,14 @@ Telegram chat: https://t.me/taskopy_g
 - [Task examples](#task-examples)
 
 ## Installation
+
 ### Option 1: binary file
 
 **Requirements:** Windows 7 and above.
 You can [download](https://github.com/vikilpet/Taskopy/releases) archive with binary release but many of lousy antiviruses don't like python inside EXE so VirusTotal shows about 7 detects.
 
 ### Option 2: Python
+
 **Requirements:** Python 3.7.4; Windows 7 and above.
 
 Download project, install requirements:
@@ -140,7 +143,17 @@ Format: **option name** (default value) — description.
 - **single** (True) — allow only one instance of running task.
 - **submenu** (None) — place task in this sub menu.
 - **result** (False) — task should return some value. Use together with http option to get page with task results.
-- **http** (False) — run task by HTTP request. HTTP request syntax: http://127.0.0.1:8275/your_task_name where «your_task_name» is the name of function from crontab.
+- **http** (False) — run task by HTTP request. HTTP request syntax: http://127.0.0.1:8275/your_task_name where «your_task_name» is the name of function from crontab, *8275* - default port.  
+
+	This parameter can also accept a string with a regular expression pattern or a tuple of such strings. Example:
+
+		http=(r'task_\w+', r'task_\d+')
+
+	So the task of displaying the text when you go to the root of the *site* will be as follows:
+
+		def http_root(http='^$', result=True):
+			return 'It is a root'
+
 	If option **result** also enabled then HTTP request will show what task will return or 'OK' if there is no value returned.
 	Example:
 
@@ -195,7 +208,9 @@ Format: **setting** (default value) — description.
 - **server_port** (8275) — HTTP server port.
 
 ## Keywords
+
 ### Miscelanneous
+
 - **balloon(msg:str, title:str=APP_NAME,timeout:int=None, icon:str=None)** — shows *baloon* message from tray icon. `title` - 63 symbols max, `msg` - 255 symbols. `icon` - 'info', 'warning' or 'error'.
 - **benchmark(func, b_iter:int=1000, a:tuple=(), ka:dict={})->datetime.timedelta** — run function `func` `b_iter` times and print time. Returns the total time as a datetime.timedelta object. Example:
 
@@ -294,6 +309,27 @@ Format: **setting** (default value) — description.
 		safe(func)(arg) -> False, Exception
 
 - **sound_play (fullpath:str, wait:bool)->str** — play .wav file. *wait* — do not pause task execution. If fullpath is a folder then pick random file.
+- **str_diff(text1:str, text2:str)->tuple[tuple[str]]** — returns the different lines between two texts (strings with **line breaks**) as a tuple of tuples.
+
+		tass(
+			tuple(str_diff('foo\nbar', 'fooo\nbar'))
+			, (('foo', 'fooo'),)
+		)
+		# Different new line symbols are ok:
+		tass( tuple(str_diff('same\r\nlines', 'same\nlines') ), () )
+		# Note no difference here:
+		tass( tuple(**str_diff**('same\nlines', 'lines\nsame') ), () )
+
+- **str_short(text:str, width:int=0, placeholder:str='...')->str** — collapse and truncate the given text to fit in the given width.  
+	Non-printing characters are removed first. If after that the line fits in the specified width, it is returned. Otherwise, as many words as possible are joined and then the placeholder is appended.  
+	If *width* is not specified, the current terminal width is used.
+
+		tass( str_short('Hello,  world! ', 13), 'Hello, world!' )
+		tass( str_short('Hello,  world! ', 12), 'Hello,...' )
+		tass( str_short('Hello\nworld! ', 12), 'Hello world!' )
+		tass( str_short('Hello\nworld! ', 11), 'Hello...' )
+		tass( benchmark(str_short, ('Hello,  world! ',)), 60_000, '<')
+
 - **time_diff(start, end, unit:str='sec')->int** — returns difference between dates in units. *start* and *end* should be in datetime format.
 - **time_diff_str(start, end)->str** — returns difference between dates in string like that: '3:01:35'.	*start* and *end* should be in datetime format.
 - **time_now(\*\*delta)->datetime.datetime** — returns datetime object. Use `datetime.timedelta` keywords to get different time. Yesterday:
@@ -364,7 +400,7 @@ Format: **setting** (default value) — description.
 
 **fullpath** means full name of file, for example 'c:\\\Windows\\\System32\\\calc.exe'
 
-**IMPORTANT: always use double backslash "\\\" in paths!**
+**IMPORTANT: always use double backslash "\\\\" in paths!**
 
 - **csv_read(fullpath:str, encoding:str='utf-8', fieldnames=None, delimiter:str=';', quotechar:str='"')->list** — read a CSV file and return the contents as a list of dictionaries.
 - **csv_write(fullpath:str, content:list, fieldnames:tuple=None, encoding:str='utf-8', delimiter:str=';', quotechar:str='"', quoting:int=csv.QUOTE_MINIMAL)->str** — writes the list of dictionaries as a CSV file. If *fieldnames* is not specified - it takes the keys of the first dictionary as headers. Returns the full path to the file. *content* example:
@@ -404,15 +440,32 @@ Format: **setting** (default value) — description.
 	Examples:
 		
 		# Only files in current directory:
-		dir_list('d:\\folder\\*.jpg')
+		dir_find('d:\\folder\\*.jpg')
 
 		# with subdirectories:
-		dir_list('d:\\folder\\**\\*.jpg')
+		dir_find('d:\\folder\\**\\*.jpg')
 
-- **dir_list(fullpath)->Iterator[str]** — returns all directory content (dirs and files).
+- **dir_list(fullpath, \*\*rules)->Iterator[str]** — returns all directory content (dirs and files).  
+	*rules* - rules for the `path_rule` function.  
 
-		assert 'resources\\icon.png' in dir_list('resources')
+		tass( 'resources\\icon.png' in dir_list('resources'), True)
+		tass( 'resources\\icon.png' in dir_list('resources', ex_ext='png'), False)
+		tass(
+			benchmark(lambda d: tuple(dir_list(d)), 'log', b_iter=5)
+			, 500_000
+			, '<'
+		)
 
+- **dir_purge(fullpath, days:int=0, subdirs:bool=False, creation:bool=False, test:bool=False, print_del:bool=False, \*\*rules)->int** — deletes files older than *x* days.  
+	Returns number of deleted files and folders.
+	
+	*days=0* - delete everything  
+	*creation* - use date of creation, otherwise use last modification date.  
+	*subdirs* - delete in subfolders too. Empty subfolders will be deleted.  
+	*test* - only display the files and folders that should be deleted, without actually deleting them.  
+	*print_del* - print path when deleting.  
+	*rules* - rules for the `path_rule` function  
+		
 - **dir_size(fullpath:str, unit:str='b')->int** — folder size in specified units.
 - **dir_sync(src_dir, dst_dir, report:bool=False, \*\*rules)->dict** — syncrhonize two directories.  
 	For *rules* see the `path_rule`.  
@@ -485,13 +538,13 @@ Format: **setting** (default value) — description.
 		tass(path_short(path, 22), 'c:\Windo...msiexec.exe')
 		tass(path_short(path, 23), 'c:\Window...msiexec.exe')
 
-	
-- **dir_purge(fullpath:str, days:int=0, recursive=False, creation:bool=False, test:bool=False)** — delete files from folder *fullpath* older than n *days*.
-	If *days* == 0 then delete all files.
-	*creation* — use date of creation, otherwise use last modification date.
-	*recursive* — delete from subfolders too.
-	*test* — do not actually delete files, only print them.
-	*rule* - function that gets the full file name and returns True if the file is to be deleted.
+- **rec_bin_purge(drive:str=None, progress:bool=False, sound:bool=True)** — clears the recycle bin.
+
+		# One drive:
+		rec_bin_purge('c')
+		# All drives:
+		rec_bin_purge()
+
 - **shortcut_create(fullpath, dest:str=None, descr:str=None, icon_fullpath:str=None, icon_index:int=None, win_style:int=win32con.SW_SHOWNORMAL, cwd:str=None)->str** — creates a shortcut for a file. Returns full path of shortcut.
 	- dest - full name of the shortcut file. If not specified, the desktop folder of the current user is used.
 	- descr - shortcut description.
@@ -502,6 +555,7 @@ Format: **setting** (default value) — description.
 - **temp_file(prefix:str='', suffix:str='')->str** — returns the name for the temporary file.
 
 ### Network
+
 - **domain_ip(domain:str)->list** — get a list of IP-addresses by domain name.
 - **file_download(url:str, destination:str=None)->str:** — download file and return fullpath.
 	*destination* — it may be None, fullpath or folder. If None then download to temporary folder with random name.
@@ -594,6 +648,7 @@ Format: **setting** (default value) — description.
 
 
 ### System
+
 In the functions for working with windows, the *window* argument can be either a string with the window title or a number representing the window handle.
 
 - **free_ram(unit:str='percent')** — amount of free memory. *unit* — 'kb', 'mb'... or 'percent'.
@@ -613,14 +668,15 @@ In the functions for working with windows, the *window* argument can be either a
 - **win_title_set(window=None, new_title:str='')->int** — change window title from *cur_title* to *new_title*
 
 ### Mail
+
 - **mail_check(server:str, login:str, password:str, folders:list=['inbox'], msg_status:str='UNSEEN', headers:tuple=('subject', 'from', 'to', 'date'), silent:bool=True)->Tuple[ List[MailMsg], List[str] ]** — returns list of MailMsg and list of errors.  
-	*headers* - message headers to fetch. You can access them later
-	in MailMsg attributes.  
-		
+	*headers* - message headers to fetch. You can access them later in MailMsg attributes.  
+
 - **mail_download(server:str, login:str, password:str, output_dir:str, folders:list=['inbox'], trash_folder:str='Trash')->tuple** — downloads all messages to the specified folder. Successfully downloaded messages are moved to the IMAP *trash_folder* folder on the server. Returns a tuple of two lists: a list with decoded mail subjects and a list with errors.
 - **mail_send(recipient:str, subject:str, message:str, smtp_server:str, smtp_port:int, smtp_user:str, smtp_password:str)** — send email.
 
 ### Process
+
 - **proc_start(proc_path:str, args:str='', wait:bool=False)** — start application. If *wait=True* — returns process return code, if *False* — returns PID of created process.
 	*proc_path* — path to executable file.
 	*args* — command-line arguments.
@@ -652,6 +708,7 @@ In the functions for working with windows, the *window* argument can be either a
 		tass(proc_cpu(0), 1, '>')
 		
 - **proc_kill(process, cmd_filter:str=None)** — kill process or processes. *process* may be an integer so only process with this PID will be terminated. If *process* is a string then kill every process with that name. *cmd_filter* - kill only processes with that string in command line.
+- **proc_uptime(process)->float** — returns process running time in seconds or -1.0 f no process is found.
 - **screen_width()->int** — width of screen.
 - **screen_height()->int** — height of screen.
 - **service_start(service:str, args:tuple=None)** — starts the service.
@@ -664,12 +721,14 @@ In the functions for working with windows, the *window* argument can be either a
 - **wts_user_sessionid(users, only_active:bool=True)->list** — converts list of users to a list of session ID's. *only_active* - return only WTSActive sessions.
 
 ### Cryptography
+
 - **file_enc_write(fullpath:str, content:str, password:str, encoding:str='utf-8')->tuple**: — encrypts content with password and writes to a file. Adds salt as file extension. Returns status, fullpath/error.
 - **file_enc_read(fullpath:str, password:str, encoding:str='utf-8')->tuple** — decrypts the contents of the file and returns status, content/error
 - **file_encrypt(fullpath:str, password:str)->tuple** — encrypts file with password. Returns status, fullpath/error. Adds salt as file extension.
 - **file_decrypt(fullpath:str, password:str)->tuple** — decrypts file with password. Returns status, fullpath/or error.
 
 ### Mikrotik RouterOS
+
 - **routeros_query(query:list, device_ip:str=None, device_port:str='8728', device_user:str='admin', device_pwd:str='')** — send query to router and get status and data. Please read wiki [wiki](https://wiki.mikrotik.com/wiki/Manual:API) about query syntax.
 	Example — get information about interface 'bridge1':
 

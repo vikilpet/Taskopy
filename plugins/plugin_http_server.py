@@ -8,6 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import cgi
 import urllib
 import tempfile
+from typing import Pattern
 from .tools import dev_print, app_log_get, DataHTTPReq \
 	, patch_import, tprint, value_to_unit, exc_text
 from .plugin_filesystem import file_b64_dec, HTTPFile
@@ -174,15 +175,18 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			self.headers_and_page('error')
 			return
 		page = 'error'
-		task_name = urllib.parse.unquote(
-			self.url_path.lstrip('/') )
+		task_path = urllib.parse.unquote( self.url_path.strip('/') )
 		task = None
-		for t in self.tasks.task_list_http:
-			if task_name == t['task_func_name']:
-				task = t
-				break
+		re_pat: Pattern
+		for tdic in self.tasks.task_list_http:
+			if not (re_lst := tdic['http_re']): continue
+			for re_pat in re_lst:
+				if re_pat.match(task_path):
+					task = tdic
+					break
+			if task: break
 		else:
-			self.s_print('task not found: {}'.format( task_name[:30]) )
+			self.s_print('task path not found: "{}"'.format( task_path[:30]) )
 			self.headers_and_page('task not found')
 			return
 		if not self.white_list_check(task=task):
@@ -202,8 +206,8 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 		try:
 			req_data = DataHTTPReq(
 				client_ip=self.client_address[0]
-				, method=method
-				, path=self.path, headers=dict(self.headers)
+				, method=method, path=task_path
+				, headers=dict(self.headers)
 				, params=params, form_data=form
 				, post_file=post_file, body=body
 			)
@@ -212,7 +216,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 				wait_event = threading.Event()
 				self.tasks.run_task(
 					task
-					, caller='http'
+					, caller=tcon.CALLER_HTTP
 					, data=req_data
 					, result=result
 					, wait_event=wait_event

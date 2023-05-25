@@ -4,7 +4,6 @@ fullpath, fpath, fp - full path of a file (r'd:\soft\taskopy\crontab.py')
 fname - file name only ('crontab.py')
 relpath - relative path ('taskopy\crontab.py')
 '''
-from ctypes import WinError
 import os
 import stat
 import time
@@ -20,14 +19,12 @@ from zlib import crc32
 import tempfile
 import datetime
 import win32con
-import win32com
 from operator import itemgetter
 import win32print
 import hashlib
 import pythoncom
 import base64
-from typing import Callable, Iterator, List, Union \
-, Iterable, Tuple
+from typing import Callable, Iterator, Iterable, Generator
 import psutil
 import win32file
 
@@ -57,7 +54,7 @@ def _dir_slash(dirpath:str)->str:
 	if dirpath.endswith('\\'): return dirpath
 	return dirpath + '\\'
 
-def path_get(fullpath, max_len:int=0
+def path_get(fullpath:str|tuple|list|Iterator, max_len:int=0
 , trim_suf:str='...')->str:
 	r'''
 	Join list of paths and optionally
@@ -631,7 +628,7 @@ def dir_purge(fullpath, days:int=0, subdirs:bool=False
 , creation:bool=False, test:bool=False
 , print_del:bool=False, **rules)->int:
 	r'''
-	Deletes files older than *x* days.
+	Deletes files older than *x* days.  
 	Returns number of deleted files and folders. 
 	
 	*days=0* - delete everything  
@@ -639,7 +636,7 @@ def dir_purge(fullpath, days:int=0, subdirs:bool=False
 	modification date.  
 	*subdirs* - delete in subfolders too. Empty subfolders 
 	will be deleted.  
-	*test* - only print files and folders that should be removed.  
+	*test* - only display the files and folders that should be deleted, without actually deleting them.  
 	*print_del* - print path when deleting.  
 	*rules* - rules for the `path_rule` function  
 	'''
@@ -791,8 +788,8 @@ def dir_find(fullpath, only_files:bool=False)->list:
 	files and directories  
 
 	Examples:
-		dir_list('d:\\folder\\*.jpg')
-		dir_list('d:\\folder\\**\\*.jpg')
+		dir_find('d:\\folder\\*.jpg')
+		dir_find('d:\\folder\\**\\*.jpg')
 
 	'''
 	fullpath = path_get(fullpath)
@@ -861,6 +858,9 @@ def dir_size(fullpath, unit:str='b', skip_err:bool=True)->int:
 	'''
 	Returns directory size without symlinks.  
 	*skip_err* - do not raise an exeption on non-existent files.
+
+		tass( benchmark(dir_size, a=('logs',), b_iter=1 ) , 200_000, '<' )
+
 	'''
 	fullpath = path_get(fullpath)
 	udiv = _SIZE_UNITS.get(unit.lower(), 1)
@@ -1025,9 +1025,9 @@ def file_hash(fullpath, algorithm:str='crc32'
 		return hash_obj.hexdigest()
 	
 def drive_list(exclude:str='')->str:
-	'''
-	Returns a string of local drive letters in lower case.
-	Exclude - drives to exclude.
+	r'''
+	Returns a string of local drive letters in lower case.  
+	*exclude* - drives to exclude.  
 	'''
 	drives = win32api.GetLogicalDriveStrings() \
 		.replace(':\\\000', '').lower()
@@ -1471,9 +1471,10 @@ DriveIO = namedtuple(
 	, psutil._common.sdiskio._fields
 	+ ('read_bytes_delta', 'write_bytes_delta', 'total_bytes_delta')
 )
-def drive_io(drive_num:int=None)->Iterator[namedtuple]:
-	'''
-	Returns physical drive (not partition!) I/O generator
+
+def drive_io(drive_num:int=-1)->Generator[DriveIO|dict, None, None]:
+	r'''
+	Returns a physical drive (not a volume/partition) I/O generator
 	that returns a named tuples with counters. Example:
 
 		dio = drive_io()
@@ -1491,7 +1492,7 @@ def drive_io(drive_num:int=None)->Iterator[namedtuple]:
 		cur = {}
 		for drive, info in psutil.disk_io_counters(perdisk=True).items():
 			drive = int(drive[13:])
-			if (drive_num != None) and drive_num != drive: continue
+			if (drive_num != -1) and drive_num != drive: continue
 			if not drive in prev:
 				prev[drive] = DriveIO(*info, 0, 0, 0)
 			cur_rb, cur_wb = info.read_bytes, info.write_bytes
@@ -1505,33 +1506,33 @@ def drive_io(drive_num:int=None)->Iterator[namedtuple]:
 			cur[drive] = DriveIO(*info, delta_rb
 			, delta_wb, delta_rb + delta_wb)
 		prev_time = cur_time
-		if drive_num:
+		if drive_num != -1:
 			yield cur[drive_num]
 		else:
 			yield cur
 
 def path_rule(
-	ex_ext:Iterable = ()
-	, in_ext:Iterable = ()
-	, ex_path:Iterable = ()
-	, in_path:Iterable = ()
-	, ex_dir:Iterable = ()
-	, in_dir:Iterable = ()
-	, ex_name:Iterable = ()
-	, in_name:Iterable = ()
-	, in_datem_aft:datetime.datetime = None
-	, ex_datem_aft:datetime.datetime = None
-	, in_datem_bef:datetime.datetime = None
-	, ex_datem_bef:datetime.datetime = None
-	, in_datec_aft:datetime.datetime = None
-	, ex_datec_aft:datetime.datetime = None
-	, in_datec_bef:datetime.datetime = None
-	, ex_datec_bef:datetime.datetime = None
-	, in_datea_aft:datetime.datetime = None
-	, ex_datea_aft:datetime.datetime = None
-	, in_datea_bef:datetime.datetime = None
-	, ex_datea_bef:datetime.datetime = None
-)->Tuple[ List[Callable], List[Callable] ]:
+	ex_ext:Iterable = tuple()
+	, in_ext:Iterable = tuple()
+	, ex_path:Iterable = tuple()
+	, in_path:Iterable = tuple()
+	, ex_dir:Iterable = tuple()
+	, in_dir:Iterable = tuple()
+	, ex_name:Iterable = tuple()
+	, in_name:Iterable = tuple()
+	, in_datem_aft:datetime.datetime|None = None
+	, ex_datem_aft:datetime.datetime|None = None
+	, in_datem_bef:datetime.datetime|None = None
+	, ex_datem_bef:datetime.datetime|None = None
+	, in_datec_aft:datetime.datetime|None = None
+	, ex_datec_aft:datetime.datetime|None = None
+	, in_datec_bef:datetime.datetime|None = None
+	, ex_datec_bef:datetime.datetime|None = None
+	, in_datea_aft:datetime.datetime|None = None
+	, ex_datea_aft:datetime.datetime|None = None
+	, in_datea_bef:datetime.datetime|None = None
+	, ex_datea_bef:datetime.datetime|None = None
+)->tuple[ list[Callable], list[Callable] ]:
 	r'''
 	Creates a list of rules (functions) to check
 	a file or directory.  
@@ -2020,7 +2021,7 @@ class DirDup:
 	ALGO_HASH_BEG = 'Hash of the beginning'
 	ALGO_HASH_FULL = 'Hash of the whole'
 
-	def __init__(self, src_dir:Union[str, tuple, list], algo:str
+	def __init__(self, src_dir:str|tuple|list, algo:str
 	, hash_size_limit_perc:int=5, **rules)->None:
 		assert algo in (self.ALGO_SIZE, self.ALGO_HASH_BEG
 		, self.ALGO_HASH_FULL, self.ALGO_MDATE, self.ALGO_CDATE), 'unknown algorithm'
@@ -2190,7 +2191,7 @@ class DirDup:
 		tdebug(f'cleaned: {count}, {file_size_str(size)}')
 		return count, size
 
-def dir_dedup(src_dir:Union[str, tuple, list], leave:str
+def dir_dedup(src_dir:str|tuple|list, leave:str
 , algo:str=DirDup.ALGO_HASH_BEG, print_dup:bool=True
 , recycle:bool=True, **rules)->tuple:
 	r'''

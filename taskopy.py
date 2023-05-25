@@ -63,6 +63,7 @@ TASK_OPTIONS = (
 	, ('http', False)
 	, ('timeout', 60)
 	, ('http_dir', None)
+	, ('http_re', ())
 	, ('http_white_list', None)
 	, ('err_threshold', 0)
 	, ('err_counter', False)
@@ -349,7 +350,7 @@ class Task:
 
 	def __init__(self):
 		self.name:str = ''
-		self.every:Union[str, tuple] = ''
+		self.every:str|tuple|list = ''
 		self.func = None
 		self.menu:bool = True
 		self.submenu:str = ''
@@ -447,9 +448,12 @@ class Tasks:
 				else:
 					self.task_list_menu.append(task_opts)
 			if task_opts['http'] != False:
-				if task_opts['http'] != True:
-					if not is_iter(task_opts['http']):
-						task_opts['http'] = (task_opts['http'],)
+				if task_opts['http'] == True:
+					http_re = ('^' + task_opts['task_func_name'] + '$', )
+				else:
+					http_re = task_opts['http']
+					if not is_iter(http_re): http_re = (task_opts['http'],)
+				task_opts['http_re'] = tuple(re.compile(p) for p in http_re)
 				if not task_opts['http_dir']:
 					task_opts['http_dir'] = temp_dir()
 				self.task_list_http.append(task_opts)
@@ -1277,7 +1281,7 @@ def show_app_window():
 	except Exception as e:
 		dev_print(f'show window exception: {e}')
 
-def every_parse(every:Union[str, list, tuple])->Tuple[bool, list]:
+def every_parse(every:str|list|tuple)->tuple[bool, list]:
 	r'''
 	Examples:
 
@@ -1331,7 +1335,7 @@ def main():
 	if sett.kiosk:
 		sett.dev = False
 		sett.hide_console = True
-	print(f'{APP_NAME} version {APP_VERSION}')
+	print(f'{APP_NAME} {APP_VERSION} (Python {sys.version})')
 	print(lang.load_homepage)
 	print(lang.load_donate + '\n\n')
 	try:

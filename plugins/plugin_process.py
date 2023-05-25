@@ -89,7 +89,7 @@ def proc_start(
 	, priority:str=''
 	, its_script:bool=False
 	, args_as_str:bool=False
-)->Union[Tuple, int]:
+)->tuple|int:
 	'''
 	Starts application.
 	
@@ -200,6 +200,7 @@ def proc_start(
 		, 'startupinfo': startupinfo
 		, 'encoding': encoding
 		, 'errors': 'replace'
+		, 'stdin': subprocess.PIPE
 	}
 	if env:
 		env = {**os.environ, **env}
@@ -321,7 +322,8 @@ def proc_cpu(process, interval:float=1.0)->float:
 
 def proc_uptime(process)->float:
 	r'''
-	Returns process uptime in seconds.
+	Returns process running time in seconds or -1.0
+	if no process is found.
 	'''
 	if (pid := proc_get(process)) == -1: return -1.0
 	return time.time() - psutil.Process(pid).create_time()

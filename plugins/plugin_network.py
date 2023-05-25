@@ -386,11 +386,11 @@ def html_element(url:str, element
 	else:
 		return result
 
-def json_element(source:str, element:Union[list, tuple]=[]
-, **kwargs)->Union[str, list]:
-	'''
+def json_element(source:str, element:list|tuple=[], **kwargs)->str|list:
+	r'''
 	Download JSON from URL and get its nested element by
 	map of keys like ['list', 0, 'someitem', 1]  
+
 	*source* - URL to download or string with JSON.  
 	*element* - can be a None, list or list of lists so it will
 	get every element specified in nested list and return
