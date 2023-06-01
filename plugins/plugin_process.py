@@ -4,7 +4,8 @@ import sys
 import ctypes
 import psutil
 import time
-from typing import List, Iterable, Tuple, Union
+from typing import Iterable
+from dataclasses import dataclass
 import win32gui
 import win32api
 import win32con
@@ -81,9 +82,9 @@ def proc_start(
 	, args:Iterable=()
 	, wait:bool=False
 	, capture:bool=False
-	, encoding:Union[str,None]=None
+	, encoding:str|None=None
 	, shell:bool=False
-	, cwd:Union[str,None]=None
+	, cwd:str|None=None
 	, env:dict=dict()
 	, window:str=''
 	, priority:str=''
@@ -127,7 +128,6 @@ def proc_start(
 
 	https://docs.python.org/3/library/subprocess.html
 	'''
-
 	PRIORITIES = {
 		'above': subprocess.ABOVE_NORMAL_PRIORITY_CLASS
 		, 'below': subprocess.BELOW_NORMAL_PRIORITY_CLASS
@@ -489,7 +489,7 @@ def service_restart(service:str):
 	' Restarts windows service '
 	return win32serviceutil.RestartService(service)
 
-def service_list()->List[psutil._pswindows.WindowsService]:
+def service_list()->list[psutil._pswindows.WindowsService]:
 	'''
 	Returns the list (generator) of services.  
 	Object `WindowsService` methods: as_dict, binpath, description
@@ -766,9 +766,62 @@ def win_by_pid(process)->tuple:
 		if win32process.GetWindowThreadProcessId(hwnd)[1] == pid:
 			return (hwnd, title)
 
-def cmd_elev(cmd:str):
-	' Run application via task sceduler'
-	tprint(proc_start('schtasks', '/run /tn taskopy_cmd_elev'
-	, env={'CMD_ELEV': cmd}, capture=True))
+
+
+def os_task_start(name:str)->tuple[bool, str]:
+	r'''
+	Starts a Windows task.  
+	'''
+	ret, out, err = proc_start('schtasks', f'/run /tn "{name}"'
+	, capture=True, args_as_str=True)
+	if ret: return False, err
+	return True, out
+
+@dataclass
+class OSTask:
+	folder:str=''
+	hostname:str=''
+	taskname:str=''
+	next_run_time:str=''
+	status:str=''
+	logon_mode:str=''
+	last_run_time:str=''
+	last_result:int=0
+	author:str=''
+	task_to_run:str=''
+	start_in:str=''
+	comment:str=''
+
+def os_task_info(name:str='')->tuple[bool, list[OSTask]|str]:
+	r'''
+	Returns information about Windows tasks as list
+	of `OSTask` objects or (False, 'error text').  
+	*name* - to get information about one particular task.  
+	Tested not in all versions of Windows.  
+
+		status, data = os_task_info(r'\Microsoft\Windows\CertificateServicesClient\UserTask')
+
+	'''
+	ret, out, err = proc_start(
+		'schtasks.exe'
+		, '/query /v /fo list' + (f' /tn "{name}"' if name else '')
+		, capture=True, args_as_str=True
+	)
+	if ret: return False, err
+	os_tasks = []
+	fields = tuple(enumerate(f for f in OSTask.__dataclass_fields__.keys()))
+	for task_sect in out.split('\n\n'):
+		values = tuple(l.split(':', maxsplit=1)[1].strip()
+			for l in task_sect.strip().splitlines() if ':' in l)
+		if (val_len := len(values)) < 2: continue
+		os_task = OSTask()
+		for num, key in fields:
+			if num + 1 > val_len:
+				tprint(f'not enough values ({len(values)})')
+				break
+			setattr(os_task, key, values[num])
+		os_task.last_result = int(os_task.last_result)
+		os_tasks.append(os_task)
+	return True, os_tasks
 
 if __name__ != '__main__': patch_import()

@@ -43,7 +43,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-05-25'
+APP_VERSION = 'v2023-06-01'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 _app_log_limit = 10_000
@@ -173,21 +173,19 @@ def task(**kwargs):
 		return func
 	return with_attrs
 
-def sound_play(fullpath, wait=False):
+def sound_play(sound:tuple|list|set, wait=False):
+	r'''
+	Plays a *.wav* file. If *fullpath* is a folder, select a random file.  
+	If fullpath is *Iterable*, select a random file from this list.  
 	'''
-	Play .wav sound. If fullpath is a folder then pick random file.
-	If fullpath is a list then pick random file from this list.
-	'''
-	if isinstance(fullpath, (list, tuple)):
-		fi = random.choice(fullpath)
-	elif os.path.isdir(fullpath):
-		fi = random.choice(glob.glob(fullpath + '\\*'))
-	else:
-		fi = fullpath
-	if wait:
-		winsound.PlaySound(fi, winsound.SND_FILENAME)
-	else:
-		winsound.PlaySound(fi, winsound.SND_FILENAME + winsound.SND_ASYNC)
+	fpath = sound
+	if is_iter(sound):
+		fpath = random.choice(sound)
+	elif os.path.isdir(sound):
+		fpath = random.choice(glob.glob(sound + '\\*'))
+	flags = winsound.SND_FILENAME
+	if not wait: flags += winsound.SND_ASYNC
+	winsound.PlaySound(fpath, flags=flags)
 
 def dev_print(*msg, **kwargs):
 	if is_dev() or tdebug():
@@ -297,11 +295,12 @@ def time_second()->int:
 	'''Returns current second'''
 	return datetime.datetime.now().second
 
-def time_diff(start:datetime.datetime, end:datetime.datetime=None
+def time_diff(start:datetime.datetime, end:datetime.datetime|None=None
 , unit:str='sec')->int:
-	'''
-	Returns difference in units.
-	start and end should be in datetime format.
+	r'''
+	Returns difference between dates in units.  
+	*start* and *end* should be in `datetime` format.  
+	If no *end* is specified, the current time is used.  
 	'''
 	if not end: end = datetime.datetime.now()
 	seconds = (end - start).total_seconds()
@@ -1722,7 +1721,7 @@ def app_exit(force:bool=False):
 
 def benchmark(func, a:tuple=(), ka:dict={}, b_iter:int=100)->int:
 	r'''
-	Run function `func` `b_iter` times and print time.  
+	Runs function `func` `b_iter` times and return time in ns.  
 	Returns nanoseconds per loop.  
 	Example:
 

@@ -9,7 +9,7 @@ import html
 import psutil
 import tempfile
 from hashlib import md5
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
 import json
 import subprocess
 import datetime
@@ -28,18 +28,25 @@ _USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWeb
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 _PUB_SUF_LST = set()
 
+warnings.filterwarnings('ignore', category=MarkupResemblesLocatorWarning)
+
 def http_req(url:str, encoding:str='utf-8', session:bool=False
 , cookies:dict=None, headers:dict=None
 , http_method:str='get', json_data:str=None
 , post_file:str=None, post_hash:bool=False
 , post_form_data:dict=None, post_file_capt:str='file'
 , timeout:float=3.0, attempts:int=3, **kwargs)->str:
-	'''
-	Gets content of the specified URL
+	r'''
+	Gets content of the specified URL.
 	
 	**Kwargs tips:**  
 	Skip SSL verification: `verify=False`  
 	Follow redirects: `allow_redirects=True`  
+
+	Caveats:
+
+		- Header `If-Modified-Since` may result in zero file length.
+		
 	'''
 	if (post_file or post_form_data): http_method = 'POST'
 	if http_method: http_method = http_method.lower()
@@ -172,6 +179,10 @@ def file_download(url:str, destination:str=None
 
 		headers = {'Range': 'bytes=0-1024'}
 
+	Caveats:
+
+		- Header `If-Modified-Since` may result in zero file length.
+		
 	'''
 	if isinstance(destination, (list, tuple)):
 		destination = os.path.join(*destination)
@@ -205,7 +216,6 @@ def file_download(url:str, destination:str=None
 					fname = req.headers.get('content-disposition', '') \
 						.split('filename=')[1]
 				except Exception as e:
-					tdebug(f'content-disposition error: {e}')
 					fname = req.url.split('/')[-1]
 				if fname:
 					dst_file = os.path.join(dst_file, fname.strip('"'))
@@ -251,11 +261,11 @@ def html_clean(html_str:str, sep:str=' ', is_mail:bool=False
 		tass( html_clean('\u200b\r \n<a>t</a>\t', is_mail=True), 't')
 		tass( html_clean('<style>{}</style><a>t</a>\t'), 't')
 		tass( html_clean('<img>jpg</img><a>t</a>\t', del_spec=False), 'jpg t')
+		tass( benchmark(html_clean, a=('',)), 120_000, "<" )
 
 	'''
 	SPEC_CHARS = ' \r\n\t\u200b\xa0\u200c'
 	DEL_TAGS = ('script', 'style', 'img')
-	warnings.filterwarnings('ignore', category=UserWarning, module='bs4')
 	soup = BeautifulSoup(html_str, 'html.parser')
 	if del_spec:
 		for tag in DEL_TAGS: [s.decompose() for s in soup(tag)]
@@ -386,7 +396,7 @@ def html_element(url:str, element
 	else:
 		return result
 
-def json_element(source:str, element:list|tuple=[], **kwargs)->str|list:
+def json_element(source:str, element:list|tuple=[], **kwargs)->str|list|tuple|float|int|dict:
 	r'''
 	Download JSON from URL and get its nested element by
 	map of keys like ['list', 0, 'someitem', 1]  

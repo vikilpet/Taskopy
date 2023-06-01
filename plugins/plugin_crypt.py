@@ -1,6 +1,9 @@
 import os
 import base64
 import glob
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning, module='cryptography')
+
 from cryptography.hazmat.backends import default_backend
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
