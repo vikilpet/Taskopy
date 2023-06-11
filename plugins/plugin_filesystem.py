@@ -268,9 +268,10 @@ def file_copy(fullpath, destination)->str:
 	return destination
 
 def file_append(fullpath, content:str, encoding:str='utf-8')->str:
-	''' Append content to a file. Creates fullpath
-		if not specified.
-		Returns the fullpath.
+	r'''
+	Append content to a file. Creates fullpath
+	if not specified.  
+	Returns the fullpath.  
 	'''
 	if fullpath:
 		fullpath = path_get(fullpath)
@@ -1243,9 +1244,9 @@ def _file_name_pe(filename:str):
 	return filename
 
 def var_fpath(var)->str:
+	if isinstance(var, str) and var[1] == ':': return var
 	if is_iter(var):
-		return os.path.join(_VAR_DIR
-		, *map(_file_name_pe, var) )
+		return os.path.join(_VAR_DIR, *map(_file_name_pe, var) )
 	else:
 		return os.path.join(_VAR_DIR, _file_name_pe(var) )
 
@@ -1346,27 +1347,34 @@ def var_add(var:str, value, var_type=None
 	var_set(var, value, encoding=encoding)
 	return value
 
-def var_lst_get(var:str, default=[]
+
+
+def var_lst_get(var:str, default:list=[]
 , encoding:str='utf-8', com_str:str='#')->list:
-	'''
-	Returns list with the text lines. Excludes empty lines
-	and lines that begin with *com_str*
+	r'''
+	Returns a list with text strings. Excludes empty strings
+	and strings starting with *com_str*.  
+	Reads files line by line, suitable for large files.  
 
 		var_lst_set('_test', ['a', 'b'])
 		tass(var_lst_get('_test'), ['a', 'b'])
 		var_lst_set('_test', map(str, (1, 2)))
 		tass(var_lst_get('_test'), ['1', '2'])
 		tass(var_del('_test'), True)
+		tass( var_lst_get('_test', ['not exists']), ['not exists'] )
 
 	'''
-	cont = var_get(var, default=default
-	, encoding=encoding)
-	if cont:
-		lst = cont.strip().splitlines()
-		return [l for l in lst
-			if l and (not l.startswith(com_str)) ]
-	else:
-		return cont
+	fpath = var_fpath(var)
+	lst = []
+	try:
+		with open(fpath, encoding=encoding) as fd:
+			for line in fd:
+				line = line.strip()
+				if line and not line.startswith(com_str):
+					lst.append(line)
+	except FileNotFoundError:
+		return default
+	return lst if lst else default
 
 def var_mod(var)->datetime.datetime:
 	'''

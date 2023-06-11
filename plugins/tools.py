@@ -43,7 +43,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-06-01'
+APP_VERSION = 'v2023-06-11'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 _app_log_limit = 10_000
@@ -458,6 +458,7 @@ def re_find(source:str, re_pattern:str, sort:bool=False
 	*re.LOCALE* - make {\w, \W, \b, \B} follow locale.  
 	*re.VERBOSE* - allow comment in regex.  
 
+	Grouping:  
 	Non-capturing group: (?:aaa)  
 	Positive lookbehind: (?<=abc)  
 	Negative lookbehind: (?<!abc)  
@@ -1361,7 +1362,7 @@ def table_print(
 			if cell in consider_empty:
 				cell = empty_str
 			elif isinstance(cell, (int, float)):
-				cell = '{:,}'.format(cell).replace(',', ' ')
+				cell = '{:,}'.format(cell).replace(',', '_')
 			else:
 				cell = ' '.join( str(cell).splitlines() )
 			new_row.append(cell)

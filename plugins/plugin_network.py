@@ -480,26 +480,6 @@ def xml_element(url:str, element:str
 	else:
 		return result[0]
 
-def tracking_status_rp(track_number:str)->str:
-	''' Get last status of Russian post parcel 
-	'''
-	url = r'https://www.pochta.ru/tracking?p_p_id=trackingPortlet_WAR_portalportlet&p_p_lifecycle=2&p_p_state=normal&p_p_mode=view&p_p_resource_id=getList&p_p_cacheability=cacheLevelPage&p_p_col_id=column-1&p_p_col_pos=1&p_p_col_count=2&barcodeList={}&pos'
-	status_list = json_element(
-		url.format(track_number)
-		, [
-			[
-				'list',0,'trackingItem', 'trackingHistoryItemList', 
-				0, 'description'
-			]
-			, [
-				'list',0,'trackingItem', 'trackingHistoryItemList'
-				, 0, 'humanStatus'
-			]
-		]
-		, headers={'Accept-Language':'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3'}
-	)
-	return ', '.join(status_list)
-
 def domain_ip(domain:str)->list:
 	'''
 	Get IP adresses of domain.
@@ -607,10 +587,11 @@ def json_to_html(json_data, **kwargs)->str:
 		json=json_data, **kwargs)
 
 def http_header(url:str, header:str
-, timeout:float=2.0, **kwargs)->str:
-	'''
+, timeout:float=2.0, **kwargs)->str|dict:
+	r'''
 	Get HTTP header of URL or get them all (as a dictionary)
-	if header=='all'.
+	if header=='all'. In the latter case, the case insensitive
+	dictionary will return  
 	'''
 	headers={**_USER_AGENT, **kwargs.get('headers', {}) }
 	req = requests.head(url, timeout=timeout

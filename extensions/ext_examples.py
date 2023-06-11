@@ -160,7 +160,7 @@ def examp_file_decrypt():
 def examp_cert_check(caller:str, codepage:str=''
 , stores:tuple=('Root', 'AuthRoot')):
 	r'''
-	Find the difference in the PC root certificate list and the similar
+	Find the difference in the PC certificate list and the similar
 	list from Windows Update.
 
 	Links:
@@ -173,7 +173,7 @@ def examp_cert_check(caller:str, codepage:str=''
 
 	def parser(dump:str)->dict:
 		dct = {}
-		# There is difference between pc and wu dump
+		# There is a difference between a pc and a wu dump
 		for sect in dump.split('================'):
 			hsh = re_find(sect, r'(?:\):\s)([0-9a-z\s]{32,})')
 			if not hsh: continue
