@@ -11,39 +11,51 @@ r'''
 Key codes: https://docs.microsoft.com/en-us/windows/desktop/inputdev/virtual-key-codes
 https://github.com/boppreh/keyboard
 
+Key codes for task option *hotkey* (windows VK) and for *key_* (keyboard module) functions not always the same!
+
 from keyboard._canonical_names import canonical_names
 sorted(set(canonical_names.values()))
 
-Special keys:
- 'alt',
- 'alt gr',
- 'backspace',
- 'caps lock',
- 'ctrl',
- 'delete',
- 'down',
- 'enter',
- 'esc',
- 'insert',
- 'left',
- 'left alt',
- 'left ctrl',
- 'left windows',
- 'menu',
- 'num lock',
- 'page down',
- 'page up',
- 'pause',
- 'play/pause media',
- 'print screen',
- 'right',
- 'right ctrl',
- 'right windows',
- 'scroll lock',
- 'space',
- 'tab',
- 'up',
- 'windows'
+Special keys for *keyboard* module:
+
+	'alt',
+	'alt gr',
+	'backspace',
+	'caps lock',
+	'ctrl',
+	'delete',
+	'down',
+	'enter',
+	'esc',
+	'insert',
+	'left',
+	'left alt',
+	'left ctrl',
+	'left windows',
+	'menu',
+	'num lock',
+	'page down',
+	'page up',
+	'pause',
+	'play/pause media',
+	'print screen',
+	'right',
+	'right ctrl',
+	'right windows',
+	'scroll lock',
+	'space',
+	'tab',
+	'up',
+	'windows',
+	'volume_up',
+	'voume_down'
+
+How to find a key name (exit on *space*):
+
+	while True:
+		keyboard_event = keyboard.read_event(True)
+		print(keyboard_event.event_type, keyboard_event.name)
+		if keyboard_event.name == 'space': break
 
 '''
 

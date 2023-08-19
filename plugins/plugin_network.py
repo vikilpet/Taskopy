@@ -24,7 +24,7 @@ from .tools import dev_print, exc_text, time_sleep, tdebug \
 , median, is_iter, str_indent
 from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 _PUB_SUF_LST = set()
 
@@ -449,13 +449,13 @@ def json_element(source:str, element:list|tuple=[], **kwargs)->str|list|tuple|fl
 def xml_element(url:str, element:str
 , element_num:int=0, encoding:str='utf-8'
 , **kwargs):
-	'''	Downloads a XML document from the specified URL and gets the value
-		by the list with 'map' of parent elements like ['foo', 'bar']
-		
-		element - XPath or list of XPath's.
-		Example: element='/result/array/msgContact[1]/msgCtnt'
-
-		kwargs - additional arguments for http_req.
+	r'''
+	Downloads a XML document from the specified URL and gets the value
+	by the list with 'map' of parent elements like ['foo', 'bar']
+	
+	*element* - XPath or list of XPath's.
+	Example: element='/result/array/msgContact[1]/msgCtnt'  
+	*kwargs* - additional arguments for http_req.  
 	'''
 	if url.startswith('http'):
 		status, content = safe(http_req)(url=url, **kwargs)

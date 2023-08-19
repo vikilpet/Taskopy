@@ -400,10 +400,10 @@ def proc_close(process, timeout:int=10
 		dev_print(f'PID {pid} was not found')
 	return False
 
-def wts_user_sessionid(users, only_active:bool=True)->list:
-	''' Convert list of users to list of
-		session id's.
-		only_active - return only WTSActive sessions.
+def wts_user_sessionid(users:str|list|tuple, only_active:bool=True)->list:
+	r'''
+	Convert list of users to list of session id's.  
+	*only_active* - return only WTSActive sessions.
 	'''
 	if isinstance(users, str):
 		user_dict = {users:''}

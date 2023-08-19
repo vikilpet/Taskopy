@@ -43,7 +43,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-06-11'
+APP_VERSION = 'v2023-08-19'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 _app_log_limit = 10_000
@@ -1075,7 +1075,7 @@ def dialog(
 	, timeout:Union[str, int]=0
 	, return_button:bool=False
 	, wait:bool=True
-)->int|str:
+)->int|str|tuple:
 	r'''
 	Shows dialog with multiple optional buttons.  
 	Returns ID of selected button starting with 1000
@@ -1942,7 +1942,7 @@ def str_short(text:str, width:int=0, placeholder:str='...')->str:
 
 	'''
 	if width == 0: width = os.get_terminal_size().columns - 1
-	return textwrap.shorten(text=text, width=width
+	return textwrap.shorten(text=str(text), width=width
 	, placeholder=placeholder)
 
 if __name__ != '__main__': patch_import()

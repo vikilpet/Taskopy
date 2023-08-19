@@ -463,15 +463,15 @@ def mail_download(server:str, login:str, password:str
 				for att in range(attempts):
 					time.sleep(att * 2)
 					status, fetch_data = imap.fetch(msg_id, '(RFC822)')
-					if status == 'OK': break
-					log(f'fetch attempt {att} ({status}): {data}')
+					if status == 'OK':
+						try:
+							raw_bytes = fetch_data[0][1]
+							break
+						except:
+							log(f'{msg_id=} fetch exception: «{fetch_data=}»')
+					log(f'fetch {att=} ({status=}): {data=}')
 				else:
-					log(f'fetch error ({status}): {fetch_data}')
-					continue
-				try:
-					raw_bytes = fetch_data[0][1]
-				except:
-					log(f'{msg_id=} error, wrong data: «{fetch_data}»')
+					log(f'fetch failed ({status=}): {fetch_data=}')
 					continue
 				msg:MailMsg = MailMsg(login=login, server=server
 				, raw_bytes=raw_bytes, sub_rule=sub_rule)
@@ -499,11 +499,11 @@ def mail_download(server:str, login:str, password:str
 						os.makedirs(os.path.dirname(msg.fullpath))
 						continue
 					except Exception as e:
-						log(f'  file write error:{exc_text(indent=True)}')
+						log(f'  file write exception:{exc_text(indent=True)}')
 						try:
 							os.remove(msg.fullpath)
 						except:
-							log(f'  file deletion error: {repr(e)}')
+							log(f'  file deletion exception: {repr(e)}')
 					break
 				if not file_ok: continue
 				msgs.append(msg)
@@ -514,7 +514,7 @@ def mail_download(server:str, login:str, password:str
 						imap.store(msg_id, '+FLAGS', '\\Deleted')
 						log(f'  moved to "{trash_folder}"')
 					else:
-						log(f'  move to {trash_folder} error ({status}): {data}')
+						log(f'  move to {trash_folder} imap error ({status}): {data}')
 						data = str(data).lower()
 						if (
 							'does not exists' in data
@@ -533,7 +533,7 @@ def mail_download(server:str, login:str, password:str
 		log(f'close: {imap.close()}')
 		log(f'logout: {imap.logout()}')
 	except Exception as e:
-		log(f'general error:{exc_text(last_n=0, indent=True)}')
+		log(f'general exception:{exc_text(last_n=0, indent=True)}')
 	return msgs, errors
 
 def mail_download_batch(mailboxes:list, dst_dir:str, timeout:int=60
@@ -564,7 +564,7 @@ def mail_download_batch(mailboxes:list, dst_dir:str, timeout:int=60
 					pass
 			return True, log_file
 		except Exception as e:
-			return False, 'write_log error: ' + repr(e)
+			return False, 'write_log exception: ' + repr(e)
 		
 	def log_warning()->tuple:
 		''' Returns True and last line if there is too many errors

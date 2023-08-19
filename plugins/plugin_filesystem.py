@@ -699,7 +699,11 @@ def file_name_wo_ext(fullpath)->str:
 	return os.path.splitext(path_get(fullpath))[0]
 
 def file_dir(fullpath)->str:
-	''' Returns directory from fullpath
+	r'''
+	Returns directory from fullpath.  
+	
+		tass( benchmark(file_dir, r'c:\Windows\System32\calc.exe'), 5617, "<" )
+	
 	'''
 	return os.path.dirname(path_get(fullpath))
 
