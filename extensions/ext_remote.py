@@ -1,4 +1,3 @@
-# 2023.08.11
 from plugins.tools import *
 from plugins.plugin_filesystem import *
 from plugins.plugin_network import *
@@ -38,17 +37,16 @@ def rmt_page(actions:dict, data:DataHTTPReq, title:str='Remote'
 	global _RMT_HTML
 	BUTTON_TEMPL = '''<div class='task' onclick="SendReq(this)">{capt}</div>'''
 	if not data.form:
-		#! It's not an action request, so create a page
-		# if not _RMT_HTML: _RMT_HTML = html_minify(file_read('ext_remote.html'))
-		_RMT_HTML = html_minify(file_read('ext_remote.html'))
+		# It's not an action request, so create a page
+		if not _RMT_HTML: _RMT_HTML = html_minify(file_read('ext_remote.html'))
 		buttons = ''
 		for capt in actions.keys(): buttons += BUTTON_TEMPL.format(capt=capt)
 		page = _RMT_HTML.replace('%title%', title).replace('%buttons%', buttons)
 		return page.replace('%status%', time_str(tcon.DATE_STR_HUMAN))
-	#! It's an action. Let's perform it safely:
+	# It's an action. Let's perform it safely:
 	status, data = safe( actions.get( data.form['action'] ) )()
 	if status: return 'ok' if data == None else str_short(data, max_status_len)
-	#! There is an error:
+	# There is an error:
 	tprint(data)
 	return 'error: ' + str_short(data, max_status_len - 7)
 
