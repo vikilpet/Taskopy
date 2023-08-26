@@ -1011,9 +1011,10 @@ def temp_file(prefix:str='', suffix:str=''
 
 def file_hash(fullpath, algorithm:str='crc32'
 , buf_size:int=65536)->str:
-	''' Returns hash of file.
-		algorithm - 'crc32' or any algorithm
-		from hashlib (md5, sha512 etc).
+	'''
+	Returns hash of file. 
+	*algorithm* -- 'crc32' or any algorithm
+	from hashlib (md5, sha512 etc).  
 	'''
 	fullpath = path_get(fullpath)
 	algorithm = algorithm.lower().replace('-', '')

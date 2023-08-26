@@ -172,7 +172,7 @@ Format: **option name** (default value) — description.
 		settings.ini
 		taskopy.exe
 
-	If a task has a *data* argument, it will be assigned query information in *DataHTTPReq* format.
+	If a task has a *data* argument, it will be assigned query information as *DataHTTPReq* object.
 
 	See also [settings](#settings) section for IP and port bindings.
 - **http_dir** — folder where to save files sent via HTTP POST request. If not set then use system temporary folder.

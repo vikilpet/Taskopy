@@ -166,7 +166,7 @@ CancelIoEx.argtypes = (
 
 def _close_directory_handle(handle):
 	try:
-		CancelIoEx(handle, None)
+		win32file.CancelIo(handle)
 	except WindowsError as e:
 		pass
 	except Exception as e:
@@ -347,7 +347,6 @@ class SuppressPrint:
 		sys.stdout = self._original_stdout
 
 class Task:
-
 	def __init__(self):
 		self.name:str = ''
 		self.every:str|tuple|list = ''
@@ -529,7 +528,7 @@ class Tasks:
 		' Watch for changes in directory '
 		WAIT_SEC = .1
 		FILE_LIST_DIRECTORY = 0x0001
-		BUFFER_LENGTH = 1024
+		BUFFER_SIZE = 2048
 
 		def dir_watch(task:dict, path:str, is_file:bool=False):
 			while True:
@@ -554,7 +553,7 @@ class Tasks:
 						flags = task['on_dir_change_flags']
 					results = win32file.ReadDirectoryChangesW(
 						hDir,
-						BUFFER_LENGTH,
+						BUFFER_SIZE,
 						not is_file,
 						flags,
 						None,
@@ -572,7 +571,7 @@ class Tasks:
 								dev_print(f'_close_directory_handle exception: {e2}')
 						try:
 							self.dir_change_stop.remove(hDir)
-							del hDir
+							_close_directory_handle(hDir)
 						except Exception as e:
 							dev_print(f'hDir not exists ({e})')
 						time.sleep(13.0)
@@ -608,18 +607,22 @@ class Tasks:
 						fullpath = os.path.join(path, res_relname)
 					self.run_task(
 						task=task
-						, caller=CALLER_FILE_CHANGE if is_file else CALLER_DIR_CHANGE
+						, caller=(
+							CALLER_FILE_CHANGE if is_file
+							else CALLER_DIR_CHANGE
+						)
 						, data=(
 							fullpath
 							, FILE_ACTIONS.get(res_action, 'unknown')
 						)
 					)
+					
 		thread_start(
 			dir_watch
 			, kwargs={
-					'task': task
-					, 'path': path
-					, 'is_file': is_file
+				'task': task
+				, 'path': path
+				, 'is_file': is_file
 			}
 			, err_msg=True
 		)

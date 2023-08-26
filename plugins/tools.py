@@ -43,7 +43,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-08-19'
+APP_VERSION = 'v2023-08-26'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 _app_log_limit = 10_000
@@ -1433,36 +1433,74 @@ def patch_import():
 			+ ', '.join(patch_items)
 	)
 
-class DataHTTPReq(object):
+class lazy_property(object):
 	'''
-	Browser request data as an object.
+	Meant to be used for lazy evaluation of an object attribute.
+	Property should represent non-mutable data, as it replaces itself.
+	'''
+	def __init__(self, fget):
+		self.fget = fget
+		functools.update_wrapper(self, fget)
+
+	def __get__(self, obj, cls):
+		if obj is None:
+			return self
+
+		value = self.fget(obj)
+		setattr(obj, self.fget.__name__, value)
+		return value
+
+
+class DataHTTPReq(object):
+	r'''
+	HTTP client request data.  
 	'''
 	def __init__(self, client_ip:str='', path:str=''
-	, headers:dict={}, params:dict={}, method:str='GET'
-	, form_data:dict={}, post_file:str='', body=None):
-		'''
-		*path* - '/task_name'
-		*headers* - {"Accept-Encoding": "gzip, deflate", ...}
-		*params* - URL parameters as a dictionary like {'par1': '123', ...}
+	, headers:dict={}, params:dict={}, method:str='GET'):
+		r'''
+		*path* -- '/task_name'
+		*headers* -- {"Accept-Encoding": "gzip, deflate", ...}
+		*params* -- URL parameters as a dictionary like {'par1': '123', ...}
 		'''
 		self.client_ip = client_ip
 		self.path = path
 		self.method:str = method
-		self.body = body
-		self.post_file = post_file
+		self._file:str = ''
+		self._body:bytes = b''
+		self._fullpath:str = ''
 		self.host = ''
+		self._md5:str = ''
 		self.accept = ''
 		self.accept_encoding = ''
 		self.accept_language = ''
 		self.referer = ''
-		self.headers = headers
-		self.params = params
-		self.form = form_data
+		self.headers:dict = headers
+		self.params:dict = params
+		self.form:dict = {}
+	
+	def _form_upd(self):
 		try:
-			self.__dict__.update(form_data)
+			self.__dict__.update(self.form)
 		except:
-			dev_print('not a dict')
+			dev_print('DataHTTPReq: not a dict')
 			pass
+	
+	@lazy_property
+	def file(self)->str:
+		if self._file:
+			return self._file
+		elif self.body:
+			with open(self._fullpath, 'wb') as fd:
+				fd.write(self.body)
+			return self._fullpath
+	
+	@lazy_property
+	def body(self)->bytes:
+		if self._body: return self._body
+		if self._file:
+			with open(self._file, 'rb') as fd:
+				return fd.read()
+		return b''
 
 class DataBrowserExt(DataHTTPReq):
 	'''
@@ -1809,23 +1847,6 @@ def is_iter(obj, and_not_str:bool=True)->bool:
 		return False
 	except:
 		raise
-
-class lazy_property(object):
-	'''
-	meant to be used for lazy evaluation of an object attribute.
-	property should represent non-mutable data, as it replaces itself.
-	'''
-	def __init__(self, fget):
-		self.fget = fget
-		functools.update_wrapper(self, fget)
-
-	def __get__(self, obj, cls):
-		if obj is None:
-			return self
-
-		value = self.fget(obj)
-		setattr(obj, self.fget.__name__, value)
-		return value
 
 def tass(value, expect, comp:str='=='):
 	'''

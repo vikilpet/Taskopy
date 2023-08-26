@@ -28,11 +28,14 @@ Crontab task example:
 _RMT_HTML:str = ''
 
 def rmt_page(actions:dict, data:DataHTTPReq, title:str='Remote'
-, max_status_len:int=40)->str:
+, status_src:Callable|None=None, max_status_len:int=60)->str:
 	r'''
 	Returns string wiht HTML or action result  
 	*actions* -- a dictionary where keys are button captions
 	and values are actions to call.  
+	*status_src* -- function whose value is substituted
+	into the status field. New lines via `<br>`. No more than 
+	two lines.  
 	'''
 	global _RMT_HTML
 	BUTTON_TEMPL = '''<div class='task' onclick="SendReq(this)">{capt}</div>'''
@@ -42,7 +45,14 @@ def rmt_page(actions:dict, data:DataHTTPReq, title:str='Remote'
 		buttons = ''
 		for capt in actions.keys(): buttons += BUTTON_TEMPL.format(capt=capt)
 		page = _RMT_HTML.replace('%title%', title).replace('%buttons%', buttons)
-		return page.replace('%status%', time_str(tcon.DATE_STR_HUMAN))
+		status_str = time_str(tcon.DATE_STR_HUMAN)
+		if status_src:
+			status, data = safe(status_src)()
+			if status:
+				status_str = str(data)
+			else:
+				status_str = str(data)
+		return page.replace('%status%', str_short(status_str, max_status_len))
 	# It's an action. Let's perform it safely:
 	status, data = safe( actions.get( data.form['action'] ) )()
 	if status: return 'ok' if data == None else str_short(data, max_status_len)
