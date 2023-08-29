@@ -166,7 +166,7 @@ CancelIoEx.argtypes = (
 
 def _close_directory_handle(handle):
 	try:
-		win32file.CancelIo(handle)
+		CancelIoEx(handle, None)
 	except WindowsError as e:
 		pass
 	except Exception as e:
@@ -571,7 +571,7 @@ class Tasks:
 								dev_print(f'_close_directory_handle exception: {e2}')
 						try:
 							self.dir_change_stop.remove(hDir)
-							_close_directory_handle(hDir)
+							del hDir
 						except Exception as e:
 							dev_print(f'hDir not exists ({e})')
 						time.sleep(13.0)
@@ -1209,16 +1209,17 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 	def on_edit_settings(self, event=None):
 		proc_start(sett.editor, os.path.join(APP_PATH, r'settings.ini'))
 
-	def on_disable(self, event=None):
-		tasks.enabled = not tasks.enabled
-		app.enabled = tasks.enabled
-		if tasks.enabled:
+	def on_disable(self, event=None, state:bool|None=None):
+		if state == None: state = not tasks.enabled
+		tasks.enabled = state
+		app.enabled = state
+		if state:
 			set_title(APP_NAME)
-			con_log('Enabled')
+			con_log('app enabled')
 		else:
-			set_title(f'Disabled {APP_NAME}')
-			con_log('Disabled')
-		self.set_icon(dis=not tasks.enabled)
+			set_title(f'{APP_NAME} (disabled)')
+			con_log('app isabled')
+		self.set_icon(dis=not state)
 	
 	def on_restart(self, event=None):
 		if not self.on_exit(): return

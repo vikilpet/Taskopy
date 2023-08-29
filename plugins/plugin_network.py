@@ -24,6 +24,7 @@ from .tools import dev_print, exc_text, time_sleep, tdebug \
 , median, is_iter, str_indent
 from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 
+
 _USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 _PUB_SUF_LST = set()
@@ -487,6 +488,14 @@ def domain_ip(domain:str)->list:
 	data = socket.gethostbyname_ex(domain)
 	return data[2]
 
+def net_pc_ip()->str:
+	' Returns the IP address of the computer '
+	return socket.gethostbyname(socket.gethostname())
+
+def net_pc_hostname()->str:
+	' Returns the hostname of the computer '
+	return socket.gethostname()
+
 def url_hostname(url:str, sld:bool=True)->str:
 	'''
 	Get hostname (domain name) from URL.
@@ -575,10 +584,6 @@ def _file_hash(fullpath:str)->str:
 		for chunk in iter(lambda: fi.read(4096), b''):
 			hash_md5.update(chunk)
 	return hash_md5.hexdigest()
-
-def pc_name()->str:
-	''' Returns hostname of current computer '''
-	return socket.gethostname()
 
 def json_to_html(json_data, **kwargs)->str:
 	''' Convert json to HTML table with

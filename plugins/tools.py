@@ -43,7 +43,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-08-26'
+APP_VERSION = 'v2023-08-29'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 _app_log_limit = 10_000
@@ -1758,6 +1758,14 @@ def app_exit(force:bool=False):
 	'''
 	app.exit(force=force)
 
+def app_enable():
+	' Enabling the application '
+	app.taskbaricon.on_disable(state=True)
+
+def app_disable():
+	' Disabling the application '
+	app.taskbaricon.on_disable(state=False)
+
 def benchmark(func, a:tuple=(), ka:dict={}, b_iter:int=100)->int:
 	r'''
 	Runs function `func` `b_iter` times and return time in ns.  
@@ -1892,7 +1900,7 @@ def exc_text(last_n:int=3, indent:bool=False):
 	else:
 		return '\n'.join(lines[-last_n:])
 
-def str_indent(src_str:str, prefix:str='    '
+def str_indent(src_str, prefix:str='    '
 , borders:bool=True)->str:
 	r'''
 	Adds an indent to each line of text.  
