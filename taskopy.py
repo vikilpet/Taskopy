@@ -82,8 +82,14 @@ TASK_OPTIONS = (
 	, ('on_dir_change', None)
 	, (
 		'on_dir_change_flags'
-		, tcon.FILE_NOTIFY_CHANGE_LAST_WRITE
-			| tcon.FILE_NOTIFY_CHANGE_FILE_NAME
+		, (
+			win32con.FILE_NOTIFY_CHANGE_FILE_NAME
+			| win32con.FILE_NOTIFY_CHANGE_DIR_NAME
+			| win32con.FILE_NOTIFY_CHANGE_ATTRIBUTES
+			| win32con.FILE_NOTIFY_CHANGE_SIZE
+			| win32con.FILE_NOTIFY_CHANGE_LAST_WRITE
+			| win32con.FILE_NOTIFY_CHANGE_SECURITY
+		)
 	)
 	, ('on_file_change_flags', tcon.FILE_NOTIFY_CHANGE_LAST_WRITE)
 	, ('every', ())
@@ -528,53 +534,62 @@ class Tasks:
 		' Watch for changes in directory '
 		WAIT_SEC = .1
 		FILE_LIST_DIRECTORY = 0x0001
-		BUFFER_SIZE = 2048
+		BUFFER_SIZE = 65536
+		RECONNECT_TIMEOUT = 13.0
+
+		def get_dir_handle(dir_path:str)->tuple:
+			' Returns (status:bool, handle) '
+			try:
+				hDir = win32file.CreateFile (
+					dir_path
+					, FILE_LIST_DIRECTORY
+					, (win32con.FILE_SHARE_READ
+						| win32con.FILE_SHARE_WRITE
+						| win32con.FILE_SHARE_DELETE)
+					, None
+					, win32con.OPEN_EXISTING
+					, win32con.FILE_FLAG_BACKUP_SEMANTICS
+					, None
+				)
+			except pywintypes.error as e:
+				dev_print(f'no access ({e.winerror}) to «{dir_path}»')
+				return False, e.strerror
+			return True, hDir
 
 		def dir_watch(task:dict, path:str, is_file:bool=False):
+			dir_path:str = file_dir(path) if is_file else path
 			while True:
+				status, hDir = get_dir_handle(dir_path)
+				if not status:
+					time.sleep(RECONNECT_TIMEOUT)
+					continue
+				self.dir_change_stop.append(hDir)
+				filename = file_name(path)
+				prev_file = ('', time.time())
+				if is_file:
+					flags = task['on_file_change_flags']
+				else:
+					flags = task['on_dir_change_flags']
 				try:
-					hDir = win32file.CreateFile (
-						file_dir(path) if is_file else path
-						, FILE_LIST_DIRECTORY
-						, win32con.FILE_SHARE_READ
-							| win32con.FILE_SHARE_WRITE
-							| win32con.FILE_SHARE_DELETE
-						, None
-						, win32con.OPEN_EXISTING
-						, win32con.FILE_FLAG_BACKUP_SEMANTICS
-						, None
-					)
-					self.dir_change_stop.append(hDir)
-					filename = file_name(path)
-					prev_file = ('', time.time())
-					if is_file:
-						flags = task['on_file_change_flags']
-					else:
-						flags = task['on_dir_change_flags']
 					results = win32file.ReadDirectoryChangesW(
-						hDir,
-						BUFFER_SIZE,
-						not is_file,
-						flags,
-						None,
-						None
+						hDir
+						, BUFFER_SIZE
+						, not is_file
+						, flags
+						, None
+						, None
 					)
 				except pywintypes.error as e:
 					if e.winerror == 995:
 						return
 					elif e.winerror in (6, 53, 64):
-						dev_print(f'disconnected ({e.winerror}) from {path}')
-						if e.winerror != 53:
-							try:
-								_close_directory_handle(hDir)
-							except Exception as e2:
-								dev_print(f'_close_directory_handle exception: {e2}')
+						dev_print(f'disconnected ({e.winerror}) from «{path}»')
+						_close_directory_handle(hDir)
+						self.dir_change_stop.remove(hDir)
 						try:
-							self.dir_change_stop.remove(hDir)
 							del hDir
 						except Exception as e:
 							dev_print(f'hDir not exists ({e})')
-						time.sleep(13.0)
 						continue
 					else:
 						tprint(f'pywintypes error: {e.args}')
@@ -1215,10 +1230,10 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		app.enabled = state
 		if state:
 			set_title(APP_NAME)
-			con_log('app enabled')
+			con_log(f'{APP_NAME} enabled')
 		else:
 			set_title(f'{APP_NAME} (disabled)')
-			con_log('app isabled')
+			con_log(f'{APP_NAME} disabled')
 		self.set_icon(dis=not state)
 	
 	def on_restart(self, event=None):

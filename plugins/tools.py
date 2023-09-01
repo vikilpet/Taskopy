@@ -43,7 +43,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-08-29'
+APP_VERSION = 'v2023-09-01'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 _app_log_limit = 10_000
@@ -1772,7 +1772,7 @@ def benchmark(func, a:tuple=(), ka:dict={}, b_iter:int=100)->int:
 	Returns nanoseconds per loop.  
 	Example:
 
-		tass( benchmark(lambda i: i+1, a=(1,), b_iter=10 ) , 1000, '<' )
+		tass( benchmark(lambda i: i+1, a=(1,), b_iter=10 ) , 2_000, '<' )
 	
 	'''
 	start = time.perf_counter_ns()
@@ -1955,23 +1955,30 @@ def str_diff(text1:str, text2:str)->tuple[tuple[str]]:
 		diff2.append(line)
 	return tuple(zip_longest(diff1, diff2, fillvalue=''))
 
+
+
 def str_short(text:str, width:int=0, placeholder:str='...')->str:
 	r'''
 	Collapse and truncate the given text to fit in the given width.  
-	Non-printing characters are removed first. If after that the
-	line fits in the specified width, it is returned. Otherwise, as many words
-	as possible are joined and then the placeholder is appended.  
+	The main purpose is to shorten text for output to the console
+	so extra whitespace characters are removed, including line breaks.  
 	If *width* is not specified, the current terminal width is used.
 
 		tass( str_short('Hello,  world! ', 13), 'Hello, world!' )
-		tass( str_short('Hello,  world! ', 12), 'Hello,...' )
+		tass( str_short('Hello', 13), 'Hello' )
+		tass( str_short('Hello,  world! ', 12), 'Hello, wo...' )
 		tass( str_short('Hello\nworld! ', 12), 'Hello world!' )
-		tass( str_short('Hello\nworld! ', 11), 'Hello...' )
-		tass( benchmark(str_short, ('Hello,  world! ',)), 100_000, '<')
+		tass( str_short('Hello\nworld! ', 11), 'Hello wo...' )
+		tass( benchmark(str_short, ('Hello,  world! ', 5)), 5_000, '<')
 
 	'''
+
 	if width == 0: width = os.get_terminal_size().columns - 1
-	return textwrap.shorten(text=str(text), width=width
-	, placeholder=placeholder)
+	new_text = ' '.join(
+		text.translate({ord(c): ' ' for c in string.whitespace}).split()
+	)
+	if len(new_text) <= width: return new_text
+	return new_text[:(width - len(placeholder))] + placeholder
+
 
 if __name__ != '__main__': patch_import()
