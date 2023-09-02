@@ -1,5 +1,4 @@
 import sys
-
 _DEF_LANGUAGE = 'en'
 class Language:
 	def __init__(self, language: str = _DEF_LANGUAGE):
@@ -36,6 +35,7 @@ class Language:
 		self.warn_no_run_tasks = 'No running tasks'
 		self.warn_on_exit = 'Waiting for tasks to complete on exit'
 		self.warn_rule_exc = 'Exception in a rule in the task «{}»: {}'
+		self.warn_path_not_exist = "The path doesn't exist: «{}»"
 
 		if not (di_str := getattr(
 			sys.modules[__name__]
@@ -97,4 +97,5 @@ button_close=Закрыть
 button_cancel=Отмена
 warn_on_exit=Ожидаем завершения задач при выходе
 warn_rule_exc=Исключение в правиле у задачи «{}»: {}
+warn_path_not_exist=Путь не существует: «{}»
 '''

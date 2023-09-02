@@ -170,14 +170,6 @@ CancelIoEx.argtypes = (
 	ctypes.POINTER(OVERLAPPED)  # lpOverlapped
 )
 
-def _close_directory_handle(handle):
-	try:
-		CancelIoEx(handle, None)
-	except WindowsError as e:
-		pass
-	except Exception as e:
-		tprint(f'unexpected error: {e}')
-
 class Settings:
 	''' Load global settings from settings.ini
 		Settings from all sections are collected.
@@ -538,7 +530,7 @@ class Tasks:
 		RECONNECT_TIMEOUT = 13.0
 
 		def get_dir_handle(dir_path:str)->tuple:
-			' Returns (status:bool, handle) '
+			' Returns (status:bool, handle) or (False, pywintypes.error) '
 			try:
 				hDir = win32file.CreateFile (
 					dir_path
@@ -551,86 +543,94 @@ class Tasks:
 					, win32con.FILE_FLAG_BACKUP_SEMANTICS
 					, None
 				)
+				return True, hDir
 			except pywintypes.error as e:
 				dev_print(f'no access ({e.winerror}) to «{dir_path}»')
-				return False, e.strerror
-			return True, hDir
+				return False, e
+			except Exception as e:
+				raise
 
 		def dir_watch(task:dict, path:str, is_file:bool=False):
 			dir_path:str = file_dir(path) if is_file else path
+			filename = file_name(path)
+			prev_file = ('', time.time())
+			if is_file:
+				flags = task['on_file_change_flags']
+			else:
+				flags = task['on_dir_change_flags']
 			while True:
-				status, hDir = get_dir_handle(dir_path)
-				if not status:
-					time.sleep(RECONNECT_TIMEOUT)
-					continue
-				self.dir_change_stop.append(hDir)
-				filename = file_name(path)
-				prev_file = ('', time.time())
-				if is_file:
-					flags = task['on_file_change_flags']
-				else:
-					flags = task['on_dir_change_flags']
-				try:
-					results = win32file.ReadDirectoryChangesW(
-						hDir
-						, BUFFER_SIZE
-						, not is_file
-						, flags
-						, None
-						, None
-					)
-				except pywintypes.error as e:
-					if e.winerror == 995:
+				status:bool = False
+				while not status:
+					status, data = get_dir_handle(dir_path)
+					if status: break
+					if data.winerror == 2:
+						warning(lang.warn_path_not_exist.format(path))
 						return
-					elif e.winerror in (6, 53, 64):
-						dev_print(f'disconnected ({e.winerror}) from «{path}»')
-						_close_directory_handle(hDir)
-						self.dir_change_stop.remove(hDir)
-						try:
-							del hDir
-						except Exception as e:
-							dev_print(f'hDir not exists ({e})')
-						continue
-					else:
-						tprint(f'pywintypes error: {e.args}')
-						raise e
-				if prev_file[0]:
-					pfile, ptime = prev_file
+					time.sleep(RECONNECT_TIMEOUT)
+				hDir = data
+				self.dir_change_stop.append(hDir)
+				while True:
 					try:
-						cfile, ctime = results[-1][1], time.time()
-					except:
-						if is_dev():
-							print(f'{prev_file=}, {results=}, exception:\n{exc_text()}\n')
-							dialog(
-								f'Exception in "dir_watch":\n\n{exc_text()}'
-								, timeout='5 min'
+						results = win32file.ReadDirectoryChangesW(
+							hDir
+							, BUFFER_SIZE
+							, not is_file
+							, flags
+							, None
+							, None
+						)
+					except pywintypes.error as e:
+						if e.winerror == 995:
+							return
+						elif e.winerror in (6, 53, 64):
+							dev_print(f'disconnected ({e.winerror}) from «{path}»')
+							self.dir_change_stop.remove(hDir)
+							try:
+								hDir.Close()
+								dev_print('hDir closed')
+							except Exception as e:
+								dev_print(f'hDir close exception: {e}')
+							break
+						else:
+							tprint(f'pywintypes error: {e.args}')
+							raise e
+					if prev_file[0]:
+						pfile, ptime = prev_file
+						try:
+							cfile, ctime = results[-1][1], time.time()
+						except:
+							if is_dev():
+								print(f'{prev_file=}, {results=}, exception:\n{exc_text()}\n')
+								dialog(
+									f'Exception in "dir_watch":\n\n{exc_text()}'
+									, timeout='5 min'
+								)
+						if cfile == pfile \
+						and ( (ctime - ptime) < WAIT_SEC ):
+							prev_file = (cfile, ctime)
+							continue
+					prev_file = (results[-1][1], time.time())
+					for res_action, res_relname in results[:1]:
+						if is_file and (
+							res_relname != filename
+							or res_action != 3
+						):
+							continue
+						if is_file:
+							fullpath = path
+						else:
+							fullpath = os.path.join(path, res_relname)
+						self.run_task(
+							task=task
+							, caller=(
+								CALLER_FILE_CHANGE if is_file
+								else CALLER_DIR_CHANGE
 							)
-					if cfile == pfile \
-					and ( (ctime - ptime) < WAIT_SEC ):
-						prev_file = (cfile, ctime)
-						continue
-				prev_file = (results[-1][1], time.time())
-				for res_action, res_relname in results[:1]:
-					if is_file and (
-						res_relname != filename
-						or res_action != 3
-					):
-						continue
-					if is_file:
-						fullpath = path
-					else:
-						fullpath = os.path.join(path, res_relname)
-					self.run_task(
-						task=task
-						, caller=(
-							CALLER_FILE_CHANGE if is_file
-							else CALLER_DIR_CHANGE
+							, data=(
+								fullpath
+								, FILE_ACTIONS.get(res_action, 'unknown')
+							)
 						)
-						, data=(
-							fullpath
-							, FILE_ACTIONS.get(res_action, 'unknown')
-						)
-					)
 					
 		thread_start(
 			dir_watch
@@ -1020,7 +1020,12 @@ class Tasks:
 				eh.close()
 			except Exception as e:
 				dev_print(f'event close error: {e}')
-		for h in self.dir_change_stop: _close_directory_handle(h.handle)
+		for h in self.dir_change_stop:
+			try:
+				CancelIoEx(h.handle, None)
+				h.Close()
+			except Exception as e:
+				dev_print(f'dir_change_stop exception: {e}')
 
 def create_menu_item(menu, task, func=None, parent_menu=None):
 	''' Task - task dict or menu item label
