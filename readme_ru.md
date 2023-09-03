@@ -32,6 +32,10 @@
 
 [![Taskopy + Autoruns vs Firefox browser agent](https://img.youtube.com/vi/bUIVBRI3hBg/0.jpg)](https://youtu.be/bUIVBRI3hBg)
 
+Удаленное управление:
+
+[![PotPlayer remote control](https://img.youtube.com/vi/_FTuEid0Q7U/0.jpg)](https://youtu.be/_FTuEid0Q7U)
+
 Чат в Телеграме: https://t.me/taskopy_g
 
 ## Содержание

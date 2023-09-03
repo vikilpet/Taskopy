@@ -43,7 +43,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-09-02'
+APP_VERSION = 'v2023-09-03'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 _app_log_limit = 10_000
@@ -1975,7 +1975,7 @@ def str_short(text:str, width:int=0, placeholder:str='...')->str:
 
 	if width == 0: width = os.get_terminal_size().columns - 1
 	new_text = ' '.join(
-		text.translate({ord(c): ' ' for c in string.whitespace}).split()
+		str(text).translate({ord(c): ' ' for c in string.whitespace}).split()
 	)
 	if len(new_text) <= width: return new_text
 	return new_text[:(width - len(placeholder))] + placeholder

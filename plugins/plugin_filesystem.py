@@ -1135,11 +1135,11 @@ def shortcut_create(fullpath, dest:str=None, descr:str=None
 
 def file_print(fullpath, printer:str=None
 , use_alternative:bool=False)->bool:
-	''' Prints file on specified printer.
-		Non-blocking.
-		Returns True on success.
-		If no printer is specified - print on 
-		system default printer.
+	'''
+	Prints file on specified printer. Non-blocking.  
+	Returns True on success.  
+	If no printer is specified, printing is performed
+	on the default system printer.  
 	'''
 	fullpath = path_get(fullpath)
 	if ' ' in fullpath: fullpath = f'"{fullpath}"'
@@ -1662,11 +1662,15 @@ def path_rule(
 		, f'{tstamp} ({val})')
 		if is_bef:
 			lst.append(
-				lambda p, a=time_att, t=tstamp: getattr(os.stat(p), a) <= t
+				lambda p, a=time_att, t=tstamp: getattr( \
+					os.stat('\\\\?\\' + p), a \
+				) <= t
 			)
 		else:
 			lst.append(
-				lambda p, a=time_att, t=tstamp: getattr(os.stat(p), a) >= t
+				lambda p, a=time_att, t=tstamp: getattr( \
+					os.stat('\\\\?\\' + p), a \
+				) >= t
 			)
 	return in_rules, ex_rules
 

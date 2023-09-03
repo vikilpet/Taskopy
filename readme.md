@@ -32,6 +32,10 @@ Tracking changes in the Windows startup:
 
 [![Taskopy + Autoruns vs Firefox browser agent](https://img.youtube.com/vi/bUIVBRI3hBg/0.jpg)](https://youtu.be/bUIVBRI3hBg)
 
+Remote control:
+
+[![PotPlayer remote control](https://img.youtube.com/vi/_FTuEid0Q7U/0.jpg)](https://youtu.be/_FTuEid0Q7U)
+
 Telegram chat: https://t.me/taskopy_g
 
 ## Contents

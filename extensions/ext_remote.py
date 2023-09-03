@@ -5,6 +5,8 @@ from plugins.plugin_network import *
 r'''
 Create HTML menu with configurable actions.  
 
+Short demo: https://youtu.be/_FTuEid0Q7U
+
 Crontab task example:
 
 	from ext_remote import rmt_page
@@ -16,10 +18,12 @@ Crontab task example:
 				'Dialog': lambda: dialog({'Yes': 'y', 'No': 'n'}, timeout=3)
 				# Just an example of an action with an error:
 				, 'Make an error': lambda: 0 / 0
-				# Press a hotkey:
-				, 'Pause': lambda: key_send('space')
-				, 'Rewind': lambda: key_send('left')
-				, 'Forward': lambda: key_send('right')
+				# Press a key:
+				, 'Vol down': lambda: key_send('volume_down')
+				, 'Vol up': lambda: key_send('volume_up')
+				# You can use emoji:
+				, '⏪️ back': lambda: key_send('left')
+				, '⏩️ forward': lambda: key_send('right')
 			}
 			, data=data
 		)
