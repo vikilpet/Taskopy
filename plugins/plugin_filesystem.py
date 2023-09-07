@@ -4,6 +4,8 @@ fullpath, fpath, fp - full path of a file (r'd:\soft\taskopy\crontab.py')
 fname - file name only ('crontab.py')
 relpath - relative path ('taskopy\crontab.py')
 '''
+
+
 import os
 import stat
 import time
@@ -48,6 +50,28 @@ _FORBIDDEN_DICT = dict(
 	, **{ c : '%' + hex(ord(c))[2:].upper() for c in _FORBIDDEN_CHARS}
 )
 _VAR_DIR = 'resources\\var'
+
+_MAX_PATH:int = 260
+
+def path_long(path:str):
+	r'''
+	Apply only to a string.  
+
+		tass( path_long('p'), 'p' )
+		tass( path_long('c:' + 'p'*261), '\\\\?\\c:' + 'p'*261 )
+		tass( path_long('\\\\share\\' + 'p'*261), '\\\\?\\UNC\share\\' + 'p'*261 )
+
+	'''
+	if len(path) < _MAX_PATH: return path
+	if path.startswith('\\\\?\\'): return path
+	if path[1] == ':':
+		return '\\\\?\\' + path
+	elif path.startswith('\\\\'):
+		return '\\\\?\\UNC\\' + path[2:]
+	else:
+		return path
+
+	
 
 def _dir_slash(dirpath:str)->str:
 	''' Adds a trailing slash if it's not there. '''
@@ -106,15 +130,8 @@ def path_get(fullpath:str|tuple|list|Iterator, max_len:int=0
 		fullpath = os.path.join(
 			fdir, fname[:-limit] + trim_suf + ext
 		)
-	elif (
-		len(fullpath) > 255
-		and not fullpath.startswith('\\\\?\\')
-		and (
-			fullpath[1:3] == ':\\'
-			or fullpath.startswith('\\\\')
-		)
-	):
-		return '\\\\?\\' + fullpath
+	else:
+		fullpath = path_long(fullpath)
 	return fullpath
 
 def file_read(fullpath, encoding:str='utf-8', errors:str=None)->str:
@@ -1663,13 +1680,13 @@ def path_rule(
 		if is_bef:
 			lst.append(
 				lambda p, a=time_att, t=tstamp: getattr( \
-					os.stat('\\\\?\\' + p), a \
+					os.stat(path_long(p)), a \
 				) <= t
 			)
 		else:
 			lst.append(
 				lambda p, a=time_att, t=tstamp: getattr( \
-					os.stat('\\\\?\\' + p), a \
+					os.stat(path_long(p)), a \
 				) >= t
 			)
 	return in_rules, ex_rules

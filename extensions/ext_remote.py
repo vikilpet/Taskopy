@@ -4,6 +4,8 @@ from plugins.plugin_network import *
 
 r'''
 Create HTML menu with configurable actions.  
+The purpose is to perform actions on your computer from your
+phone's browser.  
 
 Short demo: https://youtu.be/_FTuEid0Q7U
 
@@ -27,6 +29,12 @@ Crontab task example:
 			}
 			, data=data
 		)
+
+Open the URL on your phone: http://Your.PC.IP.Address:8275/remote_demo
+
+Your phone's IP address must fall under the *white_list*
+parameter in the *settings.ini* file (or in *http_white_list* of the task)
+otherwise you will get 403 error.
 
 '''
 _RMT_HTML:str = ''
