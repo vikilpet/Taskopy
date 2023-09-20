@@ -709,7 +709,15 @@ def dir_purge(fullpath, days:int=0, subdirs:bool=False
 	return counter
 
 def file_name(fullpath)->str:
-	''' Returns only file name from fullpath '''
+	r'''
+	Returns only the filename from the fullpath.  
+	
+		tass( file_name(r'C:\Windows\System32\calc.exe'), 'calc.exe' )
+		# Note: for a directory with a slash at the end
+		tass( file_name('C:\\Windows\\System32\\'), '' )
+		tass( file_name('C:\\Windows\\System32'), 'System32' )
+
+	'''
 	return os.path.basename( path_get(fullpath) )
 
 def file_name_wo_ext(fullpath)->str:
@@ -814,6 +822,7 @@ def dir_find(fullpath, only_files:bool=False)->list:
 		dir_find('d:\\folder\\**\\*.jpg')
 
 	'''
+	
 	fullpath = path_get(fullpath)
 	if not '*' in fullpath: fullpath = os.path.join(fullpath, '*')
 	subdirs = ('**' in fullpath)
@@ -1226,8 +1235,10 @@ class HTTPFile:
 def file_lock_wait(fullpath, wait_interval:str='100 ms'
 , log:bool=False)->bool:
 	'''
-	Blocks execution until the file is available.
-	Usage - wait for another process to stop writing to the file.
+	Blocks execution until the file is available for reading.   
+	The purpose is to wait for another process to
+	stop writing to the file.  
+	It's unreliable in many cases.  
 	'''
 	fullpath = path_get(fullpath)
 	while True:
@@ -1240,10 +1251,10 @@ def file_lock_wait(fullpath, wait_interval:str='100 ms'
 			if log:
 				tprint('locked:', file_name(fullpath))
 			else:
-				dev_print('File is locked:', file_name(fullpath))
+				pass
 			time_sleep(wait_interval)
 		except Exception as e:
-			tprint('wrong exception:', file_name(fullpath), repr(e))
+			tprint('unexpected exception:', file_name(fullpath), repr(e))
 			return False
 
 def file_relpath(fullpath, start)->str:
@@ -2239,6 +2250,13 @@ def dir_dedup(src_dir:str|tuple|list, leave:str
 	ddup.find_dup()
 	if print_dup: ddup.print_dup()
 	return ddup.clean(leave=leave, recycle=recycle)
+
+def rec_bin_size(drive:str|None=None)->tuple:
+	r'''
+	Retrieves the total size and number of items
+	in the Recycle Bin for a specified drive.  
+	'''
+	return shell.SHQueryRecycleBin(drive)
 
 def rec_bin_purge(drive:str=None, progress:bool=False, sound:bool=True):
 	r'''

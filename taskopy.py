@@ -1371,7 +1371,6 @@ def main():
 		if load_crontab():
 			tasks.run_at_startup()
 			tasks.run_at_sys_startup()
-			if sett.dev: app.taskbaricon.popup_menu_hk()
 		app.MainLoop()
 	except Exception as e:
 		trace_full, _ = _exc_texts()

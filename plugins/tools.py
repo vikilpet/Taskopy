@@ -43,7 +43,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-09-07'
+APP_VERSION = 'v2023-09-20'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 _app_log_limit = 10_000
@@ -101,6 +101,7 @@ def value_to_unit(value, unit:str='sec', unit_dict:dict=None
 		tass( value_to_unit('1 min', 'sec'), 60.0)
 		tass( value_to_unit('2m', 'sec'), 120.0)
 		tass( value_to_unit(3, 'sec'), 3.0)
+		tass( benchmark(value_to_unit, '1 ms'), 4763, "<" )
 
 	'''
 	if not unit_dict: unit_dict = _TIME_UNITS
@@ -418,12 +419,13 @@ def date_last_day_of_month(date:datetime.datetime)->datetime.datetime:
 	return date.replace(month=date.month+1, day=1) - datetime.timedelta(days=1)
 
 def time_sleep(interval, unit:str=None):
-	''' Pauses for specified amount of time.
-		interval - number of seconds or str with unit like '5 min'
-		or tuple with (start, stop) for random interval (you should
-		provide unit in this case). Example:
+	r'''
+	Pauses for specified amount of time.  
+	*interval* - number of seconds or `str` with unit like '5 min'
+	or tuple with (start, stop) for random interval (you should
+	provide unit in this case). Example:
 
-			time_sleep( (2,10), 'sec' )
+		time_sleep( (2,10), 'sec' )
 
 	'''
 	if isinstance(interval, (list, tuple)):
@@ -890,7 +892,12 @@ def tprint(*msgs, **kwargs):
 	print(time.strftime('%y.%m.%d %H:%M:%S'), *msgs, **kwargs)
 
 def tdebug(*msgs, **kwargs)->bool:
-	''' Is the code running from the console? '''
+	r'''
+	Is the code running from the console?  
+
+		tass( benchmark(tdebug), 435, "<" )
+
+	'''
 	if not hasattr(sys, 'ps1'): return False
 	if msgs:
 		if kwargs.get('par', True):
@@ -1697,7 +1704,6 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 			dev_print('thread_start save error: ' + repr(e))
 			pass
 	return thr.ident
-
 task_run = thread_start
 
 def app_threads_print():
@@ -1979,6 +1985,37 @@ def str_short(text:str, width:int=0, placeholder:str='...')->str:
 	)
 	if len(new_text) <= width: return new_text
 	return new_text[:(width - len(placeholder))] + placeholder
+
+_often_dct:dict[str, datetime.datetime] = {}
+def is_often(ident, interval)->bool:
+	r'''
+	Is some event happening too often?  
+	The purpose is not to bother the user
+	too often with event alerts.  
+	*ident* - unique identifier of an event.  
+	*interval* - interval for measurement
+	, not less than 1 ms.  
+
+		is_often('_', '1 ms')
+		tass( is_often('_', '1 ms'), True)
+		time_sleep('1 ms')
+		tass( is_often('_', '1 ms'), False)
+		tass( benchmark(is_often, ('_', '1 ms')), 5000, "<" )
+
+	'''
+	global _often_dct
+	UNIT:str = 'ms'
+	assert ident, 'the ident should not be empty'
+	intr = value_to_unit(interval, unit=UNIT)
+	if not (prev_time := _often_dct.get(ident)):
+		_often_dct[ident] = datetime.datetime.now()
+		return False
+	diff = time_diff(prev_time, unit=UNIT)
+	if diff < intr:
+		return True
+	else:
+		_often_dct[ident] = datetime.datetime.now()
+		return False
 
 
 if __name__ != '__main__': patch_import()

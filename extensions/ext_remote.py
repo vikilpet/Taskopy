@@ -9,6 +9,7 @@ phone's browser.
 
 Short demo: https://youtu.be/_FTuEid0Q7U
 
+Don't forget to download the 'ext_remote.html' page template.  
 Crontab task example:
 
 	from ext_remote import rmt_page
