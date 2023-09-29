@@ -236,11 +236,13 @@ def dir_rename(fullpath, dest
 	return dest
 
 def file_log(fullpath, message:str, encoding:str='utf-8'
-, time_format:str='%Y.%m.%d %H:%M:%S'):
-	''' Writes message to log '''
+, time_format:str='%Y.%m.%d %H:%M:%S', sep:str='\t', end:str='\n'):
+	r'''
+	Logging a message.  
+	'''
 	fullpath = path_get(fullpath)
 	with open(fullpath, 'at+', encoding=encoding) as f:
-		f.write(time.strftime(time_format) + '\t' + message + '\n')
+		f.write(f'{time.strftime(time_format)}{sep}{message}{end}')
 
 
 

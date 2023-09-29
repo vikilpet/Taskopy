@@ -43,7 +43,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-09-20'
+APP_VERSION = 'v2023-09-29'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 _app_log_limit = 10_000
@@ -145,7 +145,8 @@ def _get_parent_func_name(parent=None, repl_undrsc:str=None)->str:
 	EXCLUDE = ('wrapper', 'run_task', 'run', 'dev_print', 'tprint'
 		, 'main', 'run_task_inner', 'popup_menu_hk'
 		, 'MainLoop', 'catcher', 'run_code', 'mapstar'
-		, 'run_ast_nodes')
+		, 'run_ast_nodes', 'run_cell_async', 'run_cell'
+		, 'interact')
 	if parent: return str(parent)
 	for i in range(2, 10):
 		try:

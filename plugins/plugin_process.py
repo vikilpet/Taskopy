@@ -262,14 +262,18 @@ def proc_exists(process, cmd_filter:str=None
 
 def proc_list(name:str='', cmd_filter:str=None
 , ad_value=None)->list:
-	''' Returns list of DictToObj with process information.
-		name - image name. If not specified then list all
-			processes.
-		cmd_filter - a substring to look for in command line.
+	r'''
+	Returns list of DictToObj with process information.
+	*name* - image name. If not specified then list all
+	processes.  
+	*cmd_filter* - a substring to look for in command line.
 
-		Process information includes: pid:int, name:str
-		, username:str, fullpath:str, cmdline:list
-		, cmdline_str:str.
+	Note: while iterating through the process list, the
+	process may cease to exist.  
+	
+	Process information includes: pid:int, name:str
+	, username:str, fullpath:str, cmdline:list
+	, cmdline_str:str.
 
         ad_value - is the value which gets assigned in case
         AccessDenied or ZombieProcess exception is raised when
@@ -278,6 +282,7 @@ def proc_list(name:str='', cmd_filter:str=None
 		You may need admin rights to read info for every
 		process.
 		All strings in lowercase.
+	
 	'''
 	ATTRS=['pid', 'name', 'username', 'exe', 'cmdline']
 	name = name.lower()

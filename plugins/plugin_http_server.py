@@ -240,7 +240,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 				self.end_headers()
 				self.wfile.write(_FAVICON[0])
 			else:
-				dev_print(f'unknown favicon request: {self.path}')
+				dev_print(f'unknown favicon request: {self.path} from {self.client_address}')
 				self.wfile.write(b'<link rel="icon" href="data:,">')
 			return
 		self.process_req('GET')

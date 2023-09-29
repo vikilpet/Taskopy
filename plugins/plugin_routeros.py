@@ -171,11 +171,12 @@ def routeros_send(
 	, device_user:str='admin'
 	, device_pwd:str=''
 	, info:bool=False
-):
-	''' Send command 'cmd' through api.
-		cmd - list of strings (single command) or list
-		of lists (many commands at once).
-		Return True, None on success or False, 'error'
+)->tuple[bool, None|str]:
+	r'''
+	Send command 'cmd' through api.
+	*cmd* - list of strings (single command) or list
+	of lists (many commands at once).
+	Return True, None on success or False, 'error'
 	'''
 	soc = None
 	for res in socket.getaddrinfo(
@@ -224,7 +225,7 @@ def routeros_find_send(
 	, device_user:str='admin'
 	, device_pwd:str=''
 	, info:bool=False
-):
+)->tuple[bool, None|str]:
 	''' Find id and perform command against them.
 		cmd_find - list of str to get list of id's.
 			Example - find static id's in address-list:
@@ -289,7 +290,7 @@ def routeros_query(
 	, device_user:str='admin'
 	, device_pwd:str=''
 	, info:bool=False
-):
+)->tuple[bool, list[dict]]:
 	''' Send query and return True, data = list of dictionaries
 		or False, 'error'
 		query - list with commands or list with such lists.
