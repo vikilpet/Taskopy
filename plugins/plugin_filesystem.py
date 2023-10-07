@@ -35,7 +35,7 @@ from win32com.shell import shell, shellcon
 from pathlib import Path
 import shutil
 import configparser
-from .tools import _APP_PATH, APP_NAME, exc_text, random_str, table_print, tdebug, patch_import, time_diff_str, time_now \
+from .tools import app_dir, APP_NAME, exc_text, random_str, table_print, tdebug, patch_import, time_diff_str, time_now \
 , time_sleep, dev_print, tprint, is_iter, time_diff, time_from_str
 try:
 	import constants as tcon
@@ -120,7 +120,7 @@ def path_get(fullpath:str|tuple|list|Iterator, max_len:int=0
 		rem = fullpath[start + 1: ]
 		rem = rem.lstrip('\\')
 		if env_var.lower() == APP_NAME.lower():
-			fullpath = os.path.join( _APP_PATH, rem )
+			fullpath = os.path.join( app_dir(), rem )
 		else:
 			fullpath = os.path.join( os.getenv(env_var), rem )
 	if max_len and (len(fullpath) > max_len):
@@ -763,12 +763,23 @@ def file_backup(fullpath, dest_dir:str=''
 	shutil.copy2(fullpath, destination)
 	return destination
 
-def drive_free(letter:str, unit:str='GB')->int:
-	''' Returns drive free space in GB, MB, KB or B
+def drive_free(path:str, unit:str='GB')->int:
+	r'''
+	Returns drive free space in specified unit.  
+	You can just specify the full path here
+	, so you don't need to extract the drive letter.  
+
+		tass( drive_free('c'), 0, '>')
+		tass( drive_free('c:\\windows'), 10, '>')
+		tass( drive_free('c:\\windows\\'), 10, '>')
+		tass( benchmark(drive_free, 'c'), 24948, "<" )
+
 	'''
 	e = _SIZE_UNITS.get(unit.lower(), 1073741824)
+	if len(path) == 1:
+		path = f'{path}:\\'
 	try:
-		return shutil.disk_usage(f'{letter}:\\')[2] // e
+		return win32api.GetDiskFreeSpaceEx(path)[2] // e
 	except:
 		return -1
 
@@ -1116,21 +1127,24 @@ def file_attr_set(fullpath
 	'''
 	win32api.SetFileAttributes(path_get(fullpath), attribute)
 
-def shortcut_create(fullpath, dest:str=None, descr:str=None
-, icon_fullpath:str=None, icon_index:int=None
-, win_style:int=win32con.SW_SHOWNORMAL, cwd:str=None
-, hotkey:int=None)->str:
-	''' Creates shortcut to the file.
-		Returns full path of shortcut.
+def shortcut_create(fullpath, dest, descr:str=''
+, icon_fullpath='', icon_index:int=-1
+, win_style:int=win32con.SW_SHOWNORMAL, cwd:str=''
+, hotkey:int=0)->str:
+	r'''
+	Creates shortcut to the file.  
+	Returns full path of shortcut.  
 
-		dest - shortcut destination. If None then
-			use desktop path of current user.
-		descr - shortcut description.
-		icon_fullpath - source file for icon.
-		icon_index - if specified and icon_fullpath is None
-			then fullpath is used as icon_fullpath.
+	*dest* - shortcut destination. If `None` then
+	use desktop path of current user.  
+	*descr* - shortcut description. 
+	*icon_fullpath* - source file for icon.  
+	*icon_index* - if specified and icon_fullpath is `None`
+	then fullpath is used as icon_fullpath.  
 	'''
 	fullpath = path_get(fullpath)
+	dest = path_get(dest)
+	icon_fullpath = path_get(icon_fullpath)
 	if not descr: descr = file_name(fullpath)
 	if not dest:
 		dest = os.path.join(
@@ -1140,9 +1154,9 @@ def shortcut_create(fullpath, dest:str=None, descr:str=None
 	elif dir_exists(dest):
 		dest = os.path.join(dest, file_name(fullpath) )
 	if not dest.endswith('lnk'): dest = file_ext_replace(dest, 'lnk')
-	if icon_index != None and not icon_fullpath:
+	if icon_index != -1 and not icon_fullpath:
 		icon_fullpath = fullpath
-	if icon_fullpath and icon_index == None: icon_index = 0
+	if icon_fullpath and icon_index == -1: icon_index = 0
 	pythoncom.CoInitialize()
 	shortcut = pythoncom.CoCreateInstance (
 		shell.CLSID_ShellLink
@@ -1155,7 +1169,7 @@ def shortcut_create(fullpath, dest:str=None, descr:str=None
 	shortcut.SetShowCmd(win_style)
 	if hotkey: shortcut.SetHotKey(hotkey)
 	if cwd: shortcut.SetWorkingDirectory(cwd)
-	if icon_index != None: shortcut.SetIconLocation(fullpath, 0)
+	if icon_index != -1: shortcut.SetIconLocation(icon_fullpath, icon_index)
 	persist_file = shortcut.QueryInterface(pythoncom.IID_IPersistFile)
 	persist_file.Save(dest, 0)
 	pythoncom.CoUninitialize()

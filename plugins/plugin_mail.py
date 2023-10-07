@@ -228,8 +228,9 @@ def mail_send(
 	, from_name:str=''
 	, attachment:Iterable=''
 	, reply_to:str=''
+	, timeout:int=180
 )->Tuple[bool, str]:
-	'''
+	r'''
 	Send mail. Returns (True, None) on success or
 	(False, 'error text').  
 	*recipient* - emails separated with commas. 
@@ -266,7 +267,7 @@ def mail_send(
 	
 	try:
 		with smtplib.SMTP_SSL(host=server, port=port
-		, context=context) as smtp:
+		, context=context, timeout=timeout) as smtp:
 			smtp.login(login, password)
 			smtp.send_message(
 				msg
@@ -305,7 +306,7 @@ def mail_send_batch(recipients:str=''
 def mail_check(server:str, login:str, password:str
 , folders:list=['inbox'], msg_status:str='UNSEEN'
 , headers:tuple=('subject', 'from', 'to', 'date')
-, silent:bool=True)->Tuple[ List[MailMsg], List[str] ]:
+, silent:bool=True, timeout:int=180)->Tuple[ List[MailMsg], List[str] ]:
 	'''
 	Returns list of MailMsg and list of errors.  
 	*headers* - message headers to fetch. You can access them later
@@ -317,7 +318,7 @@ def mail_check(server:str, login:str, password:str
 	log = _MailLog(prefix='check', login=login, server=server
 	, silent=silent, err_lst=errors).log
 	try:
-		imap = imaplib.IMAP4_SSL(server)
+		imap = imaplib.IMAP4_SSL(server, timeout=timeout)
 		try:
 			imap.login(login, password)
 		except Exception as e:
@@ -397,11 +398,13 @@ def _mail_get_folders(imap:imaplib.IMAP4_SSL)->list:
 		folders.append((fld, flda))
 	return folders
 	
-def mail_download(server:str, login:str, password:str
-, dst_dir:str, folders:list=['inbox']
-, trash_folder:str='Trash', silent:bool=True
-, attempts:int=3
-, sub_rule:Callable=None)->Tuple[List[MailMsg], List[str] ]:
+def mail_download(
+	server:str, login:str, password:str
+	, dst_dir:str, folders:list=['inbox']
+	, trash_folder:str='Trash', silent:bool=True
+	, attempts:int=3, sub_rule:Callable=None
+	, timeout:int=3600
+)->Tuple[List[MailMsg], List[str] ]:
 	r'''
 	Downloads all messages from the server to the
 	specified directory (*dst_dir*).
@@ -432,7 +435,7 @@ def mail_download(server:str, login:str, password:str
 	
 	try:
 		log('connect to server')
-		imap = imaplib.IMAP4_SSL(server)
+		imap = imaplib.IMAP4_SSL(server, timeout=timeout)
 		try:
 			imap.login(login, password)
 		except Exception as e:
@@ -536,7 +539,7 @@ def mail_download(server:str, login:str, password:str
 		log(f'general exception:{exc_text(last_n=0, indent=True)}')
 	return msgs, errors
 
-def mail_download_batch(mailboxes:list, dst_dir:str, timeout:int=60
+def mail_download_batch(mailboxes:list, dst_dir:str, timeout:int=3600
 , log_file:str=r'mail_errors.log', err_thr:int=8
 , silent:bool=True)->Tuple[ List[MailMsg], List[str] ]:
 	r'''
@@ -586,6 +589,7 @@ def mail_download_batch(mailboxes:list, dst_dir:str, timeout:int=60
 		jobs = []
 		for box in mailboxes:
 			box['silent'] = silent
+			box['timeout'] = timeout
 			target = mail_download
 			if box.get('check_only'):
 				target = mail_check
@@ -600,7 +604,7 @@ def mail_download_batch(mailboxes:list, dst_dir:str, timeout:int=60
 		msgs = []
 		table = [('Login', 'Time')]
 		job: Job
-		for job in job_batch(jobs, timeout=timeout):
+		for job in job_batch(jobs, timeout=(timeout + 1)):
 			if job.error:
 				table.append( ('{}@{}'.format(job.kwargs['login']
 				, job.kwargs['server']), 'error') )

@@ -20,6 +20,7 @@ import getpass
 import traceback
 import inspect
 import ctypes
+import types
 import pyperclip
 import random
 import functools
@@ -43,16 +44,18 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-09-29'
+APP_VERSION = 'v2023-10-07'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 _app_log_limit = 10_000
 
-if not __builtins__.get('gdic', None):
+if __builtins__.get('gdic', None) == None:
 	gdic = {}
 	__builtins__['gdic'] = gdic
-	_app:wx.App = None
-	__builtins__['_app'] = _app
+	if hasattr(sys, 'ps1'):
+		app:wx.App = wx.App()
+		app.dir = os.getcwd()
+		__builtins__['app'] = app
 
 _DEFAULT_INI = r'''[General]
 language=en
@@ -64,10 +67,6 @@ server_ip=127.0.0.1
 server_port=8275
 white_list=127.0.0.1
 '''
-if getattr(sys, 'frozen', False):
-	_APP_PATH = os.path.dirname(sys.executable)
-else:
-	_APP_PATH = os.getcwd()
 _TIME_UNITS = {
 	'millisecond': 1, 'milliseconds': 1, 'msec': 1, 'ms': 1
 	, 'second': 1000, 'seconds': 1000, 'sec': 1000, 's': 1000
@@ -93,15 +92,15 @@ class DictToObj:
 
 def value_to_unit(value, unit:str='sec', unit_dict:dict=None
 , def_src_unit:str='sec')->float:
-	'''
+	r'''
 	Converts a string with a number and unit of measure
-	to the desired unit of measure.
+	to the desired unit of measure.  
 	Usage:
 
 		tass( value_to_unit('1 min', 'sec'), 60.0)
 		tass( value_to_unit('2m', 'sec'), 120.0)
 		tass( value_to_unit(3, 'sec'), 3.0)
-		tass( benchmark(value_to_unit, '1 ms'), 4763, "<" )
+		tass( benchmark(value_to_unit, ('1 ms',)), 1872, "<" )
 
 	'''
 	if not unit_dict: unit_dict = _TIME_UNITS
@@ -175,7 +174,7 @@ def task(**kwargs):
 		return func
 	return with_attrs
 
-def sound_play(sound:tuple|list|set, wait=False):
+def sound_play(sound:str|tuple|list|set, wait=False):
 	r'''
 	Plays a *.wav* file. If *fullpath* is a folder, select a random file.  
 	If fullpath is *Iterable*, select a random file from this list.  
@@ -194,6 +193,12 @@ def dev_print(*msg, **kwargs):
 		tprint(*msg, **kwargs)
 
 def is_dev()->bool:
+	r'''
+	Running in developer mode?
+
+		tass( benchmark(is_dev), 455, "<" )
+
+	'''
 	return ('--developer' in sys.argv) or hasattr(sys, 'ps1')
 
 def con_log(*msgs, **kwargs):
@@ -227,8 +232,11 @@ def con_log(*msgs, **kwargs):
 
 def time_now_str(template:str=tcon.DATE_STR_FILE
 , use_locale:str='C', timezone=None, **delta)->str:
-	'''
-	Returns a string with current time.
+	r'''
+	Returns a string with current time.  
+
+		tass( benchmark(time_now_str), 38339, "<" )
+	
 	'''
 	if not delta:
 		return time_str(
@@ -246,11 +254,12 @@ def time_now_str(template:str=tcon.DATE_STR_FILE
 def time_str(template:str=tcon.DATE_STR_FILE
 , time_val:datetime.datetime=None
 , use_locale:str='C', timezone=None)->str:
-	'''
+	r'''
 	Returns time in the form of a string in specified locale.  
 	Use datetime in `time_val`. How to get yesterday's date:  
 
 		time_val = datetime.date.today() - datetime.timedelta(days=1)
+		tass( benchmark(time_str), 43573, "<" )
 
 	'''
 	if timezone == 'utc':
@@ -265,12 +274,13 @@ def time_str(template:str=tcon.DATE_STR_FILE
 		return time_val.strftime(template)
 
 def time_now(**delta)->datetime.datetime:
-	'''
-	Returns datetime object.
-	Use `datetime.timedelta` keywords to get different time.
+	r'''
+	Returns datetime object.  
+	Use `datetime.timedelta` keywords to get different time.  
 	Yesterday:
 
 		time_now(days=-1)
+		tass( benchmark(time_now), 1046, "<" )
 
 	'''
 	if not delta: return datetime.datetime.now()
@@ -278,9 +288,9 @@ def time_now(**delta)->datetime.datetime:
 
 def time_from_str(date_string:str, template:str=tcon.DATE_STR_FILE
 , use_locale:str='C')->datetime.datetime:
-	'''
+	r'''
 	Returns datetime object from string and
-	specified locale.
+	specified locale.  
 	'''
 	with locale_set(use_locale):
 		return datetime.datetime.strptime(date_string, template)
@@ -303,6 +313,11 @@ def time_diff(start:datetime.datetime, end:datetime.datetime|None=None
 	Returns difference between dates in units.  
 	*start* and *end* should be in `datetime` format.  
 	If no *end* is specified, the current time is used.  
+
+		ts = datetime.datetime(2023, 10, 1, 19, 40, 6, 903000)
+		te = datetime.datetime(2023, 10, 1, 20, 40, 6, 903000)
+		tass( benchmark(time_diff, (ts, te)), 1400, "<" )
+	
 	'''
 	if not end: end = datetime.datetime.now()
 	seconds = (end - start).total_seconds()
@@ -351,8 +366,12 @@ def date_day(date_val:datetime.datetime=None, delta:dict=None)->int:
 
 def date_weekday(date_val:datetime.datetime=None
 , template:str='%A')->str:
-	'''
-	Returns weekday as a string.
+	r'''
+	Returns weekday as a string.  
+
+		tass( date_weekday(datetime.datetime(2023, 10, 1)), 'Sunday' )
+		tass( benchmark(date_weekday, (datetime.datetime(2023, 10, 1),)), 5137, "<" )
+
 	'''
 	if not date_val: date_val = datetime.date.today()
 	return date_val.strftime(template)
@@ -1658,7 +1677,7 @@ class DataEvent:
 def thread_start(func, args:tuple=(), kwargs:dict={}
 , thr_daemon:bool=True, err_msg:bool=False, ident:str=''
 , err_action=None)->int:
-	'''
+	r'''
 	Runs task in a thread. Returns thread id.  
 	*ident* - user-defined identifier of stream.  
 	*err_action* - function to run if an exception occurs.  
@@ -1782,6 +1801,30 @@ def benchmark(func, a:tuple=(), ka:dict={}, b_iter:int=100)->int:
 		tass( benchmark(lambda i: i+1, a=(1,), b_iter=10 ) , 2_000, '<' )
 	
 	'''
+	
+	def arg_to_str(arg)->str:
+		if isinstance(arg, (int, float)):
+			return(str(arg))
+		elif isinstance(arg, (str, datetime.datetime)):
+			return(repr(arg))
+		elif isinstance(arg, (tuple, list, set)):
+			if isinstance(arg, tuple):
+				bs, be = '(', ') '
+			elif isinstance(arg, list):
+				bs, be = '[', ']'
+			else:
+				bs, be = '{', '}'
+			return f'{bs}{", ".join(arg_to_str(a) for a in arg)}{be}'
+		elif isinstance(arg, dict):
+			return '{' + ', '.join(
+				f'{arg_to_str(k)}: {arg_to_str(v)}' for k,v in arg.items()
+			) + '}'
+		elif isinstance(arg, types.FunctionType):
+			return arg.__name__
+		elif arg is None:
+			return 'None'
+		else:
+			raise Exception(f'Unknown type: {type(arg)}')
 	start = time.perf_counter_ns()
 	if not is_iter(a): a = (a,)
 	assert isinstance(ka, dict), 'ka should be a dictionary'
@@ -1794,7 +1837,11 @@ def benchmark(func, a:tuple=(), ka:dict={}, b_iter:int=100)->int:
 	name = func.__name__
 	tdebug(f'{name}: {ns_loop_str} ns/loop, total={ns_total_str}, {b_iter=}')
 	if tdebug():
-		print(f'tass( benchmark({name}), {int(ns_loop * 1.3)}, "<" )')
+		args = []
+		for arg in a:
+			args.append(arg_to_str(arg))
+		args = f", ({', '.join(args)},)" if args else ''
+		print(f'tass( benchmark({name}{args}), {int(ns_loop * 1.3)}, "<" )')
 	return total_ns // b_iter
 
 def median(source):
@@ -2018,5 +2065,14 @@ def is_often(ident, interval)->bool:
 		_often_dct[ident] = datetime.datetime.now()
 		return False
 
+def is_app_exe()->bool:
+	r'''
+	Returns true if the application is converted to *exe*.  
+
+		tass( is_app_exe(), False)
+		tass( benchmark(is_app_exe), 2061, "<" )
+
+	'''
+	return getattr(sys, 'frozen', False)
 
 if __name__ != '__main__': patch_import()

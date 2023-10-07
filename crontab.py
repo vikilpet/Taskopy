@@ -52,3 +52,6 @@ def embedded__update(caller:str
 
 def embedded__backup_and_purge(every='day 21:30'):
 	emb_backup_and_purge()
+
+def embedded__add_to_startup():
+	emb_add_to_startup()
