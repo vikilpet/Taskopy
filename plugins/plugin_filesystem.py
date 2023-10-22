@@ -520,9 +520,11 @@ def file_name_fix(filename:str, repl_char:str='_')->str:
 def dir_dirs(fullpath, subdirs:bool=True)->Iterator[str]:
 	r'''
 	Returns list of full paths of all directories
-	in this directory and its subdirectories.
+	in this directory and its subdirectories.  
+	*fullpath* (source directory) is not included in results.  
 
 		tass( r'c:\windows\System32' in dir_dirs(r'c:\windows', False), True )
+		tass( r'c:\windows' in dir_dirs(r'c:\windows', False), False )
 
 	'''
 	fullpath = path_get(fullpath)
@@ -1040,8 +1042,9 @@ def temp_dir(new_dir:str=None)->str:
 def temp_file(prefix:str='', suffix:str=''
 , content=None, encoding='utf-8')->str:
 	'''
-	Returns the full name for the temporary file.  
-	If *content* is specified then writes content to the file.
+	Returns the full name for the temporary file.
+	(the file is not created as such)  
+	If *content* is specified then writes content to the file.  
 	'''
 	fname = os.path.join(tempfile.gettempdir()
 		, prefix + time.strftime('%m%d%H%M%S') + random_str(5) + suffix)
@@ -1051,7 +1054,7 @@ def temp_file(prefix:str='', suffix:str=''
 def file_hash(fullpath, algorithm:str='crc32'
 , buf_size:int=65536)->str:
 	'''
-	Returns hash of file. 
+	Returns hash of file.  
 	*algorithm* -- 'crc32' or any algorithm
 	from hashlib (md5, sha512 etc).  
 	'''
@@ -1126,6 +1129,36 @@ def file_attr_set(fullpath
 	constants.
 	'''
 	win32api.SetFileAttributes(path_get(fullpath), attribute)
+
+def file_date_set(fullpath, datec=None, datea=None, datem=None):
+	r'''
+	Sets a file date.  
+
+		fp = temp_file(content=' ')
+		tass(
+			benchmark(file_date_set, ka={'fullpath': fp, 'datec': time_now()}, b_iter=3)
+			, 220000
+			, "<"
+		)
+		file_delete(fp)
+
+	'''
+	handle = win32file.CreateFile(
+		path_get(fullpath)
+		, win32file.GENERIC_WRITE
+		, 0
+		, None
+		, win32file.OPEN_EXISTING
+		, 0
+		, 0
+	)
+	for d in (datec, datea, datem):
+		if d: d = d.timestamp()
+	win32file.SetFileTime(
+		handle, datec, datea, datem
+	)
+	handle.close()
+
 
 def shortcut_create(fullpath, dest, descr:str=''
 , icon_fullpath='', icon_index:int=-1
@@ -1329,7 +1362,7 @@ def var_get(var:str, default=None, encoding:str='utf-8'
 		return content
 
 def var_set(var, value, encoding:str='utf-8'):
-	'''
+	r'''
 	Sets the disk variable.
 
 		var_set('_test', 5)
@@ -1344,10 +1377,10 @@ def var_set(var, value, encoding:str='utf-8'):
 	fpath = var_fpath(var)
 	value = str(value)
 	try:
-		file_write(fpath, value, encoding=encoding)
+		file_write(fpath, content=value, encoding=encoding)
 	except FileNotFoundError:
 		os.makedirs(_VAR_DIR)
-		file_write(fpath, value, encoding=encoding)
+		file_write(fpath, content=value, encoding=encoding)
 
 def var_del(var:str):
 	'''
@@ -1396,9 +1429,7 @@ def var_add(var:str, value, var_type=None
 	var_set(var, value, encoding=encoding)
 	return value
 
-
-
-def var_lst_get(var:str, default:list=[]
+def var_lst_get(var, default=None
 , encoding:str='utf-8', com_str:str='#')->list:
 	r'''
 	Returns a list with text strings. Excludes empty strings
@@ -1422,8 +1453,8 @@ def var_lst_get(var:str, default:list=[]
 				if line and not line.startswith(com_str):
 					lst.append(line)
 	except FileNotFoundError:
-		return default
-	return lst if lst else default
+		return [] if default is None else default
+	return lst
 
 def var_mod(var)->datetime.datetime:
 	'''
@@ -1450,13 +1481,13 @@ def var_lst_set(var, value, encoding:str='utf-8'):
 		tass( var_del('_test'), True)
 
 	'''
-	var_set(var, '\n'.join(map(str, value))
+	var_set(var, value='\n'.join(map(str, value))
 	, encoding=encoding)
 
 def var_lst_add(var, value, encoding:str='utf-8')->list:
-	'''
+	r'''
 	Adds the value to the list
-	and returns the list.
+	and returns the list.  
 
 		var_lst_set('_test', 'ab')
 		tass( var_lst_add('_test', 'c'), ['a', 'b', 'c'] )
@@ -1465,11 +1496,11 @@ def var_lst_add(var, value, encoding:str='utf-8')->list:
 	'''
 	lst = var_lst_get(var, encoding=encoding)
 	lst.append(str(value))
-	var_lst_set(var, lst, encoding=encoding)
+	var_lst_set(var, value=lst, encoding=encoding)
 	return lst
 
 def var_lst_ext(var, value, encoding:str='utf-8')->list:
-	'''
+	r'''
 	Expands the list with the values of *value*. Returns
 	new list.
 
@@ -1601,7 +1632,7 @@ def path_rule(
 
 	*ex_ext*, *in_ext* - by extension.  
 	*ex_path*, *in_path* - by any part of a full file path  
-	*in_name*, *ex_name* - by part of file name.  
+	*in_name*, *ex_name* - by part of a file name.  
 	*ex_dir*, *in_dir* - by beginning of a file path  
 
 	File date variables.  

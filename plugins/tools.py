@@ -44,7 +44,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-10-07'
+APP_VERSION = 'v2023-10-22'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 _app_log_limit = 10_000
@@ -1792,7 +1792,8 @@ def app_disable():
 	' Disabling the application '
 	app.taskbaricon.on_disable(state=False)
 
-def benchmark(func, a:tuple=(), ka:dict={}, b_iter:int=100)->int:
+def benchmark(func, a:tuple=(), ka:dict={}, b_iter:int=100
+, do_print:bool=True)->int:
 	r'''
 	Runs function `func` `b_iter` times and return time in ns.  
 	Returns nanoseconds per loop.  
@@ -1835,8 +1836,8 @@ def benchmark(func, a:tuple=(), ka:dict={}, b_iter:int=100)->int:
 	ns_loop_str = '{:,}'.format(ns_loop).replace(',', ' ')
 	ns_total_str = '{:,}'.format(total_ns).replace(',', ' ')
 	name = func.__name__
-	tdebug(f'{name}: {ns_loop_str} ns/loop, total={ns_total_str}, {b_iter=}')
-	if tdebug():
+	if do_print and tdebug():
+		print(f'{name}: {ns_loop_str} ns/loop, total={ns_total_str}, {b_iter=}')
 		args = []
 		for arg in a:
 			args.append(arg_to_str(arg))
@@ -1935,8 +1936,8 @@ def tass(value, expect, comp:str='=='):
 		raise Exception('Unknown comp')
 	raise Exception(f'does not match ({comp}):\nval: «{value}»\nexp: «{expect}»')
 
-def exc_text(last_n:int=3, indent:bool=False):
-	'''
+def exc_text(last_n:int=3, indent:bool=False)->str:
+	r'''
 	Get exception text.  
 	*last_n* - the number of lines of the exception
 	text from the end. *0* - get all.  
@@ -1953,6 +1954,21 @@ def exc_text(last_n:int=3, indent:bool=False):
 		return str_indent( '\n'.join(lines[-last_n:]) )
 	else:
 		return '\n'.join(lines[-last_n:])
+
+def exc_name()->str:
+	r'''
+	Returns exception name only:
+
+		try:
+			0 / 0
+		except:
+			tass(exc_name(), 'ZeroDivisionError')
+
+		tass( benchmark(exc_name), 521, "<" )
+	
+	'''
+	ex_class = sys.exc_info()[0]
+	return ex_class.__name__ if ex_class else ''
 
 def str_indent(src_str, prefix:str='    '
 , borders:bool=True)->str:

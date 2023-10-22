@@ -25,7 +25,7 @@ from .tools import dev_print, exc_text, time_sleep, tdebug \
 from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 _PUB_SUF_LST = set()
 
@@ -747,7 +747,7 @@ def net_usage_str(interf:str)->Iterator[ Tuple[str] ]:
 
 def ping_tcp(host:str, port:int, count:int=1, pause:int=100
 , timeout:int=500)->tuple:
-	'''
+	r'''
 	Measure loss and response time with a TCP connection.
 	Returns (True, (loss percentage, time in ms) )
 	or (False, 'error text').  
