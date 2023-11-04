@@ -44,7 +44,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-10-22'
+APP_VERSION = 'v2023-11-04'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 _app_log_limit = 10_000
@@ -1587,9 +1587,9 @@ def _xml_to_dict_event(event_xml:str)->tuple:
 	return xml_to_dict(event_xml, remove_str=_event_xmlns)
 
 def value_to_str(value, sep:str='\n')->str:
-	'''
-		Convert simple data types (str, dict, list, tuple)
-		to a string.
+	r'''
+	Converts simple data types (str, dict, list, tuple)
+	to a string.  
 	'''
 	if isinstance(value, (str, int, float, type(None)) ): return str(value)
 	strings = []
@@ -1946,7 +1946,7 @@ def exc_text(last_n:int=3, indent:bool=False)->str:
 		try:
 			raise ZeroDivisionError('Just a test')
 		except:
-			dialog(exc_text())
+			dialog(exc_text(1))
 
 	'''
 	lines = traceback.format_exc().splitlines()

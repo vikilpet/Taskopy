@@ -36,6 +36,7 @@ class Language:
 		self.warn_on_exit = 'Waiting for tasks to complete on exit'
 		self.warn_rule_exc = 'Exception in a rule in the task «{}»: {}'
 		self.warn_path_not_exist = "The path doesn't exist: «{}»"
+		self.warn_file_not_exist = "The file doesn't exist: «{}»"
 
 		if not (di_str := getattr(
 			sys.modules[__name__]
@@ -98,4 +99,5 @@ button_cancel=Отмена
 warn_on_exit=Ожидаем завершения задач при выходе
 warn_rule_exc=Исключение в правиле у задачи «{}»: {}
 warn_path_not_exist=Путь не существует: «{}»
+warn_file_not_exist=Файл не существует: «{}»
 '''

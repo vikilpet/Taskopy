@@ -131,8 +131,9 @@ _re_css = re.compile(r'!/\*[^*]*\*+([^/][^*]*\*+)*/!')
 _re_white_space = re.compile(r">\s*<")
 _re_js = re.compile('<script>.+?</script>', flags=re.DOTALL)
 def html_minify(html:str)->str:
-	'''
-	Removes HTML, javascript and CSS comments and whitespace.
+	r'''
+	Removes HTML, javascript and CSS comments and whitespace.  
+	Not well tested, use at your own risk.  
 	'''
 	html = _re_html.sub('', html)
 	js_blocks = _re_js.findall(html)

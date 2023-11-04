@@ -1,8 +1,8 @@
 r'''
-Naming convention:
-fullpath, fpath, fp - full path of a file (r'd:\soft\taskopy\crontab.py')
-fname - file name only ('crontab.py')
-relpath - relative path ('taskopy\crontab.py')
+Naming convention:  
+fullpath, fpath, fp - full path of a file (r'd:\soft\taskopy\crontab.py')  
+fname - file name only ('crontab.py')  
+relpath - relative path ('taskopy\crontab.py')  
 '''
 
 
@@ -50,6 +50,7 @@ _FORBIDDEN_DICT = dict(
 	, **{ c : '%' + hex(ord(c))[2:].upper() for c in _FORBIDDEN_CHARS}
 )
 _VAR_DIR = 'resources\\var'
+_FILE_ATTRIBUTE_REPARSE_POINT = 1024
 
 _MAX_PATH:int = 260
 
@@ -901,11 +902,11 @@ def csv_write(fullpath, content:list, fieldnames:tuple=None
 	return fullpath
 
 def dir_size(fullpath, unit:str='b', skip_err:bool=True)->int:
-	'''
-	Returns directory size without symlinks.  
-	*skip_err* - do not raise an exeption on non-existent files.
+	r'''
+	Returns directory size (without symlinks).  
+	*skip_err* - do not raise an exeption on non-existent files.  
 
-		tass( benchmark(dir_size, a=('logs',), b_iter=1 ) , 200_000, '<' )
+		tass( benchmark(dir_size, a=('logs',), b_iter=1 ) , 150_000, '<' )
 
 	'''
 	fullpath = path_get(fullpath)
@@ -913,16 +914,22 @@ def dir_size(fullpath, unit:str='b', skip_err:bool=True)->int:
 	total_size = 0
 	for dirpath, _, filenames in os.walk(fullpath):
 		for fn in filenames:
-			fpath = os.path.join(dirpath, fn)
-			if os.path.islink(fpath): continue
+			fpath = '\\\\?\\' + dirpath + '\\' + fn
 			try:
-				total_size += os.path.getsize(fpath)
+				atts = win32file.GetFileAttributesEx(fpath)
 			except Exception as e:
 				if skip_err:
-					tdebug(f'skip {fpath} ({e})')
+					tdebug(f'skip {path_short(fpath, 50)} ({e})')
 					continue
 				else:
 					raise e
+			if (
+				atts[0] & _FILE_ATTRIBUTE_REPARSE_POINT
+					== _FILE_ATTRIBUTE_REPARSE_POINT
+			):
+				tdebug(f'skip link: {fn}')
+				continue
+			total_size += atts[4]
 	return total_size // udiv
 
 def dir_zip(fullpath, destination=None
@@ -1052,11 +1059,11 @@ def temp_file(prefix:str='', suffix:str=''
 	return fname
 
 def file_hash(fullpath, algorithm:str='crc32'
-, buf_size:int=65536)->str:
-	'''
+, buf_size:int=2**18)->str:
+	r'''
 	Returns hash of file.  
 	*algorithm* -- 'crc32' or any algorithm
-	from hashlib (md5, sha512 etc).  
+	from hashlib ('md5', 'sha512' etc).  
 	'''
 	fullpath = path_get(fullpath)
 	algorithm = algorithm.lower().replace('-', '')
@@ -1064,13 +1071,12 @@ def file_hash(fullpath, algorithm:str='crc32'
 		prev = 0
 		for eachLine in open(fullpath, 'rb'):
 			prev = crc32(eachLine, prev)
-		return '%X' % (prev & 0xFFFFFFFF)		
+		return '%X' % (prev & 0xFFFFFFFF)
 	else:
-		hash_obj = getattr(hashlib, algorithm)()
 		with open(fullpath, 'rb') as fi:
-			for chunk in iter(lambda: fi.read(buf_size), b''):
-				hash_obj.update(chunk)
-		return hash_obj.hexdigest()
+			return hashlib.file_digest(
+				fi, algorithm, _bufsize=buf_size
+			).hexdigest()
 	
 def drive_list(exclude:str='')->str:
 	r'''
@@ -1129,6 +1135,23 @@ def file_attr_set(fullpath
 	constants.
 	'''
 	win32api.SetFileAttributes(path_get(fullpath), attribute)
+
+def file_date_get(fullpath)->tuple[datetime.datetime]:
+	r'''
+	Returns tuple(creation time, access time, modification time)
+
+		fpath = temp_file(content=' ')
+		tass( file_date_get(fpath)[2].minute, time_minute() )
+		tass( benchmark(file_date_get, (fpath,)), 22000, "<" )
+		file_delete(fpath)
+
+	'''
+	pywindate = win32file.GetFileAttributesEx(path_get(fullpath))[1:4]
+	return tuple(
+		datetime.datetime(d.year, d.month, d.day, d.hour, d.minute
+		, d.second, d.microsecond)
+		for d in pywindate
+	)
 
 def file_date_set(fullpath, datec=None, datea=None, datem=None):
 	r'''
@@ -1273,10 +1296,11 @@ class HTTPFile:
 		, name:str=None
 	):
 		self.fullpath = path_get(fullpath)
+		assert file_exists(self.fullpath) \
+		, lang.warn_file_not_exist.format(self.fullpath)
 		self.use_save_to = use_save_to
 		if not mime_type:
-			mime_type = mimetypes.MimeTypes() \
-				.guess_type(self.fullpath)[0]
+			mime_type = mimetypes.MimeTypes().guess_type(self.fullpath)[0]
 			if not mime_type: mime_type = tcon.MIME_HTML
 		self.mime_type = mime_type
 		if not name: name = file_name(fullpath)
