@@ -1314,10 +1314,10 @@ def every_parse(every:str|list|tuple)->tuple[bool, list]:
 		, '5 minutes', 'mon 05:45', 'Mon 05:45'
 		, 'day 17:45', 'hour :30', 'h:30', ('5m', '5s')
 		, '5 to 6 min', '5to6min'):
-			tass( every_parse(es)[0], True )
+			asrt( every_parse(es)[0], True )
 		for es in ('5y', '5', '5 mins', '5mins', 5
 		, 'mon 5:45', 'hour 0:30', ('5m', 'hour')):
-			tass( every_parse(es)[0], False )
+			asrt( every_parse(es)[0], False )
 		
 	'''
 	if isinstance(every, str):

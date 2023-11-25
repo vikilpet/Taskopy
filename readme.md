@@ -39,9 +39,12 @@ Remote control:
 Telegram chat: https://t.me/taskopy_g
 
 ## Contents
+
 - [Installation](#installation)
+	- [Option 1: binary file](#option-1-binary-file)
+	- [Option 2: Python](#option-2-python)
 - [Usage](#usage)
-- [Task Options](#task-options)
+- [Task options](#task-options)
 - [Settings](#settings)
 - [Keywords](#keywords)
 	- [Miscelanneous](#miscelanneous)
@@ -215,6 +218,8 @@ Format: **setting** (default value) — description.
 
 ### Miscelanneous
 
+- **app_enable()** — enabling the application.
+- **app_disable()** — disabling the application. You can still start a task via the icon menu.
 - **balloon(msg:str, title:str=APP_NAME,timeout:int=None, icon:str=None)** — shows *baloon* message from tray icon. `title` - 63 symbols max, `msg` - 255 symbols. `icon` - 'info', 'warning' or 'error'.
 - **benchmark(func, b_iter:int=1000, a:tuple=(), ka:dict={})->datetime.timedelta** — run function `func` `b_iter` times and print time. Returns the total time as a datetime.timedelta object. Example:
 
@@ -233,6 +238,15 @@ Format: **setting** (default value) — description.
 
 	![Dialog EN](https://user-images.githubusercontent.com/43970835/79643653-13d4d380-81b5-11ea-9548-eb28fc515d7b.png)
 
+- **exc_name()->str** — returns exception name only:
+
+		try:
+			0 / 0
+		except:
+			asrt(exc_name(), 'ZeroDivisionError')
+
+		asrt( benchmark(exc_name), 521, "<" )
+	
 - **hint(text:str, position:tuple=None)->int** — shows a small window with the specified text. Only for the *Python* version. *position* - a tuple with coordinates. If no coordinates are specified, it appears in the center of the screen. Returns the PID of the hint process.
 - **HTTPFile** — Use this class if your HTTP task returns a file:
 
@@ -243,6 +257,17 @@ Format: **setting** (default value) — description.
 				fullpath=r'resources\icon.png'
 				, use_save_to=True
 			)
+
+- **is_often(ident, interval)->bool** — is some event happening too often?  
+	The purpose is not to bother the user too often with event alerts.  
+	*ident* - unique identifier of an event.  
+	*interval* - interval for measurement , not less than 1 ms.  
+
+		is_often('_', '1 ms')
+		asrt( is_often('_', '1 ms'), True)
+		time_sleep('1 ms')
+		asrt( is_often('_', '1 ms'), False)
+		asrt( benchmark(is_often, ('_', '1 ms')), 5000, "<" )
 
 - **Job(func, args, job_name:str='', kwargs)** — class for concurrent function execution in *job_batch* and *job_pool*. Properties:
 	- *result* - functional result
@@ -501,6 +526,16 @@ Format: **setting** (default value) — description.
 - **file_date_a(fullpath)** — file access date .
 - **file_date_c(fullpath)** — file creation date.
 - **file_date_m(fullpath)** — file modification date.
+- **file_date_set(fullpath, datec=None, datea=None, datem=None)** — sets a file date.  
+
+		fp = temp_file(content=' ')
+		asrt(
+			benchmark(file_date_set, ka={'fullpath': fp, 'datec': time_now()}, b_iter=3)
+			, 220000
+			, "<"
+		)
+		file_delete(fp)
+
 - **file_delete(fullpath:str)** — delete file. See also *file_recycle*.
 - **file_dialog(title:str=None, multiple:bool=False, default_dir:str='', default_file:str='', wildcard:str='', on_top:bool=True)** — Shows standard file dialog and returns fullpath or list of fullpaths if _multiple_ == True.
 - **file_dir(fullpath:str)->str:** — get parent directory name of file.
@@ -549,6 +584,7 @@ Format: **setting** (default value) — description.
 		# All drives:
 		rec_bin_purge()
 
+- **rec_bin_size(drive:str|None=None)->tuple** — retrieves the total size and number of items in the Recycle Bin for a specified drive.  
 - **shortcut_create(fullpath, dest:str=None, descr:str=None, icon_fullpath:str=None, icon_index:int=None, win_style:int=win32con.SW_SHOWNORMAL, cwd:str=None)->str** — creates a shortcut for a file. Returns full path of shortcut.
 	- dest - full name of the shortcut file. If not specified, the desktop folder of the current user is used.
 	- descr - shortcut description.
@@ -601,6 +637,7 @@ Format: **setting** (default value) — description.
 		
 		"That&#039;s an example" -> "That's an example"
 
+- **net_pc_ip()->str** — returns the IP address of the computer.
 - **net_url_decode(url:str, encoding:str='utf-8')->str** — decodes URL.
 - **net_url_encode(url:str, encoding:str='utf-8')->str** — encodes URL.
 - **pc_name()->str** — computer name.

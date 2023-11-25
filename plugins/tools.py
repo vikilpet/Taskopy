@@ -44,7 +44,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-11-04'
+APP_VERSION = 'v2023-11-25'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 _app_log_limit = 10_000
@@ -97,10 +97,10 @@ def value_to_unit(value, unit:str='sec', unit_dict:dict=None
 	to the desired unit of measure.  
 	Usage:
 
-		tass( value_to_unit('1 min', 'sec'), 60.0)
-		tass( value_to_unit('2m', 'sec'), 120.0)
-		tass( value_to_unit(3, 'sec'), 3.0)
-		tass( benchmark(value_to_unit, ('1 ms',)), 1872, "<" )
+		asrt( value_to_unit('1 min', 'sec'), 60.0)
+		asrt( value_to_unit('2m', 'sec'), 120.0)
+		asrt( value_to_unit(3, 'sec'), 3.0)
+		asrt( benchmark(value_to_unit, ('1 ms',)), 1872, "<" )
 
 	'''
 	if not unit_dict: unit_dict = _TIME_UNITS
@@ -196,7 +196,7 @@ def is_dev()->bool:
 	r'''
 	Running in developer mode?
 
-		tass( benchmark(is_dev), 455, "<" )
+		asrt( benchmark(is_dev), 455, "<" )
 
 	'''
 	return ('--developer' in sys.argv) or hasattr(sys, 'ps1')
@@ -235,7 +235,7 @@ def time_now_str(template:str=tcon.DATE_STR_FILE
 	r'''
 	Returns a string with current time.  
 
-		tass( benchmark(time_now_str), 38339, "<" )
+		asrt( benchmark(time_now_str), 38339, "<" )
 	
 	'''
 	if not delta:
@@ -259,7 +259,7 @@ def time_str(template:str=tcon.DATE_STR_FILE
 	Use datetime in `time_val`. How to get yesterday's date:  
 
 		time_val = datetime.date.today() - datetime.timedelta(days=1)
-		tass( benchmark(time_str), 43573, "<" )
+		asrt( benchmark(time_str), 43573, "<" )
 
 	'''
 	if timezone == 'utc':
@@ -280,7 +280,7 @@ def time_now(**delta)->datetime.datetime:
 	Yesterday:
 
 		time_now(days=-1)
-		tass( benchmark(time_now), 1046, "<" )
+		asrt( benchmark(time_now), 1046, "<" )
 
 	'''
 	if not delta: return datetime.datetime.now()
@@ -316,7 +316,7 @@ def time_diff(start:datetime.datetime, end:datetime.datetime|None=None
 
 		ts = datetime.datetime(2023, 10, 1, 19, 40, 6, 903000)
 		te = datetime.datetime(2023, 10, 1, 20, 40, 6, 903000)
-		tass( benchmark(time_diff, (ts, te)), 1400, "<" )
+		asrt( benchmark(time_diff, (ts, te)), 1400, "<" )
 	
 	'''
 	if not end: end = datetime.datetime.now()
@@ -369,8 +369,8 @@ def date_weekday(date_val:datetime.datetime=None
 	r'''
 	Returns weekday as a string.  
 
-		tass( date_weekday(datetime.datetime(2023, 10, 1)), 'Sunday' )
-		tass( benchmark(date_weekday, (datetime.datetime(2023, 10, 1),)), 5137, "<" )
+		asrt( date_weekday(datetime.datetime(2023, 10, 1)), 'Sunday' )
+		asrt( benchmark(date_weekday, (datetime.datetime(2023, 10, 1),)), 5137, "<" )
 
 	'''
 	if not date_val: date_val = datetime.date.today()
@@ -381,7 +381,7 @@ def date_weekday_num(date_val:datetime.datetime=None)->int:
 	Weekday number (monday is 1).  
 	*tdate* - None (today) or datetime.date(2019, 6, 12)
 
-		tass( date_weekday_num(datetime.date(2022, 9, 12) ), 1)
+		asrt( date_weekday_num(datetime.date(2022, 9, 12) ), 1)
 
 	'''
 	if not date_val: date_val = datetime.date.today()
@@ -396,7 +396,7 @@ def date_fill(date_dic:dict, cur_date=None)->datetime.datetime:
 		dt_dic = {'year': None, 'month': 11
 		, 'day': 31, 'hour': 23, 'minute': 24}
 		date_fill(dt_dic)
-		tass( benchmark(date_fill, a=(dt_dic,)), 8000, '<' )
+		asrt( benchmark(date_fill, a=(dt_dic,)), 8000, '<' )
 
 	'''
 	new_date_dic = {'year': 0, 'month': 0
@@ -418,7 +418,7 @@ def date_fill_str(date_str:str)->str:
 	Replace asterisk to current datetime value:  
 	date_fill_str('*.*.01 12:30') -> '2020.10.01 12:30'
 
-		tass(
+		asrt(
 			benchmark(date_fill_str, a=('*.*.01 12:30',))
 			, 8000
 			, '<'
@@ -463,7 +463,7 @@ def clip_get()->str:
 	r'''
 	Returns the text from the clipboard, if any.
 
-		tass( benchmark(clip_get), 13031, "<" )
+		asrt( benchmark(clip_get), 13031, "<" )
 
 	'''
 	return pyperclip.paste()
@@ -508,7 +508,7 @@ def re_split(source:str, re_pattern:str, maxsplit:int=0
 	'''
 	Regexp split.
 	
-		tass( re_split('abc', 'b'), ['a', 'c'] )
+		asrt( re_split('abc', 'b'), ['a', 'c'] )
 	
 	'''
 	return re.split(
@@ -523,8 +523,8 @@ def re_match(source:str, re_pattern:str
 	r'''
 	Regexp match.
 
-		tass( re_match('C - 25.11.19.mp3', r'.+ - \d\d\.\d\d\.\d\d.+'), True )
-		tass( re_match('C - 25.11.19.mp3', r' - \d\d\.\d\d\.\d\d.+'), False)
+		asrt( re_match('C - 25.11.19.mp3', r'.+ - \d\d\.\d\d\.\d\d.+'), True )
+		asrt( re_match('C - 25.11.19.mp3', r' - \d\d\.\d\d\.\d\d.+'), False)
 
 	'''
 	return bool(re.match(re_pattern, source, flags=re_flags))
@@ -915,7 +915,7 @@ def tdebug(*msgs, **kwargs)->bool:
 	r'''
 	Is the code running from the console?  
 
-		tass( benchmark(tdebug), 435, "<" )
+		asrt( benchmark(tdebug), 435, "<" )
 
 	'''
 	if not hasattr(sys, 'ps1'): return False
@@ -1013,8 +1013,8 @@ def safe(func:Callable)->Callable:
 	and return (True, <function result>)
 	or (False, <Exception object>)
 
-		tass( benchmark(lambda: None), 240, "<" )
-		tass( benchmark(safe(lambda: None)), 650, "<" )
+		asrt( benchmark(lambda: None), 240, "<" )
+		asrt( benchmark(safe(lambda: None)), 650, "<" )
 
 	'''
 	@functools.wraps(func)
@@ -1683,7 +1683,7 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 	*err_action* - function to run if an exception occurs.  
 	The text of exception will be passed to the function.  
 
-		tass( benchmark(thread_start, (lambda: None,)), 300_000, '<' )
+		asrt( benchmark(thread_start, (lambda: None,)), 300_000, '<' )
 
 	'''
 	def wrapper():
@@ -1777,7 +1777,7 @@ def app_tasks()->dict:
 	return app.tasks
 
 def app_exit(force:bool=False):
-	'''
+	r'''
 	Closes the program.  
 	*force* - do not wait for the completion
 	of working tasks.  
@@ -1785,11 +1785,16 @@ def app_exit(force:bool=False):
 	app.exit(force=force)
 
 def app_enable():
-	' Enabling the application '
+	r'''
+	Enabling the application
+	'''
 	app.taskbaricon.on_disable(state=True)
 
 def app_disable():
-	' Disabling the application '
+	r'''
+	Disabling the application. You can still start a task
+	via the icon menu.  
+	'''
 	app.taskbaricon.on_disable(state=False)
 
 def benchmark(func, a:tuple=(), ka:dict={}, b_iter:int=100
@@ -1799,7 +1804,7 @@ def benchmark(func, a:tuple=(), ka:dict={}, b_iter:int=100
 	Returns nanoseconds per loop.  
 	Example:
 
-		tass( benchmark(lambda i: i+1, a=(1,), b_iter=10 ) , 2_000, '<' )
+		asrt( benchmark(lambda i: i+1, a=(1,), b_iter=10 ) , 2_000, '<' )
 	
 	'''
 	
@@ -1842,7 +1847,7 @@ def benchmark(func, a:tuple=(), ka:dict={}, b_iter:int=100
 		for arg in a:
 			args.append(arg_to_str(arg))
 		args = f", ({', '.join(args)},)" if args else ''
-		print(f'tass( benchmark({name}{args}), {int(ns_loop * 1.3)}, "<" )')
+		print(f'asrt( benchmark({name}{args}), {int(ns_loop * 1.3)}, "<" )')
 	return total_ns // b_iter
 
 def median(source):
@@ -1893,13 +1898,13 @@ def is_iter(obj, and_not_str:bool=True)->bool:
 	Is the object iterable?  
 	*and_not_str* - exclude strings.
 
-		tass(is_iter('a'), False)
-		tass(is_iter('a', and_not_str=False), True)
-		tass(is_iter((1, 2)), True)
+		asrt(is_iter('a'), False)
+		asrt(is_iter('a', and_not_str=False), True)
+		asrt(is_iter((1, 2)), True)
 		mapobj = map(str, (1, 2))
-		tass(is_iter(mapobj), True)
-		tass(tuple(mapobj), ('1', '2'))
-		tass(is_iter(1), False)
+		asrt(is_iter(mapobj), True)
+		asrt(tuple(mapobj), ('1', '2'))
+		asrt(is_iter(1), False)
 
 	'''
 	if and_not_str and isinstance(obj, str): return False
@@ -1911,12 +1916,12 @@ def is_iter(obj, and_not_str:bool=True)->bool:
 	except:
 		raise
 
-def tass(value, expect, comp:str='=='):
+def asrt(value, expect, comp:str='=='):
 	'''
 	Assertion showing the difference.  
 	Examples:
 
-		tass(APP_NAME, 'Taskopy')
+		asrt(APP_NAME, 'Taskopy')
 
 	'''
 	if comp == '==':
@@ -1962,9 +1967,9 @@ def exc_name()->str:
 		try:
 			0 / 0
 		except:
-			tass(exc_name(), 'ZeroDivisionError')
+			asrt(exc_name(), 'ZeroDivisionError')
 
-		tass( benchmark(exc_name), 521, "<" )
+		asrt( benchmark(exc_name), 521, "<" )
 	
 	'''
 	ex_class = sys.exc_info()[0]
@@ -2005,12 +2010,12 @@ def str_diff(text1:str, text2:str)->tuple[tuple[str]]:
 	Returns the different lines between two texts (strings with
 	**line breaks**) as a tuple of tuples.
 
-		tass(
+		asrt(
 			tuple(str_diff('foo\nbar', 'fooo\nbar'))
 			, (('foo', 'fooo'),)
 		)
-		tass( tuple(str_diff('same\r\nlines', 'same\nlines') ), () )
-		tass( tuple(str_diff('same\nlines', 'lines\nsame') ), () )
+		asrt( tuple(str_diff('same\r\nlines', 'same\nlines') ), () )
+		asrt( tuple(str_diff('same\nlines', 'lines\nsame') ), () )
 
 	'''
 	lines1 = tuple(l.strip() for l in text1.splitlines() )
@@ -2034,12 +2039,12 @@ def str_short(text:str, width:int=0, placeholder:str='...')->str:
 	so extra whitespace characters are removed, including line breaks.  
 	If *width* is not specified, the current terminal width is used.
 
-		tass( str_short('Hello,  world! ', 13), 'Hello, world!' )
-		tass( str_short('Hello', 13), 'Hello' )
-		tass( str_short('Hello,  world! ', 12), 'Hello, wo...' )
-		tass( str_short('Hello\nworld! ', 12), 'Hello world!' )
-		tass( str_short('Hello\nworld! ', 11), 'Hello wo...' )
-		tass( benchmark(str_short, ('Hello,  world! ', 5)), 5_000, '<')
+		asrt( str_short('Hello,  world! ', 13), 'Hello, world!' )
+		asrt( str_short('Hello', 13), 'Hello' )
+		asrt( str_short('Hello,  world! ', 12), 'Hello, wo...' )
+		asrt( str_short('Hello\nworld! ', 12), 'Hello world!' )
+		asrt( str_short('Hello\nworld! ', 11), 'Hello wo...' )
+		asrt( benchmark(str_short, ('Hello,  world! ', 5)), 5_000, '<')
 
 	'''
 
@@ -2061,10 +2066,10 @@ def is_often(ident, interval)->bool:
 	, not less than 1 ms.  
 
 		is_often('_', '1 ms')
-		tass( is_often('_', '1 ms'), True)
+		asrt( is_often('_', '1 ms'), True)
 		time_sleep('1 ms')
-		tass( is_often('_', '1 ms'), False)
-		tass( benchmark(is_often, ('_', '1 ms')), 5000, "<" )
+		asrt( is_often('_', '1 ms'), False)
+		asrt( benchmark(is_often, ('_', '1 ms')), 5000, "<" )
 
 	'''
 	global _often_dct
@@ -2085,8 +2090,8 @@ def is_app_exe()->bool:
 	r'''
 	Returns true if the application is converted to *exe*.  
 
-		tass( is_app_exe(), False)
-		tass( benchmark(is_app_exe), 2061, "<" )
+		asrt( is_app_exe(), False)
+		asrt( benchmark(is_app_exe), 2061, "<" )
 
 	'''
 	return getattr(sys, 'frozen', False)

@@ -58,9 +58,9 @@ def path_long(path:str):
 	r'''
 	Apply only to a string.  
 
-		tass( path_long('p'), 'p' )
-		tass( path_long('c:' + 'p'*261), '\\\\?\\c:' + 'p'*261 )
-		tass( path_long('\\\\share\\' + 'p'*261), '\\\\?\\UNC\share\\' + 'p'*261 )
+		asrt( path_long('p'), 'p' )
+		asrt( path_long('c:' + 'p'*261), '\\\\?\\c:' + 'p'*261 )
+		asrt( path_long('\\\\share\\' + 'p'*261), '\\\\?\\UNC\share\\' + 'p'*261 )
 
 	'''
 	if len(path) < _MAX_PATH: return path
@@ -89,18 +89,18 @@ def path_get(fullpath:str|tuple|list|Iterator, max_len:int=0
 	maximum length of the full path.  
 
 		path = path_get(('%appdata%', 'Media Center Programs'))
-		tass( dir_exists(path), True)
+		asrt( dir_exists(path), True)
 		path = (r'c:\Windows', '\\notepad.exe')
 		path2 = r'c:\Windows\notepad.exe'
-		tass( os.path.join(*path), r'c:\notepad.exe' )
-		tass( path_get( path ), path2 )
+		asrt( os.path.join(*path), r'c:\notepad.exe' )
+		asrt( path_get( path ), path2 )
 		path = (r'c:\Windows\\', 'notepad.exe')
-		tass( path_get( path ), path2 )
+		asrt( path_get( path ), path2 )
 		path = (r'c:\Windows\\', '\\notepad.exe')
-		tass( path_get( path ), path2 )
-		tass( path_get( path, 20 ), r'c:\Windows\no....exe' )
-		tass( path_get(r'c:\Windows\\'), 'c:\\Windows\\')
-		tass( file_exists('%taskopy%\\crontab.py'), True)
+		asrt( path_get( path ), path2 )
+		asrt( path_get( path, 20 ), r'c:\Windows\no....exe' )
+		asrt( path_get(r'c:\Windows\\'), 'c:\\Windows\\')
+		asrt( file_exists('%taskopy%\\crontab.py'), True)
 
 	'''
 	if not fullpath: return fullpath
@@ -258,12 +258,12 @@ def file_copy(fullpath, destination)->str:
 
 		tf, td = temp_file(suffix='.txt'), temp_dir('test_fc')
 		file_write(tf, 't')
-		tass(
+		asrt(
 			file_copy(tf, (td, file_name(tf) ))
 			, os.path.join(td, file_name(tf) )
 		)
-		tass( file_copy(tf, td), os.path.join(td, file_name(tf) ) )
-		tass(
+		asrt( file_copy(tf, td), os.path.join(td, file_name(tf) ) )
+		asrt(
 			file_copy(tf, (td, 'nx', file_name(tf) ) )
 			, os.path.join(td, 'nx', file_name(tf) )
 		)
@@ -460,7 +460,7 @@ def file_basename(fullpath)->str:
 	Returns basename: file name without 
 	parent folder and extension. Example:
 
-		tass( file_basename(r'c:\pagefile.sys'), 'pagefile')
+		asrt( file_basename(r'c:\pagefile.sys'), 'pagefile')
 
 	'''
 	fullpath = path_get(fullpath)
@@ -486,9 +486,9 @@ def file_name_rem(fullpath, suffix:str='', prefix:str='')->str:
 	Removes a suffix or prefix from a filename.  
 	Example:
 
-		tass( file_name_rem('my_file_1.txt', suffix='_1'), 'my_file.txt')
-		tass( file_name_rem('my_file_1.txt', suffix='_'), 'my_file_1.txt')
-		tass( file_name_rem('tmp_foo.txt', prefix='tmp_'), 'foo.txt')
+		asrt( file_name_rem('my_file_1.txt', suffix='_1'), 'my_file.txt')
+		asrt( file_name_rem('my_file_1.txt', suffix='_'), 'my_file_1.txt')
+		asrt( file_name_rem('tmp_foo.txt', prefix='tmp_'), 'foo.txt')
 	
 	'''
 	fullpath = path_get(fullpath)
@@ -518,41 +518,49 @@ def file_name_fix(filename:str, repl_char:str='_')->str:
 			new_fn += char
 	return new_fn
 
-def dir_dirs(fullpath, subdirs:bool=True)->Iterator[str]:
+def dir_dirs(fullpath, subdirs:bool=True, parent:bool=False)->Iterator[str]:
 	r'''
 	Returns list of full paths of all directories
 	in this directory and its subdirectories.  
 	*fullpath* (source directory) is not included in results.  
+	*parent* - include *fullpath* too.  
 
-		tass( r'c:\windows\System32' in dir_dirs(r'c:\windows', False), True )
-		tass( r'c:\windows' in dir_dirs(r'c:\windows', False), False )
+		asrt( r'c:\windows\System32' in dir_dirs(r'c:\windows', False), True )
+		asrt( r'c:\windows' in dir_dirs(r'c:\windows', False), False )
+		asrt( r'c:\windows' in dir_dirs(r'c:\windows', subdirs=False, parent=True), True )
 
 	'''
 	fullpath = path_get(fullpath)
+	if parent: yield fullpath
 	for dirpath, dirs, _ in os.walk(fullpath, topdown=True):
 		for d in dirs: yield os.path.join(dirpath, d)
 		if not subdirs: return
 
-def dir_files(fullpath, subdirs:bool=True
+def dir_files(fullpath, subdirs:bool=True, name_only:bool=False
 , **rules)->Iterator[str]:
 	r'''
 	Returns list of full filenames of all files
 	in the given directory and its subdirectories.  
 	*subdirs* - including files from subfolders.  
 	*rules* - rules for the `path_rule` function  
+	*name_only* - returns filenames, not the full path.  
 
-		tass( tuple(dir_files('plugins', in_ext='jpg') ), tuple() )
-		tass(
+		asrt( tuple(dir_files('plugins', in_ext='jpg') ), tuple() )
+		asrt(
 			tuple(dir_files('plugins', in_ext='py'))[0]
 			, 'plugins\\constants.py'
 		)
-		tass(
+		asrt(
 			tuple( dir_files('plugins', ex_ext='pyc') )
 			, tuple( dir_files('plugins', in_ext='py') )
 		)
-		tass(
+		asrt(
 			tuple( dir_files('plugins', ex_path='plugins\\') )
 			, tuple()
+		)
+		asrt(
+			tuple( dir_files('plugins', name_only=True, in_name='tools.py') )
+			, ('tools.py',)
 		)
 
 	'''
@@ -568,9 +576,9 @@ def dir_files(fullpath, subdirs:bool=True
 					, in_rules=in_rules
 					, ex_rules=ex_rules
 				):
-					yield fpath
+					yield fname if name_only else fpath
 			else:
-				 yield dirpath + '\\' + fname
+				 yield fname if name_only else dirpath + '\\' + fname
 
 def dir_rnd_files(fullpath, file_num:int=1
 , attempts:int=5, **rules)->Iterator[str]:
@@ -717,10 +725,10 @@ def file_name(fullpath)->str:
 	r'''
 	Returns only the filename from the fullpath.  
 	
-		tass( file_name(r'C:\Windows\System32\calc.exe'), 'calc.exe' )
+		asrt( file_name(r'C:\Windows\System32\calc.exe'), 'calc.exe' )
 		# Note: for a directory with a slash at the end
-		tass( file_name('C:\\Windows\\System32\\'), '' )
-		tass( file_name('C:\\Windows\\System32'), 'System32' )
+		asrt( file_name('C:\\Windows\\System32\\'), '' )
+		asrt( file_name('C:\\Windows\\System32'), 'System32' )
 
 	'''
 	return os.path.basename( path_get(fullpath) )
@@ -732,7 +740,7 @@ def file_dir(fullpath)->str:
 	r'''
 	Returns directory from fullpath.  
 	
-		tass( benchmark(file_dir, r'c:\Windows\System32\calc.exe'), 5617, "<" )
+		asrt( benchmark(file_dir, r'c:\Windows\System32\calc.exe'), 5617, "<" )
 	
 	'''
 	return os.path.dirname(path_get(fullpath))
@@ -772,10 +780,10 @@ def drive_free(path:str, unit:str='GB')->int:
 	You can just specify the full path here
 	, so you don't need to extract the drive letter.  
 
-		tass( drive_free('c'), 0, '>')
-		tass( drive_free('c:\\windows'), 10, '>')
-		tass( drive_free('c:\\windows\\'), 10, '>')
-		tass( benchmark(drive_free, 'c'), 24948, "<" )
+		asrt( drive_free('c'), 0, '>')
+		asrt( drive_free('c:\\windows'), 10, '>')
+		asrt( drive_free('c:\\windows\\'), 10, '>')
+		asrt( benchmark(drive_free, 'c'), 24948, "<" )
 
 	'''
 	e = _SIZE_UNITS.get(unit.lower(), 1073741824)
@@ -791,9 +799,9 @@ def dir_list(fullpath, **rules)->Iterator[str]:
 	Returns all directory content (dirs and files).  
 	*rules* - rules for the `path_rule` function.  
 
-		tass( 'resources\\icon.png' in dir_list('resources'), True)
-		tass( 'resources\\icon.png' in dir_list('resources', ex_ext='png'), False)
-		tass(
+		asrt( 'resources\\icon.png' in dir_list('resources'), True)
+		asrt( 'resources\\icon.png' in dir_list('resources', ex_ext='png'), False)
+		asrt(
 			benchmark(lambda d: tuple(dir_list(d)), 'log', b_iter=5)
 			, 500_000
 			, '<'
@@ -906,7 +914,7 @@ def dir_size(fullpath, unit:str='b', skip_err:bool=True)->int:
 	Returns directory size (without symlinks).  
 	*skip_err* - do not raise an exeption on non-existent files.  
 
-		tass( benchmark(dir_size, a=('logs',), b_iter=1 ) , 150_000, '<' )
+		asrt( benchmark(dir_size, a=('logs',), b_iter=1 ) , 150_000, '<' )
 
 	'''
 	fullpath = path_get(fullpath)
@@ -1141,8 +1149,8 @@ def file_date_get(fullpath)->tuple[datetime.datetime]:
 	Returns tuple(creation time, access time, modification time)
 
 		fpath = temp_file(content=' ')
-		tass( file_date_get(fpath)[2].minute, time_minute() )
-		tass( benchmark(file_date_get, (fpath,)), 22000, "<" )
+		asrt( file_date_get(fpath)[2].minute, time_minute() )
+		asrt( benchmark(file_date_get, (fpath,)), 22000, "<" )
 		file_delete(fpath)
 
 	'''
@@ -1158,7 +1166,7 @@ def file_date_set(fullpath, datec=None, datea=None, datem=None):
 	Sets a file date.  
 
 		fp = temp_file(content=' ')
-		tass(
+		asrt(
 			benchmark(file_date_set, ka={'fullpath': fp, 'datec': time_now()}, b_iter=3)
 			, 220000
 			, "<"
@@ -1334,7 +1342,7 @@ def file_relpath(fullpath, start)->str:
 	r'''
 	Returns a relative path.  
 
-		tass(
+		asrt(
 			file_relpath(r'c:\Windows\System32\calc.exe', r'c:\Windows')
 			, 'System32\\calc.exe'
 		)
@@ -1370,9 +1378,9 @@ def var_get(var:str, default=None, encoding:str='utf-8'
 	Dangerous! - it's just `eval`, not `ast.literal_eval`
 
 		var_set('_test', 1)
-		tass( var_get('_test'), '1')
-		tass( var_get('_test', as_literal=True), 1 )
-		tass( var_del('_test'), True)
+		asrt( var_get('_test'), '1')
+		asrt( var_get('_test', as_literal=True), 1 )
+		asrt( var_del('_test'), True)
 
 	'''
 	fpath = var_fpath(var)
@@ -1390,12 +1398,12 @@ def var_set(var, value, encoding:str='utf-8'):
 	Sets the disk variable.
 
 		var_set('_test', 5)
-		tass( var_get('_test'), '5')
-		tass( var_del('_test'), True)
+		asrt( var_get('_test'), '5')
+		asrt( var_del('_test'), True)
 		var = ('file', 'c:\\pagefile.sys')
 		var_set(var, 1)
-		tass( var_get(var, 1), '1' )
-		tass( var_del(var), True )
+		asrt( var_get(var, 1), '1' )
+		asrt( var_del(var), True )
 
 	'''
 	fpath = var_fpath(var)
@@ -1411,7 +1419,7 @@ def var_del(var:str):
 	Deletes variable. Returns True if var exists.
 
 		var_set('_test', 'a')
-		tass( var_del('_test'), True)
+		asrt( var_del('_test'), True)
 		
 	'''
 	fpath = var_fpath(var)
@@ -1426,9 +1434,9 @@ def var_add(var:str, value, var_type=None
 	'''
 	Adds the value to the previous value and returns the new value.
 
-		tass(var_add('_test', 5, var_type=int), 5)
-		tass(var_add('_test', 3),  8)
-		tass(var_del('_test'), True)
+		asrt(var_add('_test', 5, var_type=int), 5)
+		asrt(var_add('_test', 3),  8)
+		asrt(var_del('_test'), True)
 
 	'''
 	prev = var_get(var, encoding=encoding, as_literal=True)
@@ -1461,11 +1469,11 @@ def var_lst_get(var, default=None
 	Reads files line by line, suitable for large files.  
 
 		var_lst_set('_test', ['a', 'b'])
-		tass(var_lst_get('_test'), ['a', 'b'])
+		asrt(var_lst_get('_test'), ['a', 'b'])
 		var_lst_set('_test', map(str, (1, 2)))
-		tass(var_lst_get('_test'), ['1', '2'])
-		tass(var_del('_test'), True)
-		tass( var_lst_get('_test', ['not exists']), ['not exists'] )
+		asrt(var_lst_get('_test'), ['1', '2'])
+		asrt(var_del('_test'), True)
+		asrt( var_lst_get('_test', ['not exists']), ['not exists'] )
 
 	'''
 	fpath = var_fpath(var)
@@ -1492,7 +1500,7 @@ def var_mod_dif(var, unit:str='sec')->int:
 	Returns how many time units have passed
 	since the last change.
 
-		tass(var_mod_dif('_public_suffix_list', 'month'), 2, '<')
+		asrt(var_mod_dif('_public_suffix_list', 'month'), 2, '<')
 
 	'''
 	return time_diff(var_mod(var), unit=unit)
@@ -1501,8 +1509,8 @@ def var_lst_set(var, value, encoding:str='utf-8'):
 	'''
 	Sets the disk list variable.
 		var_lst_set('_test', ['a', 'b', 1])
-		tass( var_lst_get('_test'), ['a', 'b', '1'])
-		tass( var_del('_test'), True)
+		asrt( var_lst_get('_test'), ['a', 'b', '1'])
+		asrt( var_del('_test'), True)
 
 	'''
 	var_set(var, value='\n'.join(map(str, value))
@@ -1514,8 +1522,8 @@ def var_lst_add(var, value, encoding:str='utf-8')->list:
 	and returns the list.  
 
 		var_lst_set('_test', 'ab')
-		tass( var_lst_add('_test', 'c'), ['a', 'b', 'c'] )
-		tass( var_del('_test'), True)
+		asrt( var_lst_add('_test', 'c'), ['a', 'b', 'c'] )
+		asrt( var_del('_test'), True)
 
 	'''
 	lst = var_lst_get(var, encoding=encoding)
@@ -1529,8 +1537,8 @@ def var_lst_ext(var, value, encoding:str='utf-8')->list:
 	new list.
 
 		var_lst_set('_test_ext', 'ab')
-		tass( var_lst_ext('_test_ext', 'cd'), ['a', 'b', 'c', 'd'] )
-		tass( var_del('_test_ext'), True)
+		asrt( var_lst_ext('_test_ext', 'cd'), ['a', 'b', 'c', 'd'] )
+		asrt( var_del('_test_ext'), True)
 
 	'''
 	lst = var_lst_get(var, encoding=encoding)
@@ -1542,7 +1550,7 @@ def file_drive(fullpath)->str:
 	'''
 	Returns a drive letter in lowercase from a file name:
 
-		tass( file_drive(r'c:\\pagefile.sys'), 'c' )
+		asrt( file_drive(r'c:\\pagefile.sys'), 'c' )
 
 	'''
 	fullpath = path_get(fullpath)
@@ -1779,10 +1787,10 @@ def _path_match(path:str, in_rules:list, ex_rules:list)->bool:
 
 		from plugins.plugin_filesystem import _path_match
 		inr, exr = path_rule(in_ext='py', ex_ext='pyc')
-		tass( _path_match(r'crontab.py', inr, exr), True )
-		tass( _path_match(r'crontab.pyc', inr, exr), False )
+		asrt( _path_match(r'crontab.py', inr, exr), True )
+		asrt( _path_match(r'crontab.pyc', inr, exr), False )
 		inr, exr = path_rule(ex_path='.pyc')
-		tass( _path_match(r'crontab.pyc', inr, exr), False )
+		asrt( _path_match(r'crontab.pyc', inr, exr), False )
 		latest = tuple(dir_files('plugins'))
 
 	'''
@@ -1801,33 +1809,33 @@ def path_filter(
 
 		pf = path_filter
 		files = tuple(dir_files('plugins'))
-		tass( tuple( pf(files, ex_dir='__pycache__'))[0], 'plugins\\constants.py')
-		tass( tuple( pf(files, ex_ext='pyc'))[0], 'plugins\\constants.py')
-		tass( tuple( pf(files, ex_ext='pyc', ex_path='_TOOLS_patc'))[-1], 'plugins\\tools.py')
-		tass( tuple( pf(files, ex_ext=('pyc', 'py') ) ), ())
-		tass( tuple( pf(files, in_ext='txt' ) ), ())
-		tass( tuple( pf(files, in_ext='py', ex_path='_TOOLS_patc'))[-1], 'plugins\\tools.py')
-		tass( tuple( pf(files, in_path='constants.py'))[0], 'plugins\\constants.py')
-		tass( tuple( pf(files, in_dir='\\plugins\\', ex_ext='pyc', ex_path='paTch'))[-1], 'plugins\\tools.py')
-		tass( tuple( pf(files, in_name='crypt') )[0], 'plugins\plugin_crypt.py')
-		tass( tuple( pf(files, in_ext='py', ex_name=('plug', 'const')) )[0], r'plugins\tools.py')
-		tass(
+		asrt( tuple( pf(files, ex_dir='__pycache__'))[0], 'plugins\\constants.py')
+		asrt( tuple( pf(files, ex_ext='pyc'))[0], 'plugins\\constants.py')
+		asrt( tuple( pf(files, ex_ext='pyc', ex_path='_TOOLS_patc'))[-1], 'plugins\\tools.py')
+		asrt( tuple( pf(files, ex_ext=('pyc', 'py') ) ), ())
+		asrt( tuple( pf(files, in_ext='txt' ) ), ())
+		asrt( tuple( pf(files, in_ext='py', ex_path='_TOOLS_patc'))[-1], 'plugins\\tools.py')
+		asrt( tuple( pf(files, in_path='constants.py'))[0], 'plugins\\constants.py')
+		asrt( tuple( pf(files, in_dir='\\plugins\\', ex_ext='pyc', ex_path='paTch'))[-1], 'plugins\\tools.py')
+		asrt( tuple( pf(files, in_name='crypt') )[0], 'plugins\plugin_crypt.py')
+		asrt( tuple( pf(files, in_ext='py', ex_name=('plug', 'const')) )[0], r'plugins\tools.py')
+		asrt(
 			tuple( pf(files, in_datem_aft=datetime.datetime(2024, 1, 1), ) )
 			, ()
 		)
-		tass(
+		asrt(
 			tuple( pf(files, ex_datem_aft=datetime.datetime(2020, 12, 24), ) )
 			, ()
 		)
-		tass(
+		asrt(
 			tuple( pf(files, in_datem_aft='2024.1.1 0:0:0', ) )
 			, ()
 		)
-		tass(
+		asrt(
 			tuple( pf(files, ex_datem_aft='2020.12.24 0:0:0', ) )
 			, ()
 		)
-		tass(
+		asrt(
 			tuple( pf(files, in_ext='py', in_datem_bef='2020.12.24 0:0:0', ) )
 			, ()
 		)
@@ -2091,8 +2099,8 @@ def path_short(fullpath, max_len:int=100)->str:
 	Shortens a long file name to display.
 
 		path = r'c:\Windows\System32\msiexec.exe'
-		tass(path_short(path, 22), 'c:\Windo...msiexec.exe')
-		tass(path_short(path, 23), 'c:\Window...msiexec.exe')
+		asrt(path_short(path, 22), 'c:\Windo...msiexec.exe')
+		asrt(path_short(path, 23), 'c:\Window...msiexec.exe')
 
 	'''
 	if len(fp := fullpath) <= max_len: return fullpath

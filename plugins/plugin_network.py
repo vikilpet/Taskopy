@@ -25,7 +25,7 @@ from .tools import dev_print, exc_text, time_sleep, tdebug \
 from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 _PUB_SUF_LST = set()
 
@@ -258,12 +258,12 @@ def html_clean(html_str:str, sep:str=' ', is_mail:bool=False
 	of non-text tags: *style, script, img*  
 	*sep* - separator between tags.
 
-		tass( html_clean('\r\n<a>t</a>\t'), 't')
-		tass( html_clean('\r\n<a>t</a><a>t2</a>\t', sep='\n'), 't\nt2')
-		tass( html_clean('\u200b\r \n<a>t</a>\t', is_mail=True), 't')
-		tass( html_clean('<style>{}</style><a>t</a>\t'), 't')
-		tass( html_clean('<img>jpg</img><a>t</a>\t', del_spec=False), 'jpg t')
-		tass( benchmark(html_clean, a=('',)), 120_000, "<" )
+		asrt( html_clean('\r\n<a>t</a>\t'), 't')
+		asrt( html_clean('\r\n<a>t</a><a>t2</a>\t', sep='\n'), 't\nt2')
+		asrt( html_clean('\u200b\r \n<a>t</a>\t', is_mail=True), 't')
+		asrt( html_clean('<style>{}</style><a>t</a>\t'), 't')
+		asrt( html_clean('<img>jpg</img><a>t</a>\t', del_spec=False), 'jpg t')
+		asrt( benchmark(html_clean, a=('',)), 120_000, "<" )
 
 	'''
 	SPEC_CHARS = ' \r\n\t\u200b\xa0\u200c'
@@ -482,15 +482,17 @@ def xml_element(url:str, element:str
 	else:
 		return result[0]
 
-def domain_ip(domain:str)->list:
-	'''
-	Get IP adresses of domain.
+def domain_ip(domain:str)->list[str]:
+	r'''
+	Get IP adresses of domain.  
 	'''
 	data = socket.gethostbyname_ex(domain)
 	return data[2]
 
 def net_pc_ip()->str:
-	' Returns the IP address of the computer '
+	r'''
+	Returns the IP address of the computer.  
+	'''
 	return socket.gethostbyname(socket.gethostname())
 
 def net_pc_hostname()->str:
@@ -504,16 +506,16 @@ def url_hostname(url:str, sld:bool=True)->str:
 	*sld* - if True then return the second level domain
 	otherwise return the full domain.
 
-		tass( url_hostname('https://www.example.gov.uk'), 'example.gov.uk')
-		tass( url_hostname('https://www.example.gov.uk', sld=False) \
+		asrt( url_hostname('https://www.example.gov.uk'), 'example.gov.uk')
+		asrt( url_hostname('https://www.example.gov.uk', sld=False) \
 		, 'www.example.gov.uk')
-		tass( url_hostname('http://user:pwd@abc.example.com:443/api') \
+		asrt( url_hostname('http://user:pwd@abc.example.com:443/api') \
 		, 'example.com')
-		tass( url_hostname('http://user:pwd@abc.example.com:443/api'
+		asrt( url_hostname('http://user:pwd@abc.example.com:443/api'
 		, sld=False), 'abc.example.com')
-		tass( url_hostname('http://user:pwd@192.168.0.1:80/api') \
+		asrt( url_hostname('http://user:pwd@192.168.0.1:80/api') \
 		, '192.168.0.1')
-		tass( url_hostname('http://abc.example.com:443/api?ip=1.2.3.4') \
+		asrt( url_hostname('http://abc.example.com:443/api?ip=1.2.3.4') \
 		, 'example.com')
 
 	'''
@@ -561,8 +563,8 @@ def is_online(*sites, timeout:float=2.0)->int:
 	The function will not raise an exception.  
 	*timeout* - timeout in seconds.  
 
-		tass( is_online(), 2 )
-		tass( is_online('https://non.existent.domain'), 0 )
+		asrt( is_online(), 2 )
+		asrt( is_online('https://non.existent.domain'), 0 )
 
 	'''
 	if not sites:
@@ -631,7 +633,7 @@ def http_req_status(url:str, method='HEAD', timeout:float=1.0)->int:
 	r'''
 	Returns just a status of HTTP request:
 
-		tass( http_req_status('https://github.com'), 200)
+		asrt( http_req_status('https://github.com', timeout=3.0), 200)
 		
 	'''
 	return getattr(requests, method.lower())(url, timeout=timeout).status_code
@@ -757,9 +759,9 @@ def ping_tcp(host:str, port:int, count:int=1, pause:int=100
 
 	Examples:
 
-		tass( ping_tcp('8.8.8.8', 443)[1][1] > 10, True )
-		tass( ping_tcp('127.0.0.1', 445)[1][1] < 15, True )
-		tass( ping_tcp('non.existent.domain', 80), (False, '[Errno 11004] getaddrinfo failed') )
+		asrt( ping_tcp('8.8.8.8', 443)[1][1] > 10, True )
+		asrt( ping_tcp('127.0.0.1', 445)[1][1] < 15, True )
+		asrt( ping_tcp('non.existent.domain', 80), (False, '[Errno 11004] getaddrinfo failed') )
 
 	'''
 	timings = []
@@ -799,9 +801,9 @@ def ping_icmp(host:str, count:int=3
 	
 	Examples:
 	
-		tass( ping_icmp('8.8.8.8', 1)[0], True)
-		tass( ping_icmp('non.existent.domain', 1), (False, 'host unreachable (1)') )
-		tass( ping_icmp('127.0.0.1', 1), (True, (0, 0)) )
+		asrt( ping_icmp('8.8.8.8', 1)[0], True)
+		asrt( ping_icmp('non.existent.domain', 1), (False, 'host unreachable (1)') )
+		asrt( ping_icmp('127.0.0.1', 1), (True, (0, 0)) )
 
 	'''
 	proc = subprocess.Popen(

@@ -317,8 +317,8 @@ def proc_cpu(process, interval:float=1.0)->float:
 	of time in seconds.  
 	If a process not found then returns -1:
 
-		tass(proc_cpu('not existing process'), -1)
-		tass(proc_cpu(0), 1, '>')
+		asrt(proc_cpu('not existing process'), -1)
+		asrt(proc_cpu(0), 1, '>')
 		
 	'''
 	if (pid := proc_get(process)) == -1: return -1

@@ -39,7 +39,10 @@
 Чат в Телеграме: https://t.me/taskopy_g
 
 ## Содержание
+
 - [Установка](#установка)
+	- [Вариант 1: архив с исполняемым файлом.](#вариант-1-архив-с-исполняемым-файлом)
+	- [Вариант 2: Python](#вариант-2-python)
 - [Использование](#использование)
 - [Свойства задачи](#свойства-задачи)
 - [Настройки](#настройки)
@@ -53,10 +56,10 @@
 	- [Процессы](#процессы)
 	- [Шифрование](#шифрование)
 	- [Mikrotik RouterOS](#mikrotik-routeros)
-- [Советы и рекомендации]()
+- [Полезные советы](#полезные-советы)
 - [Расширение для Firefox](#расширение-для-firefox)
 - [Контекстное меню](#контекстное-меню)
-- [Помочь проекту](#помощь-проекту)
+- [Помощь проекту](#помощь-проекту)
 - [Примеры задач](#примеры-задач)
 
 ## Установка
@@ -215,6 +218,8 @@
 
 ### Разное
 
+- **app_enable()** — включение приложения.
+- **app_disable()** — отключение приложения. Запуск задачи по-прежнему возможен через меню иконки.
 - **balloon(msg:str, title:str=APP_NAME,timeout:int=None, icon:str=None)** — показывает сообщение у иконки в трее. `title` - 63 символа максимум, `msg` - 255 символов. `icon` - 'info', 'warning' или 'error'.
 - **benchmark(func, b_iter:int=1000, a:tuple=(), ka:dict={})->datetime.timedelta** — выполняет футкцию `func` `b_iter` раз и выводит время выполнения. Пример:
 
@@ -233,6 +238,15 @@
 
 	![Dialog RU](https://user-images.githubusercontent.com/43970835/79643801-bc833300-81b5-11ea-8a2e-ea6baa045480.png)
 
+- **exc_name()->str** — возвращает только имя исключения:
+
+		try:
+			0 / 0
+		except:
+			asrt(exc_name(), 'ZeroDivisionError')
+
+		asrt( benchmark(exc_name), 521, "<" )
+
 - **hint(text:str, position:tuple=None)->int** — показывает небольшое окошко с указанным текстом. Только для *Python* версии. *position* - кортеж с координатами. Если координаты не указаны - появится в центре экрана. Возвращает PID процесса с окошком.
 - **HTTPFile** — Используйте этот класс, если ваша HTTP задача возвращает файл:
 
@@ -243,6 +257,17 @@
 				fullpath=r'resources\icon.png'
 				, use_save_to=True
 			)
+
+- **is_often(ident, interval)->bool** — не происходит ли какое-то событие слишком часто?  
+	Цель - не беспокоить пользователя слишком частыми оповещениями о событиях.  
+	*ident* - уникальный идентификатор события.  
+	*interval* - интервал измерения, не менее 1 мс.  
+
+		is_often('_', '1 ms')
+		asrt( is_often('_', '1 ms'), True)
+		time_sleep('1 ms')
+		asrt( is_often('_', '1 ms'), False)
+		asrt( benchmark(is_often, ('_', '1 ms')), 5000, "<" )
 
 - **Job(func, args, job_name:str='', kwargs)** — класс для параллельного запуска функций в *job_batch* и *job_pool*. Свойства:
 	- *result* - результат выполнения функции
@@ -501,6 +526,16 @@
 - **file_date_a(fullpath)** — дата открытия файла.
 - **file_date_c(fullpath)** — дата создания файла.
 - **file_date_m(fullpath)** — дата изменения файла.
+- **file_date_set(fullpath, datec=None, datea=None, datem=None)** — устанавливает дату файла.  
+
+		fp = temp_file(content=' ')
+		asrt(
+			benchmark(file_date_set, ka={'fullpath': fp, 'datec': time_now()}, b_iter=3)
+			, 220000
+			, "<"
+		)
+		file_delete(fp)
+
 - **file_delete(fullpath:str)** — удалить файл. Смотрите так же *file_recycle*.
 - **file_dialog(title:str=None, multiple:bool=False, default_dir:str='', default_file:str='', wildcard:str='', on_top:bool=True)** — открывает стандартный диалог выбора файла. Возвращает полный путь или список полных путей, если _multiple_ == True.
 - **file_dir(fullpath:str)->str:** — получить полное имя папки, в которой файл лежит.
@@ -549,6 +584,7 @@
 		# All drives:
 		rec_bin_purge()
 
+- **rec_bin_size(drive:str|None=None)->tuple** — получает общий размер и количество элементов в корзине для указанного диска.  
 - **shortcut_create(fullpath, dest:str=None, descr:str=None, icon_fullpath:str=None, icon_index:int=None, win_style:int=win32con.SW_SHOWNORMAL, cwd:str=None)->str** — создаёт ярлык для файла. Возвращает полный путь к файлу ярлыка.
 	- dest - полное имя файла ярлыка. Если не указано, используется папка рабочего стола текущего пользователя.
 	- descr - описание
@@ -601,6 +637,7 @@
 		
 		"That&#039;s an example" -> "That's an example"
 
+- **net_pc_ip()->str** — возвращает IP-адрес компьютера.
 - **net_url_decode(url:str, encoding:str='utf-8')->str** — декодирует URL.
 - **net_url_encode(url:str, encoding:str='utf-8')->str** — кодирует URL.
 - **pc_name()->str** — имя компьютера.

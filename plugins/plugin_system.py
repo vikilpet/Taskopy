@@ -33,8 +33,8 @@ def win_get(window=None, class_name:str=None)->int:
 	finds foreground window.
 	You can use asterisk for imprecise search:
 
-		tass( win_get('Total Commander*'), 0, '>' )
-		tass( win_get('Non-existent window'), 0 )
+		asrt( win_get('Total Commander*'), 0, '>' )
+		asrt( win_get('Non-existent window'), 0 )
 
 	'''
 	if isinstance(window, int):
@@ -416,8 +416,8 @@ def sys_codepage():
 	r'''
 	Returns current Windows code page for non-unicode programs.
 
-		tass( sys_codepage(), 'cp1251' )
-		tass( benchmark(sys_codepage), 2056, "<" )
+		asrt( sys_codepage(), 'cp1251' )
+		asrt( benchmark(sys_codepage), 2056, "<" )
 
 	'''
 	return 'cp' + str(_GetACP())
