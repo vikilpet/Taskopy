@@ -67,21 +67,20 @@
 ### Вариант 1: архив с исполняемым файлом.
 
 **Требования:** Windows 7 и выше.
-Вы можете [скачать](https://github.com/vikilpet/Taskopy/releases) zip архив (taskopy.zip), но многие не особо качественные антивирусы не любят Python, упакованный в exe, так что VirusTotal покажет примерно 7 срабатываний.
+Вы можете [скачать](https://github.com/vikilpet/Taskopy/releases) zip архив (taskopy.zip)
 
 ### Вариант 2: Python
 
-**Требования:** Python 3.7+; Windows 7 и выше.
-
+**Требования:** Python 3.7+; Windows 7 и выше.  
 Скачайте проект, установите зависимости:
 
 	pip install -r requirements.txt
 
-Сделайте ярлык для taskopy.py и поместите в автозагрузку:
+Примечание: *wxPython* требует *Pillow*, но [Pillow > 9.5.0 больше не включает 32-битные колеса](https://pillow.readthedocs.io/en/latest/installation.html#basic-installation), поэтому установите 9.5.0:
 
-	%userprofile%\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\
+	pip install Pillow==9.5.0
 
-В свойствах ярлыка выберите запуск минимизированным а так же смените иконку на resources\\logo.ico
+Создайте ярлык *taskopy.py* в папке запуска пользователя со встроенной задачей *Add to startup*.
 
 ## Использование
 Откройте _crontab.py_ в вашем любимом текстовом редакторе и создайте задачу как функцию с аргументами:

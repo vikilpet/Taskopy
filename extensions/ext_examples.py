@@ -1,4 +1,4 @@
-'''
+r'''
 Extension with examples of *complex* tasks
 '''
 
@@ -226,5 +226,56 @@ def examp_cert_check(caller:str, codepage:str=''
 	app_win_show()
 	if dialog('Save the new difference?', ('No', 'Yes')) == 1001:
 		var_set('cert_check_diff', diff)
+
+# pip install pytelegrambotapi --upgrade
+# This module is not included in the standard set of *exe* distribution
+# , comment it out to use:
+# import telebot
+# Just for a syntax tips:
+# from telebot.types import Message
+def work__tlg_bot_start(
+	# Use *every* to ensure that the bot always works
+	# , even after a crash/disconnect:
+	every='1 sec'
+	# We ignore 10 errors so that we don't get messages
+	# every second if we make a mistake in the code:
+	, err_threshold=10
+):
+	token = 'YOUR BOT TOKEN'
+	bot = telebot.TeleBot(token)
+	# Save the bot for access from other tasks:
+	gdic['tlg_bot'] = bot
+	
+	@bot.message_handler(commands=['start', 'help'])
+	def send_welcome(msg:Message):
+		# Just send a chat id:
+		bot.send_message(msg.chat.id, str(msg.chat.id))
+
+	@bot.message_handler(func=lambda message: True)
+	def new_msg(msg:Message):
+		# We got a message.
+		# Get user name:
+		user_str = msg.from_user.first_name
+		# Print message:
+		tprint(f'{user_str}: {msg.text}')
+		if msg.text.lower() == 'hi':
+			# a specific response for a known message:
+			bot.send_message(msg.chat.id, 'Hello!')
+		else:
+			# Unknown message:
+			bot.reply_to(msg, f"I don't get it 🤔")
+
+	# Start the bot:
+	bot.infinity_polling()
+	# Signaling that we're out of the infinite server polling loop:
+	tprint('exit')
+
+# Use *on_load* so that it stops the bot
+# when the crontab is reloaded. This is handy
+# while you are changing bot functionality 
+# in the *_start* task and you need to restart bot.
+# When you're done, this can be turned off.
+def work__tlg_bot_stop(on_load=True, on_exit=True):
+	if bot := gdic.get('tlg_bot'): bot.stop_bot()
 
 if __name__ != '__main__': patch_import()

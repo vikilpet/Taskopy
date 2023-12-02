@@ -67,21 +67,20 @@ Telegram chat: https://t.me/taskopy_g
 ### Option 1: binary file
 
 **Requirements:** Windows 7 and above.
-You can [download](https://github.com/vikilpet/Taskopy/releases) archive with binary release but many of lousy antiviruses don't like python inside EXE so VirusTotal shows about 7 detects.
+You can [download](https://github.com/vikilpet/Taskopy/releases) archive with binary release.
 
 ### Option 2: Python
 
-**Requirements:** Python 3.7.4; Windows 7 and above.
-
+**Requirements:** Python > 3.7; Windows 7 and above.  
 Download project, install requirements:
 
 	pip install -r requirements.txt
 
-Make shortcut to taskopy.py in Startup folder:
+Note: *wxPython* requires *Pillow*, but [Pillow > 9.5.0 no longer includes 32-bit wheels](https://pillow.readthedocs.io/en/latest/installation.html#basic-installation) so install 9.5.0:
 
-	%userprofile%\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\
+	pip install Pillow==9.5.0
 
-In shortcut options choose *Run: minimized* option and change shortcut icon to resources\logo.ico
+Create a shortcut *taskopy.py* in the user's startup folder with the built-in *Add to startup* task.
 
 ## Usage
 Open crontab.py in your favorite text editor and create your task as function with arguments:
