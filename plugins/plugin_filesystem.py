@@ -582,7 +582,7 @@ def dir_files(fullpath, subdirs:bool=True, name_only:bool=False
 
 def dir_rnd_files(fullpath, file_num:int=1
 , attempts:int=5, **rules)->Iterator[str]:
-	'''
+	r'''
 	Gets random files from a directory or None
 	if nothing is found.  
 	*file_num* - how many files to return.  
@@ -615,7 +615,10 @@ def dir_rnd_files(fullpath, file_num:int=1
 			path = fullpath
 			if found_num == file_num: return
 			for _ in range(attempts):
-				dlist = os.listdir(path)
+				try:
+					dlist = os.listdir(path)
+				except PermissionError:
+					break
 				if not dlist: break
 				path = os.path.join(path, random.choice(dlist) )
 				if os.path.isfile(path):
@@ -1858,7 +1861,7 @@ class DirSync:
 		, src_dir:str
 		, dst_dir:str
 		, report:bool=False
-		, max_table_width:int=100
+		, max_table_width:int=0
 		, **rules
 	):
 		'''
@@ -2262,7 +2265,7 @@ class DirDup:
 			else:
 				sign = props.get('hash', None)
 			table.append((name, str(props['is_unique']), sign))
-		table_print(table, use_headers=True, max_table_width=(100, 0)
+		table_print(table, use_headers=True, trim_col=0
 		, trim_func=path_short, sorting=(1, 0))
 
 	def print_dup(self, fullname:bool=False):
@@ -2287,7 +2290,7 @@ class DirDup:
 					, str(props[f'is_{dtype}oldest'])
 					, sign
 				))
-		table_print(table, use_headers=True, max_table_width=(100, 0)
+		table_print(table, use_headers=True, trim_col=0
 		, trim_func=path_short, sorting=(-1, 0))
 		size, count = 0, 0
 		for dups in self.dups:

@@ -29,8 +29,7 @@ import string
 import win32gui
 import win32con
 import win32com.client
-from typing import List, Tuple, Callable \
-	, Union, Iterable, Iterator, Generator
+from typing import Callable, Iterable 
 from itertools import zip_longest
 import pythoncom
 import wx
@@ -44,7 +43,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-12-02'
+APP_VERSION = 'v2023-12-10'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 _app_log_limit = 10_000
@@ -79,6 +78,7 @@ _TIME_UNITS = {
 }
 _LOCALE_LOCK = threading.Lock()
 _LOG_TIME_FORMAT = '%Y.%m.%d %H:%M:%S'
+_TERMINAL_WIDTH = os.get_terminal_size().columns - 1
 
 class DictToObj:
 	''' Converts dictionary to object.
@@ -469,7 +469,7 @@ def clip_get()->str:
 	return pyperclip.paste()
 
 def re_find(source:str, re_pattern:str, sort:bool=False
-, unique:bool=False, re_flags:int=re.IGNORECASE)->List[str]:
+, unique:bool=False, re_flags:int=re.IGNORECASE)->list[str]:
 	r'''
 	Returns list with matches.  
 	re_flags:  
@@ -504,7 +504,7 @@ def re_replace(source:str, re_pattern:str, repl:str=''
 	)
 
 def re_split(source:str, re_pattern:str, maxsplit:int=0
-, re_flags:int=re.IGNORECASE)->List[str]:
+, re_flags:int=re.IGNORECASE)->list[str]:
 	'''
 	Regexp split.
 	
@@ -1093,13 +1093,13 @@ class _TaskDialogConfig(ctypes.Structure):
 
 def dialog(
 	msg:Iterable=''
-	, buttons:Union[Iterable, None]=None
+	, buttons:Iterable|None=None
 	, title:str=''
 	, content:str=''
 	, flags:int=0
-	, common_buttons:Union[int, None]=None
+	, common_buttons:int|None=None
 	, default_button:int=0
-	, timeout:Union[str, int]=0
+	, timeout:str|int=0
 	, return_button:bool=False
 	, wait:bool=True
 )->int|str|tuple:
@@ -1274,7 +1274,7 @@ def locale_set(name:str='C'):
 
 def table_print(
 	table
-	, use_headers=False
+	, use_headers:bool|tuple=False
 	, row_sep:str=''
 	, headers_sep:str='-'
 	, col_pad:str='  '
@@ -1285,14 +1285,15 @@ def table_print(
 	, repeat_headers:int=None
 	, empty_str:str='-'
 	, consider_empty:tuple=(None, '')
-	, max_table_width:Union[int, tuple]=()
+	, max_table_width:int=0
+	, trim_col:int=-1
 	, trim_func=None
 ):
 	'''
 	Print list of lists/tuples as a table.
 
 	*use_headers* - if it's True - takes first row as
-	a headers. If list, then use this list as
+	a headers. If it's list or tuple, then use this as
 	a headers.  
 	*sorting* - list of column numbers to sort by.  
 	Example:
@@ -1302,13 +1303,14 @@ def table_print(
 	*sorting_rev* - sort in reverse order.  
 	*row_sep* - string to repeat as a row separator.  
 	*headers_sep* - same for header(s).  
-	*max_table_width* - maximum width and number of
-	the column to trim or just the maximum width. In that
-	case column number will be set to the number of
-	last column.  
-	*trim_func* - function to trim a long string. If not
-	set then internal *trim_str* will be used. The function
-	receives a string and its maximum length as input.
+	*max_table_width* - maximum width of a table.  
+	*trim_col* - number of the column (from 0) to be trimmed
+	to meet the *max_table_width* constraint.
+	The default (-1) is the last column.  
+	*trim_func* - function to shorten a long string. If not
+	set then `str_short` will be used. The function
+	receives a string and its maximum length as an input.
+	For full file paths, it is better to use `path_short`  
 	
 	Example:
 
@@ -1319,16 +1321,11 @@ def table_print(
 				for _ in range(3)
 			)
 		]
-		table_print(table, max_table_width=(100, 1))
+		_ = table_print(table, trim_col=1)
 
 	'''
 
 	DEF_SEP = '-'
-
-	def trim_str(string:str, max_len:int):
-		' Trim the string if its length exceeds *max_len* '
-		if len(string) <= max_len: return string
-		return '...' + string[-max_len + 3 : ]
 
 	def print_sep(sep=row_sep):
 		nonlocal table_width
@@ -1342,15 +1339,17 @@ def table_print(
 		print(template.format(*headers))
 		print_sep(sep=headers_sep)
 
+	if not table: return table
 	headers = []
-	if not table: return
 	if use_headers and not headers_sep: headers_sep = DEF_SEP
 	if row_sep_step and not row_sep: row_sep = DEF_SEP
 	if row_sep and not headers_sep: headers_sep = row_sep
 	if isinstance(table, dict):
 		rows = [list( di.values() ) for di in table.values()]
-		if use_headers == True: headers = list(
-			list( table.values() )[0].keys() )
+		if use_headers == True:
+			headers = list(
+				list( table.values() )[0].keys()
+			)
 	elif isinstance(table[0], dict):
 		rows = [list( di.values() ) for di in table]
 		if use_headers == True: headers = list( table[0].keys() )
@@ -1365,7 +1364,8 @@ def table_print(
 			headers = rows.pop(0)
 		except UnboundLocalError:
 			raise Exception(
-				'table_print: the first row must be list of headers')
+				'table_print: the first row must be list of headers'
+			)
 	if sorting: sort_key = itemgetter(*sorting)
 	if sorting_func:
 		if isinstance(sorting_func, (tuple, list)):
@@ -1395,18 +1395,18 @@ def table_print(
 			new_row.append(cell)
 		new_rows.append(new_row)
 	rows = new_rows
-	col_sizes = tuple( max( map(len, col) ) for col in zip(*rows) )
-	table_width = sum(col_sizes) + len(col_pad) * (len(col_sizes) - 1)
-	trim_len, trim_col = 0, 0
-	if max_table_width and isinstance(max_table_width, int):
-		max_table_width = (max_table_width, len(rows[0]) - 1)
-	if max_table_width and (table_width > max_table_width[0]):
-		trim_col = max_table_width[1]
+	max_col_len = tuple( max( map(len, col) ) for col in zip(*rows) )
+	table_width = sum(max_col_len) + len(col_pad) * (len(max_col_len) - 1)
+	if not max_table_width:
+		max_table_width = _TERMINAL_WIDTH
+	if table_width > max_table_width:
+		trim_len = 0
+		if trim_col == -1: trim_col = len(rows[0]) - 1
+		if not trim_func: trim_func = str_short
 		trim_len = (
-			col_sizes[trim_col] - (table_width - max_table_width[0])
+			max_col_len[trim_col] - (table_width - max_table_width)
 		)
 		new_rows = []
-		if not trim_func: trim_func = trim_str
 		for row in rows:
 			new_rows.append((
 				*row[:trim_col]
@@ -1414,10 +1414,10 @@ def table_print(
 				, *row[trim_col + 1:]
 			))
 		rows = new_rows
-		col_sizes = [ max( map(len, col) ) for col in zip(*rows) ]
-		table_width = max_table_width[0]
+		max_col_len = tuple( max( map(len, col) ) for col in zip(*rows) )
+		table_width = max_table_width
 	template = col_pad.join(
-		[ '{{:<{}}}'.format(s) for s in col_sizes ]
+		[ '{{:<{}}}'.format(s) for s in max_col_len ]
 	)
 	if headers: rows.pop(0)
 	print()
@@ -1988,7 +1988,7 @@ def str_indent(src_str, prefix:str='    '
 
 	'''
 	lines = str(src_str).strip().splitlines()
-	tsize = os.get_terminal_size().columns - len(prefix) - 1
+	tsize = _TERMINAL_WIDTH - len(prefix)
 	wrap_lines = []
 	for line in lines:
 		if len(line := line.rstrip()) <= tsize:
@@ -2048,7 +2048,7 @@ def str_short(text:str, width:int=0, placeholder:str='...')->str:
 
 	'''
 
-	if width == 0: width = os.get_terminal_size().columns - 1
+	if width == 0: width = _TERMINAL_WIDTH
 	new_text = ' '.join(
 		str(text).translate({ord(c): ' ' for c in string.whitespace}).split()
 	)

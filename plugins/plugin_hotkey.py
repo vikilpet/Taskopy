@@ -11,10 +11,11 @@ r'''
 Key codes: https://docs.microsoft.com/en-us/windows/desktop/inputdev/virtual-key-codes
 https://github.com/boppreh/keyboard
 
-Key codes for task option *hotkey* (windows VK) and for *key_* (keyboard module) functions not always the same!
+Key codes for task option *hotkey* (windows VK) and for *key_* (keyboard module)
+functions not always the same!  
 
-from keyboard._canonical_names import canonical_names
-sorted(set(canonical_names.values()))
+	from keyboard._canonical_names import canonical_names
+	sorted(set(canonical_names.values()))
 
 Special keys for *keyboard* module:
 

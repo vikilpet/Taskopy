@@ -334,13 +334,15 @@ def proc_uptime(process)->float:
 	return time.time() - psutil.Process(pid).create_time()
 
 
-def proc_kill(process, cmd_filter:str=None):
-	''' Kills the prosess.
+def proc_kill(process, cmd_filter:str=''):
+	r'''
+	Kills the prosess.  
+	*cmd_filter* is case-insensitive.  
 	'''
 	if isinstance(process, int):
 		try:
 			psutil.Process(process).kill()
-		except ProcessLookupError:
+		except (ProcessLookupError, psutil.NoSuchProcess):
 			dev_print(f'proc_kill: PID {process} not found')
 	elif isinstance(process, str):
 		name = process.lower()
