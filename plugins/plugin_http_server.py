@@ -1,6 +1,5 @@
 import time
 import os
-import re
 import fnmatch
 import hashlib
 import threading
@@ -118,7 +117,12 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 				except Exception as e:
 					dev_print(f'connection error: {e}')
 		else:
-			self.wfile.write(bytes(page, 'utf-8'))
+			try:
+				self.wfile.write(bytes(page, 'utf-8'))
+			except ConnectionAbortedError:
+				dev_print('connection abort')
+			except Exception as e:
+				dev_print(f'connection exception: {e}')
 
 	def start_data_processing(self)->tuple:
 		'''
@@ -238,10 +242,18 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 				self.send_header('Content-Type', 'image/x-icon')
 				self.send_header('Content-Length', _FAVICON[1])
 				self.end_headers()
-				self.wfile.write(_FAVICON[0])
+				try:
+					self.wfile.write(_FAVICON[0])
+				except ConnectionAbortedError:
+					dev_print(f'favicon connection aborted')
+				except Exception as e:
+					dev_print(f'favicon req exception: {e}')
 			else:
 				dev_print(f'unknown favicon request: {self.path} from {self.client_address}')
-				self.wfile.write(b'<link rel="icon" href="data:,">')
+				try:
+					self.wfile.write(b'<link rel="icon" href="data:,">')
+				except Exception as e:
+					dev_print(f'favicon req (unknown) exception: {e}')
 			return
 		self.process_req('GET')
 		

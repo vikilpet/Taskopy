@@ -146,6 +146,7 @@ Format: **option name** (default value) — description.
 - **sys_startup** (False) — run at Windows startup (uptime is less than 3 min).
 - **left_click** (False) — assign to mouse left button click on tray icon.
 - **log** (True) — log to console and file.
+- **rule** (None) — function or a tuple of functions. If the function returns `False`, the task is not executed. This check is not performed if the task is launched from the system tray menu.
 - **single** (True) — allow only one instance of running task.
 - **submenu** (None) — place task in this sub menu.
 - **result** (False) — task should return some value. Use together with http option to get page with task results.

@@ -17,7 +17,6 @@ class Language:
 		self.menu_edit_settings = 'Edit settings'
 		self.menu_command = 'Enter a command'
 		self.menu_command_con = 'Enter a command'
-		self.menu_exit = 'Exit'
 		self.warn_crontab_reload = 'Error when reloading the crontab:'
 		self.warn_mod_reload = 'Failed to reload module «{}»'
 		self.warn_hotkey = 'Wrong hotkey syntax in task «{}»'
@@ -30,13 +29,12 @@ class Language:
 		self.warn_date_format = 'Wrong date format in task «{}»: «{}»'
 		self.warn_event_format = 'Wrong event specification in task «{}»'
 		self.warn_too_many_win = 'Too many {} windows was found: {}'
-		self.button_close = 'Close'
-		self.button_cancel = 'Cancel'
 		self.warn_no_run_tasks = 'No running tasks'
 		self.warn_on_exit = 'Waiting for tasks to complete on exit'
 		self.warn_rule_exc = 'Exception in a rule in the task «{}»: {}'
 		self.warn_path_not_exist = "The path doesn't exist: «{}»"
 		self.warn_file_not_exist = "The file doesn't exist: «{}»"
+		self.dlg_nx_tasks = 'Delete tasks without threads'
 
 		if not (di_str := getattr(
 			sys.modules[__name__]
@@ -100,4 +98,5 @@ warn_on_exit=Ожидаем завершения задач при выходе
 warn_rule_exc=Исключение в правиле у задачи «{}»: {}
 warn_path_not_exist=Путь не существует: «{}»
 warn_file_not_exist=Файл не существует: «{}»
+dlg_nx_tasks=Удалить задачи без потоков
 '''

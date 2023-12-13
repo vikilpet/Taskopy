@@ -787,7 +787,7 @@ class Tasks:
 
 	def run_task(self, task:dict, caller:str=None, data=None
 	, result:list=None, wait_event:threading.Event=None):
-		'''
+		r'''
 		Logging, threading, error catching and other stuff.
 		task - dict with task options
 		caller - who actually launched the task.
@@ -872,12 +872,17 @@ class Tasks:
 				and caller != tcon.CALLER_MENU
 			): return
 			if task['single'] and task['running']: return
-			if task['rule']:
+			if task['rule'] and (caller != tcon.CALLER_MENU):
 				for rule in task['rule']:
 					try:
-						if not rule(): return
+						if not rule():
+							dev_print(
+								task["task_name"]
+								, 'execution was canceled due to rule'
+							)
+							return
 					except Exception as e:
-						con_log(f'{task["task_name"]} rule exception: {e}')
+						con_log(f'task {task["task_name"]} rule exception: {e}')
 						warning(lang.warn_rule_exc.format(task["task_name"], e))
 						return
 			if task['log']:
@@ -1170,10 +1175,10 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 
 	def running_tasks(self, show_msg:bool= True
 	, event=None)->list:
-		'''
+		r'''
 		Prints running tasks and shows dialog
 		(if show_msg == True).  
-		Returns the list of running task names.
+		Returns the list of running task names.  
 		'''
 		TASKS_MSG_MAX = 10
 		running_tasks = tuple(
@@ -1187,28 +1192,30 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 					, timeout=3
 					, wait=False)
 			return []
-		cur_threads = []
-		for thread in threading.enumerate():
-			if thread._target is None: continue
-			cur_threads.append(thread.name)
-		table = [('Task function', 'Thread'
+		os_threads:dict[str, int] = {}
+		for thr in threading.enumerate():
+			if thr._target is None: continue
+			os_threads[thr.name] = thr.native_id
+		table = [('Task function', 'Thread', 'Thread (OS)'
 		, 'Start time', 'Running time')]
+		nx_tasks:list = []
 		for t in running_tasks:
-			if t['thread'] in cur_threads:
-				thread = t['thread']
+			if t['thread'] in os_threads:
+				thr_name = t['thread']
 			else:
-				thread = str(t['thread']) + ' (nonexistent)'
+				thr_name = str(t['thread']) + ' (nonexistent)'
+				nx_tasks.append(t)
 			last_start = None
 			duration = None
 			if t['last_start']:
-				last_start = t['last_start'].strftime(
-					'%Y.%m.%d %H:%M:%S')
+				last_start = t['last_start'].strftime('%Y.%m.%d %H:%M:%S')
 				duration = str(
 					time_now() - t['last_start']
 				).split('.')[0]
 			table.append((
 				t['task_func_name']
-				, thread
+				, thr_name
+				, os_threads[t['thread']]
 				, last_start
 				, duration
 			))
@@ -1221,7 +1228,12 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		)
 		if len(running_tasks) > TASKS_MSG_MAX:
 			tasks_str += '\r\n...'
-		dialog(tasks_str, timeout='10 sec', wait=False)
+		buttons = lang.dlg_nx_tasks if nx_tasks else None
+		choice = dialog(tasks_str, buttons=buttons, timeout='10 sec'
+		, wait=(True if nx_tasks else False))
+		if choice != 1000: return
+		for task in nx_tasks:
+			tasks.task_dict.pop(task['task_func_name'], None)
 
 	def on_edit_crontab(self, event=None):
 		proc_start(sett.editor, os.path.join(APP_PATH, 'crontab.py'))
