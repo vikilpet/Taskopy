@@ -14,7 +14,7 @@ import imaplib
 import mimetypes
 from .tools import Job, job_batch, tdebug \
 , patch_import, dev_print, lazy_property \
-, table_print, time_diff_str, exc_text
+, table_print, time_diff_str, exc_text, str_indent
 from .plugin_filesystem import file_name_fix, file_size_str \
 , var_get, var_set, path_get
 from .plugin_network import html_clean
@@ -275,9 +275,9 @@ def mail_send(
 			)
 	except smtplib.SMTPResponseException as e:
 		return False, e.smtp_error.decode()
-	except Exception as e:
-		tdebug(exc_text(indent=True))
-		return False, repr(e)
+	except:
+		tdebug(str_indent( exc_text(6) ))
+		return False, exc_text()
 	return True, 'ok'
 	
 def mail_send_batch(recipients:str=''
@@ -358,8 +358,8 @@ def mail_check(server:str, login:str, password:str
 				, raw_bytes=data[0][1], check_only=True) )
 		log(imap.close())
 		log(imap.logout())
-	except Exception as e:
-		log(f'general error:{exc_text(indent=True)}')
+	except:
+		log(f'general error:{str_indent( exc_text(6) )}')
 	return msgs, errors
 
 def _get_last_index(folder:str)->int:
@@ -376,8 +376,8 @@ def _get_last_index(folder:str)->int:
 			])
 		else:
 			num = 0
-	except Exception as e:
-		dev_print(f'last index error:{exc_text(indent=True)}')
+	except:
+		dev_print(f'last index error:{str_indent( exc_text(6) )}')
 		num = 0
 	return num
 
@@ -438,8 +438,8 @@ def mail_download(
 		imap = imaplib.IMAP4_SSL(server, timeout=timeout)
 		try:
 			imap.login(login, password)
-		except Exception as e:
-			log(f'login error:{exc_text(indent=True)}')
+		except:
+			log(f'login error:{str_indent( exc_text(6) )}')
 			return [], errors
 		log('login OK')
 		if get_sub:
@@ -501,12 +501,12 @@ def mail_download(
 					except FileNotFoundError:
 						os.makedirs(os.path.dirname(msg.fullpath))
 						continue
-					except Exception as e:
-						log(f'  file write exception:{exc_text(indent=True)}')
+					except:
+						log(f'  file write exception:{str_indent( exc_text(6) )}')
 						try:
 							os.remove(msg.fullpath)
 						except:
-							log(f'  file deletion exception: {repr(e)}')
+							log(f'  file deletion exception: {exc_text()}')
 					break
 				if not file_ok: continue
 				msgs.append(msg)
@@ -535,8 +535,8 @@ def mail_download(
 		log(f'expunge: {imap.expunge()}')
 		log(f'close: {imap.close()}')
 		log(f'logout: {imap.logout()}')
-	except Exception as e:
-		log(f'general exception:{exc_text(last_n=0, indent=True)}')
+	except:
+		log(f'general exception:{str_indent( exc_text(6) )}')
 	return msgs, errors
 
 def mail_download_batch(mailboxes:list, dst_dir:str, timeout:int=3600
@@ -630,9 +630,9 @@ def mail_download_batch(mailboxes:list, dst_dir:str, timeout:int=3600
 			errors.append(
 				f'Too many errors! The last one: {last_error}'
 			)
-	except Exception as e:
-		dev_print(f'exception:{exc_text(indent=True)}')
-		errors.append(repr(e))
+	except:
+		dev_print(f'exception:{str_indent( exc_text(6) )}')
+		errors.append(exc_text())
 	return msgs, errors
 	
 if __name__ != '__main__': patch_import()

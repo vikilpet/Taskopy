@@ -333,7 +333,6 @@ def proc_uptime(process)->float:
 	if (pid := proc_get(process)) == -1: return -1.0
 	return time.time() - psutil.Process(pid).create_time()
 
-
 def proc_kill(process, cmd_filter:str=''):
 	r'''
 	Kills the prosess.  

@@ -43,7 +43,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-12-13'
+APP_VERSION = 'v2023-12-20'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 _app_log_limit = 10_000
@@ -1941,24 +1941,25 @@ def asrt(value, expect, comp:str='=='):
 		raise Exception('Unknown comp')
 	raise Exception(f'does not match ({comp}):\nval: «{value}»\nexp: «{expect}»')
 
-def exc_text(last_n:int=3, indent:bool=False)->str:
+def exc_text(line_num:int=1)->str:
 	r'''
-	Get exception text.  
-	*last_n* - the number of lines of the exception
+	Gets the shorted text of an exception.  
+	*line_num* - the number of lines of the exception
 	text from the end. *0* - get all.  
 	Example:
 
 		try:
 			raise ZeroDivisionError('Just a test')
 		except:
-			dialog(exc_text(1))
+			dialog(exc_text())
 
 	'''
+	if line_num == 1:
+		exc_type, _, exc_tb = sys.exc_info()
+		fname = os.path.basename(exc_tb.tb_frame.f_code.co_filename)
+		return f'{exc_type.__name__} at line {exc_tb.tb_lineno} in {fname}'
 	lines = traceback.format_exc().splitlines()
-	if indent:
-		return str_indent( '\n'.join(lines[-last_n:]) )
-	else:
-		return '\n'.join(lines[-last_n:])
+	return '\n'.join(lines[-line_num:])
 
 def exc_name()->str:
 	r'''
