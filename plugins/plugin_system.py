@@ -139,8 +139,8 @@ def win_title_set(window=None, new_title:str='')->int:
 def win_list(title_filter:str=None
 , class_filter:str=None
 , case_sensitive:bool=False)->list:
-	'''
-	List titles of all the windows.  
+	r'''
+	List titles of all the windows that have non-empty titles.  
 	*title_filter* and *class_filter* - optional filters  
 	'''
 	
@@ -156,10 +156,7 @@ def win_list(title_filter:str=None
 		
 	titles = []
 	func = get_class_name if class_filter else get_title
-	win32gui.EnumWindows(
-		func
-		, None
-	)
+	win32gui.EnumWindows(func, None)
 	if title_filter:
 		if case_sensitive:
 			title_filter = title_filter.lower()
@@ -175,17 +172,20 @@ def win_list(title_filter:str=None
 	return titles
 
 def win_find(title:str, exact:bool=True)->list:
-	''' Find window handle by title.
-		Returns list of found window handles.
+	r'''
+	Finds window handle by title.  
+	Returns list of found window handles.  
 	'''
 
 	def check_title(hwnd, title:str):
+		nonlocal result
+		wtitle = win32gui.GetWindowText(hwnd)
+		if title == '':
+			dev_print(f'win32gui.GetWindowText empty')
 		if exact:
-			if win32gui.GetWindowText(hwnd) == title:
-				result.append(hwnd)
+			if wtitle == title: result.append(hwnd)
 		else:
-			if title.lower() in win32gui.GetWindowText(hwnd).lower():
-				result.append(hwnd)
+			if title.lower() in wtitle.lower(): result.append(hwnd)
 
 	result = []
 	win32gui.EnumWindows(check_title, title)

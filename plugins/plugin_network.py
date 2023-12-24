@@ -617,8 +617,8 @@ def http_h_last_modified(url:str, **kwargs):
 
 def port_scan(host:str, port:int
 , timeout:int=500)->bool:
-	'''
-	Scan a TCP port.  
+	r'''
+	Scans a TCP port and returns `True` on success.  
 	*timeout* - timeout in milliseconds.  
 	'''
 	SUCCESS = 0
@@ -794,10 +794,10 @@ def ping_tcp(host:str, port:int, count:int=1, pause:int=100
 
 def ping_icmp(host:str, count:int=3
 , timeout:int=500, encoding:str='cp866')->tuple:
-	'''
-	Wrapper over ping.exe
-	Returns (True, (loss %, aver. time) )
-	or (False, 'cause of failure')
+	r'''
+	Wrapper over ping.exe.
+	Returns (True, (loss percentage, time in ms) )
+	or (False, 'cause of failure').  
 	
 	Examples:
 	

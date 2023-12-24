@@ -43,7 +43,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-12-20'
+APP_VERSION = 'v2023-12-24'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 _app_log_limit = 10_000
@@ -202,7 +202,8 @@ def is_dev()->bool:
 	return ('--developer' in sys.argv) or hasattr(sys, 'ps1')
 
 def con_log(*msgs, **kwargs):
-	''' Log to console and logfile
+	r'''
+	Log to console and logfile.  
 	'''
 	global _app_log
 	log_str = ''
@@ -1288,6 +1289,7 @@ def table_print(
 	, max_table_width:int=0
 	, trim_col:int=-1
 	, trim_func=None
+	, trim_placeholder:str='...'
 ):
 	'''
 	Print list of lists/tuples as a table.
@@ -1338,6 +1340,10 @@ def table_print(
 		if both: print_sep(sep=headers_sep)
 		print(template.format(*headers))
 		print_sep(sep=headers_sep)
+	
+	def trimmer(src_str:str, width:int
+	, placeholder:str=trim_placeholder)->str:
+		return str_short(text=src_str, width=width, placeholder=placeholder)
 
 	if not table: return table
 	headers = []
@@ -1402,7 +1408,7 @@ def table_print(
 	if table_width > max_table_width:
 		trim_len = 0
 		if trim_col == -1: trim_col = len(rows[0]) - 1
-		if not trim_func: trim_func = str_short
+		if not trim_func: trim_func = trimmer
 		trim_len = (
 			max_col_len[trim_col] - (table_width - max_table_width)
 		)

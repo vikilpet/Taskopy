@@ -351,6 +351,7 @@ class Task:
 		self.func = None
 		self.menu:bool = True
 		self.submenu:str = ''
+		self.status
 
 class Tasks:
 	''' Tasks from the crontab and their properties '''
@@ -830,8 +831,7 @@ class Tasks:
 							t['thread'] = None
 					except NameError:
 						dev_print(f'"tasks" not exists for the task {task["task_func_name"]}')
-					self.task_opt_set(task['task_func_name']
-						, 'err_counter', 0)
+					self.task_opt_set(task['task_func_name'], 'err_counter', 0)
 					if wait_event: wait_event.set()
 				except Exception:
 					try:
@@ -859,10 +859,20 @@ class Tasks:
 						dev_print(f'err_counter={err_counter}')
 						self.task_opt_set(task['task_func_name']
 							, 'err_counter', 0)
-						warning(
-							lang.warn_task_error.format(task['task_name_full'])
-							+ f'\n\n{trace_short}'
-						)
+						if is_often(
+							'__' + task['task_func_name'] + ' exception'
+							, '30 sec'
+						):
+							dev_print(
+								'[often] ' 
+								+ task['task_func_name'] + ' exception: '
+								+ exc_name()
+							)
+						else:
+							warning(
+								lang.warn_task_error.format(task['task_name_full'])
+								+ f'\n\n{trace_short}'
+							)
 					else:
 						self.task_opt_set(task['task_func_name']
 							, 'err_counter', err_counter)
@@ -876,14 +886,16 @@ class Tasks:
 				for rule in task['rule']:
 					try:
 						if not rule():
-							dev_print(
-								task["task_name"]
-								, 'execution was canceled due to rule'
-							)
+							msg = task["task_name"] + ' execution was canceled due to rule'
+							if not is_often(msg, '1 min'): dev_print(msg)
 							return
 					except Exception as e:
-						con_log(f'task {task["task_name"]} rule exception: {e}')
-						warning(lang.warn_rule_exc.format(task["task_name"], e))
+						msg = f'task {task["task_name"]} rule exception: {e}'
+						if not is_often(msg, '1 min'):
+							con_log(msg)
+							warning(
+								lang.warn_rule_exc.format(task["task_name"], e)
+							)
 						return
 			if task['log']:
 				cs = f' ({caller})' if caller else ''
