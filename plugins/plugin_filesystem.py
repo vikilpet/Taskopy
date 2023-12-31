@@ -35,8 +35,9 @@ from win32com.shell import shell, shellcon
 from pathlib import Path
 import shutil
 import configparser
-from .tools import app_dir, APP_NAME, exc_text, random_str, table_print, tdebug, patch_import, time_diff_str, time_now \
-, time_sleep, dev_print, tprint, is_iter, time_diff, time_from_str
+from .tools import app_dir, APP_NAME, exc_text, random_str, table_print \
+, tdebug, patch_import, time_diff_str, time_now, time_sleep, dev_print \
+, tprint, is_iter, time_diff, time_from_str, _TERMINAL_WIDTH, str_short
 try:
 	import constants as tcon
 except ModuleNotFoundError:
@@ -302,10 +303,11 @@ def file_append(fullpath, content:str, encoding:str='utf-8')->str:
 	return fullpath
 
 def file_move(fullpath, destination)->str:
-	''' Move file to destination.
-		Returns full path of destination file.
-		Destination may be fullpath or folder name.
-		If destination path exist it will be overwritten.
+	r'''
+	Moves the file to a new destination.  
+	Returns the full path to the destination file.  
+	*destination* can be a full path or just a directory.  
+	If the destination path exists, it will be overwritten.  
 	'''
 	fullpath = path_get(fullpath)
 	destination = path_get(destination)
@@ -347,17 +349,15 @@ def file_recycle(fullpath, silent:bool=True)->bool:
 	flags = shellcon.FOF_ALLOWUNDO
 	if silent:
 		flags = flags | shellcon.FOF_SILENT | shellcon.FOF_NOCONFIRMATION
-	result = shell.SHFileOperation(
-		(
-			0
-			, shellcon.FO_DELETE
-			, fullpath
-			, None
-			, flags
-			, None
-			, None
-		)
-	)
+	result = shell.SHFileOperation((
+		0
+		, shellcon.FO_DELETE
+		, fullpath
+		, None
+		, flags
+		, None
+		, None
+	))
 	return result[0] <= 3
 
 def dir_copy(fullpath, destination:str
@@ -374,7 +374,7 @@ def dir_copy(fullpath, destination:str
 		pass
 	except Exception as e:
 		err += 1
-		print(f'dir_copy error: {repr(e)}')
+		print(f'dir_copy exception: {repr(e)}')
 	return err
 
 def dir_create(fullpath=None)->str:
@@ -389,15 +389,27 @@ def dir_create(fullpath=None)->str:
 	except FileExistsError: pass
 	return fullpath
 
-def dir_delete(fullpath):
-	''' Deletes folder with it's contents '''
+
+
+def dir_delete(fullpath)->int:
+	r'''
+	Deletes folder with it's contents.  
+	Does not raise an exception when an error occurs.  
+	Some of return codes:  
+	0 - success  
+	2 - not found  
+	32 - access denied  
+	'''
 	fullpath = path_get(fullpath)
-	try:
-		shutil.rmtree(fullpath
-		, onerror=lambda func, path, exc: file_delete(path))
-		return fullpath
-	except FileNotFoundError:
-		return fullpath
+	return shell.SHFileOperation((
+		0
+		, shellcon.FO_DELETE
+		, fullpath
+		, None
+		, shellcon.FOF_NO_UI
+		, None
+		, None
+	))[0]
 
 def dir_exists(fullpath)->bool:
 	return os.path.isdir( path_get(fullpath) )
@@ -690,7 +702,7 @@ def dir_purge(fullpath, days:int=0, subdirs:bool=False
 		nonlocal counter
 		try:
 			print_d(fn, 'dir')
-			shutil.rmtree(fn)
+			dir_delete(fn)
 			counter += 1
 		except:
 			pass
@@ -915,7 +927,7 @@ def csv_write(fullpath, content:list, fieldnames:tuple=None
 def dir_size(fullpath, unit:str='b', skip_err:bool=True)->int:
 	r'''
 	Returns directory size (without symlinks).  
-	*skip_err* - do not raise an exeption on non-existent files.  
+	*skip_err* - do not raise an exeption on unavailable files.  
 
 		asrt( benchmark(dir_size, a=('logs',), b_iter=1 ) , 150_000, '<' )
 
@@ -924,13 +936,14 @@ def dir_size(fullpath, unit:str='b', skip_err:bool=True)->int:
 	udiv = _SIZE_UNITS.get(unit.lower(), 1)
 	total_size = 0
 	for dirpath, _, filenames in os.walk(fullpath):
-		for fn in filenames:
-			fpath = '\\\\?\\' + dirpath + '\\' + fn
+		for fname in filenames:
+			fpath = '\\\\?\\' + dirpath + '\\' + fname
 			try:
 				atts = win32file.GetFileAttributesEx(fpath)
 			except Exception as e:
 				if skip_err:
-					tdebug(f'skip {path_short(fpath, 50)} ({e})')
+					tdebug(f'skip {path_short(fpath, 50)}'
+					, f' ({e.args[2]})', short=True)
 					continue
 				else:
 					raise e
@@ -938,7 +951,7 @@ def dir_size(fullpath, unit:str='b', skip_err:bool=True)->int:
 				atts[0] & _FILE_ATTRIBUTE_REPARSE_POINT
 					== _FILE_ATTRIBUTE_REPARSE_POINT
 			):
-				tdebug(f'skip link: {fn}')
+				tdebug(f'skip link: {fname}')
 				continue
 			total_size += atts[4]
 	return total_size // udiv
@@ -1337,8 +1350,8 @@ def file_lock_wait(fullpath, wait_interval:str='100 ms'
 			else:
 				pass
 			time_sleep(wait_interval)
-		except Exception as e:
-			tprint('unexpected exception:', file_name(fullpath), repr(e))
+		except:
+			tprint('unexpected exception:', file_name(fullpath), exc_text())
 			return False
 
 def file_relpath(fullpath, start)->str:
@@ -1655,20 +1668,32 @@ def path_rule(
 	, ex_datea_aft:datetime.datetime|None = None
 	, in_datea_bef:datetime.datetime|None = None
 	, ex_datea_bef:datetime.datetime|None = None
+	, in_link:bool = False
+	, ex_link:bool = False
+	, in_rule:Callable|tuple|list|None = None
+	, ex_rule:Callable|tuple|list|None = None
 )->tuple[ list[Callable], list[Callable] ]:
 	r'''
 	Creates a list of rules (functions) to check
 	a file or directory.  
+	
 	*in_\** - rule to include, *ex_\** - rule to exclude.  
 	All rules are case-insensitive. All rules may be a string
 	or a tuple/list of strings:  
-	*ex_ext='py'*  
-	*ex_ext=('py', 'pyc')*  
+	`ex_ext='py'`  
+	`ex_ext=('py', 'pyc')`  
+	Examples can be seen in `path_filter`.  
+
 
 	*ex_ext*, *in_ext* - by extension.  
 	*ex_path*, *in_path* - by any part of a full file path  
 	*in_name*, *ex_name* - by part of a file name.  
 	*ex_dir*, *in_dir* - by beginning of a file path  
+
+	*in_link*, *ex_link* - whether the folder or file is a link.  
+
+	*in_rule*, *ex_rule* - user-defined rule(s) for a path. This
+	should be a function that returns True or False when a match occurs.  
 
 	File date variables.  
 	Date value is a `datetime.datetime` or `datetime.timedelta`
@@ -1677,6 +1702,11 @@ def path_rule(
 	*datem*, *datea*, *datec* - date of modification, access, creation.  
 	*in_datem_aft* - by date of modification (greater or equal)  
 	*ex_datem_aft* - by date of modification (greater or equal)  
+
+	Caveats:  
+	
+	- A file or directory will be excluded if `GetFileAttributes` fails
+	to retrieve attributes (`in_link` for example).  
 
 	'''
 	ex_rules = list()
@@ -1741,6 +1771,15 @@ def path_rule(
 			p.lower().startswith(e)
 			for e in in_dir
 		))
+	if in_link or ex_link:
+		(in_rules if in_link else ex_rules).append( lambda p: (
+			max(win32file.GetFileAttributes(p), 0) & _FILE_ATTRIBUTE_REPARSE_POINT
+			) == _FILE_ATTRIBUTE_REPARSE_POINT
+		)
+	if in_rule:
+		in_rules.extend( in_rule if is_iter(in_rule) else (in_rule,) )
+	if ex_rule:
+		ex_rules.extend( ex_rule if is_iter(ex_rule) else (ex_rule,) )
 	for val, time_att, is_inc, is_bef in (
 		(ex_datem_aft, 'st_mtime', False, False)
 		, (ex_datem_bef, 'st_mtime', False, True)
@@ -1768,8 +1807,6 @@ def path_rule(
 		else:
 			raise Exception('wrong date rule')
 		tstamp = val.timestamp()
-		tdebug(time_att, ('<=' if is_bef else '>=')
-		, f'{tstamp} ({val})')
 		if is_bef:
 			lst.append(
 				lambda p, a=time_att, t=tstamp: getattr( \
@@ -1811,7 +1848,7 @@ def path_filter(
 	Filters a list of files by criteria from the `path_rule`
 
 		pf = path_filter
-		files = tuple(dir_files('plugins'))
+		files = tuple(dir_files('plugins', subdirs=False))
 		asrt( tuple( pf(files, ex_dir='__pycache__'))[0], 'plugins\\constants.py')
 		asrt( tuple( pf(files, ex_ext='pyc'))[0], 'plugins\\constants.py')
 		asrt( tuple( pf(files, ex_ext='pyc', ex_path='_TOOLS_patc'))[-1], 'plugins\\tools.py')
@@ -1842,6 +1879,29 @@ def path_filter(
 			tuple( pf(files, in_ext='py', in_datem_bef='2020.12.24 0:0:0', ) )
 			, ()
 		)
+		asrt(
+			tuple( pf( (r'c:\Documents and Settings',) , in_link=True) )
+			, (r'c:\Documents and Settings',)
+		)
+		asrt(
+			tuple( pf( (r'c:\Documents and Settings', r'c:\Users') , ex_link=True) )
+			, (r'c:\Users',)
+		)
+		asrt(
+			tuple( pf(files, in_rule=lambda p: 'mail' in p ) )
+			, (r'plugins\plugin_mail.py',)
+		)
+		asrt(
+			tuple( pf(files, ex_rule=lambda p: '_' in p ) )
+			, ('plugins\\constants.py', 'plugins\\tools.py')
+		)
+		asrt(
+			tuple( pf(files, in_rule=(
+				lambda p: '_' in p
+				, lambda p: 'mail' in p
+			) ) )
+			, (r'plugins\plugin_mail.py',)
+		)
 
 	'''
 	in_rules, ex_rules = path_rule(**rules)
@@ -1851,8 +1911,8 @@ def path_filter(
 
 
 class DirSync:
-	'''
-	Syncrhonize two directories.
+	r'''
+	One-way directory synchronization.
 	'''
 	
 
@@ -1907,7 +1967,7 @@ class DirSync:
 				self._dst_files.add(
 					os.path.join(dirpath, f)
 				)
-		tdebug(time_diff_str(tstart))
+		tdebug('walk done in', time_diff_str(tstart))
 
 
 	def compare(self)->bool:
@@ -1938,14 +1998,13 @@ class DirSync:
 		self._dst_only_dirs = self._dst_dirs - self._src_dirs
 		self._get_new_files()
 		self.duration = time_diff_str(tstart, no_ms=True)
-		tdebug('done in', self.duration)
+		tdebug('compare done in', self.duration)
 		return len(self.errors) == 0
 	
 	def _log(self, oper:str, path:str):
 		' Print current file operation '
 		if not self._report: return
-		maxw = self._max_table_width - len(oper) - 7
-		print(f'sync {oper}: {path_short(path, maxw)}')
+		print(path_short( f'sync {oper}: {path}'))
 	
 	def _get_new_files(self):
 		self._new_files = set()
@@ -1960,7 +2019,8 @@ class DirSync:
 				if src_mtime > dst_mtime:
 					self._new_files.add(rpath)
 			except:
-				tdebug('mdate error', exc_text())
+				tdebug(str_short('mdate error: ' + exc_text(with_file=False)))
+				tdebug('mdate error:', exc_text(with_file=False), short=True)
 				self.errors[rpath] = 'mdate error'
 
 	def _copy(self):
@@ -1974,23 +2034,28 @@ class DirSync:
 						, destination=(self._dst_dir, rpath)
 					)
 				except:
-					tdebug('copy error', exc_text())
-					self.errors[rpath] = 'copy error'
+					if tdebug():
+						print(str_short(
+							'copy err ('
+							+ path_short(rpath, 40) + '): '
+							+ exc_text(with_file=False)
+						))
+					self.errors[rpath] = 'copy'
 	
 	def _delete_dirs(self):
-		'''
+		r'''
 		Deletes dst-only directories and removes
 		their files from self._dst_only_files.
 		'''
 		errors = set()
 		for rpath in self._dst_only_dirs:
-			try:
-				shutil.rmtree( os.path.join(self._dst_dir, rpath) )
-				self._log('del dir', rpath)
-			except:
+			res = dir_delete((self._dst_dir, rpath))
+			self._log('del dir', rpath)
+			if res:
 				errors.add(rpath)
-				tdebug('dir del error', exc_text())
-				self.errors[rpath] = 'dir del error'
+				if tdebug(): print(path_short(f'dir del err {res}: {rpath}'))
+				tdebug(f'dir del err {res}: {rpath}', short=path_short)
+				self.errors[rpath] = 'dir del'
 		del_dirs = self._dst_only_dirs - errors
 		self._dst_only_files = set(
 			f for f in self._dst_only_files
@@ -2006,8 +2071,9 @@ class DirSync:
 			except FileNotFoundError:
 				pass
 			except:
-				tdebug('file del error', exc_text())
-				self.errors[rpath] = 'file del error'
+				if tdebug():
+					str_short('file del err: ' + exc_text(with_file=False))
+				self.errors[rpath] = 'file del'
 
 	def print_diff(self):
 		'''
@@ -2082,7 +2148,7 @@ class DirSync:
 def dir_sync(src_dir, dst_dir, report:bool=False
 , **rules)->dict:
 	'''
-	Syncrhonize two directories.  
+	One-way directory synchronization.  
 	For *rules* see the `path_rule`.  
 	Returns dict with errors:  
 	
@@ -2097,7 +2163,7 @@ def dir_sync(src_dir, dst_dir, report:bool=False
 	if sync.errors and report: sync.print_errors()
 	return sync.errors
 
-def path_short(fullpath, max_len:int=100)->str:
+def path_short(fullpath, max_len:int=0)->str:
 	r'''
 	Shortens a long file name to display.
 
@@ -2106,6 +2172,7 @@ def path_short(fullpath, max_len:int=100)->str:
 		asrt(path_short(path, 23), 'c:\Window...msiexec.exe')
 
 	'''
+	if not max_len: max_len = _TERMINAL_WIDTH
 	if len(fp := fullpath) <= max_len: return fullpath
 	return fp[:( -(-max_len // 2 ) )-3] + '...' + fp[-(max_len//2):]
 
@@ -2358,5 +2425,20 @@ def rec_bin_purge(drive:str=None, progress:bool=False, sound:bool=True):
 			tdebug(f'recycle bin is empty')
 		else:
 			raise
+
+def path_is_link(fullpath)->bool:
+	r'''
+	Returns `True` if the path is a link.  
+	Returns `False` even if the file does not exist.  
+
+		asrt( path_is_link(r'c:\Documents and Settings'), True )
+		asrt( path_is_link(r'c:\pagefile.sys'), False )
+		asrt( benchmark(path_is_link, ('c:\\Documents and Settings',)), 16117, "<" )
+		
+	'''
+	fpath = path_get(fullpath)
+	if (atts := win32file.GetFileAttributes(fpath)) == -1: return False
+	return (atts & _FILE_ATTRIBUTE_REPARSE_POINT) \
+	== _FILE_ATTRIBUTE_REPARSE_POINT
 
 if __name__ != '__main__': patch_import()

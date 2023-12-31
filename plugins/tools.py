@@ -43,7 +43,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2023-12-24'
+APP_VERSION = 'v2024-01-01'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 _app_log_limit = 10_000
@@ -914,22 +914,23 @@ def tprint(*msgs, **kwargs):
 
 def tdebug(*msgs, **kwargs)->bool:
 	r'''
-	Is the code running from the console?  
+	Does the code execute from the console?  
+	Use kwarg *short* to apply `str_short` to the output.  
+	For paths better use `short=path_short`  
 
 		asrt( benchmark(tdebug), 435, "<" )
 
 	'''
 	if not hasattr(sys, 'ps1'): return False
-	if msgs:
-		if kwargs.get('par', True):
-			msg = _get_parent_func_name() + ': '
-		else:
-			msg = ''
-		if isinstance(msgs, dict):
-			msg += '\n'.join(f'{k}:{v}' for k, v in msgs.items())
-		else:
-			msg += ' '.join(map(str, msgs))
-		print(msg)
+	if not msgs: return True
+	short = kwargs.pop('short', False)
+	sh_func = short if isinstance(short, Callable) else str_short
+	msg:str = ''
+	if kwargs.get('par', True):
+		msg = _get_parent_func_name()
+		if msg: msg += ': '
+	msg += ' '.join(map(str, msgs))
+	print(sh_func(msg) if short else msg)
 	return True
 
 def balloon(msg:str, title:str=APP_NAME, timeout:int=None, icon:str=None):
@@ -1947,11 +1948,15 @@ def asrt(value, expect, comp:str='=='):
 		raise Exception('Unknown comp')
 	raise Exception(f'does not match ({comp}):\nval: «{value}»\nexp: «{expect}»')
 
-def exc_text(line_num:int=1)->str:
+def exc_text(line_num:int=1, with_file:bool=True)->str:
 	r'''
 	Gets the shorted text of an exception.  
 	*line_num* - the number of lines of the exception
 	text from the end. *0* - get all.  
+	
+	Rationale: because of the heavy use of the win32 api
+	, these win32 exceptions should be handled differently.  
+
 	Example:
 
 		try:
@@ -1961,9 +1966,16 @@ def exc_text(line_num:int=1)->str:
 
 	'''
 	if line_num == 1:
-		exc_type, _, exc_tb = sys.exc_info()
-		fname = os.path.basename(exc_tb.tb_frame.f_code.co_filename)
-		return f'{exc_type.__name__} at line {exc_tb.tb_lineno} in {fname}'
+		exc_type, exc_obj, exc_tb = sys.exc_info()
+		if with_file:
+			fname = os.path.basename(exc_tb.tb_frame.f_code.co_filename)
+		if isinstance(exc_obj, pywintypes.error):
+			txt = f'{exc_obj.funcname}: {exc_obj.strerror.rstrip(".")}' \
+			+ f' ({exc_obj.winerror})'
+			if with_file:
+				txt += f' at line {exc_tb.tb_lineno} in file {fname}'
+			return txt
+		return f'{exc_type.__name__} at line {exc_tb.tb_lineno} in file {fname}'
 	lines = traceback.format_exc().splitlines()
 	return '\n'.join(lines[-line_num:])
 
