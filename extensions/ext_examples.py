@@ -233,7 +233,7 @@ def examp_cert_check(caller:str, codepage:str=''
 # import telebot
 # Just for a syntax tips:
 # from telebot.types import Message
-def work__tlg_bot_start(
+def telegram__tlg_bot_start(
 	# Use *every* to ensure that the bot always works
 	# , even after a crash/disconnect:
 	every='1 sec'
@@ -241,7 +241,7 @@ def work__tlg_bot_start(
 	# every second if we make a mistake in the code:
 	, err_threshold=10
 ):
-	token = 'YOUR BOT TOKEN'
+	token = 'YOUR BOT TOKEN FROM BOTFATHER'
 	bot = telebot.TeleBot(token)
 	# Save the bot for access from other tasks:
 	gdic['tlg_bot'] = bot
@@ -275,7 +275,7 @@ def work__tlg_bot_start(
 # while you are changing bot functionality 
 # in the *_start* task and you need to restart bot.
 # When you're done, this can be turned off.
-def work__tlg_bot_stop(on_load=True, on_exit=True):
+def telegram__tlg_bot_stop(on_load=True, on_exit=True):
 	if bot := gdic.get('tlg_bot'): bot.stop_bot()
 
 if __name__ != '__main__': patch_import()

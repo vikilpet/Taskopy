@@ -687,7 +687,7 @@ def dir_rnd_files(fullpath, file_num:int=1
 
 def dir_rnd_dir(fullpath, attempts:int=5
 , filter_func=None)->str:
-	'''
+	r'''
 	Same as `dir_rnd_file` but returns a directory.
 	'''
 	fullpath = path_get(fullpath)

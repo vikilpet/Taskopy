@@ -6,8 +6,8 @@ def emb_backup_and_purge(log_days:int=30, backup_days:int=30):
 	' Make backup of crontab and extensions to the *backup* directory '
 	for fpath in dir_files(app_dir(), in_ext='py', subdirs=False):
 		tprint(file_backup(fpath, 'backup'))
-	dir_purge('log', days=log_days)
-	dir_purge('backup', days=backup_days)
+	dir_purge( (app_dir(), 'log'), days=log_days)
+	dir_purge( (app_dir(), 'backup'), days=backup_days)
 def emb_app_update(caller:str):
 	' Check to see if there is a new version available '
 	VARNAME = '_taskopy_version'
@@ -57,7 +57,7 @@ def emb_app_update(caller:str):
 def emb_add_to_startup(caller=''):
 	' Add the program to the startup '
 	shortcut_create(
-		'taskopy.exe' if is_app_exe() else 'taskopy.py'
+		(app_dir(), 'taskopy.exe' if is_app_exe() else 'taskopy.py')
 		, dest=(dir_user_startup(), 'taskopy.lnk')
 		, cwd=app_dir()
 		, icon_fullpath=(app_dir(), r'resources\logo.ico')
