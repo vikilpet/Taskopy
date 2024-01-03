@@ -43,7 +43,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2024-01-01'
+APP_VERSION = 'v2024-01-03'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 _app_log_limit = 10_000
@@ -1975,7 +1975,10 @@ def exc_text(line_num:int=1, with_file:bool=True)->str:
 			if with_file:
 				txt += f' at line {exc_tb.tb_lineno} in file {fname}'
 			return txt
-		return f'{exc_type.__name__} at line {exc_tb.tb_lineno} in file {fname}'
+		if with_file:
+			return f'{exc_type.__name__} at line {exc_tb.tb_lineno} in file {fname}'
+		else:
+			return f'{exc_type.__name__} at line {exc_tb.tb_lineno}'
 	lines = traceback.format_exc().splitlines()
 	return '\n'.join(lines[-line_num:])
 

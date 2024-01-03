@@ -35,9 +35,8 @@ from win32com.shell import shell, shellcon
 from pathlib import Path
 import shutil
 import configparser
-from .tools import app_dir, APP_NAME, exc_text, random_str, table_print \
-, tdebug, patch_import, time_diff_str, time_now, time_sleep, dev_print \
-, tprint, is_iter, time_diff, time_from_str, _TERMINAL_WIDTH, str_short
+from .tools import *
+from .tools import _TERMINAL_WIDTH
 try:
 	import constants as tcon
 except ModuleNotFoundError:
@@ -55,16 +54,18 @@ _FILE_ATTRIBUTE_REPARSE_POINT = 1024
 
 _MAX_PATH:int = 260
 
-def path_long(path:str):
+def path_long(path:str, force:bool=False):
 	r'''
-	Apply only to a string.  
+	Adds '\\?\' prefix to a path if it's long.
+	Apply only to a string!  
+	*force* - adds prefix event to a short file.  
 
 		asrt( path_long('p'), 'p' )
 		asrt( path_long('c:' + 'p'*261), '\\\\?\\c:' + 'p'*261 )
 		asrt( path_long('\\\\share\\' + 'p'*261), '\\\\?\\UNC\share\\' + 'p'*261 )
 
 	'''
-	if len(path) < _MAX_PATH: return path
+	if (len(path) < _MAX_PATH) and not force: return path
 	if path.startswith('\\\\?\\'): return path
 	if path[1] == ':':
 		return '\\\\?\\' + path
@@ -73,9 +74,7 @@ def path_long(path:str):
 	else:
 		return path
 
-	
-
-def _dir_slash(dirpath:str)->str:
+def dir_slash(dirpath:str)->str:
 	''' Adds a trailing slash if it's not there. '''
 	if dirpath.endswith('\\'): return dirpath
 	return dirpath + '\\'
@@ -282,9 +281,7 @@ def file_copy(fullpath, destination)->str:
 		win32api.CopyFile(fullpath, destination)
 	except win32api.error as e:
 		if e.winerror != 3: raise
-		os.makedirs(
-			os.path.dirname(destination)
-		)
+		os.makedirs( os.path.dirname(destination) )
 		win32api.CopyFile(fullpath, destination)
 	return destination
 
@@ -312,7 +309,7 @@ def file_move(fullpath, destination)->str:
 	fullpath = path_get(fullpath)
 	destination = path_get(destination)
 	if os.path.isdir(destination):
-		new_fullpath = _dir_slash(destination) \
+		new_fullpath = dir_slash(destination) \
 			+ os.path.basename(fullpath)
 	else:
 		new_fullpath = destination
@@ -323,20 +320,40 @@ def file_move(fullpath, destination)->str:
 	shutil.move(fullpath, new_fullpath)
 	return new_fullpath
 
-def file_delete(fullpath):
-	''' Deletes the file. '''
+
+
+def file_delete(fullpath)->int:
+	r'''
+	Deletes the file permanently.  
+	Returns *0* on success or if the file does not exist.  
+
+		benchmark(
+			lambda fls: tuple(file_delete(f) for f in fls)
+			, ( tuple(temp_file(content='t') for _ in range(3)), )
+			, b_iter=1
+		)
+		asrt( file_delete( temp_file(content='t') ), 0 )
+
+	'''
 	fullpath = path_get(fullpath)
-	try:
-		os.remove(fullpath)
-	except PermissionError:
+	last_err:int = 0
+	while True:
 		try:
-			os.chmod(fullpath, stat.S_IWRITE)
-			os.remove(fullpath)
+			win32api.DeleteFile(fullpath)
+			return 0
 		except Exception as e:
-			tdebug(f'file_delete error: {e}')
-	except FileNotFoundError:
-		tdebug('not found')
-		pass
+			last_err = e.args[0]
+			if last_err == 2:
+				return 0
+			elif last_err == 5:
+				try:
+					win32api.SetFileAttributes(fullpath
+					, win32con.FILE_ATTRIBUTE_NORMAL)
+				except:
+					break
+			else:
+				break
+	return last_err
 
 def file_recycle(fullpath, silent:bool=True)->bool:
 	'''
@@ -378,11 +395,12 @@ def dir_copy(fullpath, destination:str
 	return err
 
 def dir_create(fullpath=None)->str:
-	''' Creates new dir and returns full path.
-		If fullpath=None then creates temporary directory.
+	r'''
+	Creates new dir and returns full path.  
+	If `fullpath=None` then creates temporary directory.  
 	'''
 	fullpath = path_get(fullpath)
-	if not fullpath: return temp_dir('temp')
+	if not fullpath: return temp_dir('rnd')
 	fullpath = fullpath.rstrip('.').rstrip(' ')
 	try:
 		os.makedirs(fullpath)
@@ -391,25 +409,34 @@ def dir_create(fullpath=None)->str:
 
 
 
-def dir_delete(fullpath)->int:
+def dir_delete(fullpath)->dict[str, str]:
 	r'''
 	Deletes folder with it's contents.  
+	Returns an error dictionary of the form {'file': 'error text'}.  
 	Does not raise an exception when an error occurs.  
-	Some of return codes:  
-	0 - success  
-	2 - not found  
-	32 - access denied  
+
+		asrt( dir_delete( dir_test() ), {} )
+
 	'''
 	fullpath = path_get(fullpath)
-	return shell.SHFileOperation((
-		0
-		, shellcon.FO_DELETE
-		, fullpath
-		, None
-		, shellcon.FOF_NO_UI
-		, None
-		, None
-	))[0]
+	subdirs, errors = [], {}
+	for dirpath, dirnames, filenames in os.walk(
+		path_long(fullpath, force=True)
+	):
+		for sdir in dirnames: subdirs.append(dir_slash(dirpath) + sdir)
+		for fname in filenames:
+			fpath = dir_slash(dirpath) + fname
+			if (err := file_delete(fpath)) != 0:
+				errors[fpath[4:]] = f'file del {err}'
+	if not errors:
+		subdirs.append(path_long(fullpath, force=True))
+	subdirs.sort(reverse=True)
+	for sdir in subdirs:
+		try:
+			win32file.RemoveDirectory(sdir)
+		except Exception as e:
+			errors[sdir[4:]] = e.args[2].rstrip('.')
+	return errors
 
 def dir_exists(fullpath)->bool:
 	return os.path.isdir( path_get(fullpath) )
@@ -544,8 +571,9 @@ def dir_dirs(fullpath, subdirs:bool=True, parent:bool=False)->Iterator[str]:
 	'''
 	fullpath = path_get(fullpath)
 	if parent: yield fullpath
-	for dirpath, dirs, _ in os.walk(fullpath, topdown=True):
-		for d in dirs: yield os.path.join(dirpath, d)
+	for dirpath, dirs, _ in os.walk(path_long(fullpath, force=True)
+	, topdown=True):
+		for d in dirs: yield dir_slash(dirpath[4:]) + d
 		if not subdirs: return
 
 def dir_files(fullpath, subdirs:bool=True, name_only:bool=False
@@ -557,40 +585,49 @@ def dir_files(fullpath, subdirs:bool=True, name_only:bool=False
 	*rules* - rules for the `path_rule` function  
 	*name_only* - returns filenames, not the full path.  
 
-		asrt( tuple(dir_files('plugins', in_ext='jpg') ), tuple() )
+		pdir = path_get((app_dir(), 'plugins'))
 		asrt(
-			tuple(dir_files('plugins', in_ext='py'))[0]
-			, 'plugins\\constants.py'
-		)
-		asrt(
-			tuple( dir_files('plugins', ex_ext='pyc') )
-			, tuple( dir_files('plugins', in_ext='py') )
-		)
-		asrt(
-			tuple( dir_files('plugins', ex_path='plugins\\') )
+			tuple(dir_files( pdir, in_ext='jpg') )
 			, tuple()
 		)
 		asrt(
-			tuple( dir_files('plugins', name_only=True, in_name='tools.py') )
+			tuple(dir_files( pdir, name_only=True, in_ext='py') )[0]
+			, 'constants.py'
+		)
+		asrt(
+			tuple( dir_files(pdir, ex_ext='pyc') )
+			, tuple( dir_files(pdir, in_ext='py') )
+		)
+		asrt(
+			tuple( dir_files(pdir, ex_path='plugins\\') )
+			, tuple()
+		)
+		asrt(
+			tuple( dir_files(pdir, name_only=True, in_name='tools.py') )
 			, ('tools.py',)
 		)
+		td = dir_test(sdirnum=3)
+		asrt( len( tuple( dir_files(td) ) ), 3 )
+		dir_delete(td)
 
 	'''
+
 	fullpath = path_get(fullpath)
 	if rules: in_rules, ex_rules = path_rule(**rules)
-	for dirpath, dirs, filenames in os.walk(fullpath, topdown=True):
+	for dirpath, dirs, filenames in os.walk(path_long(fullpath, force=True)
+	, topdown=True):
 		if not subdirs: dirs.clear()
 		for fname in filenames:
 			if rules:
-				fpath = dirpath + '\\' + fname
+				fpath = dir_slash(dirpath) + fname
 				if _path_match(
 					path=fpath
 					, in_rules=in_rules
 					, ex_rules=ex_rules
 				):
-					yield fname if name_only else fpath
+					yield fname if name_only else fpath[4:]
 			else:
-				 yield fname if name_only else dirpath + '\\' + fname
+				 yield fname if name_only else dir_slash(dirpath[4:]) + fname
 
 def dir_rnd_files(fullpath, file_num:int=1
 , attempts:int=5, **rules)->Iterator[str]:
@@ -670,12 +707,12 @@ def dir_rnd_dir(fullpath, attempts:int=5
 				break
 	return None
 
-def dir_purge(fullpath, days:int=0, subdirs:bool=False
+def dir_purge(fullpath, days:int=0, subdirs:bool=True
 , creation:bool=False, test:bool=False
 , print_del:bool=False, **rules)->int:
 	r'''
 	Deletes files older than *x* days.  
-	Returns number of deleted files and folders. 
+	Returns number of deleted files and folders.  
 	
 	*days=0* - delete everything  
 	*creation* - use date of creation, otherwise use last
@@ -685,18 +722,24 @@ def dir_purge(fullpath, days:int=0, subdirs:bool=False
 	*test* - only display the files and folders that should be deleted, without actually deleting them.  
 	*print_del* - print path when deleting.  
 	*rules* - rules for the `path_rule` function  
+
+		td = dir_test(sdirnum=2)
+		asrt( len( tuple( dir_files(td) ) ), 2 )
+		dir_purge(td, days=0, subdirs=True)
+		asrt(
+			len( tuple( dir_files(td) ) )
+			, 0
+		)
+		dir_delete(td)
+
 	'''
 	def print_d(fn:str, reason:str):
 		if print_del: print('dir_purge:', reason, os.path.relpath(fn, fullpath))
 
 	def robust_remove_file(fn):
 		nonlocal counter
-		try:
-			print_d(fn, 'file')
-			file_delete(fn)
-			counter += 1
-		except:
-			pass
+		print_d(fn, 'file')
+		if file_delete(fn) == 0: counter += 1
 		
 	def robust_remove_dir(fn):
 		nonlocal counter
@@ -732,7 +775,9 @@ def dir_purge(fullpath, days:int=0, subdirs:bool=False
 		dir_func = robust_remove_dir
 	for fpath in files: file_func(fpath)
 	for fpath in dirs:
-		if not any( len(t[2]) for t in os.walk(fpath) ):
+		if not any(
+			len(t[2]) for t in os.walk( path_long(fpath, force=True ) )
+		):
 			dir_func(fpath)
 	return counter
 
@@ -814,8 +859,13 @@ def dir_list(fullpath, **rules)->Iterator[str]:
 	Returns all directory content (dirs and files).  
 	*rules* - rules for the `path_rule` function.  
 
-		asrt( 'resources\\icon.png' in dir_list('resources'), True)
-		asrt( 'resources\\icon.png' in dir_list('resources', ex_ext='png'), False)
+		rdir = path_get( (app_dir(), 'resources') )
+		asrt( 'icon.png' in (file_name(f) for f in dir_list(rdir) ), True)
+		asrt(
+			'icon.png' in (file_name(f) for f
+				in dir_list('resources', ex_ext='png'))
+			, False
+		)
 		asrt(
 			benchmark(lambda d: tuple(dir_list(d)), 'log', b_iter=5)
 			, 500_000
@@ -825,29 +875,31 @@ def dir_list(fullpath, **rules)->Iterator[str]:
 	'''
 	fullpath = path_get(fullpath)
 	if rules: in_rules, ex_rules = path_rule(**rules)
-	for dirpath, dirnames, filenames in os.walk(fullpath):
+	for dirpath, dirnames, filenames in os.walk(
+		path_long(fullpath, force=True)
+	):
 		for d in dirnames:
-			fpath = dirpath + '\\' + d
+			fpath = dir_slash(dirpath) + d
 			if rules:
 				if _path_match(
 					path=fpath
 					, in_rules=in_rules
 					, ex_rules=ex_rules
 				):
-					yield fpath
+					yield fpath[4:]
 			else:
-				yield fpath
-		for f in filenames:
-			fpath = dirpath + '\\' + f
+				yield fpath[4:]
+		for fn in filenames:
+			fpath = dir_slash(dirpath) + fn
 			if rules:
 				if _path_match(
 					path=fpath
 					, in_rules=in_rules
 					, ex_rules=ex_rules
 				):
-					yield fpath
+					yield fpath[4:]
 			else:
-				yield fpath
+				yield fpath[4:]
 
 def dir_find(fullpath, only_files:bool=False)->list:
 	'''
@@ -935,14 +987,14 @@ def dir_size(fullpath, unit:str='b', skip_err:bool=True)->int:
 	fullpath = path_get(fullpath)
 	udiv = _SIZE_UNITS.get(unit.lower(), 1)
 	total_size = 0
-	for dirpath, _, filenames in os.walk(fullpath):
+	for dirpath, _, filenames in os.walk(path_long(fullpath, force=True)):
 		for fname in filenames:
-			fpath = '\\\\?\\' + dirpath + '\\' + fname
+			fpath = dir_slash(dirpath) + fname
 			try:
 				atts = win32file.GetFileAttributesEx(fpath)
 			except Exception as e:
 				if skip_err:
-					tdebug(f'skip {path_short(fpath, 50)}'
+					tdebug(f'skip {path_short(fpath[4:], 50)}'
 					, f' ({e.args[2]})', short=True)
 					continue
 				else:
@@ -979,7 +1031,7 @@ def dir_zip(fullpath, destination=None
 		base_name = os.path.basename(fullpath)
 		new_fullpath += '.zip'
 	elif os.path.isdir(destination):
-		new_fullpath = _dir_slash(destination) \
+		new_fullpath = dir_slash(destination) \
 			+ os.path.basename(fullpath)
 		base_name = os.path.basename(fullpath)
 		new_fullpath += '.zip'
@@ -1051,14 +1103,16 @@ def file_zip_cont(fullpath, only_files:bool=False)->list:
 		else:
 			return [f.filename for f in z.filelist]
 
-def temp_dir(new_dir:str=None)->str:
-	''' Returns full path of temp dir (without trailing slash).
-		If new_dir - creates folder in temp dir
-		and returns its full path.
+def temp_dir(new_dir:str='')->str:
+	r'''
+	Returns the full path to the user's temporary directory.  
+	If *new_dir* is specified, creates this subfolder and
+	returns the path to it.  
+	If *new_dir='rnd'*, a directory with a random name is created.  
 	'''
 	if not new_dir:
 		return tempfile.gettempdir()
-	if new_dir == 'temp':
+	if new_dir == 'rnd':
 		new_dir = os.path.join(
 			tempfile.gettempdir()
 			, time.strftime("%m%d%H%M%S") + random_str(5)
@@ -1072,7 +1126,7 @@ def temp_dir(new_dir:str=None)->str:
 
 def temp_file(prefix:str='', suffix:str=''
 , content=None, encoding='utf-8')->str:
-	'''
+	r'''
 	Returns the full name for the temporary file.
 	(the file is not created as such)  
 	If *content* is specified then writes content to the file.  
@@ -1688,7 +1742,7 @@ def path_rule(
 	*ex_ext*, *in_ext* - by extension.  
 	*ex_path*, *in_path* - by any part of a full file path  
 	*in_name*, *ex_name* - by part of a file name.  
-	*ex_dir*, *in_dir* - by beginning of a file path  
+	*ex_dir*, *in_dir* - by parent directory, i.e. the relative path.   
 
 	*in_link*, *ex_link* - whether the folder or file is a link.  
 
@@ -1848,19 +1902,39 @@ def path_filter(
 	Filters a list of files by criteria from the `path_rule`
 
 		pf = path_filter
-		files = tuple(dir_files('plugins', subdirs=False))
-		asrt( tuple( pf(files, ex_dir='__pycache__'))[0], 'plugins\\constants.py')
-		asrt( tuple( pf(files, ex_ext='pyc'))[0], 'plugins\\constants.py')
-		asrt( tuple( pf(files, ex_ext='pyc', ex_path='_TOOLS_patc'))[-1], 'plugins\\tools.py')
+		files = tuple( dir_files((app_dir(), 'plugins')
+		, name_only=True, subdirs=False) )
+		asrt( tuple( pf(files, ex_dir='__pycache__'))[0], 'constants.py')
+		asrt( tuple( pf(files, ex_ext='pyc'))[0], 'constants.py')
+		asrt( tuple( pf(files, ex_ext='pyc', ex_path='_TOOLS_patc'))[-1], 'tools.py')
 		asrt( tuple( pf(files, ex_ext=('pyc', 'py') ) ), ())
 		asrt( tuple( pf(files, in_ext='txt' ) ), ())
-		asrt( tuple( pf(files, in_ext='py', ex_path='_TOOLS_patc'))[-1], 'plugins\\tools.py')
-		asrt( tuple( pf(files, in_path='constants.py'))[0], 'plugins\\constants.py')
-		asrt( tuple( pf(files, in_dir='\\plugins\\', ex_ext='pyc', ex_path='paTch'))[-1], 'plugins\\tools.py')
-		asrt( tuple( pf(files, in_name='crypt') )[0], 'plugins\plugin_crypt.py')
-		asrt( tuple( pf(files, in_ext='py', ex_name=('plug', 'const')) )[0], r'plugins\tools.py')
+		asrt( tuple( pf(files, in_ext='py', ex_path='_TOOLS_patc'))[-1], 'tools.py')
+		asrt( tuple( pf(files, in_path='constants.py'))[0], 'constants.py')
+		asrt( tuple( pf(files, in_name='crypt') )[0], 'plugin_crypt.py')
 		asrt(
-			tuple( pf(files, in_datem_aft=datetime.datetime(2024, 1, 1), ) )
+			tuple( pf(files, in_ext='py', ex_name=('plug', 'const')) )[0]
+			, r'tools.py'
+		)
+		asrt(
+			tuple( pf(files, in_rule=lambda p: 'mail' in p ) )
+			, ('plugin_mail.py',)
+		)
+		asrt(
+			tuple( pf(files, ex_rule=lambda p: '_' in p ) )
+			, ('constants.py', 'tools.py')
+		)
+		asrt(
+			tuple( pf(files, in_rule=(
+				lambda p: '_' in p
+				, lambda p: 'mail' in p
+			) ) )
+			, ('plugin_mail.py',)
+		)
+		files = tuple( dir_files((app_dir(), 'plugins')
+		, name_only=False, subdirs=False) )
+		asrt(
+			tuple( pf(files, in_datem_aft=datetime.datetime(2030, 1, 1), ) )
 			, ()
 		)
 		asrt(
@@ -1868,7 +1942,7 @@ def path_filter(
 			, ()
 		)
 		asrt(
-			tuple( pf(files, in_datem_aft='2024.1.1 0:0:0', ) )
+			tuple( pf(files, in_datem_aft='2030.1.1 0:0:0', ) )
 			, ()
 		)
 		asrt(
@@ -1886,21 +1960,6 @@ def path_filter(
 		asrt(
 			tuple( pf( (r'c:\Documents and Settings', r'c:\Users') , ex_link=True) )
 			, (r'c:\Users',)
-		)
-		asrt(
-			tuple( pf(files, in_rule=lambda p: 'mail' in p ) )
-			, (r'plugins\plugin_mail.py',)
-		)
-		asrt(
-			tuple( pf(files, ex_rule=lambda p: '_' in p ) )
-			, ('plugins\\constants.py', 'plugins\\tools.py')
-		)
-		asrt(
-			tuple( pf(files, in_rule=(
-				lambda p: '_' in p
-				, lambda p: 'mail' in p
-			) ) )
-			, (r'plugins\plugin_mail.py',)
 		)
 
 	'''
@@ -1949,23 +2008,27 @@ class DirSync:
 		self._src_dirs = set()
 		self._dst_files = set()
 		self._dst_dirs = set()
-		for dirpath, dirnames, filenames in os.walk(self._src_dir):
+		for dirpath, dirnames, filenames in os.walk(
+			path_long(self._src_dir, force=True)
+		):
 			for d in dirnames:
 				self._src_dirs.add(
-					os.path.join(dirpath, d)
+					os.path.join(dirpath[4:], d)
 				)
 			for f in filenames:
 				self._src_files.add(
-					os.path.join(dirpath, f)
+					os.path.join(dirpath[4:], f)
 				)
-		for dirpath, dirnames, filenames in os.walk(self._dst_dir):
+		for dirpath, dirnames, filenames in os.walk(
+			path_long(self._dst_dir, force=True)
+		):
 			for d in dirnames:
 				self._dst_dirs.add(
-					os.path.join(dirpath, d)
+					os.path.join(dirpath[4:], d)
 				)
 			for f in filenames:
 				self._dst_files.add(
-					os.path.join(dirpath, f)
+					os.path.join(dirpath[4:], f)
 				)
 		tdebug('walk done in', time_diff_str(tstart))
 
@@ -1979,8 +2042,8 @@ class DirSync:
 		self._walk()
 		slen = len(self._src_dir.rstrip('\\')) + 1
 		dlen = len(self._dst_dir.rstrip('\\')) + 1
-		self._src_files = set( (p[slen:].lower() for p in self._src_files) )
-		self._dst_files = set( (p[dlen:].lower() for p in self._dst_files) )
+		self._src_files = set( (p[slen:] for p in self._src_files) )
+		self._dst_files = set( (p[dlen:] for p in self._dst_files) )
 		if self._rules:
 			self._src_files = set(path_filter(
 				paths=self._src_files
@@ -1988,8 +2051,8 @@ class DirSync:
 			))
 		self._src_only_files = self._src_files - self._dst_files
 		self._dst_only_files = self._dst_files - self._src_files
-		self._src_dirs = set( (p[slen:].lower() for p in self._src_dirs) )
-		self._dst_dirs = set( (p[dlen:].lower() for p in self._dst_dirs) )
+		self._src_dirs = set( (p[slen:] for p in self._src_dirs) )
+		self._dst_dirs = set( (p[dlen:] for p in self._dst_dirs) )
 		if self._rules:
 			self._src_dirs = set(path_filter(
 				paths=self._src_dirs
@@ -2010,16 +2073,16 @@ class DirSync:
 		self._new_files = set()
 		for rpath in (self._src_files.intersection(self._dst_files)):
 			try:
-				src_mtime = int(os.path.getmtime(
-					'\\\\?\\' + os.path.join(self._src_dir, rpath)
-				))
-				dst_mtime = int(os.path.getmtime(
-					'\\\\?\\' + os.path.join(self._dst_dir, rpath)
-				))
-				if src_mtime > dst_mtime:
+				src_datem = win32file.GetFileAttributesEx(
+					path_long(dir_slash(self._src_dir)) + rpath
+				)[3].timestamp()
+				dst_datem = win32file.GetFileAttributesEx(
+					path_long(dir_slash(self._dst_dir)) + rpath
+				)[3].timestamp()
+				if int(src_datem) > int(dst_datem):
 					self._new_files.add(rpath)
 			except:
-				tdebug(str_short('mdate error: ' + exc_text(with_file=False)))
+				tdebug(str_short('datem error: ' + exc_text(with_file=False)))
 				tdebug('mdate error:', exc_text(with_file=False), short=True)
 				self.errors[rpath] = 'mdate error'
 
@@ -2049,13 +2112,13 @@ class DirSync:
 		'''
 		errors = set()
 		for rpath in self._dst_only_dirs:
-			res = dir_delete((self._dst_dir, rpath))
+			err = dir_delete((self._dst_dir, rpath))
 			self._log('del dir', rpath)
-			if res:
+			if err:
 				errors.add(rpath)
-				if tdebug(): print(path_short(f'dir del err {res}: {rpath}'))
-				tdebug(f'dir del err {res}: {rpath}', short=path_short)
-				self.errors[rpath] = 'dir del'
+				if tdebug():
+					print(path_short(f'dir del err {len(err)}: {rpath}'))
+				self.errors[rpath] = f'dir del {len(err)}'
 		del_dirs = self._dst_only_dirs - errors
 		self._dst_only_files = set(
 			f for f in self._dst_only_files
@@ -2065,15 +2128,13 @@ class DirSync:
 	def _delete_files(self):
 		' Delete files that do not exist in the src '
 		for rpath in self._dst_only_files:
-			try:
-				file_delete((self._dst_dir, rpath))
+			if (err := file_delete((self._dst_dir, rpath))) == 0: 
 				self._log('del file', rpath)
-			except FileNotFoundError:
-				pass
-			except:
+			else:
 				if tdebug():
-					str_short('file del err: ' + exc_text(with_file=False))
-				self.errors[rpath] = 'file del'
+					print(str_short('file del err: '
+					+ exc_text(with_file=False) ) )
+				self.errors[rpath] = f'file del {err}'
 
 	def print_diff(self):
 		'''
@@ -2137,9 +2198,9 @@ class DirSync:
 		' Perform synchronization '
 		tstart = time_now()
 		self.errors = dict()
-		self._copy()
 		self._delete_dirs()
 		self._delete_files()
+		self._copy()
 		self.duration = time_diff_str(tstart, no_ms=True)
 		tdebug('done in', self.duration)
 		return len(self.errors) == 0
@@ -2147,12 +2208,19 @@ class DirSync:
 
 def dir_sync(src_dir, dst_dir, report:bool=False
 , **rules)->dict:
-	'''
+	r'''
 	One-way directory synchronization.  
 	For *rules* see the `path_rule`.  
-	Returns dict with errors:  
-	
-		{'path\\file.exe': 'copy error', ...}
+	Returns dict with errors: `{'path\\file.exe': 'copy error', ...}`  
+		
+		src, dst = dir_test(), temp_dir('rnd')
+		dir_sync(src, dst)
+		asrt(
+			tuple( dir_files(src, name_only=True) )
+			, tuple( dir_files(dst, name_only=True) )
+		)
+		dir_delete(src)
+		dir_delete(dst)
 
 	'''
 	sync = DirSync(src_dir=src_dir, dst_dir=dst_dir
@@ -2170,6 +2238,7 @@ def path_short(fullpath, max_len:int=0)->str:
 		path = r'c:\Windows\System32\msiexec.exe'
 		asrt(path_short(path, 22), 'c:\Windo...msiexec.exe')
 		asrt(path_short(path, 23), 'c:\Window...msiexec.exe')
+		asrt(path_short(path), path)
 
 	'''
 	if not max_len: max_len = _TERMINAL_WIDTH
@@ -2440,5 +2509,7 @@ def path_is_link(fullpath)->bool:
 	if (atts := win32file.GetFileAttributes(fpath)) == -1: return False
 	return (atts & _FILE_ATTRIBUTE_REPARSE_POINT) \
 	== _FILE_ATTRIBUTE_REPARSE_POINT
+
+
 
 if __name__ != '__main__': patch_import()
