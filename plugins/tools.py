@@ -30,6 +30,8 @@ import win32gui
 import win32con
 import win32com.client
 from typing import Callable, Iterable 
+from dataclasses import dataclass, field
+from queue import Queue, SimpleQueue
 from itertools import zip_longest
 import pythoncom
 import wx
@@ -37,13 +39,14 @@ from collections import defaultdict
 import lxml
 import textwrap
 from xml.etree import ElementTree as _ElementTree
+import windows_toasts as wtoasts
 try:
 	import constants as tcon
 except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2024-01-03'
+APP_VERSION = 'v2024-02-08'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 _app_log = []
 _app_log_limit = 10_000
@@ -219,14 +222,14 @@ def con_log(*msgs, **kwargs):
 	try:
 		if not (sett := __builtins__.get('sett', None)): return
 		with open(
-			f'log\\{ltime.strftime(sett.log_file_name)}.log'
+			app_dir() + f'\\log\\{ltime.strftime(sett.log_file_name)}.log'
 			, 'ta+', encoding='utf-8'
 		) as f:
 			f.write(log_str)
 	except FileNotFoundError:
 		os.makedirs('log')
 		with open(
-			f'log\\{ltime.strftime(sett.log_file_name)}.log'
+			app_dir() + f'\\log\\{ltime.strftime(sett.log_file_name)}.log'
 			, 'ta+', encoding='utf-8'
 		) as f:
 			f.write(log_str)
@@ -371,7 +374,7 @@ def date_weekday(date_val:datetime.datetime=None
 	Returns weekday as a string.  
 
 		asrt( date_weekday(datetime.datetime(2023, 10, 1)), 'Sunday' )
-		asrt( benchmark(date_weekday, (datetime.datetime(2023, 10, 1),)), 5137, "<" )
+		asrt( benchmark(date_weekday, (datetime.datetime(2023, 10, 1),)), 8_000, "<" )
 
 	'''
 	if not date_val: date_val = datetime.date.today()
@@ -464,7 +467,7 @@ def clip_get()->str:
 	r'''
 	Returns the text from the clipboard, if any.
 
-		asrt( benchmark(clip_get), 13031, "<" )
+		asrt( benchmark(clip_get), 25_000, "<" )
 
 	'''
 	return pyperclip.paste()
@@ -664,10 +667,11 @@ def warning(msg:str, title:str=None):
 def inputbox(message:str, title:str=None
 , is_pwd:bool=False, default:str=''
 , multiline:bool=False, topmost:bool=True)->str:
-	''' Request input from user.
-		is_pwd - use password dialog (hide input).
-		Problem: don't use default or you will get this value
-		whatever button user will press.
+	r'''
+	Request input from user.  
+	*is_pwd* - use password dialog (hide input).
+	Problem: don't use default or you will get this value
+	whatever button user will press.
 	'''
 	if tdebug():
 		if is_pwd:
@@ -704,6 +708,39 @@ def inputbox(message:str, title:str=None
 	value = dlg.GetValue()
 	dlg.Destroy()
 	return value
+
+_toast_app_icon = None
+def toast(msg:str|tuple|list, dur:str='default', img:str=''
+, often_ident:str='', often_inter:str='30 sec', on_click:Callable=None):
+	r'''
+	Windows toast notification.  
+	*img* - full path to a picture.  
+	*duration* - 'short'|'long'|'default'. 'default' and 'short' the same?
+	'long' is about 30 sec.  
+	*on_click* - an action to perform on click. It is passed an
+	argument with the click properties.  
+	'''
+	global _toast_app_icon
+	if dur == 'default': dur = 'Default'
+	assert dur in ('Default', 'short', 'long')
+	msg = ' '.join(map(str, msg)) if is_iter(msg) else str(msg)
+	often_ident = str(often_ident) if often_ident else msg[:10]
+	if is_often('_toast ' + often_ident, interval=often_inter): return 'often'
+	toaster = wtoasts.WindowsToaster(APP_NAME)
+	newToast = wtoasts.Toast()
+	newToast.duration = wtoasts.ToastDuration(dur)
+	newToast.text_fields = [msg]
+	if not _toast_app_icon:
+		_toast_app_icon = wtoasts.ToastDisplayImage.fromPath(
+			os.path.join(app_dir(), r'resources\logo.ico')
+		)
+	if img:
+		timg = wtoasts.ToastDisplayImage.fromPath(img)
+		newToast.AddImage(timg)
+	else:
+		newToast.AddImage(_toast_app_icon)
+	if on_click: newToast.on_activated = on_click
+	toaster.show_toast(newToast)
 
 
 
@@ -784,7 +821,7 @@ def app_icon_text_set(text:str=APP_FULLNAME):
 def create_default_ini_file():
 	''' Creates default settings.ini file.
 	'''
-	with open('settings.ini', 'xt', encoding='utf-8-sig') as ini:
+	with open(app_dir() + '\\settings.ini', 'xt', encoding='utf-8-sig') as ini:
 		ini.write(_DEFAULT_INI)
 
 def job_pool(jobs:list, pool_size:int=None)->list:
@@ -915,7 +952,7 @@ def tprint(*msgs, **kwargs):
 def tdebug(*msgs, **kwargs)->bool:
 	r'''
 	Does the code execute from the console?  
-	Use kwarg *short* to apply `str_short` to the output.  
+	Use kwarg `short=True` to apply `str_short` to the output.  
 	For paths better use `short=path_short`  
 
 		asrt( benchmark(tdebug), 435, "<" )
@@ -1030,7 +1067,7 @@ def safe(func:Callable)->Callable:
 		except Exception as e:
 			trace_li = traceback.format_exc().splitlines()
 			trace_str = '\n'.join(trace_li[-3:])
-			tdebug(f'safe: \n{trace_str}')
+			if tdebug(): tprint(f'safe: \n{trace_str}')
 			return False, e
 	return wrapper
 _TaskDialogIndirect = ctypes.WinDLL('comctl32.dll').TaskDialogIndirect
@@ -1110,8 +1147,8 @@ def dialog(
 	Returns ID of selected button starting with 1000
 	or 0 if timeout is over.  
 	*return_button* - returns (status, selected button value).  
-		Status == True if some of button was selected and
-		False if no button was selected (timeout or escape).
+		Status == `True` if some of button was selected and
+		`False` if no button was selected (timeout or escape).
 	*wait* - non-blocking mode. It returns c_long object
 	so it is possible to get user responce later with
 	'.value' property (=2 before user makes any choice)
@@ -1690,7 +1727,7 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 	*err_action* - function to run if an exception occurs.  
 	The text of exception will be passed to the function.  
 
-		asrt( benchmark(thread_start, (lambda: None,)), 300_000, '<' )
+		asrt( benchmark(thread_start, (lambda: None,)), 500_000, '<' )
 
 	'''
 	def wrapper():

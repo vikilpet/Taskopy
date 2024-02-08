@@ -32,6 +32,7 @@ class Language:
 		self.warn_no_run_tasks = 'No running tasks'
 		self.warn_on_exit = 'Waiting for tasks to complete on exit'
 		self.warn_rule_exc = 'Exception in a rule in the task «{}»: {}'
+		self.warn_rule_type = 'Task «{}»: rule should be a function or tuple of functions'
 		self.warn_path_not_exist = "The path doesn't exist: «{}»"
 		self.warn_file_not_exist = "The file doesn't exist: «{}»"
 		self.dlg_nx_tasks = 'Delete tasks without threads'
@@ -96,6 +97,7 @@ button_close=Закрыть
 button_cancel=Отмена
 warn_on_exit=Ожидаем завершения задач при выходе
 warn_rule_exc=Исключение в правиле у задачи «{}»: {}
+warn_rule_type=Задача «{}»: правило должно быть функцией или кортежом функций
 warn_path_not_exist=Путь не существует: «{}»
 warn_file_not_exist=Файл не существует: «{}»
 dlg_nx_tasks=Удалить задачи без потоков

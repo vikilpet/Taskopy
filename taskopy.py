@@ -381,7 +381,7 @@ class Tasks:
 			if not isinstance(task_obj, types.FunctionType): continue
 			if task_obj.__module__ != 'crontab': continue
 			
-			task_opts = {}
+			task_opts:dict = {}
 			params = inspect.signature(task_obj).parameters
 			for opt, opt_def in TASK_OPTIONS:
 				param = params.get(opt)
@@ -462,8 +462,14 @@ class Tasks:
 							task_opts['http_white_list'].append(ip.strip())
 			if task_opts['idle']: self.add_idle_task(task_opts)
 			if task_opts['event_log']: self.add_event_handler(task_opts)
-			if task_opts['rule'] and not is_iter(task_opts['rule']):
-				task_opts['rule'] = (task_opts['rule'], )
+			if task_opts['rule'] != None:
+				if not is_iter(task_opts['rule']):
+					task_opts['rule'] = (task_opts['rule'], )
+				for rule in task_opts['rule']:
+					if not isinstance(rule, Callable):
+						warning(lang.warn_rule_type.format(
+							task_opts['task_name_full']
+						))
 		self.task_list_menu.sort( key=lambda k: k['task_name'].lower() )
 		self.task_list_submenus.sort( key=lambda k: k[0].lower() )
 		for subm in self.task_list_submenus:
@@ -1227,7 +1233,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			table.append((
 				t['task_func_name']
 				, thr_name
-				, os_threads[t['thread']]
+				, os_threads.get(t['thread'], '?')
 				, last_start
 				, duration
 			))
@@ -1240,7 +1246,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		)
 		if len(running_tasks) > TASKS_MSG_MAX:
 			tasks_str += '\r\n...'
-		buttons = lang.dlg_nx_tasks if nx_tasks else None
+		buttons = (lang.dlg_nx_tasks,) if nx_tasks else None
 		choice = dialog(tasks_str, buttons=buttons, timeout='10 sec'
 		, wait=(True if nx_tasks else False))
 		if choice != 1000: return

@@ -229,7 +229,7 @@ def proc_exists(process, cmd_filter:str=None
 	Returns PID if the process with the specified name exists.  
 	*process* - image name or PID.  
 	*cmd_filter* - optional string to search in the
-	command line of the process.  
+	command line of the process (case-insensitive).  
 	*user_filter* - only search within processes of
 	specified user. Format: pc\\username  
 	'''

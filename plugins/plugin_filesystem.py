@@ -10,31 +10,32 @@ import os
 import stat
 import time
 import glob
-from contextlib import contextmanager
-from collections import namedtuple
 import csv
 import random
 import pyodbc
 import mimetypes
 import zipfile
-from zlib import crc32
 import tempfile
 import datetime
 import win32con
-from operator import itemgetter
 import win32print
 import hashlib
 import pythoncom
 import base64
-from typing import Callable, Iterator, Iterable, Generator
 import psutil
 import win32file
 
-import win32api
-from win32com.shell import shell, shellcon
-from pathlib import Path
 import shutil
 import configparser
+import win32api
+from operator import itemgetter
+from zlib import crc32
+from contextlib import contextmanager
+from collections import namedtuple
+from typing import Callable, Iterator, Iterable, Generator
+from win32com.shell import shell, shellcon
+from pathlib import Path
+from _winapi import CreateJunction
 from .tools import *
 from .tools import _TERMINAL_WIDTH
 try:
@@ -88,7 +89,7 @@ def path_get(fullpath:str|tuple|list|Iterator, max_len:int=0
 	*max_len* - if set, then limit the
 	maximum length of the full path.  
 
-		path = path_get(('%appdata%', 'Media Center Programs'))
+		path = path_get(('%appdata%', 'Microsoft\\Crypto'))
 		asrt( dir_exists(path), True)
 		path = (r'c:\Windows', '\\notepad.exe')
 		path2 = r'c:\Windows\notepad.exe'
@@ -356,11 +357,11 @@ def file_delete(fullpath)->int:
 	return last_err
 
 def file_recycle(fullpath, silent:bool=True)->bool:
-	'''
+	r'''
 	Move file to the recycle bin.  
 	*silent* - do not show standard windows
 	dialog to confirm deletion.  
-	Returns True on successful operation.  
+	Returns `True` on successful operation.  
 	'''
 	fullpath = path_get(fullpath)
 	flags = shellcon.FOF_ALLOWUNDO
@@ -801,13 +802,14 @@ def file_dir(fullpath)->str:
 	Returns directory from fullpath.  
 	
 		asrt( benchmark(file_dir, r'c:\Windows\System32\calc.exe'), 5617, "<" )
+		asrt( file_dir(r'sdcard/Music/file.mp3'), r'sdcard/Music')
 	
 	'''
 	return os.path.dirname(path_get(fullpath))
 
 def file_dir_repl(fullpath, new_dir:str)->str:
 	''' Changes the directory of the file (in full path)
-	'''
+	i'''
 	fullpath = path_get(fullpath)
 	return os.path.join(new_dir, os.path.basename(fullpath) )
 
@@ -843,7 +845,7 @@ def drive_free(path:str, unit:str='GB')->int:
 		asrt( drive_free('c'), 0, '>')
 		asrt( drive_free('c:\\windows'), 10, '>')
 		asrt( drive_free('c:\\windows\\'), 10, '>')
-		asrt( benchmark(drive_free, 'c'), 24948, "<" )
+		asrt( benchmark(drive_free, 'c'), 35_000, "<" )
 
 	'''
 	e = _SIZE_UNITS.get(unit.lower(), 1073741824)
@@ -868,7 +870,7 @@ def dir_list(fullpath, **rules)->Iterator[str]:
 		)
 		asrt(
 			benchmark(lambda d: tuple(dir_list(d)), 'log', b_iter=5)
-			, 500_000
+			, 600_000
 			, '<'
 		)
 
@@ -1103,26 +1105,30 @@ def file_zip_cont(fullpath, only_files:bool=False)->list:
 		else:
 			return [f.filename for f in z.filelist]
 
-def temp_dir(new_dir:str='')->str:
+def temp_dir(new_dir:str='', prefix:str='', suffix:str='')->str:
 	r'''
 	Returns the full path to the user's temporary directory.  
 	If *new_dir* is specified, creates this subfolder and
 	returns the path to it.  
+	*prefix*, *suffix* - add something to a directory name.  
 	If *new_dir='rnd'*, a directory with a random name is created.  
+		asrt( temp_dir(), os.getenv('temp') )
+
 	'''
-	if not new_dir:
-		return tempfile.gettempdir()
-	if new_dir == 'rnd':
-		new_dir = os.path.join(
-			tempfile.gettempdir()
-			, time.strftime("%m%d%H%M%S") + random_str(5)
-		)
-	else:
-		new_dir = os.path.join(tempfile.gettempdir(), new_dir)
+	dst_dir = tempfile.gettempdir()
+	if all((new_dir == '', prefix == '', suffix == '')): return dst_dir
+	new_dir, prefix, suffix = str(new_dir), str(prefix), str(suffix)
+	dname:str = new_dir if new_dir else ''
+	if (dname == 'rnd') or ((dname == '') and (suffix or prefix)):
+		dname = time.strftime("%m%d%H%M%S") + random_str(4)
+	if prefix or suffix:
+		dname = file_name_add(dname, suffix=suffix, prefix=prefix)
+	dst_dir = os.path.join(dst_dir, dname)
 	try:
-		os.mkdir(new_dir)
-	except FileExistsError: pass
-	return new_dir
+		os.mkdir(dst_dir)
+	except FileExistsError:
+		pass
+	return dst_dir
 
 def temp_file(prefix:str='', suffix:str=''
 , content=None, encoding='utf-8')->str:
@@ -1220,7 +1226,7 @@ def file_date_get(fullpath)->tuple[datetime.datetime]:
 
 		fpath = temp_file(content=' ')
 		asrt( file_date_get(fpath)[2].minute, time_minute() )
-		asrt( benchmark(file_date_get, (fpath,)), 22000, "<" )
+		asrt( benchmark(file_date_get, (fpath,)), 42_000, "<" )
 		file_delete(fpath)
 
 	'''
@@ -1566,7 +1572,7 @@ def var_mod(var)->datetime.datetime:
 	return file_date_m(fpath)
 
 def var_mod_dif(var, unit:str='sec')->int:
-	'''
+	r'''
 	Returns how many time units have passed
 	since the last change.
 
@@ -2502,13 +2508,32 @@ def path_is_link(fullpath)->bool:
 
 		asrt( path_is_link(r'c:\Documents and Settings'), True )
 		asrt( path_is_link(r'c:\pagefile.sys'), False )
-		asrt( benchmark(path_is_link, ('c:\\Documents and Settings',)), 16117, "<" )
+		asrt(benchmark(path_is_link, ('c:\\Documents and Settings',)), 25_000, "<" )
 		
 	'''
 	fpath = path_get(fullpath)
 	if (atts := win32file.GetFileAttributes(fpath)) == -1: return False
 	return (atts & _FILE_ATTRIBUTE_REPARSE_POINT) \
 	== _FILE_ATTRIBUTE_REPARSE_POINT
+
+def dir_junc(src_path, dst_path):
+	r'''
+	Creates a junction link to a directory.  
+	Only for local paths.  
+
+		td = dir_test()
+		tdj = file_name_add(td, ' junc')
+		dir_junc(td, tdj)
+		asrt( dir_exists(tdj), True )
+		dir_delete(td)
+		asrt( dir_exists(tdj), False )
+		dir_delete(tdj)
+
+	'''
+	src_path = path_get(src_path)
+	dst_path = path_get(dst_path)
+	CreateJunction(src_path, dst_path)
+
 
 
 

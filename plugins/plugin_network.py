@@ -28,8 +28,9 @@ from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 _USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 _PUB_SUF_LST = set()
-
 warnings.filterwarnings('ignore', category=MarkupResemblesLocatorWarning)
+requests.packages.urllib3.disable_warnings(
+	requests.packages.urllib3.exceptions.InsecureRequestWarning)
 
 def http_req(url:str, encoding:str='utf-8', session:bool=False
 , cookies:dict=None, headers:dict=None
@@ -40,7 +41,7 @@ def http_req(url:str, encoding:str='utf-8', session:bool=False
 	r'''
 	Gets content of the specified URL.
 	
-	**Kwargs tips:**  
+	**kwargs tips:**  
 	Skip SSL verification: `verify=False`  
 	Follow redirects: `allow_redirects=True`  
 
@@ -556,22 +557,20 @@ def net_html_unescape(html_str:str)->str:
 
 
 
-def is_online(*sites, timeout:float=2.0)->int:
+def is_online(
+	sites=('http://clients3.google.com', 'http://captive.apple.com')
+	, timeout:float=2.0
+)->int:
 	r'''
-	Checks if there is an internet connection using *HEAD*
-	requests to the specified web sites.  
-	The function will not raise an exception.  
+	A simple check if there is an internet connection with *HEAD*
+	requests to the specified sites.  
+	The function will not raise any exception.  
 	*timeout* - timeout in seconds.  
 
 		asrt( is_online(), 2 )
-		asrt( is_online('https://non.existent.domain'), 0 )
+		asrt( is_online( ('https://non.existent.domain',) ), 0 )
 
 	'''
-	if not sites:
-		sites = (
-			'https://www.google.com/'
-			, 'https://yandex.ru/'
-		)
 	r = 0
 	for site in sites:
 		try:
@@ -761,7 +760,7 @@ def ping_tcp(host:str, port:int, count:int=1, pause:int=100
 
 		asrt( ping_tcp('8.8.8.8', 443)[1][1] > 10, True )
 		asrt( ping_tcp('127.0.0.1', 445)[1][1] < 15, True )
-		asrt( ping_tcp('non.existent.domain', 80), (False, '[Errno 11004] getaddrinfo failed') )
+		asrt( ping_tcp('non.existent.domain', 80), (False, '[Errno 11001] getaddrinfo failed') )
 
 	'''
 	timings = []
