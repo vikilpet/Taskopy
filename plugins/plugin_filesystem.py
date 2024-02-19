@@ -640,6 +640,7 @@ def dir_rnd_files(fullpath, file_num:int=1
 
 	Designed for large directories that take a significant
 	amount of time to list.  
+	Note: the function may return the same file more than once.  
 	Example:
 
 		dir_rnd_files('.')
@@ -713,6 +714,7 @@ def dir_purge(fullpath, days:int=0, subdirs:bool=True
 , print_del:bool=False, **rules)->int:
 	r'''
 	Deletes files older than *x* days.  
+	Deletes empty subfolders.  
 	Returns number of deleted files and folders.  
 	
 	*days=0* - delete everything  
@@ -1424,8 +1426,8 @@ def file_relpath(fullpath, start)->str:
 		)
 
 	'''
-	fullpath = path_get(fullpath)
-	start = path_get(start)
+	fullpath = path_get(fullpath).lstrip('\\\\?\\')
+	start = path_get(start).lstrip('\\\\?\\')
 	return os.path.relpath(fullpath, start=start)
 
 def _file_name_pe(filename:str):

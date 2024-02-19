@@ -46,8 +46,11 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2024-02-08'
+APP_VERSION = 'v2024-02-19'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
+APP_ICON = r'resources\icon.png'
+APP_ICON_DIS = r'resources\icon_dis.png'
+APP_ICON_ICO = r'resources\icon.ico'
 _app_log = []
 _app_log_limit = 10_000
 
@@ -711,14 +714,19 @@ def inputbox(message:str, title:str=None
 
 _toast_app_icon = None
 def toast(msg:str|tuple|list, dur:str='default', img:str=''
-, often_ident:str='', often_inter:str='30 sec', on_click:Callable=None):
+, often_ident:str='', often_inter:str='30 sec', on_click:Callable=None
+, appid:str=APP_NAME):
 	r'''
 	Windows toast notification.  
 	*img* - full path to a picture.  
 	*duration* - 'short'|'long'|'default'. 'default' and 'short' the same?
 	'long' is about 30 sec.  
 	*on_click* - an action to perform on click. It is passed an
-	argument with the click properties.  
+	argument with the click properties. If the notification has
+	already disappeared from the screen and is in the action center
+	, the action will be performed only if an valid *appid* is specified  
+	*appid* - custom AppID. If you want toast to have the Taskopy icon, see the `emb_appid_add` task
+	from *ext_embedded*.  
 	'''
 	global _toast_app_icon
 	if dur == 'default': dur = 'Default'
@@ -726,19 +734,12 @@ def toast(msg:str|tuple|list, dur:str='default', img:str=''
 	msg = ' '.join(map(str, msg)) if is_iter(msg) else str(msg)
 	often_ident = str(often_ident) if often_ident else msg[:10]
 	if is_often('_toast ' + often_ident, interval=often_inter): return 'often'
-	toaster = wtoasts.WindowsToaster(APP_NAME)
+	toaster = wtoasts.WindowsToaster(appid)
 	newToast = wtoasts.Toast()
 	newToast.duration = wtoasts.ToastDuration(dur)
 	newToast.text_fields = [msg]
-	if not _toast_app_icon:
-		_toast_app_icon = wtoasts.ToastDisplayImage.fromPath(
-			os.path.join(app_dir(), r'resources\logo.ico')
-		)
 	if img:
-		timg = wtoasts.ToastDisplayImage.fromPath(img)
-		newToast.AddImage(timg)
-	else:
-		newToast.AddImage(_toast_app_icon)
+		newToast.AddImage( wtoasts.ToastDisplayImage.fromPath(img) )
 	if on_click: newToast.on_activated = on_click
 	toaster.show_toast(newToast)
 
@@ -1329,15 +1330,15 @@ def table_print(
 	, trim_func=None
 	, trim_placeholder:str='...'
 ):
-	'''
+	r'''
 	Print list of lists/tuples as a table.
 
 	*use_headers* - if it's True - takes first row as
 	a headers. If it's list or tuple, then use this as
 	a headers.  
 	*sorting* - list of column numbers to sort by.  
-	Example:
-	sorting=[0, 1] - sort table by first
+	Example:  
+	`sorting=[0, 1]` - sort table by first
 	and second column  
 	*sorting_func* - sort with this function.  
 	*sorting_rev* - sort in reverse order.  

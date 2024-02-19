@@ -50,49 +50,70 @@ def win_get(window=None, class_name:str=None)->int:
 		return win32gui.FindWindow(class_name, window)
 	else:
 		return win32gui.GetForegroundWindow()
-	
+
+def registry_path_add(fullpath:str)->bool|str:
+	r'''
+	Creates a new path in the registry.  
+	Returns *True* on success or 'error text' on fail.  
+	'''
+	hive = fullpath.split('\\')[0]
+	new_path = '\\'.join(fullpath.split('\\')[1:])
+	if hive in [w for w in winreg.__dict__ if w[:5] == 'HKEY_']:
+		hive = getattr(winreg, hive)
+	else:
+		return 'unknown hive'
+	try:
+		winreg.CreateKeyEx(hive, new_path)
+		return True
+	except:
+		return exc_text()
+
 def registry_get(fullpath:str):
-	''' Get value by fullpath to registry key.
-		fullpath - full path to key.
-		Example:
+	r'''
+	Get value by fullpath to registry key.  
+	*fullpath* - full path to the key.  
+	Example:
 		
-			>registry_get('HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Internet Explorer\\Build')
-			'99600'
+		asrt(
+			registry_get('HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Internet Explorer\\Build')
+			, '922621'
+		)
+
 	'''
 	if fullpath[:5] != 'HKEY_':
-		return Exception('Path must begin with with «HKEY_»')
+		return 'the fullpath must start with «HKEY_»'
 	hive = fullpath.split('\\')[0]
 	key_path = '\\'.join(fullpath.split('\\')[1:-1])
 	key_name = fullpath.split('\\')[-1]
 	if hive in [w for w in winreg.__dict__ if w[:5] == 'HKEY_']:
 		hive = getattr(winreg, hive)
 	else:
-		return Exception('unknown hive')
+		return 'unknown hive'
 	try:
 		with winreg.OpenKey(hive, key_path, 0
 		, winreg.KEY_READ) as reg_key:
 			value, value_type = winreg.QueryValueEx(reg_key, key_name)
 		return value
-	except WindowsError as e:
-		tdebug(e)
-		return e
+	except:
+		return exc_text()
 
-def registry_set(fullpath:str, value, value_type:str=None):
-	r''' Set value by fullpath to registry key.
-		If value_type not specified: if type of value is int
-		then store as REG_DWORD, otherwise store as REG_SZ.
-		If key doesn't exist it will be created.
-		fullpath  - string like
-		'HKEY_CURRENT_USER\Software\Microsoft\Calc\layout'
+def registry_set(fullpath:str, value, value_type=None)->bool|str:
+	r'''
+	Set the value to the full path of the registry key.  
+	*value_type* - type like `winreg.REG_SZ` or `winreg.REG_DWORD`.  
+	If *value_type* is not specified: if type of value is *int*
+	then store as *REG_DWORD*, otherwise store as *REG_SZ*.  
+	If the key does not exist, it will be created.  
+	*fullpath*  - full path to the key like this:  
+	r'HKEY_CURRENT_USER\Software\Microsoft\Calc\layout'  
+	Returns `True` on success or 'error text' on fail.  
 	'''
 	if fullpath[:5] != 'HKEY_':
-		return Exception('Path must begin with with «HKEY_»')
+		return 'the fullpath must start with «HKEY_»'
 	hive = fullpath.split('\\')[0]
 	key_path = '\\'.join(fullpath.split('\\')[1:-1])
 	key_name = fullpath.split('\\')[-1]
-	if value_type:
-		value_type = getattr(winreg, value_type)
-	else:
+	if value_type == None:
 		if isinstance(value, int):
 			value_type = winreg.REG_DWORD
 		else:
@@ -108,8 +129,8 @@ def registry_set(fullpath:str, value, value_type:str=None):
 			winreg.SetValueEx(reg_key, key_name, 0
 								, value_type, value)
 		return True
-	except WindowsError as e:
-		return f'error: {e}'
+	except:
+		return exc_text()
 
 def win_class_name(window=None)->str:
 	''' Gets the name of the window class '''

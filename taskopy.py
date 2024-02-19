@@ -144,8 +144,6 @@ if getattr(sys, 'frozen', False):
 else:
 	APP_PATH = os.getcwd()
 
-APP_ICON = r'resources\icon.png'
-APP_ICON_DIS = r'resources\icon_dis.png'
 PLUGIN_SOURCE = 'plugins\\*.py'
 class OVERLAPPED(ctypes.Structure):
 	_fields_ = [
@@ -521,7 +519,7 @@ class Tasks:
 		else:
 			try:
 				keyboard.add_hotkey(
-					hotkey=str(task['hotkey']).lower()
+					hotkey=str(task['hotkey'])
 					, callback=self.run_task
 					, suppress=False
 					, args=[task, 'hotkey']

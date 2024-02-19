@@ -2,6 +2,7 @@ import ctypes
 import ctypes.wintypes
 import win32con
 import keyboard
+from collections import namedtuple
 try:
 	from .tools import warning, patch_import, time_sleep, tdebug
 except ImportError:
@@ -63,103 +64,112 @@ How to find a key name (exit on *space*):
 _user32 = ctypes.windll.user32
 _kernel32 = ctypes.windll.kernel32
 
-class GlobalHotKeys():
-	''' Register a global hotkey using the register() method.
-		Start the listening mode with 'listen' method which
-		SHALL be run in another thread.
+_KeyMap = namedtuple('KeyMap', ('vkey', 'modifier', 'func', 'args'))
+
+class GlobalHotKeys:
+	r'''
+	Register a global hotkey using the register() method.  
+	Start the listening mode with *listen* method which 
+	SHALL run in a different thread.  
 	'''
-	
-	def __init__(s):
-		s.thread_id = 0
-		s.key_mapping = []
-		s.keys = {}
-		s.modifiers = {
+
+	def __init__(self):
+		self.thread_id:int = 0
+		self.key_mapping:list = []
+		self.keys:dict = {}
+		self.modifiers:dict = {
 			'alt': win32con.MOD_ALT
 			, 'ctrl': win32con.MOD_CONTROL
 			, 'shift': win32con.MOD_SHIFT
 			, 'win': win32con.MOD_WIN
 		}
-		s.fill_key_dict()
+		self.fill_key_dict()
 
-	def fill_key_dict(s):
-		''' Fill keys dict with VK_ constants from win32con
+	def fill_key_dict(self):
+		r'''
+		Fill keys dict with *VK_* constants from `win32con`
 		'''
 		for item, value in win32con.__dict__.items():
 			if str(item)[:3] == 'VK_':
-				s.keys[str(item[3:]).lower()] = value
+				self.keys[str(item[3:]).lower()] = value
 		for key_code in (
 			list(range(ord('A'), ord('Z') + 1))
 			+ list(range(ord('0'), ord('9') + 1))
 		):
-			s.keys[chr(key_code).lower()] = key_code
+			self.keys[chr(key_code).lower()] = key_code
 
-	def register(s, hotkey:str, func=None, func_args:list=[]):
-		''' hotkey - string like 'ctrl+shift+m'
-			func - function to run on hotkey
-			func_args - list of arguments for func
+	def register(self, hotkey:str, func=None, func_args:list=[]):
+		r'''
+		*hotkey* - string like 'ctrl+shift+m'  
+		*func* - function to run on hotkey  
+		*func_args* - list of arguments for func  
 		'''
-		modifier = 0
-		key_li = hotkey.lower().split('+')
+		vkey:int = 0
+		modifier:int = 0
+		key_li = [k.strip() for k in hotkey.strip().lower().split('+')]
 		if len(key_li) > 1:
-			for k in key_li:
-				if k in s.modifiers.keys():
-					modifier |= s.modifiers[k]
-				elif k in s.keys.keys():
-					vk = s.keys[k]
-				elif k.isdigit():
-					vk = int(k)
+			for key in key_li:
+				if key in self.modifiers.keys():
+					modifier |= self.modifiers[key]
+				elif key in self.keys.keys():
+					vkey = self.keys[key]
+				elif key.isdigit():
+					vkey = int(key)
 				else:
-					raise Exception(f'Unknown key: {k}')
+					raise Exception(f'Unknown key: {key}')
 		else:
-			k = key_li[0]
-			vk = s.keys.get(k)
-			if not vk:
-				if k.isdigit():
-					vk = int(k)
+			key = key_li[0]
+			vkey = self.keys.get(key, 0)
+			if not vkey:
+				if key.isdigit():
+					vkey = int(key)
 				else:
-					raise Exception(f'Unknown key: {k}')
+					raise Exception(f'Unknown key: {key}')
  
-		s.key_mapping.append(
-			(vk, modifier, lambda a=func_args: func(*a))
-		)
+		self.key_mapping.append(_KeyMap(vkey=vkey, modifier=modifier
+		, func=func, args=func_args))
 
-	def stop_listener(s):
-		''' Stop current listen thread
+	def stop_listener(self):
+		r'''
+		Stop the current listening thread.
 		'''
 		WM_QUIT = 0x0012
-		_user32.PostThreadMessageW(s.thread_id, WM_QUIT, 0, 0)
+		_user32.PostThreadMessageW(self.thread_id, WM_QUIT, 0, 0)
 
-	def unregister(s):
-		for index, (vk, modifiers, func) in enumerate(s.key_mapping):
+	def unregister(self):
+		for index, _ in enumerate(self.key_mapping):
 			_user32.UnregisterHotKey(None, index)
 
-	def listen(s):
-		''' Start listening for hotkeys
+	def listen(self):
+		r'''
+		Start listening for hotkeys.
 		'''
-		s.thread_id = _kernel32.GetCurrentThreadId()
-		for index, (vk, modifiers, func) in enumerate(s.key_mapping):
-			if not _user32.RegisterHotKey(None, index, modifiers, vk):
+		self.thread_id = _kernel32.GetCurrentThreadId()
+		kmap:_KeyMap
+		for index, kmap in enumerate(self.key_mapping):
+			if not _user32.RegisterHotKey(None, index, kmap.modifier
+			, kmap.vkey):
+				lasterr = _kernel32.GetLastError()
+				if lasterr == 1409: lasterr = 'hotkey is already registered'
 				error = (
-					'Unable to register hot key: '
-					+ str(vk) + ' error code is: '
-					+ str(_kernel32.GetLastError())
+					'Task: «' + kmap.args[0].get('task_name_full', '?') + '»'
+					+ '\nHotkey: ' + kmap.args[0].get('hotkey', '??')
+					+ f' ({kmap.vkey})'
+					+ f'\nHotkey register error: {lasterr}'
 				)
-
 				print(error)
 				warning(error)
- 
 		try:
 			msg = ctypes.wintypes.MSG()
 			while _user32.GetMessageW(ctypes.byref(msg), None, 0, 0) != 0:
 				if msg.message == win32con.WM_HOTKEY:
-					(vk, modifiers, func) = s.key_mapping[msg.wParam]
-					if not func:
-						break
-					func()
+					kmap = self.key_mapping[msg.wParam]
+					if not kmap.func: break
+					kmap.func(*kmap.args)
 				_user32.TranslateMessage(ctypes.byref(msg))
 				_user32.DispatchMessageA(ctypes.byref(msg))
 		finally:
-			s.unregister()
+			self.unregister()
 key_pressed = keyboard.is_pressed
 key_send = keyboard.send
 key_write = keyboard.write

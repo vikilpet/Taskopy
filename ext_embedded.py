@@ -60,9 +60,37 @@ def emb_add_to_startup(caller=''):
 		(app_dir(), 'taskopy.exe' if is_app_exe() else 'taskopy.py')
 		, dest=(dir_user_startup(), 'taskopy.lnk')
 		, cwd=app_dir()
-		, icon_fullpath=(app_dir(), r'resources\logo.ico')
+		, icon_fullpath=(app_dir(), APP_ICON_ICO)
 		, win_style=win32con.SW_SHOWMINNOACTIVE
 	)
 
+def emb_appid_add(appid:str=APP_NAME, appname:str=APP_NAME
+, icon:str=path_get((app_dir(), APP_ICON_ICO)) ):
+	r'''
+	Adds the *AppID* to the registry for use with `toast` notifications.
+	'''
+	KEY_ROOT = 'HKEY_CURRENT_USER\\SOFTWARE\\Classes\\AppUserModelId\\'
+	if icon:
+		assert file_exists(icon), 'Icon file does not exist'
+		assert file_ext(icon) == 'ico', 'Icon file must be of type .ico'
+	key_path = KEY_ROOT + appid
+	res = registry_path_add(key_path)
+	if res != True:
+		dialog(f'Path fail: {res}')
+		return
+	res = registry_set(f'{key_path}\\DisplayName', value=appname
+	, value_type=winreg.REG_SZ)
+	if res != True:
+		dialog(f'DisplayName fail: {res}')
+		return
+	if not icon: return
+	res = registry_set( f'{key_path}\\IconUri', value=icon
+	, value_type=winreg.REG_SZ)
+	if res != True:
+		dialog(f'IconUri fail: {res}')
+		return
+	toast('Done!')
+
+	
 
 if __name__ != '__main__': patch_import()
