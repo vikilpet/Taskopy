@@ -6,7 +6,6 @@ import traceback
 import threading
 import inspect
 import types
-import configparser
 import wx.adv
 import wx
 import schedule
@@ -134,8 +133,8 @@ _EVERY_PATTERNS = {
 
 set_title = win32api.SetConsoleTitle
 tasks = None
-crontab:types.ModuleType = None
-sett = None
+crontab:types.ModuleType|None = None
+sett:Settings = Settings(ini_file='')
 lang:Language = None
 if getattr(sys, 'frozen', False):
 	APP_PATH = os.path.dirname(sys.executable)
@@ -167,38 +166,6 @@ CancelIoEx.argtypes = (
 	ctypes.wintypes.HANDLE,  # hObject
 	ctypes.POINTER(OVERLAPPED)  # lpOverlapped
 )
-
-class Settings:
-	''' Load global settings from settings.ini
-		Settings from all sections are collected.
-	'''
-	def __init__(self):
-		config = configparser.ConfigParser()
-		config.optionxform = str
-		try:
-			with open(r'settings.ini', 'tr', encoding='utf-8-sig') as f:
-				config.read_file(f)
-		except FileNotFoundError:
-			dev_print('create new settings.ini')
-			create_default_ini_file()
-			config.read(r'settings.ini', encoding='utf-8-sig')
-		for section in config._sections.values():
-			for sett_name, sett_val in section.items():
-				if sett_val.lower() in ('true', 'yes'):
-					self.__dict__[sett_name] = True
-				elif sett_val.lower() in ('false', 'no'):
-					self.__dict__[sett_name] = False
-				elif sett_val.isdigit():
-					self.__dict__[sett_name] = int(sett_val)
-				elif sett_val.replace('.', '', 1).isdigit():
-					try:
-						self.__dict__[sett_name] = float(sett_val)
-					except:
-						self.__dict__[sett_name] = sett_val
-				else:
-					self.__dict__[sett_name] = sett_val
-		for sett in APP_SETTINGS:
-			self.__dict__.setdefault(sett[0], sett[1])
 
 def load_crontab(event=None)->bool:
 	global tasks
@@ -252,10 +219,7 @@ def load_crontab(event=None)->bool:
 		return True
 	except:
 		trace_full, trace_short = _exc_texts()
-		con_log(
-			lang.warn_crontab_reload
-			, str_indent(trace_full)
-		)
+		con_log( lang.warn_crontab_reload + str_indent(trace_full) )
 		warning(
 			f'{lang.warn_crontab_reload}\n\n{trace_short}'
 			, title=lang.menu_reload
@@ -267,24 +231,24 @@ def load_modules():
 	(Re)Loads all application plugins and
 	crontab extensions if any.
 	'''
+
 	global crontab
-	if not hasattr(sett, 'own_modules'):
-		sett.own_modules = {'plugins.constants'}
-		for obj_name, obj in crontab.__dict__.items():
-			if not (
-				hasattr(obj, '__module__')
-				and obj.__module__ != 'crontab'
-				and not obj.__module__.startswith('pyimod')
-				and hasattr(sys.modules[obj.__module__], '__file__')
-			): continue
-			try:
-				if os.path.relpath(
-					inspect.getfile(sys.modules[obj.__module__])
-				).startswith('.'):
-					continue
-				sett.own_modules.add(obj.__module__)
-			except ValueError:
+	setattr(sett, 'own_modules', {'plugins.constants'})
+	for obj_name, obj in crontab.__dict__.items():
+		if not (
+			hasattr(obj, '__module__')
+			and obj.__module__ != 'crontab'
+			and not obj.__module__.startswith('pyimod')
+			and hasattr(sys.modules[obj.__module__], '__file__')
+		): continue
+		try:
+			if os.path.relpath(
+				inspect.getfile(sys.modules[obj.__module__])
+			).startswith('.'):
 				continue
+			sett.own_modules.add(obj.__module__)
+		except ValueError:
+			continue
 	for mdl_name in sett.own_modules:
 		prev_mdl = sys.modules.pop(mdl_name)
 		try:
@@ -377,7 +341,10 @@ class Tasks:
 			if item.startswith('_'): continue
 			task_obj = getattr(crontab, item)
 			if not isinstance(task_obj, types.FunctionType): continue
-			if task_obj.__module__ != 'crontab': continue
+			if (
+				(getattr(task_obj, '__is_task__', None) == None)
+				and (task_obj.__module__ != 'crontab')
+			): continue
 			
 			task_opts:dict = {}
 			params = inspect.signature(task_obj).parameters
@@ -1020,9 +987,10 @@ class Tasks:
 				break
 
 	def close(self):
-		''' Destructor.
-			Remove scheduler jobs, hotkey bindings, stop http server
-			, close event handlers.
+		r'''
+		Destructor.  
+		Remove scheduler jobs, hotkey bindings, stop http server
+		, close event handlers.  
 		'''
 		if self.http_server:
 			self.http_server.shutdown()
@@ -1049,9 +1017,10 @@ class Tasks:
 				dev_print(f'dir_change_stop exception: {e}')
 
 def create_menu_item(menu, task, func=None, parent_menu=None):
-	''' Task - task dict or menu item label
-		If task is a dict then func = tasks.run_task
-		parent_menu - only for submenu items.
+	r'''
+	*task* - task dict or menu item label  
+	If *task* is a dictionary then *func* is *tasks.run_task*  
+	*parent_menu* - for submenu items only.  
 	'''
 	if isinstance(task, dict):
 		tname = task['task_name']
@@ -1376,7 +1345,7 @@ def main():
 	global lang
 	set_title(APP_NAME)
 	try:
-		sett = Settings()
+		sett = Settings(def_sett=APP_SETTINGS)
 	except Exception as e:
 		print(f'Cannot load settings:\n{repr(e)}')
 		warning(f'Cannot load settings:\n{repr(e)}')

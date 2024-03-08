@@ -54,7 +54,8 @@ def emb_app_update(caller:str):
 	if dialog(f'Download finished ({file_size_str(data)})'
 	, {'OK': '', 'Open archive': 'open'} ) == 'open':
 		file_open(data)
-def emb_add_to_startup(caller=''):
+@task_add
+def embedded__add_to_startup(caller=''):
 	' Add the program to the startup '
 	shortcut_create(
 		(app_dir(), 'taskopy.exe' if is_app_exe() else 'taskopy.py')
@@ -64,10 +65,17 @@ def emb_add_to_startup(caller=''):
 		, win_style=win32con.SW_SHOWMINNOACTIVE
 	)
 
-def emb_appid_add(appid:str=APP_NAME, appname:str=APP_NAME
+@task_add
+def embedded__Create_AppID(appid:str=APP_NAME, appname:str=APP_NAME
 , icon:str=path_get((app_dir(), APP_ICON_ICO)) ):
 	r'''
-	Adds the *AppID* to the registry for use with `toast` notifications.
+	Adds the *AppID* to the registry for use with `toast` notifications.  
+	*icon* - an *.ico* file.  
+	What it's for:  
+	
+	1. So that the toast has an icon.
+	2. To make the `on_click` action work when clicking in *Action center*.  
+
 	'''
 	KEY_ROOT = 'HKEY_CURRENT_USER\\SOFTWARE\\Classes\\AppUserModelId\\'
 	if icon:

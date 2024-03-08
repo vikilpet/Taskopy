@@ -5,6 +5,7 @@ import datetime
 import statistics
 import pytz
 import threading
+import configparser
 import psutil
 import sqlite3
 import subprocess
@@ -46,7 +47,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2024-02-19'
+APP_VERSION = 'v2024-03-08'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
@@ -85,6 +86,41 @@ _TIME_UNITS = {
 _LOCALE_LOCK = threading.Lock()
 _LOG_TIME_FORMAT = '%Y.%m.%d %H:%M:%S'
 _TERMINAL_WIDTH = os.get_terminal_size().columns - 1
+
+class Settings:
+	r'''
+	Load global settings from *.ini* file.  
+	Settings from all sections are collected.  
+	'''
+	def __init__(self, ini_file:str='settings.ini'
+	, def_sett:tuple=()):
+		config = configparser.ConfigParser()
+		config.optionxform = str
+		if not ini_file: return
+		try:
+			with open(ini_file, 'tr', encoding='utf-8-sig') as f:
+				config.read_file(f)
+		except FileNotFoundError:
+			create_default_ini_file()
+			config.read(r'settings.ini', encoding='utf-8-sig')
+		for section in config._sections.values():
+			for sett_name, sett_val in section.items():
+				if sett_val.lower() in ('true', 'yes'):
+					self.__dict__[sett_name] = True
+				elif sett_val.lower() in ('false', 'no'):
+					self.__dict__[sett_name] = False
+				elif sett_val.isdigit():
+					self.__dict__[sett_name] = int(sett_val)
+				elif sett_val.replace('.', '', 1).isdigit():
+					try:
+						self.__dict__[sett_name] = float(sett_val)
+					except:
+						self.__dict__[sett_name] = sett_val
+				else:
+					self.__dict__[sett_name] = sett_val
+		for setname, setval in def_sett:
+			self.__dict__.setdefault(setname, setval)
+
 
 class DictToObj:
 	''' Converts dictionary to object.
@@ -172,13 +208,14 @@ def _get_parent_func_name(parent=None, repl_undrsc:str=None)->str:
 		parent = parent.replace('_', repl_undrsc)
 	return parent
 
-def task(**kwargs):
-	def with_attrs(func):
-		for key, value in kwargs.items():
-			setattr(func, key, value)
-		setattr(func, 'is_task', True)
-		return func
-	return with_attrs
+def task_add(func):
+	r'''
+	Adds a attribute that the function is a *task*.
+	'''
+	setattr(func, '__is_task__', True)
+	return func
+
+
 
 def sound_play(sound:str|tuple|list|set, wait=False):
 	r'''
@@ -207,35 +244,40 @@ def is_dev()->bool:
 	'''
 	return ('--developer' in sys.argv) or hasattr(sys, 'ps1')
 
-def con_log(*msgs, **kwargs):
+def _log_file(log_str:str, fname:str)->int:
 	r'''
-	Log to console and logfile.  
+	Append the string to a file.
 	'''
-	global _app_log
-	log_str = ''
-	ltime = datetime.datetime.now()
-	for msg in msgs:
-		tprint(msg, **kwargs)
-		_app_log.append((ltime, msg))
-		del _app_log[:-_app_log_limit]
-		log_str += (
-			ltime.strftime(_LOG_TIME_FORMAT)
-			+ ' ' + str(msg) + '\n'
-		)
 	try:
-		if not (sett := __builtins__.get('sett', None)): return
 		with open(
-			app_dir() + f'\\log\\{ltime.strftime(sett.log_file_name)}.log'
-			, 'ta+', encoding='utf-8'
+			 f'{app_dir()}\\log\\{fname}.log'
+			, 'ta+'
+			, encoding='utf-8'
 		) as f:
 			f.write(log_str)
 	except FileNotFoundError:
+		return 1
+	except:
+		print(f'log file exception: {exc_text()}')
+		return 2
+	return 0
+
+def con_log(*msg, **kwargs):
+	r'''
+	Outputs a message to the console and to a log file.  
+	'''
+	global _app_log
+	ltime = datetime.datetime.now()
+	msg = ' '.join(map(str, msg)) if is_iter(msg) else str(msg)
+	tprint(msg, **kwargs)
+	_app_log.append((ltime, msg))
+	del _app_log[:-_app_log_limit]
+	log_str = ( ltime.strftime(_LOG_TIME_FORMAT) + ' ' + msg + '\n')
+	if not (sett := __builtins__.get('sett', None)): return
+	if _log_file(log_str, ltime.strftime(sett.log_file_name)) == 1:
 		os.makedirs('log')
-		with open(
-			app_dir() + f'\\log\\{ltime.strftime(sett.log_file_name)}.log'
-			, 'ta+', encoding='utf-8'
-		) as f:
-			f.write(log_str)
+		_log_file(log_str=log_str
+		, fname=ltime.strftime(sett.log_file_name))
 
 def time_now_str(template:str=tcon.DATE_STR_FILE
 , use_locale:str='C', timezone=None, **delta)->str:
@@ -730,7 +772,10 @@ def toast(msg:str|tuple|list, dur:str='default', img:str=''
 	'''
 	global _toast_app_icon
 	if dur == 'default': dur = 'Default'
-	assert dur in ('Default', 'short', 'long')
+	assert dur in ('Default', 'short', 'long'), 'wrong *dur* value'
+	if on_click:
+		assert len( func_arg(on_click) ) == 1, \
+			'The `on_click` function must take 1 argument'
 	msg = ' '.join(map(str, msg)) if is_iter(msg) else str(msg)
 	often_ident = str(often_ident) if often_ident else msg[:10]
 	if is_often('_toast ' + often_ident, interval=often_inter): return 'often'
@@ -820,7 +865,8 @@ def app_icon_text_set(text:str=APP_FULLNAME):
 	app.taskbaricon.set_icon(text=text)
 
 def create_default_ini_file():
-	''' Creates default settings.ini file.
+	'''
+	Creates default settings.ini file.
 	'''
 	with open(app_dir() + '\\settings.ini', 'xt', encoding='utf-8-sig') as ini:
 		ini.write(_DEFAULT_INI)
@@ -1015,11 +1061,12 @@ def decor_except(func):
 	return wrapper
 
 def decor_except_status(func):
-	''' Adds 'try... except' for function and returns
-		(True, result) or (False, Exception).
+	r'''
+	Adds 'try... except' for function and returns
+	(True, result) or (False, Exception).
 
-		Downside - iPython autoreload does not
-		work for decorated 'func'.
+	Downside: *iPython* autoreload does not
+	work for decorated 'func'.
 	'''
 	@functools.wraps(func)
 	def wrapper(*args, **kwargs) -> tuple:
@@ -1814,7 +1861,7 @@ def app_win_show():
 	app.show_window()
 
 def app_dir()->str:
-	' Returns current working directory '
+	' Returns the current working directory without the slash '
 	return app.dir
 
 def app_tasks()->dict:
@@ -1874,8 +1921,10 @@ def benchmark(func, a:tuple=(), ka:dict={}, b_iter:int=100
 			return arg.__name__
 		elif arg is None:
 			return 'None'
+		elif isinstance(arg, Callable):
+			return arg.__name__
 		else:
-			raise Exception(f'Unknown type: {type(arg)}')
+			raise Exception(f'Unknown arg type: {type(arg)}')
 	start = time.perf_counter_ns()
 	if not is_iter(a): a = (a,)
 	assert isinstance(ka, dict), 'ka should be a dictionary'
@@ -2155,5 +2204,15 @@ def is_app_exe()->bool:
 
 	'''
 	return getattr(sys, 'frozen', False)
+
+def func_arg(func:Callable)->tuple:
+	r'''
+	Returns a tuple of function arguments.  
+
+		asrt( func_arg(print), ('args', 'sep', 'end', 'file', 'flush') )
+		asrt( benchmark(func_arg, (print,)), 480_000, "<" )
+
+	'''
+	return tuple( inspect.signature(func).parameters.keys() )
 
 if __name__ != '__main__': patch_import()

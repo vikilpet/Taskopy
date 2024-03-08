@@ -154,10 +154,11 @@ def file_read(fullpath, encoding:str='utf-8', errors:str=None)->str:
 def file_write(fullpath, content:str
 , encoding:str='utf-8')->str:
 	r'''
-	Saves content to a file.  
+	Saves content to a file (assuming it's text, otherwise
+	use `encoding='binary'`.).  
 	Creates file if the fullpath doesn't exist
 	and creates intermediate directories  
-	If fullpath is '' or None - uses `temp_file()`.  
+	If *fullpath* is '' or *None* - uses `temp_file()`.  
 	Returns the fullpath.  
 	'''
 	if encoding == 'binary':
@@ -362,6 +363,10 @@ def file_recycle(fullpath, silent:bool=True)->bool:
 	*silent* - do not show standard windows
 	dialog to confirm deletion.  
 	Returns `True` on successful operation.  
+
+	NOTES: with `silent=True` large files that cannot be placed in the
+	recycle garbage can will be permanently deleted without notification.  
+
 	'''
 	fullpath = path_get(fullpath)
 	flags = shellcon.FOF_ALLOWUNDO
@@ -640,7 +645,7 @@ def dir_rnd_files(fullpath, file_num:int=1
 
 	Designed for large directories that take a significant
 	amount of time to list.  
-	Note: the function may return the same file more than once.  
+	The function will not return the same file twice.  
 	Example:
 
 		dir_rnd_files('.')
@@ -659,12 +664,12 @@ def dir_rnd_files(fullpath, file_num:int=1
 		
 	'''
 	fullpath = path_get(fullpath)
-	found_num = 0
+	uniq = set()
 	in_rules, ex_rules = path_rule(**rules)
 	for _ in range(file_num):
 		for _ in range(attempts):
 			path = fullpath
-			if found_num == file_num: return
+			if len(uniq) == file_num: return
 			for _ in range(attempts):
 				try:
 					dlist = os.listdir(path)
@@ -680,17 +685,17 @@ def dir_rnd_files(fullpath, file_num:int=1
 							, in_rules=in_rules
 							, ex_rules=ex_rules
 						)
-					):
-						found_num += 1
+					) and (not path in uniq):
+						uniq.add(path)
 						yield path
 						break
 					else:
 						break
 
-def dir_rnd_dir(fullpath, attempts:int=5
+def dir_rnd_dirs(fullpath, attempts:int=5
 , filter_func=None)->str:
 	r'''
-	Same as `dir_rnd_file` but returns a directory.
+	Same as `dir_rnd_file`, but returns the subdirectories.
 	'''
 	fullpath = path_get(fullpath)
 	for _ in range(attempts):
@@ -1269,8 +1274,8 @@ def file_date_set(fullpath, datec=None, datea=None, datem=None):
 	handle.close()
 
 
-def shortcut_create(fullpath, dest, descr:str=''
-, icon_fullpath='', icon_index:int=-1
+def shortcut_create(fullpath, dest:str|tuple, descr:str=''
+, icon_fullpath:str|tuple='', icon_index:int=-1
 , win_style:int=win32con.SW_SHOWNORMAL, cwd:str=''
 , hotkey:int=0)->str:
 	r'''

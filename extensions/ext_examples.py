@@ -131,7 +131,8 @@ def examp_autoruns(exe_path:str, caller:str
 	elif choice == 's':
 		var_set(VAR_NAME, json.dumps(new_dct))
 
-def examp_file_encrypt():
+@task_add
+def examples__file_encrypt():
 	' Choose a file and encrypt it '
 	fpath = file_dialog()
 	if not fpath: return
@@ -144,7 +145,8 @@ def examp_file_encrypt():
 		return
 	dialog(f'Done:\n{fullpath}')
 
-def examp_file_decrypt():
+@task_add
+def examples__file_decrypt():
 	' Choose a file and decrypt it '
 	fpath = file_dialog()
 	if not fpath: return
