@@ -88,7 +88,7 @@ Open crontab.py in your favorite text editor and create your task as function wi
 	def demo_task_3('left_click'=True, log=False):
 		proc_start('calc.exe')
 
-Then right click on tray icon and choose "Reload crontab" and your task is ready.
+Then right click on tray icon and choose *Reload crontab* and your task is ready.
 
 ## Task options
 This is what you need to put in round brackets in task (function). It is not actual arguments for function.
@@ -868,6 +868,8 @@ In the functions for working with windows, the *window* argument can be either a
 
 ## Tips and tricks
 
+### Variables
+
 If you want to save something so that it survives a crontab reload, use the global dictionary **gdic**:
 
 	def demo__gdic():
@@ -876,7 +878,11 @@ If you want to save something so that it survives a crontab reload, use the glob
 		gdic['test var'] += 1
 		dialog(f'Try to reload crontab: {gdic["test var"]}')
 
-If you want to save something so that it survives a Taskopy restart, use the file variables **var_get**, **var_set**, etc.
+If you want to save something so that it survives a Taskopy restart, use the *file variables*: **var_get**, **var_set**, etc.
+
+### Centralization and deployment
+
+You can define a task not only in a *crontab*, but also in an extension, using the *task_add* decorator. In this way you can import from an extension once in the *crontab*, and then update only the file with the extension.
 
 ## Firefox extension
 https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/
