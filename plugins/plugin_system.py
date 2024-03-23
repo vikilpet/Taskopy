@@ -26,6 +26,7 @@ _WM_APPCOMMAND = 0x319
 _APPCOMMAND_VOLUME_MUTE = 0x80000
 _APPCOMMAND_VOLUME_DOWN = 0x90000
 _APPCOMMAND_VOLUME_UP = 0xA0000
+WIN_TASKBAR_CLS = 'Shell_TrayWnd'
 
 def win_get(window=None, class_name:str=None)->int:
 	r'''
@@ -238,13 +239,23 @@ def win_act_rest(window=None)->int:
 	if win32gui.IsIconic(hwnd): win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
 	return hwnd
 
+def win_is_min(window)->bool|None:
+	r'''
+	Returns `True` if the window is minimized.
+
+		asrt( win_is_min(win_get(class_name=WIN_TASKBAR_CLS)), False )
+
+	'''
+	if not (hwnd := win_get(window) ): return
+	return win32gui.IsIconic(hwnd) != 0
+
 def win_minimize(window=None)->int:
-	''' Minimize window. Returns hwnd.
+	r'''
+	Minimizes window. Returns *hwnd*.
 	'''
 	hwnd = win_get(window)
-	if hwnd:
-		win32gui.ShowWindow(hwnd, win32con.SW_MINIMIZE)
-		return hwnd
+	if hwnd: win32gui.ShowWindow(hwnd, win32con.SW_MINIMIZE)
+	return hwnd
 	
 def win_maximize(window=None)->int:
 	''' Maximize window. Returns hwnd.

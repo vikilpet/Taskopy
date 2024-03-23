@@ -492,9 +492,21 @@ def domain_ip(domain:str)->list[str]:
 
 def net_pc_ip()->str:
 	r'''
-	Returns the IP address of the computer.  
+	Returns the main IP address of the computer.  
+
+		asrt( benchmark(net_pc_ip), 90_000, "<" )
+
 	'''
-	return socket.gethostbyname(socket.gethostname())
+	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+	s.settimeout(0)
+	try:
+		s.connect(('10.254.254.254', 1))
+		ip = s.getsockname()[0]
+	except Exception:
+		ip = '127.0.0.1'
+	finally:
+		s.close()
+	return ip
 
 def net_pc_hostname()->str:
 	' Returns the hostname of the computer '

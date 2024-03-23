@@ -513,11 +513,13 @@ def file_basename(fullpath)->str:
 	return os.path.splitext(fname)[0]
 
 def file_name_add(fullpath, suffix:str='', prefix:str='')->str:
-	''' Adds suffix or prefix to a file name.
-		Example:
+	r'''
+	Adds suffix or prefix to a file name.  
+	Example:  
 
-			file_name_add('my_file.txt', suffix='_1')
-			> 'my_file_1.txt'
+		asrt( file_name_add('my_file.txt', suffix='_1'), 'my_file_1.txt' )
+		asrt( file_name_add('my_file.txt', prefix='~'), '~my_file.txt' )
+
 	'''
 	fullpath = path_get(fullpath)
 	if not isinstance(suffix, str): suffix = str(suffix)
@@ -1019,14 +1021,14 @@ def dir_size(fullpath, unit:str='b', skip_err:bool=True)->int:
 
 def dir_zip(fullpath, destination=None
 , do_cwd:bool=False)->str:
-	''' Compresses folder and returns the full
-		path to archive.
-		If destination is a folder then take
-		archive name from fullpath directory name.
-		Overwrites the destination if it exists.
-		If destination is not specified then create
-		archive in same directory.
-		Returns destination.
+	r'''
+	Compresses folder and returns the full path to archive.  
+	If destination is a folder then take
+	archive name from fullpath directory name.
+	Overwrites the destination if it exists.
+	If destination is not specified then create
+	archive in same directory.  
+	Returns destination.  
 	'''
 	EXT = 'zip'
 	fullpath = path_get(fullpath)

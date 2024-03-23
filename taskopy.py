@@ -66,7 +66,6 @@ TASK_OPTIONS = (
 	, ('http_white_list', None)
 	, ('err_threshold', 0)
 	, ('err_counter', False)
-	, ('no_print', False)
 	, ('idle', None)
 	, ('on_load', False)
 	, ('rule', None)
@@ -297,15 +296,6 @@ def load_modules():
 				setattr(crontab, obj_name, decor_except_status(obj))
 		sys.modules[mdl_name] = mdl
 
-class SuppressPrint:
-	def __enter__(self):
-		self._original_stdout = sys.stdout
-		sys.stdout = open(os.devnull, 'w')
-
-	def __exit__(self, exc_type, exc_val, exc_tb):
-		sys.stdout.close()
-		sys.stdout = self._original_stdout
-
 class Task:
 	def __init__(self):
 		self.name:str = ''
@@ -342,7 +332,7 @@ class Tasks:
 			task_obj = getattr(crontab, item)
 			if not isinstance(task_obj, types.FunctionType): continue
 			if (
-				(getattr(task_obj, '__is_task__', None) == None)
+				(not getattr(task_obj, TASK_ATTR, False))
 				and (task_obj.__module__ != 'crontab')
 			): continue
 			
@@ -790,11 +780,7 @@ class Tasks:
 					if 'data' in func_args:
 						task_kwargs['data'] = data
 					task['last_start'] = datetime.datetime.now()
-					if task['no_print']:
-						with SuppressPrint():
-							r = task['task_func'](**task_kwargs)
-					else:
-						r = task['task_func'](**task_kwargs)
+					r = task['task_func'](**task_kwargs)
 					if result != None: result.append(r)
 					try:
 						if ( t := tasks.task_dict.get(task['task_func_name'], {}) ):

@@ -8877,7 +8877,7 @@ meteorapp.com
 eu.meteorapp.com
 co.pl
 *.azurecontainer.io
-*.cloudapp.azure.com
+cloudapp.azure.com
 azure-api.net
 azureedge.net
 azurefd.net

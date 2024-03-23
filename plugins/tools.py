@@ -47,7 +47,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2024-03-08'
+APP_VERSION = 'v2024-03-23'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
@@ -86,6 +86,7 @@ _TIME_UNITS = {
 _LOCALE_LOCK = threading.Lock()
 _LOG_TIME_FORMAT = '%Y.%m.%d %H:%M:%S'
 _TERMINAL_WIDTH = os.get_terminal_size().columns - 1
+TASK_ATTR:str = '__is_task__'
 
 class Settings:
 	r'''
@@ -131,6 +132,20 @@ class DictToObj:
 
 	def __getattr__(self, name):
 		return 'DictToObj - unknown key'
+
+
+class SuppressPrint:
+	r'''
+	Suppresses outputting anything to the console.  
+	'''
+	def __enter__(self):
+		self._original_stdout = sys.stdout
+		sys.stdout = open(os.devnull, 'w')
+
+	def __exit__(self, exc_type, exc_val, exc_tb):
+		sys.stdout.close()
+		sys.stdout = self._original_stdout
+
 
 def value_to_unit(value, unit:str='sec', unit_dict:dict=None
 , def_src_unit:str='sec')->float:
@@ -182,7 +197,13 @@ def _get_parents()->list:
 	return parents
 
 def _get_parent_func_name(parent=None, repl_undrsc:str=None)->str:
-	''' Get name of parent function if any '''
+	r'''
+	Get name of parent function if any.  
+
+		from plugins.tools import _get_parent_func_name
+		asrt( benchmark(_get_parent_func_name), 6328, "<" )
+		
+	'''
 	EXCLUDE = ('wrapper', 'run_task', 'run', 'dev_print', 'tprint'
 		, 'main', 'run_task_inner', 'popup_menu_hk'
 		, 'MainLoop', 'catcher', 'run_code', 'mapstar'
@@ -208,11 +229,46 @@ def _get_parent_func_name(parent=None, repl_undrsc:str=None)->str:
 		parent = parent.replace('_', repl_undrsc)
 	return parent
 
+def task_name(is_human:bool=False)->str:
+	r'''
+	Gets the name of the task from which it was called.
+
+		asrt( benchmark(task_name), 1500, "<" )
+
+	'''
+	START_LVL = 2
+	MAX_LVL = 20
+	tname = ''
+	first_name = ''
+	try:
+		tasks:dict = app.tasks.task_dict.keys()
+	except NameError:
+		return ''
+	except AttributeError:
+		return '<console>'
+	except:
+		dev_print(f'tprint exception: {exc_text()}')
+		return ''
+	for lvl in range(START_LVL, MAX_LVL):
+		try:
+			tn = sys._getframe(lvl).f_code.co_name
+			if tn in tasks:
+				tname = tn
+				break
+			if lvl == START_LVL: first_name = tn
+		except ValueError:
+			tname = first_name
+			break
+	else:
+		pass
+	if is_human and tname: tname = tname.replace('_', ' ')
+	return tname
+
 def task_add(func):
 	r'''
 	Adds a attribute that the function is a *task*.
 	'''
-	setattr(func, '__is_task__', True)
+	setattr(func, TASK_ATTR, True)
 	return func
 
 
@@ -262,14 +318,14 @@ def _log_file(log_str:str, fname:str)->int:
 		return 2
 	return 0
 
-def con_log(*msg, **kwargs):
+def con_log(*msgs):
 	r'''
 	Outputs a message to the console and to a log file.  
 	'''
 	global _app_log
 	ltime = datetime.datetime.now()
-	msg = ' '.join(map(str, msg)) if is_iter(msg) else str(msg)
-	tprint(msg, **kwargs)
+	msg = ' '.join(map(str, msgs))
+	tprint(msg, tname='')
 	_app_log.append((ltime, msg))
 	del _app_log[:-_app_log_limit]
 	log_str = ( ltime.strftime(_LOG_TIME_FORMAT) + ' ' + msg + '\n')
@@ -989,12 +1045,20 @@ def job_batch(jobs:list, timeout:int
 				job.time = 'timeout'
 		return jobs
 
-def tprint(*msgs, **kwargs):
-	''' Print with task name and time '''
-	parent = _get_parent_func_name()
-	msgs = list(msgs)
-	if parent: msgs.insert(0, parent + ':')
-	print(time.strftime('%y.%m.%d %H:%M:%S'), *msgs, **kwargs)
+
+
+def tprint(*msgs, tname:str|None=None):
+	r'''
+	Print the message(s) with the task name and time.  
+	*tname* - name of the caller (task name). If it
+	is `None`, then try to find the task name.  
+	'''
+	msg = ' '.join(map(str, msgs))
+	if tname == None:
+		if tname := task_name(): msg = '[' + tname + '] ' + msg
+	else:
+		if tname: msg = '[' + tname + '] ' + msg
+	print(time.strftime('%y.%m.%d %H:%M:%S'), msg)
 
 def tdebug(*msgs, **kwargs)->bool:
 	r'''
@@ -1011,8 +1075,8 @@ def tdebug(*msgs, **kwargs)->bool:
 	sh_func = short if isinstance(short, Callable) else str_short
 	msg:str = ''
 	if kwargs.get('par', True):
-		msg = _get_parent_func_name()
-		if msg: msg += ': '
+		msg = task_name()
+		if msg: msg = f'[{msg}]: '
 	msg += ' '.join(map(str, msgs))
 	print(sh_func(msg) if short else msg)
 	return True
@@ -1948,7 +2012,7 @@ def median(source):
 	return statistics.median(source)
 
 def speak(text:str, wait:bool=False):
-	'''
+	r'''
 	Pronouns text using the Windows built-in speech engine.  
 	If *wait* then returns *text*.  
 	'''
@@ -1970,17 +2034,12 @@ def speak(text:str, wait:bool=False):
 	thread_start(_speak)
 
 def func_name_human(func_name:str)->str:
-	'''
+	r'''
 	Converts function name from crontab to a "human" name.
 
-	func_name_human('my_function')
-	>'My function'
-
-	func_name_human('My_Function')
-	>'My Function'
-
-	func_name_human('My__Function')
-	>'My Function'
+		asrt( func_name_human('my_function'), 'My function' )
+		asrt( func_name_human('My_Function'), 'My Function' )
+		asrt( func_name_human('My__Function'), 'My Function')
 
 	'''
 	new_name = func_name.replace('__', '_').replace('_', ' ')
