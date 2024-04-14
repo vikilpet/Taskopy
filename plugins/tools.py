@@ -47,7 +47,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2024-03-23'
+APP_VERSION = 'v2024-04-14'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
@@ -561,7 +561,13 @@ def time_sleep(interval, unit:str=None):
 pause = time_sleep
 wait = time_sleep
 
-def clip_set(txt:str):
+def clip_set(txt):
+	r'''
+	Place something on the text clipboard.
+
+		asrt( benchmark(clip_set, ('test',), b_iter=3), 24_000_000, "<" )
+		
+	'''
 	pyperclip.copy(str(txt))
 
 def clip_get()->str:

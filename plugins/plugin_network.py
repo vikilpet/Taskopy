@@ -25,7 +25,7 @@ from .tools import dev_print, exc_text, time_sleep, tdebug \
 from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 _PUB_SUF_LST = set()
 warnings.filterwarnings('ignore', category=MarkupResemblesLocatorWarning)
@@ -513,11 +513,11 @@ def net_pc_hostname()->str:
 	return socket.gethostname()
 
 def url_hostname(url:str, sld:bool=True)->str:
-	'''
+	r'''
 	Get hostname (domain name) from URL.
 
-	*sld* - if True then return the second level domain
-	otherwise return the full domain.
+	*sld* - if *True* then returns the second level domain
+	otherwise returns the full domain.
 
 		asrt( url_hostname('https://www.example.gov.uk'), 'example.gov.uk')
 		asrt( url_hostname('https://www.example.gov.uk', sld=False) \
@@ -530,9 +530,11 @@ def url_hostname(url:str, sld:bool=True)->str:
 		, '192.168.0.1')
 		asrt( url_hostname('http://abc.example.com:443/api?ip=1.2.3.4') \
 		, 'example.com')
+		asrt( url_hostname('http://server.lan:80/'), 'server.lan' )
 
 	'''
 	global _PUB_SUF_LST
+	LAN_DOMAINS = ('lan', 'local', 'home')
 	if m := re.findall(r'\D(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})[\:/]', url):
 		return m[0]
 	domain = urllib.parse.urlparse(url).netloc
@@ -543,6 +545,7 @@ def url_hostname(url:str, sld:bool=True)->str:
 		_PUB_SUF_LST = set(
 			var_lst_get('_public_suffix_list')
 		)
+		_PUB_SUF_LST.update(LAN_DOMAINS)
 	variants = []
 	for i in range(domain.count('.') + 1):
 		variants.append( '.'.join(domain.split('.')[-(i+1):]) )

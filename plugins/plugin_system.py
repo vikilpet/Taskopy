@@ -231,7 +231,7 @@ def win_activate(window=None)->int:
 	return hwnd
 
 def win_act_rest(window=None)->int:
-	'''
+	r'''
 	Activates the window and restores it if it is minimized.
 	'''
 	if not (hwnd := win_get(window) ): return
@@ -305,7 +305,11 @@ def win_on_top(window=None, on_top:bool=True)->int:
 		return hwnd
 
 def idle_duration(unit:str='sec')->int:
-	''' Returns idle time in specified units ('msec', 'sec', 'min', 'hour').
+	r'''
+	Returns idle time in specified units ('msec', 'sec', 'min', 'hour').  
+
+		asrt( benchmark(idle_duration), 10_000, "<" )
+
 	'''
 	millis = (int(uptime.uptime() * 1000) - win32api.GetLastInputInfo())
 	return int( value_to_unit([millis, 'ms'], unit) )
