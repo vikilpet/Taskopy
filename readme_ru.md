@@ -366,6 +366,12 @@
 		time_now(days=-1)
 		
 - **time_now_str(template:str='%Y-%m-%d\_%H-%M-%S')->str** — строка с текущей датой и временем.
+- **toast(msg:str|tuple|list, dur:str='default', img:str='', often_ident:str='', often_inter:str='30 sec', on_click:Callable=None, appid:str=APP_NAME)** — Тост-уведомление.  
+	*img* - полный путь к изображению.  
+	*duration* - 'short'|'long'|'default'. 'long' is about 30 sec.  
+	*on_click* - действие, выполняемое при нажатии. Ему передается аргумент со свойствами клика. Если уведомление уже исчезло с экрана и находится в Центре Уведомлений, действие будет выполнено, только если указан действительный *appid*.  
+	*appid* - пользовательский AppID. Если вы хотите, чтобы тост имел иконку Taskopy, выполните задачу `emb_appid_add` из *ext_embedded*.  
+
 - **pause(interval)** — приостановить выполнение задачи на указанное кол-во секунд. *interval* — время в секундах или строка с указанием единицы вроде '5 ms' или '6 sec' или '7 min'.
 - **var_lst_get(var:str, default=[], encoding:str='utf-8', com_str:str='#')->list** — возвращает список со строками. Исключает пустые строки и строки, начинающиеся с *com_str*
 
@@ -474,6 +480,19 @@
 		# с подкаталогами:
 		dir_find('d:\\folder\\**\\*.jpg')
 
+- **dir_junc(src_path, dst_path)** — создает *junction* ссылку на каталог.  
+	Только для локальных путей.  
+
+		td = dir_test()
+		tdj = file_name_add(td, ' junc')
+		dir_junc(td, tdj)
+		asrt( dir_exists(tdj), True )
+		# Удалить исходный каталог:
+		dir_delete(td)
+		# Теперь ссылка не работает:
+		asrt( dir_exists(tdj), False )
+		dir_delete(tdj)
+
 - **dir_list(fullpath, \*\*rules)->Iterator[str]** — возвращает все содержимое каталога (файлы и папки).  
 	*rules* - правила для функции `path_rule`  
 
@@ -494,6 +513,29 @@
 	*test* - только вывести те файлы и папки, которые следует удалить, без фактического удаления.  
 	*print_del* - вывести путь при удалении.  
 	*rules* - правила для функции `path_rule`  
+
+- **dir_rnd_dirs(fullpath, attempts:int=5, filter_func=None)->str** — то же самое, что и `dir_rnd_file`, но возвращает подкаталоги.
+- **dir_rnd_files(fullpath, file_num:int=1, attempts:int=5, \*\*rules)->Iterator[str]** — получает случайные файлы из каталога или None, если ничего не найдено.  
+	*file_num* - сколько файлов нужно вернуть.  
+	*rules* - кортеж правил из `path_rule`.
+
+	Предназначена для больших каталогов, перечисление которых занимает много времени.  
+	Функция не будет возвращать один и тот же файл дважды.  
+	Пример:
+
+		dir_rnd_files('.')
+		tuple(dir_rnd_files('.', ex_ext='py'))
+	
+	По сравнению с `dir_files` с `random.choice`:
+
+		> benchmark(lambda: random.choice( list(dir_files(temp_dir() ) ) ), b_iter=10)
+		benchmark: 113 367 113 ns/loop
+
+		> benchmark(dir_rnd_files, a=(temp_dir(), ), b_iter=10)
+		620
+
+		> len( tuple( dir_files( temp_dir() ) ) )
+		1914
 
 - **dir_size(fullpath:str, unit:str='b')->int** — размер папки в указанных единицах.
 - **dir_sync(src_dir, dst_dir, report:bool=False, \*\*rules)->dict** — синхронизировать два каталога.  
@@ -699,10 +741,15 @@
 - **registry_get(fullpath:str)** — получить значение ключа из реестра Windows.
 	*fullpath* — строка вида 'HKEY_CURRENT_USER\\\Software\\\Microsoft\\\Calc\\\layout'
 - **win_activate(window=None)->int** — вывести указанное окно на передний план. *window* может строкой с заголовком или числовым хэндлом нужного окна.
+	Примечание: не всегда возможно активировать окно. Оно будет просто мигать на панели задач.  
 - **win_by_pid(process)->tuple** — возвращает главное окно процесса в виде кортежа `(hwnd:int, title:str)`.
 - **win_close(window=None, wait:bool=True)->bool** — закрывает окно и возвращает True при успехе.
 - **win_find(title:str)->list** — вернуть список хэндлов окон, с указанным заголовком.
 - **win_hide(window=None)->int** — скрыть окно.
+- **win_is_min(window)->bool|None** — возвращает `True`, если окно свернуто.
+
+		asrt( win_is_min(win_get(class_name=WIN_TASKBAR_CLS)), False )
+
 - **win_list(title_filter:str=None, class_filter:str=None, case_sensitive:bool=False)->list** — список заголовков всех окон. *title_filter* - вернуть только заголовки с этой подстрокой.
 **- win_on_top(window=None, on_top:bool=True)->int** — делает указанное окно поверх других окон.
 - **win_show(window=None)->int** — показать окно.
@@ -882,7 +929,10 @@
 
 ### Централизация и развертывание
 
-Вы можете определить задачу не только в *crontab*, но и в расширении, используя декоратор *task_add*. Таким образом, вы можете импортировать из расширения один раз в *crontab*, а затем обновлять только файл с расширением.
+Как обновлять код задачи на нескольких компьютерах.  
+Вы можете определить задачу не только в *crontab*, но и в расширении, используя декоратор *task_add*. Таким образом, на клиентском компьютере, вы можете импортировать из расширения один раз в *crontab*, а затем обновлять только файл с расширением, в котором содержится задача.
+
+Вы можете программно перезагружать кронтаб с помощью **crontab_reload**. Это безопасно, т.к. на самом деле кронтаб сначала загружается в тестовом режиме. Даже если в кронтабе будут грубые ошибки, обновленный кронтаб не загрузится, и старые задачи будут по-прежнему выполняться.
 
 ## Расширение для Firefox
 https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/

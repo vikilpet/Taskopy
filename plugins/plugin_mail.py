@@ -5,7 +5,7 @@ import glob
 import os
 import time
 import datetime
-from typing import Callable, Iterable, Tuple, List
+from typing import Callable, Iterable
 from email.message import EmailMessage, Message
 from email import message_from_bytes
 from email.header import decode_header, make_header
@@ -32,11 +32,11 @@ class MailMsg:
 
 	def __init__(self, login:str, server:str
 	, check_only:bool=False, raw_bytes:bytes=b''
-	, error:str='', exception:Exception=None
-	, sub_rule:Callable=None):
+	, error:str='', exception:Exception|None=None
+	, sub_rule:Callable|None=None):
 		self.raw_bytes:bytes = raw_bytes
 		self.error:str = error
-		self.exception:Exception = exception 
+		self.exception:Exception|None = exception 
 		self.login:str = login
 		self.server:str = server
 		self.dst_dir:str = ''
@@ -97,7 +97,7 @@ class MailMsg:
 		body = body.strip()
 		return body
 
-	def _get_header(self, header:str)->Tuple[bool, str]:
+	def _get_header(self, header:str)->tuple[bool, str]:
 		'''
 		Returns decoded header as a string.
 		'''
@@ -229,7 +229,7 @@ def mail_send(
 	, attachment:Iterable=''
 	, reply_to:str=''
 	, timeout:int=180
-)->Tuple[bool, str]:
+)->tuple[bool, str]:
 	r'''
 	Send mail. Returns (True, None) on success or
 	(False, 'error text').  
@@ -281,7 +281,7 @@ def mail_send(
 	return True, 'ok'
 	
 def mail_send_batch(recipients:str=''
-, cc_limit:int=_CC_LIMIT, **mail_send_args)->List[str]:
+, cc_limit:int=_CC_LIMIT, **mail_send_args)->list[str]:
 	r'''
 	Send email to many recipients.
 	Returns list of errors if any.
@@ -306,7 +306,7 @@ def mail_send_batch(recipients:str=''
 def mail_check(server:str, login:str, password:str
 , folders:list=['inbox'], msg_status:str='UNSEEN'
 , headers:tuple=('subject', 'from', 'to', 'date')
-, silent:bool=True, timeout:int=180)->Tuple[ List[MailMsg], List[str] ]:
+, silent:bool=True, timeout:int=180)->tuple[ list[MailMsg], list[str] ]:
 	'''
 	Returns list of MailMsg and list of errors.  
 	*headers* - message headers to fetch. You can access them later
@@ -404,7 +404,7 @@ def mail_download(
 	, trash_folder:str='Trash', silent:bool=True
 	, attempts:int=3, sub_rule:Callable=None
 	, timeout:int=3600
-)->Tuple[List[MailMsg], List[str] ]:
+)->tuple[list[MailMsg], list[str] ]:
 	r'''
 	Downloads all messages from the server to the
 	specified directory (*dst_dir*).
@@ -541,7 +541,7 @@ def mail_download(
 
 def mail_download_batch(mailboxes:list, dst_dir:str, timeout:int=3600
 , log_file:str=r'mail_errors.log', err_thr:int=8
-, silent:bool=True)->Tuple[ List[MailMsg], List[str] ]:
+, silent:bool=True)->tuple[ list[MailMsg], list[str] ]:
 	r'''
 	Downloads (or checks) all mailboxes in list of dictionaries
 	with parameters for mail_download or mail_check.  

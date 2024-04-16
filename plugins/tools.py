@@ -47,7 +47,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2024-04-14'
+APP_VERSION = 'v2024-04-16'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
@@ -685,7 +685,7 @@ def msgbox(msg:str, title:str=None
 		except:
 			pass
 	if title == None:
-		title = func_name_human(_get_parent_func_name())
+		title = func_name_human(task_name())
 	else:
 		title = str(title)
 	if ui: ui += win32con.MB_SYSTEMMODAL
@@ -786,7 +786,7 @@ def inputbox(message:str, title:str=None
 		else:
 			return input(f'inputbox ({message}): ')
 	if title == None:
-		title = func_name_human(_get_parent_func_name())
+		title = func_name_human(task_name())
 	else:
 		title = str(title)
 	if is_pwd:
@@ -864,7 +864,7 @@ def file_dialog(title:str=None, multiple:bool=False
 	def decap(s:str): return s[:1].lower() + s[1:] if s else ''
 
 	if title == None:
-		title = func_name_human(_get_parent_func_name())
+		title = func_name_human(task_name())
 	else:
 		title = str(title)
 	if tdebug(): return input(f'File dialog ({title}): ')
@@ -894,7 +894,7 @@ def dir_dialog(title:str=None, default_dir:str='', on_top:bool=True
 	def decap(s:str): return s[:1].lower() + s[1:] if s else ''
 
 	if title == None:
-		title = func_name_human(_get_parent_func_name())
+		title = func_name_human(task_name())
 	else:
 		title = str(title)
 	if tdebug(): return input(f'Dir dialog ({title}): ')
@@ -1063,7 +1063,8 @@ def tprint(*msgs, tname:str|None=None):
 	if tname == None:
 		if tname := task_name(): msg = '[' + tname + '] ' + msg
 	else:
-		if tname: msg = '[' + tname + '] ' + msg
+		if tname and (not tname.startswith('<')):
+			msg = '[' + tname + '] ' + msg
 	print(time.strftime('%y.%m.%d %H:%M:%S'), msg)
 
 def tdebug(*msgs, **kwargs)->bool:
@@ -1324,7 +1325,7 @@ def dialog(
 		return S_OK
 	if content: content = str(content)
 	if title == '':
-		title = func_name_human(_get_parent_func_name())
+		title = func_name_human(task_name())
 	else:
 		title = str(title)
 	if is_iter(msg):

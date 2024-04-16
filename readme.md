@@ -366,6 +366,12 @@ Format: **setting** (default value) — description.
 		time_now(days=-1)
 
 - **time_now_str(template:str='%Y-%m-%d_%H-%M-%S')->str** — string with current time.
+- **toast(msg:str|tuple|list, dur:str='default', img:str='', often_ident:str='', often_inter:str='30 sec', on_click:Callable=None, appid:str=APP_NAME)** — windows toast notification.  
+	*img* - full path to a picture.  
+	*duration* - 'short'|'long'|'default'. 'default' and 'short' the same? 'long' is about 30 sec.  
+	*on_click* - an action to perform on click. It is passed an argument with the click properties. If the notification has already disappeared from the screen and is in the Action Center , the action will be performed only if an valid *appid* is specified  
+	*appid* - custom AppID. If you want toast to have the Taskopy icon, run the `emb_appid_add` task from *ext_embedded*.  
+
 - **pause(sec:float)** — pause the execution of the task for the specified number of seconds. *interval* - time in seconds or a string specifying a unit like '5 ms' or '6 sec' or '7 min'.
 - **var_lst_get(var:str, default=[], encoding:str='utf-8', com_str:str='#')->list** — returns list with the text lines. Excludes empty lines and lines that begin with *com_str*
 
@@ -474,6 +480,19 @@ Format: **setting** (default value) — description.
 		# with subdirectories:
 		dir_find('d:\\folder\\**\\*.jpg')
 
+- **dir_junc(src_path, dst_path)** — creates a junction link to a directory.  
+	Only for local paths.  
+
+		td = dir_test()
+		tdj = file_name_add(td, ' junc')
+		dir_junc(td, tdj)
+		asrt( dir_exists(tdj), True )
+		# Delete source dir:
+		dir_delete(td)
+		# Now the link doesn't work:
+		asrt( dir_exists(tdj), False )
+		dir_delete(tdj)
+
 - **dir_list(fullpath, \*\*rules)->Iterator[str]** — returns all directory content (dirs and files).  
 	*rules* - rules for the `path_rule` function.  
 
@@ -494,7 +513,30 @@ Format: **setting** (default value) — description.
 	*test* - only display the files and folders that should be deleted, without actually deleting them.  
 	*print_del* - print path when deleting.  
 	*rules* - rules for the `path_rule` function  
-		
+
+- **dir_rnd_dirs(fullpath, attempts:int=5, filter_func=None)->str** — same as `dir_rnd_file`, but returns the subdirectories.
+- **dir_rnd_files(fullpath, file_num:int=1, attempts:int=5, \*\*rules)->Iterator[str]** — gets random files from a directory or None if nothing is found.  
+	*file_num* - how many files to return.  
+	*rules* - a tuple of rules from the `path_rule`.
+
+	Designed for large directories that take a significant amount of time to list.  
+	The function will not return the same file twice.  
+	Example:
+
+		dir_rnd_files('.')
+		tuple(dir_rnd_files('.', ex_ext='py'))
+	
+	Compared to `dir_files` with `random.choice`:
+
+		> benchmark(lambda: random.choice( list(dir_files(temp_dir() ) ) ), b_iter=10)
+		benchmark: 113 367 113 ns/loop
+
+		> benchmark(dir_rnd_files, a=(temp_dir(), ), b_iter=10)
+		620
+
+		> len( tuple( dir_files( temp_dir() ) ) )
+		1914
+
 - **dir_size(fullpath:str, unit:str='b')->int** — folder size in specified units.
 - **dir_sync(src_dir, dst_dir, report:bool=False, \*\*rules)->dict** — syncrhonize two directories.  
 	For *rules* see the `path_rule`.  
@@ -698,11 +740,16 @@ In the functions for working with windows, the *window* argument can be either a
 - **monitor_on()** — turns on the monitor.
 - **registry_get(fullpath:str)** — get value from Windows Registry.
 	*fullpath* — string like 'HKEY_CURRENT_USER\\Software\\Microsoft\\Calc\\layout'
-- **win_activate(window=None)->int** — bring window to front. *window* may be a string with title or integer with window handle.
+- **win_activate(window=None)->int** — bring window to front. *window* may be a string with title or integer with window handle.  
+	Note: it is not always possible to activate the window. It will just blink on the taskbar.  
 - **win_by_pid(process)->tuple** — returns top window of a process as a tuple `(hwnd:int, title:str)`.
 - **win_close(window=None, wait:bool=True)->bool** — closes window and returns True on success.
 - **win_find(title:str)->list** — find window by title. Returns list of all found windows.
 - **win_hide(window=None)->int** — hide window.
+- **win_is_min(window)->bool|None** — returns `True` if the window is minimized.
+
+		asrt( win_is_min(win_get(class_name=WIN_TASKBAR_CLS)), False )
+
 - **win_list(title_filter:str=None, class_filter:str=None, case_sensitive:bool=False)->list** — list of titles of all windows. *title_filter* - optional filter for titles.
 **- win_on_top(window=None, on_top:bool=True)->int** — makes the window to stay always on top.
 - **win_show(window=None)->int** — show window.
@@ -882,7 +929,10 @@ If you want to save something so that it survives a Taskopy restart, use the *fi
 
 ### Centralization and deployment
 
-You can define a task not only in a *crontab*, but also in an extension, using the *task_add* decorator. In this way you can import from an extension once in the *crontab*, and then update only the file with the extension.
+How to update the task code on multiple computers.  
+You can define a task not only in a *crontab*, but also in an extension, using the *task_add* decorator. So, on the client computer, you can import from an extension once into *crontab*, and then update only the file with the extension that contains the task.  
+
+You can programmatically reload the crontab with **crontab_reload**. This is safe, since the crontab is actually loaded in test mode first. Even if there are gross errors in the crontab, the updated crontab will not load and the old tasks will still run.
 
 ## Firefox extension
 https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/
