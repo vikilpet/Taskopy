@@ -353,6 +353,8 @@ def file_delete(fullpath)->int:
 					, win32con.FILE_ATTRIBUTE_NORMAL)
 				except:
 					break
+			elif last_err == 32:
+				break
 			else:
 				break
 	return last_err

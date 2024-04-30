@@ -7612,6 +7612,7 @@ square7.de
 bplaced.net
 square7.net
 *.s.brave.io
+shop.brendly.hr
 shop.brendly.rs
 browsersafetymark.io
 uk0.bigv.io
@@ -8924,7 +8925,6 @@ meteorapp.com
 eu.meteorapp.com
 co.pl
 *.azurecontainer.io
-cloudapp.azure.com
 azure-api.net
 azureedge.net
 azurefd.net
@@ -9226,8 +9226,11 @@ ras.ru
 qa2.com
 qcx.io
 *.sys.qcx.io
-dev-myqnapcloud.com
+myqnapcloud.cn
 alpha-myqnapcloud.com
+dev-myqnapcloud.com
+mycloudnas.com
+mynascloud.com
 myqnapcloud.com
 *.quipelements.com
 vapor.cloud

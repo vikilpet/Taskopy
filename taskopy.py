@@ -327,9 +327,9 @@ class Tasks:
 		self.http_server = None
 		self.global_hk = None
 		self.global_hk_thread_id = None
-		for item in dir(crontab):
-			if item.startswith('_'): continue
-			task_obj = getattr(crontab, item)
+		for task_name in dir(crontab):
+			if task_name.startswith('_'): continue
+			task_obj = getattr(crontab, task_name)
 			if not isinstance(task_obj, types.FunctionType): continue
 			if (
 				(not getattr(task_obj, TASK_ATTR, False))
@@ -346,12 +346,13 @@ class Tasks:
 					task_opts[opt] = param.default
 			if not task_opts['task']: continue
 			if not task_opts['active']: continue
+			self.task_dict[task_name] = task_opts
 			task_opts['task_func'] = task_obj
-			task_opts['task_func_name'] = item
+			task_opts['task_func_name'] = task_name
 			if task_opts['task_name']:
-				task_opts['task_name_full'] = f'{item} ({task_opts["task_name"]})'
+				task_opts['task_name_full'] = f'{task_name} ({task_opts["task_name"]})'
 			else:
-				task_opts['task_name'] = func_name_human(item)
+				task_opts['task_name'] = func_name_human(task_name)
 				task_opts['task_name_full'] = task_opts['task_name']
 			if task_opts['schedule']: self.add_schedule(task_opts)
 			if task_opts['every']: self.add_every(task_opts)
@@ -378,7 +379,6 @@ class Tasks:
 			if task_opts['on_dir_change']:
 				self.add_dir_change_watch(task_opts, is_file=False
 				, path=task_opts['on_dir_change'])
-			self.task_dict[ task_opts['task_func_name'] ] = task_opts
 			if task_opts['menu']:
 				submenu = None
 				if '__' in task_opts['task_func_name']:

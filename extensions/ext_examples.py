@@ -177,7 +177,8 @@ def examp_cert_check(caller:str, codepage:str=''
 		dct = {}
 		# There is a difference between a pc and a wu dump
 		for sect in dump.split('================'):
-			hsh = re_find(sect, r'(?:\):\s)([0-9a-z\s]{32,})')
+			# Hash may contain spaces: 24 5c 97 df 75 14 e7 cf 2d f8 ...
+			hsh = re_find(sect, r'(?:\):\s)([0-9a-z ]{32,})')
 			if not hsh: continue
 			name = re_find(sect, r'(?:\s(?:CN=|OU=|O=))(.+?)[,\r\n]', re_flags=0)
 			if caller == tcon.CALLER_MENU:
@@ -203,7 +204,7 @@ def examp_cert_check(caller:str, codepage:str=''
 		ret, out, _ = proc_start('certutil', f'-store {store}'
 		, capture=True, encoding=codepage)
 		if ret:
-			dialog(f'certutil store {store} error: {out}')
+			dialog(f'certutil store «{store}» error: {out}')
 			return
 		hashes_pc.update(parser(out))
 	table = [('Src', 'Name', 'Hash')]
