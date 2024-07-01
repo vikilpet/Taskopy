@@ -266,7 +266,8 @@ def proc_list(name:str='', cmd_filter:str=None
 	Returns list of DictToObj with process information.
 	*name* - image name. If not specified then list all
 	processes.  
-	*cmd_filter* - a substring to look for in command line.
+	*cmd_filter* - a substring to look for in command
+	line (case-insensitive).
 
 	Note: while iterating through the process list, the
 	process may cease to exist.  
@@ -375,9 +376,10 @@ def proc_threads_num(process):
 
 def proc_close(process, timeout:int=10
 , cmd_filter:str=None)->int:
-	''' Kills the process 'softly'. Returns 'True' if process
-		was closed 'softly' and False if process was killed
-		after timeout.
+	r'''
+	Kills the process *softly*. Returns `True` if process
+	was closed *softly* and `False` if process was killed
+	after timeout.
 	'''
 	def collect_windows(hwnd, param=None):
 		nonlocal windows

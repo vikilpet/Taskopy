@@ -31,7 +31,7 @@ import win32gui
 import win32con
 import win32com.client
 from typing import Callable, Iterable 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from queue import Queue, SimpleQueue
 from itertools import zip_longest
 import pythoncom
@@ -47,7 +47,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2024-04-30'
+APP_VERSION = 'v2024-07-01'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
@@ -132,7 +132,13 @@ class DictToObj:
 
 	def __getattr__(self, name):
 		return 'DictToObj - unknown key'
-
+	
+	def __str__(self)->str:
+		return (
+			self.__class__.__name__ + '('
+			+ ', '.join(f'{k}={v}' for k,v in vars(self).items())
+			+ ')'
+		)
 
 class SuppressPrint:
 	r'''
@@ -266,7 +272,7 @@ def task_name(is_human:bool=False)->str:
 
 def task_add(func):
 	r'''
-	Adds a attribute that the function is a *task*.
+	Adds an attribute indicating that the function is a *task*.
 	'''
 	setattr(func, TASK_ATTR, True)
 	return func
@@ -482,9 +488,9 @@ def date_weekday(date_val:datetime.datetime=None
 	return date_val.strftime(template)
 
 def date_weekday_num(date_val:datetime.datetime=None)->int:
-	'''
+	r'''
 	Weekday number (monday is 1).  
-	*tdate* - None (today) or datetime.date(2019, 6, 12)
+	*tdate* - `None` (today) or datetime.date(2019, 6, 12)
 
 		asrt( date_weekday_num(datetime.date(2022, 9, 12) ), 1)
 
@@ -543,7 +549,7 @@ def date_last_day_of_month(date:datetime.datetime)->datetime.datetime:
 	if date.month == 12: return date.replace(day=31)
 	return date.replace(month=date.month+1, day=1) - datetime.timedelta(days=1)
 
-def time_sleep(interval, unit:str=None):
+def time_sleep(interval, unit:str=''):
 	r'''
 	Pauses for specified amount of time.  
 	*interval* - number of seconds or `str` with unit like '5 min'
@@ -1474,13 +1480,13 @@ def table_print(
 	Example:
 
 		table = [
-			('Header-1', 'Header-2', 'Header-3')
-			, *(
-				(random_str(3), random_str(100), random_str(5))
+			*(
+				(random_num(1, 9_999), random_str(100), random_str(5))
 				for _ in range(3)
 			)
 		]
-		_ = table_print(table, trim_col=1)
+		_ = table_print(table, use_headers=('Header-1', 'Header-2', 'Header-3')
+		, trim_col=1)
 
 	'''
 
@@ -1545,6 +1551,14 @@ def table_print(
 			rows.sort(key=sort_key, reverse=sorting_rev)
 	else:
 		if headers: rows.insert(0, headers)
+	digital = []
+	for col_num in range(len(rows[0])):
+		col_values = (row[col_num] for row in rows[(1 if use_headers else 0):])
+		if all(
+			v in consider_empty or isinstance(v, (int, float))
+			for v in col_values
+		):
+			digital.append(col_num)
 	new_rows = []
 	for row in rows:
 		new_row = []
@@ -1579,9 +1593,10 @@ def table_print(
 		rows = new_rows
 		max_col_len = tuple( max( map(len, col) ) for col in zip(*rows) )
 		table_width = max_table_width
-	template = col_pad.join(
-		[ '{{:<{}}}'.format(s) for s in max_col_len ]
-	)
+	template = col_pad.join([
+		('{{:{}{}}}').format(('>' if n in digital else '<' ), s)
+		for n, s in enumerate(max_col_len)
+	])
 	if headers: rows.pop(0)
 	print()
 	if headers: print_headers(False)
@@ -1691,6 +1706,14 @@ class DataHTTPReq(object):
 			with open(self._file, 'rb') as fd:
 				return fd.read()
 		return b''
+
+	def __str__(self)->str:
+		return (
+			self.__class__.__name__ + '('
+			+ ', '.join(f'{k}={v}' for k,v in vars(self).items())
+			+ ')'
+		)
+
 
 class DataBrowserExt(DataHTTPReq):
 	'''
@@ -1932,7 +1955,12 @@ def app_win_show():
 	app.show_window()
 
 def app_dir()->str:
-	' Returns the current working directory without the slash '
+	r'''
+	Returns the current working directory without the slash.
+
+		asrt( benchmark(app_dir), 343, "<" )
+		
+	'''
 	return app.dir
 
 def app_tasks()->dict:
@@ -2237,8 +2265,7 @@ def is_often(ident, interval)->bool:
 	The purpose is not to bother the user
 	too often with event alerts.  
 	*ident* - unique identifier of an event.  
-	*interval* - interval for measurement
-	, not less than 1 ms.  
+	*interval* - interval for measurement, not less than 1 ms.  
 
 		is_often('_', '1 ms')
 		asrt( is_often('_', '1 ms'), True)

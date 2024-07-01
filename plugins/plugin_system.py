@@ -457,6 +457,14 @@ def sys_codepage():
 
 	'''
 	return 'cp' + str(_GetACP())
+
+def sys_shutdown(timeout:int=0):
+	r'''
+	Shut down this computer.  
+	*timeout* - set the time-out period before shutdown in seconds.
+	'''
+	os.system(f'shutdown -s -t {timeout}')
+
 if __name__ == '__main__':
 	_test_reg_key()
 else:
