@@ -206,15 +206,18 @@ def load_crontab(event=None)->bool:
 		load_modules()
 		tasks = Tasks()
 		app.tasks = tasks
+		running_tasks = []
 		for rtask in run_bef_reload:
-			dev_print('still running:', rtask['task_func_name'])
 			if not (task := tasks.task_dict.get(rtask['task_func_name']) ):
 				continue
+			running_tasks.append(rtask['task_func_name'])
 			task['thread'] = rtask['thread']
 			task['last_start'] = rtask['last_start']
 			task['running'] = rtask['running']
 		tasks.run_at_crontab_load()
 		tasks.enabled = app.enabled
+		if is_dev():
+			for tn in running_tasks: tprint('still running: ' + tn)
 		return True
 	except:
 		trace_full, trace_short = _exc_texts()
@@ -545,7 +548,6 @@ class Tasks:
 						if e.winerror == 995:
 							return
 						elif e.winerror in (6, 53, 64):
-							dev_print(f'disconnected ({e.winerror}) from «{path}»')
 							self.dir_change_stop.remove(hDir)
 							try:
 								hDir.Close()
@@ -843,8 +845,6 @@ class Tasks:
 				for rule in task['rule']:
 					try:
 						if not rule():
-							msg = task["task_name"] + ' execution was canceled due to rule'
-							if not is_often(msg, '1 min'): dev_print(msg)
 							return
 					except Exception as e:
 						msg = f'task {task["task_name"]} rule exception: {e}'

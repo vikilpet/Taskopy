@@ -25,7 +25,7 @@ from .tools import dev_print, exc_text, time_sleep, tdebug \
 from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 _PUB_SUF_LST = set()
 warnings.filterwarnings('ignore', category=MarkupResemblesLocatorWarning)
@@ -104,7 +104,8 @@ def http_req(url:str, encoding:str='utf-8', session:bool=False
 	else:
 		if session: req_obj.close()
 		raise Exception(
-			f'no more attempts ({attempts}) {url[:100]}')
+			f'no more attempts ({attempts}), host={url_hostname(url)}'
+		)
 	if session: req_obj.close()
 	if file_obj: file_obj.close()
 	content = str(req.content
@@ -135,6 +136,7 @@ def html_minify(html:str)->str:
 	r'''
 	Removes HTML, javascript and CSS comments and whitespace.  
 	Not well tested, use at your own risk.  
+	Requires semicolons in the JS.  
 	'''
 	html = _re_html.sub('', html)
 	js_blocks = _re_js.findall(html)
@@ -257,7 +259,7 @@ def html_clean(html_str:str, sep:str=' ', is_mail:bool=False
 	r'''
 	Removes HTML tags from a string. Also removes content
 	of non-text tags: *style, script, img*  
-	*sep* - separator between tags.
+	*sep* - separator between tags.  
 
 		asrt( html_clean('\r\n<a>t</a>\t'), 't')
 		asrt( html_clean('\r\n<a>t</a><a>t2</a>\t', sep='\n'), 't\nt2')
@@ -653,7 +655,7 @@ def http_req_status(url:str, method='HEAD', timeout:float=1.0)->int:
 	return getattr(requests, method.lower())(url, timeout=timeout).status_code
 
 if __name__ == '__main__':
-	html = r'''
+	_html = r'''
 	<!doctype html>
 	<script>
 		function count(elem) {
@@ -678,7 +680,7 @@ if __name__ == '__main__':
 		</div>
 	</body>
 	'''
-	print(html_minify(html))
+	print(html_minify(_html))
 else:
 	patch_import()
 
@@ -841,10 +843,10 @@ def ping_icmp(host:str, count:int=3
 def ftp_upload(fullpath, server:str
 , user:str, pwd:str, dst_dir:str='/', port:int=21
 , active:bool=True, debug_lvl:int=0, attempts:int=3
-, timeout:int=10, secure:bool=False, encoding:str='utf-8')->tuple:
-	'''
-	Uploads file(s) to an FTP server
-	Returns (True, None) or (False, ('error1', 'error2'...))
+, timeout:int=10, secure:bool=False, encoding:str='utf-8')->tuple[bool, list]:
+	r'''
+	Uploads file(s) to an FTP server.  
+	Returns (True, []) or (False, ['error1', 'error2'...])
 
 	*debug_lvl* - set to 1 to see the commands.
 	
@@ -903,11 +905,8 @@ def ftp_upload(fullpath, server:str
 							+ f' local={loc_size} vs ftp={ftp_size}')
 				else:
 					errors.append(f'no more attempts')
-	except Exception as e:
-		errors.append(
-			f'general error at line {e.__traceback__.tb_lineno}: '
-			+ repr(e)
-		)
+	except:
+		errors.append(exc_text())
 	return len(errors) == 0, errors
 	
 

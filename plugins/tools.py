@@ -2,6 +2,7 @@ import sys
 import os
 import time
 import datetime
+from datetime import datetime as dtime
 import statistics
 import pytz
 import threading
@@ -47,7 +48,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2024-07-01'
+APP_VERSION = 'v2024-08-31'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
@@ -237,13 +238,14 @@ def _get_parent_func_name(parent=None, repl_undrsc:str=None)->str:
 
 def task_name(is_human:bool=False)->str:
 	r'''
-	Gets the name of the task from which it was called.
+	Gets the name of the task from which it was called.  
 
 		asrt( benchmark(task_name), 1500, "<" )
 
 	'''
-	START_LVL = 2
-	MAX_LVL = 20
+	MAX_LVL = 30
+	SKIP = ('tprint', 'dev_print', 'tdebug', 'con_log', 'dialog'
+	, 'msgbox', 'inputbox', 'file_dialog', 'dir_dialog')
 	tname = ''
 	first_name = ''
 	try:
@@ -253,15 +255,16 @@ def task_name(is_human:bool=False)->str:
 	except AttributeError:
 		return '<console>'
 	except:
-		dev_print(f'tprint exception: {exc_text()}')
+		print(f'tprint exception: {exc_text()}')
 		return ''
-	for lvl in range(START_LVL, MAX_LVL):
+	for lvl in range(1, MAX_LVL):
 		try:
-			tn = sys._getframe(lvl).f_code.co_name
-			if tn in tasks:
-				tname = tn
+			fn = sys._getframe(lvl).f_code.co_name
+			if fn in tasks:
+				tname = fn
 				break
-			if lvl == START_LVL: first_name = tn
+			if not first_name:
+				if not fn in SKIP: first_name = fn
 		except ValueError:
 			tname = first_name
 			break
@@ -294,6 +297,12 @@ def sound_play(sound:str|tuple|list|set, wait=False):
 	winsound.PlaySound(fpath, flags=flags)
 
 def dev_print(*msg, **kwargs):
+	r'''
+	For debug.
+
+		asrt( benchmark(lambda: dev_print('bench'), b_iter=3), 550_000, "<" )
+	
+	'''
 	if is_dev() or tdebug():
 		tprint(*msg, **kwargs)
 
@@ -387,11 +396,15 @@ def time_str(template:str=tcon.DATE_STR_FILE
 def time_now(**delta)->datetime.datetime:
 	r'''
 	Returns datetime object.  
-	Use `datetime.timedelta` keywords to get different time.  
+	Use `datetime.timedelta` keywords to get different date/time.  
 	Yesterday:
 
 		time_now(days=-1)
 		asrt( benchmark(time_now), 1046, "<" )
+	
+	Use `.replace` to remove part of datetime:
+
+		time_without_microsec = time_now().replace(microsecond=0)
 
 	'''
 	if not delta: return datetime.datetime.now()
@@ -1100,7 +1113,7 @@ def balloon(msg:str, title:str=APP_NAME, timeout:int=None, icon:str=None):
 	'''
 	kwargs = {'title': title, 'text': msg}
 	if tdebug():
-		tprint('balloon:', msg)
+		tprint('<balloon>:', msg)
 		return
 	if timeout: kwargs['msec'] = timeout * 1000
 	if icon:
@@ -1192,7 +1205,7 @@ def safe(func:Callable)->Callable:
 		except Exception as e:
 			trace_li = traceback.format_exc().splitlines()
 			trace_str = '\n'.join(trace_li[-3:])
-			if tdebug(): tprint(f'safe: \n{trace_str}')
+			if tdebug(): tprint(f'<safe>: \n{trace_str}')
 			return False, e
 	return wrapper
 _TaskDialogIndirect = ctypes.WinDLL('comctl32.dll').TaskDialogIndirect
@@ -1879,7 +1892,8 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 		except Exception:
 			err_str = traceback.format_exc()
 			tprint(
-				f'exception in {func.__name__}:{str_indent(err_str)}'
+				f'exception in «{func.__name__}»:{str_indent(err_str)}'
+				, tname='thread_start'
 			)
 			if err_msg:
 				warning(
@@ -2044,6 +2058,15 @@ def benchmark(func, a:tuple=(), ka:dict={}, b_iter:int=100
 	return total_ns // b_iter
 
 def median(source):
+	r'''
+	Returns `int` or `float` depending on the data.  
+	Will generate an error if the *source* is empty.  
+	Examples:
+
+		asrt( median((1, 3, 5)), 3)
+		asrt( median([1, 3]), 2.0)
+
+	'''
 	return statistics.median(source)
 
 def speak(text:str, wait:bool=False):
@@ -2232,9 +2255,6 @@ def str_diff(text1:str, text2:str)->tuple[tuple[str]]:
 		if not line or (line in lines1): continue
 		diff2.append(line)
 	return tuple(zip_longest(diff1, diff2, fillvalue=''))
-
-
-
 def str_short(text:str, width:int=0, placeholder:str='...')->str:
 	r'''
 	Collapse and truncate the given text to fit in the given width.  

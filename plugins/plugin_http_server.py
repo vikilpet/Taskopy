@@ -120,7 +120,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			try:
 				self.wfile.write(bytes(page, 'utf-8'))
 			except ConnectionAbortedError:
-				dev_print('connection abort')
+				pass
 			except Exception as e:
 				dev_print(f'connection exception: {e}')
 

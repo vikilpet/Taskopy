@@ -211,7 +211,7 @@ Format: **setting** (default value) — description.
 - **hide_console** — hide the console window.
 - **server_ip** (127.0.0.1) — bind HTTP server to this local IP. For access from any address set to *0.0.0.0*.
 	**IT IS DANGEROUS TO ALLOW ACCESS FROM ANY IP!** Do not use *0.0.0.0* in public networks or limit access with firewall.
-- **white_list** (127.0.0.1) — a list of IP addresses separated by commas from which requests are received.
+- **white_list** (127.0.0.1) — a global list of IP addresses separated by commas from which HTTP requests are allowed. You can use wildcards, such as *192\.168\.0\.\**.
 - **server_port** (8275) — HTTP server port.
 
 ## Keywords

@@ -69,7 +69,7 @@ def rmt_page(actions:dict, data:DataHTTPReq, title:str='Remote'
 	# It's an action. Let's perform it safely:
 	status, data = safe( actions.get( data.form['action'] ) )()
 	if status: return 'ok' if data == None else str_short(data, max_status_len)
-	# There is an error:
+	# There is an exception:
 	tprint(data)
 	return 'error: ' + str_short(data, max_status_len - 7)
 
