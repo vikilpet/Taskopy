@@ -15,10 +15,10 @@ def examp_autoruns(exe_path:str, caller:str
 , max_table_width=80):
 	'''
 	Check if something new has appeared in the system autorun.
-	Wrapper for the Sysinternals autoruns:
+	Wrapper for the *Sysinternals autoruns*:
 	https://docs.microsoft.com/en-us/sysinternals/downloads/autoruns  
 	*exe_path* - full path to the console version:  
-	autorunsc64.exe (note the 'c' near the end)
+	*autorunsc64.exe* (note the *c* near the end)
 
 	Usage example (crontab):
 
@@ -31,21 +31,22 @@ def examp_autoruns(exe_path:str, caller:str
 				, caller=caller
 			)
 
-	First you have to run it manually and accept the agreement.
+	First you have to run *autorunsc* manually and accept the agreement.
 
 	The autoruns run without elevated privileges
 	shows slightly less files. We can't run it automatically in
 	elevated mode so lets do it in manual (runas) at least.
 
 	Autoruns command-line options:  
-	m — hide Microsoft signed  
-	ct — tab-separated export  
-	with the -s option it will not show new files with a signature  
+	*m* — hide Microsoft signed  
+	*ct* — tab-separated export.
+	With the *-s* option it will not show new files with a signature  
 	'''
 	CMD = (exe_path, '-nobanner', '-ct', '-m', '-a', '*')
 	HASH_ALG = 'sha256'
 	# It's convient to store name for var_* in a variable:
 	VAR_NAME = 'autoruns'
+	DLG_MAX = 3
 	
 	def csv_to_hash_dict(content:str)->dict:
 		# Returns dict:
@@ -74,7 +75,7 @@ def examp_autoruns(exe_path:str, caller:str
 	if not prev_out:
 		tprint('first run')
 		if caller in (tcon.CALLER_LOAD, tcon.CALLER_MENU):
-			dialog('First run', timeout=5)
+			dialog('First run', timeout=3)
 		var_set( VAR_NAME, json.dumps( csv_to_hash_dict(new_out) ) )
 		return
 	prev_dct = json.loads(prev_out)
@@ -101,14 +102,17 @@ def examp_autoruns(exe_path:str, caller:str
 	table = []
 	for path, status in changes.items():
 		table.append((status, path))
+	# Note the use of a special function `path_short` to
+	# shorten the full file path: 
 	table_print(table, use_headers=('Status', 'File')
-	, max_table_width=max_table_width)
+	, max_table_width=max_table_width, trim_func=path_short)
 	choice = dialog(
 		f'Changes from autoruns ({len(changes)}):\n\n'
 			+ '\n'.join(
-				f'{s}: {p}' for p, s in tuple(changes.items())[0:3]
+				f'{s}: {path_short(p, 50)}'
+				for p, s in tuple(changes.items())[0:DLG_MAX]
 			)
-		, content='More in console' if len(table) > 3 else None
+		, content='More in console' if len(table) > DLG_MAX else None
 		, buttons={
 			'Save and launch autoruns': 'sl'
 			, 'Just launch autoruns': 'l'
@@ -118,7 +122,7 @@ def examp_autoruns(exe_path:str, caller:str
 	)
 	if choice == 'sl':
 		var_set(VAR_NAME, json.dumps(new_dct))
-		# 'runas' - run with elevated privileges
+		# 'runas' - run with elevated privileges:
 		file_open(
 			exe_path.replace('autorunsc', 'autoruns')
 			, operation='runas'
@@ -163,7 +167,7 @@ def examp_cert_check(caller:str, codepage:str=''
 , stores:tuple=('Root', 'AuthRoot')):
 	r'''
 	Find the difference in the PC certificate list and the similar
-	list from Windows Update.
+	list from *Windows Update*.
 
 	Links:
 	
@@ -268,8 +272,10 @@ def telegram__tlg_bot_start(
 			# Unknown message:
 			bot.reply_to(msg, f"I don't get it 🤔")
 
-	# Start the bot:
-	bot.infinity_polling()
+	# Start the bot.
+	# Disable logging so that the bot does not spam the console
+	# with its messages:
+	bot.infinity_polling(logger_level=0)
 	# Signaling that we're out of the infinite server polling loop:
 	tprint('exit')
 

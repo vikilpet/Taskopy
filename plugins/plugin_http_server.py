@@ -44,7 +44,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			super().handle_one_request()
 			req_str = str(self.raw_requestline, 'iso-8859-1')
 			if len(req_str) < 4:
-				dev_print(f'empty request from {self.client_address}')
+				dev_print(f'port scan from {self.client_address}')
 				return
 			req_type = req_str.split()[0].upper()
 			if not req_type in ('GET', 'POST', 'HEAD'):
