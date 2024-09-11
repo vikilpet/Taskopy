@@ -48,7 +48,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2024-09-10'
+APP_VERSION = 'v2024-09-11'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
@@ -1420,8 +1420,9 @@ def dialog(
 			return result.value
 
 def hint(text:str, position:tuple=None)->int:
-	'''	Shows hint.
-		Returns PID of new process.
+	r'''
+	Shows hint.  
+	Returns PID of hint process.  
 	'''
 	hint_file = os.path.join(os.getcwd(), 'resources', 'hint.py')
 	args = [
