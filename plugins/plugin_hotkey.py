@@ -193,8 +193,9 @@ def key_release_wait(keys:str, timeout='10 ms'):
 
 
 if __name__ == '__main__':
-	''' Test this module: bind test_func to 'ctrl+t'
-		global hotkey and exit test with 'ctrl+shift+t'
+	r'''
+	Test this module: bind test_func to 'ctrl+t' global hotkey
+	and exit test with 'ctrl+shift+t'
 	'''
 	import threading
 	def test_func(t:str='no arg'):

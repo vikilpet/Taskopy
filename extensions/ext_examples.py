@@ -46,7 +46,7 @@ def examp_autoruns(exe_path:str, caller:str
 	HASH_ALG = 'sha256'
 	# It's convient to store name for var_* in a variable:
 	VAR_NAME = 'autoruns'
-	DLG_MAX = 3
+	DLG_MAX = 5
 	
 	def csv_to_hash_dict(content:str)->dict:
 		# Returns dict:
@@ -109,7 +109,7 @@ def examp_autoruns(exe_path:str, caller:str
 	choice = dialog(
 		f'Changes from autoruns ({len(changes)}):\n\n'
 			+ '\n'.join(
-				f'{s}: {path_short(p, 50)}'
+				f'{s}: {path_short(p, 45)}'
 				for p, s in tuple(changes.items())[0:DLG_MAX]
 			)
 		, content='More in console' if len(table) > DLG_MAX else None

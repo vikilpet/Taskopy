@@ -7,6 +7,8 @@ The difference between *push* and *pull* tactics:
 - **push** -- triggers on file change event.
 - **pull** -- try to read a new line. If it succeeds, try to read the next one.
 
+You should test for yourself that which option is best for you.  
+
 Usage in the *crontab*:
 
 	def examples__log_watchdog_push(

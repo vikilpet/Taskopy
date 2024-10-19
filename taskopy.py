@@ -18,6 +18,7 @@ import win32evtlog
 import uptime
 from plugins.constants import *
 from plugins.tools import *
+from plugins.tools import _log_file
 from plugins.plugin_filesystem import *
 from plugins.plugin_system import *
 from plugins.plugin_process import *
@@ -169,6 +170,7 @@ CancelIoEx.argtypes = (
 def load_crontab(event=None)->bool:
 	global tasks
 	global crontab
+	start = dtime.now()
 	con_log(f'{lang.load_crontab} {os.getcwd()}')
 	try:
 		run_bef_reload = []
@@ -218,6 +220,7 @@ def load_crontab(event=None)->bool:
 		tasks.enabled = app.enabled
 		if is_dev():
 			for tn in running_tasks: tprint('still running: ' + tn)
+		dev_print('load time: ' + time_diff_str(start, no_ms=False))
 		return True
 	except:
 		trace_full, trace_short = _exc_texts()
@@ -291,9 +294,9 @@ def load_modules():
 			if not isinstance(obj, types.FunctionType):
 				setattr(crontab, obj_name, obj)
 				continue
-			for mdl_name_2 in sett.own_modules:
-				if hasattr(sys.modules[mdl_name_2], obj_name):
-					setattr(sys.modules[mdl_name_2]
+			for mdl_name_own in sett.own_modules:
+				if hasattr(sys.modules.get(mdl_name_own), obj_name):
+					setattr(sys.modules[mdl_name_own]
 						, obj_name, decor_except_status(obj))
 			if hasattr(crontab, obj_name):
 				setattr(crontab, obj_name, decor_except_status(obj))
@@ -447,11 +450,13 @@ class Tasks:
 				, app.taskbaricon.on_left_down
 			)
 		if self.global_hk:
-			self.global_hk_thread_id = thread_start(
-				self.global_hk.listen, err_msg=True)
+			self.global_hk_thread_id = thread_start(self.global_hk.listen
+			, err_msg=True, ident='app: global hotkey listener')
 		if self.task_list_http:
-			thread_start(http_server_start, args=(self,), err_msg=True)
-		self.sched_thread_id = thread_start(self.run_scheduler, err_msg=True)
+			thread_start(http_server_start, args=(self,), err_msg=True
+			, ident='app: http server')
+		self.sched_thread_id = thread_start(self.run_scheduler, err_msg=True
+		, ident='app: scheduler')
 		dev_print(f'Total number of tasks: {len(self.task_dict)}')
 	
 	def add_hotkey(self, task):
@@ -510,7 +515,6 @@ class Tasks:
 				)
 				return True, hDir
 			except pywintypes.error as e:
-				dev_print(f'no access ({e.winerror}) to «{dir_path}»')
 				return False, e
 			except Exception as e:
 				raise
@@ -551,7 +555,6 @@ class Tasks:
 							self.dir_change_stop.remove(hDir)
 							try:
 								hDir.Close()
-								dev_print('hDir closed')
 							except Exception as e:
 								dev_print(f'hDir close exception: {e}')
 							break
@@ -564,7 +567,7 @@ class Tasks:
 							cfile, ctime = results[-1][1], time.time()
 						except:
 							if is_dev():
-								print(f'{prev_file=}, {results=}, exception:\n{exc_text()}\n')
+								dev_print(f'{prev_file=}, {results=}, exception:\n{exc_text()}\n')
 								dialog(
 									f'Exception in "dir_watch":\n\n{exc_text()}'
 									, timeout='5 min'
@@ -604,6 +607,7 @@ class Tasks:
 				, 'is_file': is_file
 			}
 			, err_msg=True
+			, ident='app: dir_watch ' + path_short(path, 30)
 		)
 
 	def add_every(self, task:dict):
@@ -764,6 +768,7 @@ class Tasks:
 			catcher).
 		'''
 		def run_task_inner(result:list=None):
+			
 			def catcher(result:list=None):
 				try:
 					self.task_opt_set(task['task_func_name']
@@ -857,28 +862,20 @@ class Tasks:
 			if task['log']:
 				cs = f' ({caller})' if caller else ''
 				con_log(f'task{cs}: {task["task_name_full"]}')
-			if task['result']:
-				thr = threading.Thread(target=catcher, args=(result,)
-				, daemon=daemon)
-				thr.start()
-				thr.join()
-				app.app_threads[thr.ident] = {
-					'func': 'catcher: ' + task['task_name']
-					, 'stime': time_now()
-					, 'thread': thr
-				}
-			else:
-				thr = threading.Thread(target=catcher, daemon=daemon)
-				thr.start()
-				app.app_threads[thr.ident] = {
-					'func': 'catcher: ' + task['task_name']
-					, 'stime': time_now()
-					, 'thread': thr
-				}
+			thr = threading.Thread(target=catcher, daemon=daemon
+			, name=task['task_name']
+			, args=(result,) if task['result'] else () )
+			thr.start()
+			app.app_threads[thr.ident] = {
+				'func': 'task: ' + task['task_name']
+				, 'stime': dtime.now()
+				, 'thread': thr
+			}
+			if task['result']: thr.join()
 		daemon = (caller != CALLER_EXIT)
-		if task['result'] and not result is None:
+		if task['result'] and not (result is None):
 			thread_start(run_task_inner, thr_daemon=daemon, args=(result,)
-				, err_msg=True)
+			, err_msg=True, ident='run_task_inner: ' + task['task_name'])
 		else:
 			run_task_inner()
 
@@ -1069,7 +1066,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 	def run_command(self, event=None):
 		show_app_window()
 		cmd = input(f'{lang.menu_command_con}: ')
-		if cmd:	print(eval(cmd))
+		if cmd: qprint(eval(cmd))
 
 	def set_icon(self, dis:bool=False, text=APP_FULLNAME
 	, del_text_key=None):
@@ -1106,7 +1103,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 				show_app_window()
 
 	def on_exit(self, event=None, force:bool=False)->bool:
-		'''
+		r'''
 		*force* - do not wait for tasks.
 		'''
 		TASKS_MSG_MAX = 10
@@ -1138,8 +1135,10 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			)
 			for task in tasks.task_list_exit:
 				tasks.run_task(task, caller=CALLER_EXIT)
-		con_log(lang.menu_exit)
+		qprint(lang.menu_exit)
 		tasks.close()
+		app.que_log.stop()
+		app.que_print.stop()
 		wx.CallAfter(self.Destroy)
 		self.frame.Close()
 		return True
@@ -1167,7 +1166,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		for thr in threading.enumerate():
 			if thr._target is None: continue
 			os_threads[thr.name] = thr.native_id
-		table = [('Task function', 'Thread', 'Thread (OS)'
+		table = [('Task function', 'Thread', 'TID'
 		, 'Start time', 'Running time')]
 		nx_tasks:list = []
 		for t in running_tasks:
@@ -1184,14 +1183,14 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 					time_now() - t['last_start']
 				).split('.')[0]
 			table.append((
-				t['task_func_name']
+				t['task_func'].__module__ + '/' + t['task_func_name']
 				, thr_name
 				, os_threads.get(t['thread'], '?')
 				, last_start
 				, duration
 			))
 		if len(table) > 1:
-			print(lang.warn_runn_tasks_con + ':')
+			qprint(lang.warn_runn_tasks_con + ':')
 			table_print(table, use_headers=True)
 		if not show_msg: return running_tasks
 		tasks_str = '\r\n'.join(
@@ -1248,10 +1247,10 @@ class App(wx.App):
 
 	def OnInit(self):
 		self.enabled = True
+		self.app_threads = {}
 		self.frame=wx.Frame(None, style=wx.DEFAULT_FRAME_STYLE | wx.STAY_ON_TOP)
 		self.taskbaricon = TaskBarIcon(self.frame)
 		self.app_pid = os.getpid()
-		self.app_threads = {}
 		hwnd_list = win_find(APP_NAME)
 		if len(hwnd_list) == 1:
 			self.app_hwnd = hwnd_list[0]
@@ -1269,7 +1268,7 @@ class App(wx.App):
 		return True
 
 	def InitLocale(self):
-		'''Override with nothing (or impliment local if actually needed)'''
+		' Override with nothing (or impliment local if actually needed)'
 		pass
 
 	def popup_menu_hk(self):
@@ -1333,7 +1332,7 @@ def main():
 	try:
 		sett = Settings(def_sett=APP_SETTINGS)
 	except Exception as e:
-		print(f'Cannot load settings:\n{repr(e)}')
+		qprint(f'Cannot load settings:\n{repr(e)}')
 		warning(f'Cannot load settings:\n{repr(e)}')
 		return
 	__builtins__.sett = sett
@@ -1347,10 +1346,12 @@ def main():
 	print(lang.load_donate + '\n\n')
 	try:
 		app = App(False)
+		__builtins__.app = app
+		app.que_print:TQueue = TQueue(consumer=print)
+		app.que_log:TQueue = TQueue(consumer=_log_file)
 		app.load_crontab = load_crontab
 		app.show_window = app.taskbaricon.on_left_down
 		app.dir = APP_PATH
-		__builtins__.app = app
 		if load_crontab():
 			tasks.run_at_startup()
 			tasks.run_at_sys_startup()
@@ -1358,11 +1359,11 @@ def main():
 	except Exception as e:
 		trace_full, _ = _exc_texts()
 		msg = f'General exception:\n\n{trace_full}'
-		print('\n', msg)
+		qprint('\n ' + msg)
 		warning(msg)
 		input('Press Enter to exit...')
 	except KeyboardInterrupt:
-		tprint('Interrupted by keyboard')
+		tprint('interrupted by keyboard')
 		time.sleep(2)
 
 

@@ -494,8 +494,14 @@ def file_size_str(fullpath)->str:
 		size /= 1024.0
 
 def file_ext(fullpath)->str:
-	''' Returns file extension in lower case
-		without dot.
+	r'''
+	Returns file extension in lower case without dot.
+
+		asrt(file_ext('crontab.py'), 'py')
+		asrt(file_ext('crontab.'), '')
+		asrt(file_ext('crontab.py.py'), 'py')
+		asrt(file_ext('crontab.py.'), '')
+
 	'''
 	fullpath = path_get(fullpath)
 	ext = os.path.splitext(fullpath)[1].lower()

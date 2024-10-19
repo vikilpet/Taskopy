@@ -136,8 +136,11 @@ net.am
 org.am
 ao
 ed.ao
+edu.ao
+gov.ao
 gv.ao
 og.ao
+org.ao
 co.ao
 pb.ao
 it.ao
@@ -388,6 +391,7 @@ ato.br
 b.br
 barueri.br
 belem.br
+bet.br
 bhz.br
 bib.br
 bio.br
@@ -474,6 +478,7 @@ joinville.br
 jor.br
 jus.br
 leg.br
+leilao.br
 lel.br
 log.br
 londrina.br
@@ -3623,7 +3628,6 @@ coop.mw
 edu.mw
 gov.mw
 int.mw
-museum.mw
 net.mw
 org.mw
 mx
@@ -3651,22 +3655,11 @@ mil.mz
 net.mz
 org.mz
 na
-info.na
-pro.na
-name.na
-school.na
-or.na
-dr.na
-us.na
-mx.na
-ca.na
-in.na
-cc.na
-tv.na
-ws.na
-mobi.na
+alt.na
 co.na
 com.na
+gov.na
+net.na
 org.na
 name
 nc
@@ -4818,7 +4811,6 @@ com.pt
 nome.pt
 pw
 co.pw
-ne.pw
 or.pw
 ed.pw
 go.pw
@@ -4983,6 +4975,7 @@ org.so
 sr
 ss
 biz.ss
+co.ss
 com.ss
 edu.ss
 gov.ss
@@ -5991,7 +5984,6 @@ cruises
 cuisinella
 cymru
 cyou
-dabur
 dad
 dance
 data
@@ -6353,6 +6345,7 @@ meme
 memorial
 men
 menu
+merck
 merckmsd
 miami
 microsoft
@@ -6943,6 +6936,7 @@ execute-api.ap-southeast-1.amazonaws.com
 execute-api.ap-southeast-2.amazonaws.com
 execute-api.ap-southeast-3.amazonaws.com
 execute-api.ap-southeast-4.amazonaws.com
+execute-api.ap-southeast-5.amazonaws.com
 execute-api.ca-central-1.amazonaws.com
 execute-api.ca-west-1.amazonaws.com
 execute-api.eu-central-1.amazonaws.com
@@ -7189,6 +7183,7 @@ s3-object-lambda.ap-south-1.amazonaws.com
 s3-website.ap-south-1.amazonaws.com
 s3.dualstack.ap-south-2.amazonaws.com
 s3-accesspoint.dualstack.ap-south-2.amazonaws.com
+s3-website.dualstack.ap-south-2.amazonaws.com
 s3.ap-south-2.amazonaws.com
 s3-accesspoint.ap-south-2.amazonaws.com
 s3-object-lambda.ap-south-2.amazonaws.com
@@ -7209,16 +7204,26 @@ s3-object-lambda.ap-southeast-2.amazonaws.com
 s3-website.ap-southeast-2.amazonaws.com
 s3.dualstack.ap-southeast-3.amazonaws.com
 s3-accesspoint.dualstack.ap-southeast-3.amazonaws.com
+s3-website.dualstack.ap-southeast-3.amazonaws.com
 s3.ap-southeast-3.amazonaws.com
 s3-accesspoint.ap-southeast-3.amazonaws.com
 s3-object-lambda.ap-southeast-3.amazonaws.com
 s3-website.ap-southeast-3.amazonaws.com
 s3.dualstack.ap-southeast-4.amazonaws.com
 s3-accesspoint.dualstack.ap-southeast-4.amazonaws.com
+s3-website.dualstack.ap-southeast-4.amazonaws.com
 s3.ap-southeast-4.amazonaws.com
 s3-accesspoint.ap-southeast-4.amazonaws.com
 s3-object-lambda.ap-southeast-4.amazonaws.com
 s3-website.ap-southeast-4.amazonaws.com
+s3.dualstack.ap-southeast-5.amazonaws.com
+s3-accesspoint.dualstack.ap-southeast-5.amazonaws.com
+s3-website.dualstack.ap-southeast-5.amazonaws.com
+s3.ap-southeast-5.amazonaws.com
+s3-accesspoint.ap-southeast-5.amazonaws.com
+s3-deprecated.ap-southeast-5.amazonaws.com
+s3-object-lambda.ap-southeast-5.amazonaws.com
+s3-website.ap-southeast-5.amazonaws.com
 s3.dualstack.ca-central-1.amazonaws.com
 s3-accesspoint.dualstack.ca-central-1.amazonaws.com
 s3-accesspoint-fips.dualstack.ca-central-1.amazonaws.com
@@ -7239,6 +7244,7 @@ s3.ca-west-1.amazonaws.com
 s3-accesspoint.ca-west-1.amazonaws.com
 s3-accesspoint-fips.ca-west-1.amazonaws.com
 s3-fips.ca-west-1.amazonaws.com
+s3-object-lambda.ca-west-1.amazonaws.com
 s3-website.ca-west-1.amazonaws.com
 s3.dualstack.eu-central-1.amazonaws.com
 s3-accesspoint.dualstack.eu-central-1.amazonaws.com
@@ -7249,6 +7255,7 @@ s3-object-lambda.eu-central-1.amazonaws.com
 s3-website.eu-central-1.amazonaws.com
 s3.dualstack.eu-central-2.amazonaws.com
 s3-accesspoint.dualstack.eu-central-2.amazonaws.com
+s3-website.dualstack.eu-central-2.amazonaws.com
 s3.eu-central-2.amazonaws.com
 s3-accesspoint.eu-central-2.amazonaws.com
 s3-object-lambda.eu-central-2.amazonaws.com
@@ -7268,6 +7275,7 @@ s3-object-lambda.eu-south-1.amazonaws.com
 s3-website.eu-south-1.amazonaws.com
 s3.dualstack.eu-south-2.amazonaws.com
 s3-accesspoint.dualstack.eu-south-2.amazonaws.com
+s3-website.dualstack.eu-south-2.amazonaws.com
 s3.eu-south-2.amazonaws.com
 s3-accesspoint.eu-south-2.amazonaws.com
 s3-object-lambda.eu-south-2.amazonaws.com
@@ -7295,12 +7303,14 @@ s3-object-lambda.eu-west-3.amazonaws.com
 s3-website.eu-west-3.amazonaws.com
 s3.dualstack.il-central-1.amazonaws.com
 s3-accesspoint.dualstack.il-central-1.amazonaws.com
+s3-website.dualstack.il-central-1.amazonaws.com
 s3.il-central-1.amazonaws.com
 s3-accesspoint.il-central-1.amazonaws.com
 s3-object-lambda.il-central-1.amazonaws.com
 s3-website.il-central-1.amazonaws.com
 s3.dualstack.me-central-1.amazonaws.com
 s3-accesspoint.dualstack.me-central-1.amazonaws.com
+s3-website.dualstack.me-central-1.amazonaws.com
 s3.me-central-1.amazonaws.com
 s3-accesspoint.me-central-1.amazonaws.com
 s3-object-lambda.me-central-1.amazonaws.com
@@ -7369,6 +7379,7 @@ s3.dualstack.us-east-2.amazonaws.com
 s3-accesspoint.dualstack.us-east-2.amazonaws.com
 s3-accesspoint-fips.dualstack.us-east-2.amazonaws.com
 s3-fips.dualstack.us-east-2.amazonaws.com
+s3-website.dualstack.us-east-2.amazonaws.com
 s3.us-east-2.amazonaws.com
 s3-accesspoint.us-east-2.amazonaws.com
 s3-accesspoint-fips.us-east-2.amazonaws.com
@@ -7624,6 +7635,7 @@ appspaceusercontent.com
 appudo.net
 on-aptible.com
 f5.si
+arvanedge.ir
 user.aseinet.ne.jp
 gv.vc
 d.gv.vc
@@ -7643,9 +7655,6 @@ onavstack.net
 ecommerce-shop.pl
 b-data.io
 balena-devices.com
-*.banzai.cloud
-app.banzaicloud.io
-*.backyards.banzaicloud.io
 base.ec
 official.ec
 buyshop.jp
@@ -7684,7 +7693,6 @@ uk0.bigv.io
 dh.bytemark.co.uk
 vm.bytemark.co.uk
 cafjs.com
-mycd.eu
 canva-apps.cn
 *.my.canvasite.cn
 canva-apps.com
@@ -7722,7 +7730,6 @@ se.net
 uk.net
 ae.org
 com.se
-certmgr.org
 cx.ua
 discourse.group
 discourse.team
@@ -7825,8 +7832,6 @@ co.dk
 firm.dk
 reg.dk
 store.dk
-daplie.me
-localhost.daplie.me
 dyndns.dappnode.io
 builtwithdark.com
 darklang.io
@@ -7839,7 +7844,6 @@ dattoweb.com
 mydatto.com
 dattolocal.net
 mydatto.net
-ddns5.com
 ddnss.de
 dyn.ddnss.de
 dyndns.ddnss.de
@@ -8242,10 +8246,8 @@ ng.eu.org
 nl.eu.org
 no.eu.org
 nz.eu.org
-paris.eu.org
 pl.eu.org
 pt.eu.org
-q-a.eu.org
 ro.eu.org
 ru.eu.org
 se.eu.org
@@ -8621,7 +8623,6 @@ blogspot.lt
 blogspot.lu
 blogspot.md
 blogspot.mk
-blogspot.mr
 blogspot.com.mt
 blogspot.mx
 blogspot.my
@@ -8666,6 +8667,8 @@ conf.se
 häkkinen.fi
 hs.run
 hs.zone
+wdh.app
+hrsn.dev
 hashbang.sh
 hasura.app
 hasura-app.io
@@ -8708,6 +8711,8 @@ ngo.ng
 plc.ng
 ie.ua
 hostyhosting.io
+hf.space
+static.hf.space
 hypernode.io
 iobb.net
 co.cz
@@ -8864,7 +8869,6 @@ jouwweb.site
 js.org
 kaas.gg
 khplay.nl
-ktistory.com
 kapsi.fi
 ezproxy.kuleuven.be
 kuleuven.cloud
@@ -8965,6 +8969,7 @@ mcpe.me
 mediatech.by
 mediatech.dev
 hra.health
+medusajs.app
 miniserver.com
 memset.net
 messerli.app
@@ -9005,7 +9010,12 @@ sn.mynetname.net
 routingthecloud.net
 routingthecloud.org
 csx.cc
-forte.id
+mydbserver.com
+webspaceconfig.de
+mittwald.info
+mittwaldserver.info
+typo3server.info
+project.space
 modx.dev
 bmoattachments.org
 net.ru
@@ -9250,7 +9260,6 @@ platter-app.com
 platter-app.dev
 platterp.us
 pley.games
-dyn53.io
 onporter.run
 co.bn
 postman-echo.com
@@ -9475,6 +9484,7 @@ shiftedit.io
 myshopblocks.com
 myshopify.com
 shopitsite.com
+shopware.shop
 shopware.store
 mo-siemens.io
 1kapp.com
@@ -9483,9 +9493,6 @@ applinzi.com
 sinaapp.com
 vipsinaapp.com
 siteleaf.net
-bounty-full.com
-alpha.bounty-full.com
-beta.bounty-full.com
 small-web.org
 aeroport.fr
 avocat.fr
@@ -9571,8 +9578,6 @@ temp-dns.com
 supabase.co
 supabase.in
 supabase.net
-*.sensiosite.cloud
-*.s5y.io
 syncloud.it
 dscloud.biz
 direct.quickconnect.cn
@@ -9594,7 +9599,6 @@ mytabit.com
 mytabit.co.il
 tabitorder.co.il
 taifun-dns.de
-beta.tailscale.net
 ts.net
 *.c.ts.net
 gda.pl
@@ -9627,7 +9631,6 @@ azimuth.network
 tlon.network
 torproject.net
 pages.torproject.net
-bloxcms.com
 townnews-staging.com
 12hp.at
 2ix.at
@@ -9650,8 +9653,8 @@ webspace.rocks
 lima.zone
 *.transurl.be
 *.transurl.eu
-*.transurl.nl
 site.transip.me
+*.transurl.nl
 tuxfamily.org
 dd-dns.de
 dray-dns.de
@@ -9723,9 +9726,6 @@ pages.wiardweb.com
 toolforge.org
 wmcloud.org
 wmflabs.org
-wdh.app
-preview.wdh.app
-t.hrsn.net
 panel.gg
 daemon.panel.gg
 wixsite.com
@@ -9757,13 +9757,7 @@ storage.yandexcloud.net
 website.yandexcloud.net
 official.academy
 yolasite.com
-ybo.faith
 yombo.me
-homelink.one
-ybo.party
-ybo.review
-ybo.science
-ybo.trade
 ynh.fr
 nohost.me
 noho.st

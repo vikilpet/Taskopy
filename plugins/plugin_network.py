@@ -20,12 +20,12 @@ import ftplib
 from typing import Iterator, Tuple, Union
 import json2html
 from .tools import dev_print, exc_text, time_sleep, tdebug \
-, locale_set, safe, patch_import, time_diff \
+, locale_set, safe, patch_import, re_replace \
 , median, is_iter, str_indent
 from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 _PUB_SUF_LST = set()
 warnings.filterwarnings('ignore', category=MarkupResemblesLocatorWarning)
@@ -451,36 +451,37 @@ def json_element(source:str, element:list|tuple=[], **kwargs)->str|list|tuple|fl
 			raise Exception('element not found')
 	return r
 
-def xml_element(url:str, element:str
-, element_num:int=0, encoding:str='utf-8'
+def xml_element(url:str, elem:str
+, elem_num:int=0, encoding:str='utf-8', remove_namespace:bool=False
 , **kwargs):
 	r'''
 	Downloads a XML document from the specified URL and gets the value
 	by the list with 'map' of parent elements like ['foo', 'bar']
 	
-	*element* - XPath or list of XPath's.
-	Example: element='/result/array/msgContact[1]/msgCtnt'  
+	*elem* - XPath or list of XPath's.
+	Example: elem='/result/array/msgContact[1]/msgCtnt'  
 	*kwargs* - additional arguments for http_req.  
 	'''
 	if url.startswith('http'):
 		status, content = safe(http_req)(url=url, **kwargs)
 		if not status: raise content
 	else:
-		status = True
 		content = url
-	if isinstance(element, (list, tuple)):
-		element_li = element
+	if remove_namespace:
+		content = re_replace(content, r'\sxmlns=".+?"', '')
+	if isinstance(elem, (list, tuple)):
+		elem_lst = elem
 	else:
-		element_li = [element]
+		elem_lst = [elem]
 	result = []
 	tree = lxml.etree.fromstring(content.encode(encoding=encoding))
-	for element in element_li:
-		value = tree.xpath(element)[element_num]
+	for elm in elem_lst:
+		value = tree.xpath(elm)[elem_num]
 		if value != None:
 			result.append(value.text)
 		else:
-			raise Exception(f'xml_element: element not found: {element}')
-	if isinstance(element, (list, tuple)):
+			raise Exception(f'xml_element: element not found: {elm}')
+	if isinstance(elem, (list, tuple)):
 		return result
 	else:
 		return result[0]
@@ -499,15 +500,15 @@ def net_pc_ip()->str:
 		asrt( benchmark(net_pc_ip), 90_000, "<" )
 
 	'''
-	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	s.settimeout(0)
+	sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+	sock.settimeout(0)
 	try:
-		s.connect(('10.254.254.254', 1))
-		ip = s.getsockname()[0]
+		sock.connect(('10.254.254.254', 1))
+		ip = sock.getsockname()[0]
 	except Exception:
 		ip = '127.0.0.1'
 	finally:
-		s.close()
+		sock.close()
 	return ip
 
 def net_pc_hostname()->str:
@@ -788,15 +789,15 @@ def ping_tcp(host:str, port:int, count:int=1, pause:int=100
 		return False, str(e)
 	full_start = time.perf_counter_ns()
 	for _ in range(count):
-		with socket.socket( socket.AF_INET, socket.SOCK_STREAM ) as soc:
-			soc.settimeout(timeout/1000)
+		with socket.socket( socket.AF_INET, socket.SOCK_STREAM ) as sock:
+			sock.settimeout(timeout/1000)
 			tstart = time.perf_counter_ns()
 			try:
-				soc.connect((ip, port))
+				sock.connect((ip, port))
 				timings.append(
 					(time.perf_counter_ns() - tstart) // 1_000_000
 				)
-				soc.shutdown(socket.SHUT_RD)
+				sock.shutdown(socket.SHUT_RD)
 			except Exception as e:
 				last_err = str(e)
 				tdebug(last_err)
@@ -809,7 +810,7 @@ def ping_tcp(host:str, port:int, count:int=1, pause:int=100
 		
 
 def ping_icmp(host:str, count:int=3
-, timeout:int=500, encoding:str='cp866')->tuple:
+, timeout:int=500, encoding:str='cp866')->tuple[bool, tuple|str]:
 	r'''
 	Wrapper over ping.exe.
 	Returns (True, (loss percentage, time in ms) )

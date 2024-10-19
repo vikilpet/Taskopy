@@ -48,22 +48,13 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2024-09-11'
+APP_VERSION = 'v2024-10-19'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
 APP_ICON_ICO = r'resources\icon.ico'
-_app_log = []
-_app_log_limit = 10_000
-
-if __builtins__.get('gdic', None) == None:
-	gdic = {}
-	__builtins__['gdic'] = gdic
-	if hasattr(sys, 'ps1'):
-		app:wx.App = wx.App()
-		app.dir = os.getcwd()
-		__builtins__['app'] = app
-
+_app_log:list = []
+_app_log_limit:int = 10_000
 _DEFAULT_INI = r'''[General]
 language=en
 editor=notepad.exe
@@ -88,6 +79,7 @@ _LOCALE_LOCK = threading.Lock()
 _LOG_TIME_FORMAT = '%Y.%m.%d %H:%M:%S'
 _TERMINAL_WIDTH = os.get_terminal_size().columns - 1
 TASK_ATTR:str = '__is_task__'
+
 
 class Settings:
 	r'''
@@ -144,6 +136,10 @@ class DictToObj:
 class SuppressPrint:
 	r'''
 	Suppresses outputting anything to the console.  
+	Usage:
+
+		with SuppressPrint():
+
 	'''
 	def __enter__(self):
 		self._original_stdout = sys.stdout
@@ -153,6 +149,51 @@ class SuppressPrint:
 		sys.stdout.close()
 		sys.stdout = self._original_stdout
 
+
+class TQueue(Queue):
+	r'''
+	A queue that sends everything to the consumer in a different thread.  
+	To stop the consumer thread put a `.stop` in queue:
+
+		q = TQueue()
+		q.put(1)
+		q.put(q.stop)
+
+	'''
+
+	def __init__(self, consumer:Callable=print, max_size:int=0)->None:
+		super().__init__(maxsize=max_size)
+		self._stop_sentinel:object = object()
+		self.consumer:Callable=consumer
+		thread_start(func=self.consumer_thread
+		, ident='TQueue ' + consumer.__name__)
+	
+	def consumer_thread(self):
+		while True:
+			item = self.get()
+			if item is self._stop_sentinel:
+				tdebug('consumer_thread stopped')
+				return
+			try:
+				self.consumer(item)
+			except:
+				pass
+			self.task_done()
+	
+	def stop(self):
+		' Stop consumer thread '
+		self.put(self._stop_sentinel)
+
+
+if __builtins__.get('gdic', None) == None:
+	gdic = {}
+	__builtins__['gdic'] = gdic
+	if hasattr(sys, 'ps1'):
+		app:wx.App = wx.App()
+		app.que_print:TQueue = TQueue(consumer=print)
+		app.que_log:TQueue = TQueue(consumer=lambda t: _log_file(t))
+		app.dir = os.getcwd()
+		__builtins__['app'] = app
 
 def value_to_unit(value, unit:str='sec', unit_dict:dict=None
 , def_src_unit:str='sec')->float:
@@ -303,8 +344,7 @@ def dev_print(*msg, **kwargs):
 		asrt( benchmark(lambda: dev_print('bench'), b_iter=3), 550_000, "<" )
 	
 	'''
-	if is_dev() or tdebug():
-		tprint(*msg, **kwargs)
+	if is_dev() or tdebug(): tprint(*msg, **kwargs)
 
 def is_dev()->bool:
 	r'''
@@ -315,40 +355,39 @@ def is_dev()->bool:
 	'''
 	return ('--developer' in sys.argv) or hasattr(sys, 'ps1')
 
-def _log_file(log_str:str, fname:str)->int:
+def _log_file(str_fname:tuple[str, str]):
 	r'''
-	Append the string to a file.
+	Append the string to a log file.  
+	*str_fname* - first is a log message, second is log file name.  
 	'''
-	try:
-		with open(
-			 f'{app_dir()}\\log\\{fname}.log'
-			, 'ta+'
-			, encoding='utf-8'
-		) as f:
-			f.write(log_str)
-	except FileNotFoundError:
-		return 1
-	except:
-		print(f'log file exception: {exc_text()}')
-		return 2
-	return 0
+	for _ in range(2):
+		try:
+			with open(f'{app.dir}\\log\\{str_fname[1]}.log', 'ta+'
+			, encoding='utf-8') as f:
+				f.write(str_fname[0])
+			return 
+		except FileNotFoundError:
+			os.makedirs( app.dir + '\\log' )
+			continue
+		except:
+			print(f'logging to a file exception: {exc_text()}')
+			return
 
 def con_log(*msgs):
 	r'''
 	Outputs a message to the console and to a log file.  
 	'''
 	global _app_log
-	ltime = datetime.datetime.now()
+	ltime = dtime.now()
 	msg = ' '.join(map(str, msgs))
 	tprint(msg, tname='')
 	_app_log.append((ltime, msg))
 	del _app_log[:-_app_log_limit]
-	log_str = ( ltime.strftime(_LOG_TIME_FORMAT) + ' ' + msg + '\n')
-	if not (sett := __builtins__.get('sett', None)): return
-	if _log_file(log_str, ltime.strftime(sett.log_file_name)) == 1:
-		os.makedirs('log')
-		_log_file(log_str=log_str
-		, fname=ltime.strftime(sett.log_file_name))
+	if not (sett := __builtins__.get('sett', None)):
+		return
+	log_str = ltime.strftime(_LOG_TIME_FORMAT) + ' ' + msg + '\n'
+	fname = ltime.strftime(sett.log_file_name)
+	app.que_log.put((log_str, fname))
 
 def time_now_str(template:str=tcon.DATE_STR_FILE
 , use_locale:str='C', timezone=None, **delta)->str:
@@ -570,6 +609,11 @@ def time_sleep(interval, unit:str=''):
 	provide unit in this case). Example:
 
 		time_sleep( (2,10), 'sec' )
+	
+	`time.sleep` isn't that cheap on its own:
+
+		asrt( benchmark(lambda: None if False else time.sleep(0)), 3_000, "<" )
+		asrt( benchmark(lambda: None if True else time.sleep(0)), 200, "<" )
 
 	'''
 	if isinstance(interval, (list, tuple)):
@@ -728,7 +772,8 @@ def msgbox(msg:str, title:str=None
 			result = []
 			thread_start(
 				func=lambda *a, r=result: r.append(mb_func(*a))
-				, args=mb_args 
+				, args=mb_args
+				, ident='msgbox'
 			)
 			hwnd = get_hwnd(title_tmp)
 			if hwnd:
@@ -744,7 +789,7 @@ def msgbox(msg:str, title:str=None
 			if dis_timeout:
 				result = []
 				thread_start(lambda *a, r=result: r.append(mb_func(*a))
-				, args=mb_args)
+				, args=mb_args, ident='msgbox')
 				hwnd = get_hwnd(title_tmp)
 				if hwnd:
 					win32gui.SetWindowText(hwnd, title)
@@ -969,6 +1014,7 @@ def job_pool(jobs:list, pool_size:int=None)->list:
 				)
 			for job in job_pool(jobs, pool_size=2):
 				print(job.error, job.result, job.time)
+				
 	'''
 	pool = ThreadPool(pool_size)
 	pool.map(lambda f: f(), (j.run for j in jobs))
@@ -1056,8 +1102,9 @@ def job_batch(jobs:list, timeout:int
 			print(job.error, job.result, job.time)
 	
 	'''
+	job: Job
 	for job in jobs:
-		thread_start(job.run)
+		thread_start(job.run, ident='job: ' + job.func.__name__)
 	for _ in range(int(timeout / sleep_timeout)):
 		if all((j.finished for j in jobs)):
 			return jobs
@@ -1070,11 +1117,25 @@ def job_batch(jobs:list, timeout:int
 				job.time = 'timeout'
 		return jobs
 
+def qprint(*values):
+	r'''
+	Print to the console through a queue.  
+	Intended to be used in place of the standard `print`.  
+	Pros: non-blocking, FIFO.  
 
+		asrt( benchmark(print, ('a', 'b',), b_iter=3), 800_000, "<" )
+		asrt( benchmark(qprint, ('a', 'b',), b_iter=3), 12_000, "<" )
+
+	'''
+	msg = ' '.join(map(str, values))
+	try:
+		app.que_print.put(msg)
+	except:
+		print(msg)
 
 def tprint(*msgs, tname:str|None=None):
 	r'''
-	Print the message(s) with the task name and time.  
+	Prints the message(s) with the task name and time.  
 	*tname* - name of the caller (task name). If it
 	is `None`, then try to find the task name.  
 	'''
@@ -1084,7 +1145,7 @@ def tprint(*msgs, tname:str|None=None):
 	else:
 		if tname and (not tname.startswith('<')):
 			msg = '[' + tname + '] ' + msg
-	print(time.strftime('%y.%m.%d %H:%M:%S'), msg)
+	qprint(time.strftime('%y.%m.%d %H:%M:%S') + ' ' + msg)
 
 def tdebug(*msgs, **kwargs)->bool:
 	r'''
@@ -1125,9 +1186,9 @@ def balloon(msg:str, title:str=APP_NAME, timeout:int=None, icon:str=None):
 	app.taskbaricon.ShowBalloon(**kwargs)
 
 def app_log_get()->str:
-	'''
-	Returns current log as a string.
-	Log can't be empty.
+	r'''
+	Returns current log as a string.  
+	Log can't be empty.  
 	'''
 	log = [t.strftime(_LOG_TIME_FORMAT) + ' ' + m for t, m in _app_log]
 	return '\n'.join(log)
@@ -1404,7 +1465,7 @@ def dialog(
 			, ctypes.byref(result), None, None)
 	else:
 		thread_start(lambda: _TaskDialogIndirect(ctypes.byref(tdc) \
-			, ctypes.byref(result), None, None))
+			, ctypes.byref(result), None, None), ident='_TaskDialogIndirect')
 		return
 	if buttons and return_button:
 		if result.value >= 1000:
@@ -1436,6 +1497,7 @@ def hint(text:str, position:tuple=None)->int:
 		thread_start(
 			mdl.main
 			, kwargs={'text': text, 'position': position}
+			, ident='hint: ' + text
 		)
 	else:
 		return subprocess.Popen(args=args
@@ -1509,13 +1571,13 @@ def table_print(
 	def print_sep(sep=row_sep):
 		nonlocal table_width
 		if not sep: return
-		print( sep * (table_width // len(sep) ) )
+		qprint( sep * (table_width // len(sep) ) )
 	
 	def print_headers(both=False):
 		nonlocal headers, template
 		if not headers: return
 		if both: print_sep(sep=headers_sep)
-		print(template.format(*headers))
+		qprint(template.format(*headers))
 		print_sep(sep=headers_sep)
 	
 	def trimmer(src_str:str, width:int
@@ -1612,7 +1674,7 @@ def table_print(
 		for n, s in enumerate(max_col_len)
 	])
 	if headers: rows.pop(0)
-	print()
+	qprint()
 	if headers: print_headers(False)
 	for row_num, row in enumerate(rows):
 		if row_sep_step:
@@ -1627,8 +1689,8 @@ def table_print(
 			if repeat_headers:
 				if row_num > 0 and (row_num % repeat_headers == 0):
 					print_headers(True)
-		print(template.format(*row))
-	print()
+		qprint(template.format(*row))
+	qprint()
 	return rows
 
 def patch_import():
@@ -1878,14 +1940,15 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 , thr_daemon:bool=True, err_msg:bool=False, ident:str=''
 , err_action=None)->int:
 	r'''
-	Runs task in a thread. Returns thread id.  
-	*ident* - user-defined identifier of stream.  
+	Runs function in a thread. Returns thread id.  
+	*ident* - user-defined identifier of thread.  
 	*err_action* - function to run if an exception occurs.  
 	The text of exception will be passed to the function.  
 
 		asrt( benchmark(thread_start, (lambda: None,)), 500_000, '<' )
 
 	'''
+	
 	def wrapper():
 		nonlocal func, args, kwargs
 		try:
@@ -1906,31 +1969,29 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 				except:
 					pass
 
-	thr = threading.Thread(target=wrapper
-	, daemon=thr_daemon)
+	thr = threading.Thread(target=wrapper, daemon=thr_daemon
+	, name=func.__name__)
 	thr.start()
 	if not tdebug():
 		try:
-			parents = _get_parents()
-			parents.reverse()
-			if ident: ident = ': ' + ident
+			if not ident:
+				parents = tuple(reversed(_get_parents()))[-3:]
+				ident = '>'.join(parents) + '>' + func.__name__
 			app.app_threads[thr.ident] = {
-				'func': '>'.join(
-					parents[-3:] if parents else ()
-				) + '>' + func.__name__ + ident
+				'func': ident
 				, 'stime': time_now()
 				, 'thread': thr
 			}
-		except Exception as e:
-			dev_print('thread_start save error: ' + repr(e))
+		except:
+			dev_print('thread_start save error: ' + exc_text())
 			pass
 	return thr.ident
 task_run = thread_start
 
 def app_threads_print():
 	thread: threading.Thread
-	table = [('ID', 'Daemon', 'Start time', 'Running time'
-	, 'Target', 'Function')]
+	table = [('TID', 'Dae', 'Start time', 'Running time'
+	, 'Target', 'Identity')]
 	for ident, thr_dic in app.app_threads.items():
 		func_name = thr_dic.get('func')
 		start_time = thr_dic.get('stime')
@@ -1945,7 +2006,7 @@ def app_threads_print():
 			if target: target = getattr(target, '__name__', None)
 		table.append((
 			ident
-			, daemon
+			, 'Y' if daemon else 'N'
 			, str(start_time).split('.')[0]
 			, run_time.split('.')[0]
 			, target
@@ -1954,11 +2015,11 @@ def app_threads_print():
 	dead = sum(1 for t in threading.enumerate() if not t.is_alive())
 	table_print(table, use_headers=True, sorting=[2])
 	tnum_sys = len(psutil.Process(pid=app.app_pid).threads())
-	print('Number of threads:')
-	print(f'table		{len(table) - 1}')
-	print(f'dead		{dead}')
-	print(f'threading	{len(threading.enumerate())}')
-	print(f'system		{tnum_sys}\n')
+	qprint('Number of threads:')
+	qprint(f'table		{len(table) - 1}')
+	qprint(f'dead		{dead}')
+	qprint(f'threading	{len(threading.enumerate())}')
+	qprint(f'system		{tnum_sys}\n')
 
 
 def crontab_reload():
@@ -1971,7 +2032,7 @@ def app_win_show():
 
 def app_dir()->str:
 	r'''
-	Returns the current working directory without the slash.
+	Returns the application directory without the trailing slash.
 
 		asrt( benchmark(app_dir), 343, "<" )
 		
@@ -2050,12 +2111,12 @@ def benchmark(func, a:tuple=(), ka:dict={}, b_iter:int=100
 	ns_total_str = '{:,}'.format(total_ns).replace(',', ' ')
 	name = func.__name__
 	if do_print and tdebug():
-		print(f'{name}: {ns_loop_str} ns/loop, total={ns_total_str}, {b_iter=}')
+		qprint(f'{name}: {ns_loop_str} ns/loop, total={ns_total_str}, {b_iter=}')
 		args = []
 		for arg in a:
 			args.append(arg_to_str(arg))
 		args = f", ({', '.join(args)},)" if args else ''
-		print(f'asrt( benchmark({name}{args}), {int(ns_loop * 1.3)}, "<" )')
+		qprint(f'asrt( benchmark({name}{args}), {int(ns_loop * 1.3)}, "<" )')
 	return total_ns // b_iter
 
 def median(source):
@@ -2090,7 +2151,7 @@ def speak(text:str, wait:bool=False):
 	if wait:
 		_speak()
 		return text
-	thread_start(_speak)
+	thread_start(_speak, ident='speak «' + str_short(text, 30) + '»')
 
 def func_name_human(func_name:str)->str:
 	r'''
@@ -2129,7 +2190,7 @@ def is_iter(obj, and_not_str:bool=True)->bool:
 		raise
 
 def asrt(value, expect, comp:str='=='):
-	'''
+	r'''
 	Assertion showing the difference.  
 	Examples:
 
@@ -2328,5 +2389,8 @@ def func_arg(func:Callable)->tuple:
 
 	'''
 	return tuple( inspect.signature(func).parameters.keys() )
+
+
+
 
 if __name__ != '__main__': patch_import()
