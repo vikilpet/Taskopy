@@ -25,7 +25,7 @@ from .tools import dev_print, exc_text, time_sleep, tdebug \
 from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 _PUB_SUF_LST = set()
 warnings.filterwarnings('ignore', category=MarkupResemblesLocatorWarning)
@@ -320,6 +320,9 @@ def html_element(url:str, element
 		'//div[contains(@class, "main")]/div/script'
 		'//table[2]/thead/tr/th[2]'
 		'//ul[contains(@class, "pagination")]/li[1]/a/@href'
+	
+	Note: *tbody* is often missing, but the browser automatically
+	adds it.
 
 	'''
 	if not url[:4].lower().startswith('http'):

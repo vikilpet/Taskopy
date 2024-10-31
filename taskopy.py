@@ -132,7 +132,6 @@ _EVERY_PATTERNS = {
 }
 
 set_title = win32api.SetConsoleTitle
-tasks = None
 crontab:types.ModuleType|None = None
 sett:Settings = Settings(ini_file='')
 lang:Language = None
@@ -167,149 +166,6 @@ CancelIoEx.argtypes = (
 	ctypes.POINTER(OVERLAPPED)  # lpOverlapped
 )
 
-def load_crontab(event=None)->bool:
-	global tasks
-	global crontab
-	start = dtime.now()
-	con_log(f'{lang.load_crontab} {os.getcwd()}')
-	try:
-		run_bef_reload = []
-		if sys.modules.get('crontab') is None:
-			crontab = importlib.import_module('crontab')
-		else:
-			prev_crontab = sys.modules.pop('crontab')
-			for attempt in range(100):
-				try:
-					tmp_crontab = importlib.import_module('crontab')
-					break
-				except PermissionError:
-					dev_print(f'permission error {attempt=}')
-					time.sleep(.01)
-				except:
-					sys.modules['crontab'] = prev_crontab
-					trace_full, trace_short = _exc_texts()
-					con_log(lang.warn_crontab_reload + str_indent(trace_full))
-					warning(
-						f'{lang.warn_crontab_reload}\n\n{trace_short}'
-						, title=lang.menu_reload
-					)
-					return False
-			else:
-				raise Exception('No more attempts to reload crontab')
-			for task in tasks.task_dict.values():
-				if not task.get('thread'): continue
-				run_bef_reload.append(task)
-			tasks.close()
-			del tmp_crontab
-			del prev_crontab
-			del sys.modules['crontab']
-			del crontab
-			crontab = importlib.import_module('crontab')
-		load_modules()
-		tasks = Tasks()
-		app.tasks = tasks
-		running_tasks = []
-		for rtask in run_bef_reload:
-			if not (task := tasks.task_dict.get(rtask['task_func_name']) ):
-				continue
-			running_tasks.append(rtask['task_func_name'])
-			task['thread'] = rtask['thread']
-			task['last_start'] = rtask['last_start']
-			task['running'] = rtask['running']
-		tasks.run_at_crontab_load()
-		tasks.enabled = app.enabled
-		if is_dev():
-			for tn in running_tasks: tprint('still running: ' + tn)
-		dev_print('load time: ' + time_diff_str(start, no_ms=False))
-		return True
-	except:
-		trace_full, trace_short = _exc_texts()
-		con_log( lang.warn_crontab_reload + str_indent(trace_full) )
-		warning(
-			f'{lang.warn_crontab_reload}\n\n{trace_short}'
-			, title=lang.menu_reload
-		)
-		return False
-	
-def load_modules():
-	'''
-	(Re)Loads all application plugins and
-	crontab extensions if any.
-	'''
-
-	global crontab
-	setattr(sett, 'own_modules', {'plugins.constants'})
-	for obj_name, obj in crontab.__dict__.items():
-		if not (
-			hasattr(obj, '__module__')
-			and obj.__module__ != 'crontab'
-			and not obj.__module__.startswith('pyimod')
-			and hasattr(sys.modules[obj.__module__], '__file__')
-		): continue
-		try:
-			if os.path.relpath(
-				inspect.getfile(sys.modules[obj.__module__])
-			).startswith('.'):
-				continue
-			sett.own_modules.add(obj.__module__)
-		except ValueError:
-			continue
-	for mdl_name in sett.own_modules:
-		prev_mdl = sys.modules.pop(mdl_name)
-		try:
-			tmp_mdl = importlib.import_module(mdl_name)
-		except PermissionError:
-			con_log(f'permission error: {mdl_name}')
-		except ModuleNotFoundError:
-			if traceback.format_exc().rstrip().endswith("_patch'"):
-				con_log(f'patch removed: {mdl_name}')
-			else:
-				raise
-		except:
-			sys.modules[mdl_name] = prev_mdl
-			trace_full, trace_short = _exc_texts()
-			con_log(
-				lang.warn_mod_reload.format(mdl_name)
-				+ str_indent(trace_full)
-			)
-			warning(
-				'{}:\n\n{}'.format(
-					lang.warn_mod_reload.format(mdl_name)
-					, trace_short
-				)
-				, title=lang.menu_reload
-			)
-			continue
-		del tmp_mdl
-		del prev_mdl
-		del sys.modules[mdl_name]
-		mdl = importlib.import_module(mdl_name)
-		for obj_name, obj in mdl.__dict__.items():
-			if (
-				obj_name.startswith('_')
-				or ( isinstance(object, types.ModuleType) )
-				or (mdl_name != getattr(obj, '__module__', mdl_name) )
-			):
-				continue
-			if not isinstance(obj, types.FunctionType):
-				setattr(crontab, obj_name, obj)
-				continue
-			for mdl_name_own in sett.own_modules:
-				if hasattr(sys.modules.get(mdl_name_own), obj_name):
-					setattr(sys.modules[mdl_name_own]
-						, obj_name, decor_except_status(obj))
-			if hasattr(crontab, obj_name):
-				setattr(crontab, obj_name, decor_except_status(obj))
-		sys.modules[mdl_name] = mdl
-
-class Task:
-	def __init__(self):
-		self.name:str = ''
-		self.every:str|tuple|list = ''
-		self.func = None
-		self.menu:bool = True
-		self.submenu:str = ''
-		self.status
 
 class Tasks:
 	''' Tasks from the crontab and their properties '''
@@ -548,19 +404,19 @@ class Tasks:
 							, None
 							, None
 						)
-					except pywintypes.error as e:
-						if e.winerror == 995:
+					except pywintypes.error as err:
+						if err.winerror == 995:
 							return
-						elif e.winerror in (6, 53, 64):
+						elif err.winerror in (6, 53, 64):
 							self.dir_change_stop.remove(hDir)
 							try:
 								hDir.Close()
-							except Exception as e:
-								dev_print(f'hDir close exception: {e}')
+							except Exception as err_cl:
+								dev_print(f'hDir close exception: {err_cl}')
 							break
 						else:
-							tprint(f'pywintypes error: {e.args}')
-							raise e
+							tprint(f'pywintypes error: {err.args}')
+							raise err
 					if prev_file[0]:
 						pfile, ptime = prev_file
 						try:
@@ -572,8 +428,7 @@ class Tasks:
 									f'Exception in "dir_watch":\n\n{exc_text()}'
 									, timeout='5 min'
 								)
-						if cfile == pfile \
-						and ( (ctime - ptime) < WAIT_SEC ):
+						if cfile == pfile and ( (ctime - ptime) < WAIT_SEC ):
 							prev_file = (cfile, ctime)
 							continue
 					prev_file = (results[-1][1], time.time())
@@ -975,6 +830,7 @@ class Tasks:
 		Remove scheduler jobs, hotkey bindings, stop http server
 		, close event handlers.  
 		'''
+		start = dtime.now()
 		if self.http_server:
 			self.http_server.shutdown()
 			self.http_server.socket.close()
@@ -992,12 +848,158 @@ class Tasks:
 				eh.close()
 			except Exception as e:
 				dev_print(f'event close error: {e}')
-		for h in self.dir_change_stop:
+		for hDir in self.dir_change_stop:
 			try:
-				CancelIoEx(h.handle, None)
-				h.Close()
+				CancelIoEx(hDir.handle, None)
+				hDir.Close()
 			except Exception as e:
 				dev_print(f'dir_change_stop exception: {e}')
+		dev_print('close time: ' + time_diff_str(start, no_ms=False))
+tasks:Tasks = None
+
+def load_crontab(event=None)->bool:
+	global tasks
+	global crontab
+	start = dtime.now()
+	con_log(f'{lang.load_crontab} {os.getcwd()}')
+	try:
+		run_bef_reload = []
+		if sys.modules.get('crontab') is None:
+			crontab = importlib.import_module('crontab')
+		else:
+			prev_crontab = sys.modules.pop('crontab')
+			for attempt in range(100):
+				try:
+					tmp_crontab = importlib.import_module('crontab')
+					break
+				except PermissionError:
+					dev_print(f'permission error {attempt=}')
+					time.sleep(.01)
+				except:
+					sys.modules['crontab'] = prev_crontab
+					trace_full, trace_short = _exc_texts()
+					con_log(lang.warn_crontab_reload + str_indent(trace_full))
+					warning(
+						f'{lang.warn_crontab_reload}\n\n{trace_short}'
+						, title=lang.menu_reload
+					)
+					return False
+			else:
+				raise Exception('No more attempts to reload crontab')
+			for task in tasks.task_dict.values():
+				if not task.get('thread'): continue
+				run_bef_reload.append(task)
+			tasks.close()
+			del tmp_crontab
+			del prev_crontab
+			del sys.modules['crontab']
+			del crontab
+			crontab = importlib.import_module('crontab')
+		load_modules()
+		tasks = Tasks()
+		app.tasks = tasks
+		running_tasks = []
+		for rtask in run_bef_reload:
+			if not (task := tasks.task_dict.get(rtask['task_func_name']) ):
+				continue
+			running_tasks.append(rtask['task_func_name'])
+			task['thread'] = rtask['thread']
+			task['last_start'] = rtask['last_start']
+			task['running'] = rtask['running']
+		tasks.run_at_crontab_load()
+		tasks.enabled = app.enabled
+		if is_dev():
+			for tn in running_tasks: tprint('still running: ' + tn)
+		dev_print('load time: ' + time_diff_str(start, no_ms=False))
+		return True
+	except:
+		trace_full, trace_short = _exc_texts()
+		con_log( lang.warn_crontab_reload + str_indent(trace_full) )
+		warning(
+			f'{lang.warn_crontab_reload}\n\n{trace_short}'
+			, title=lang.menu_reload
+		)
+		return False
+	
+def load_modules():
+	'''
+	(Re)Loads all application plugins and
+	crontab extensions if any.
+	'''
+
+	global crontab
+	setattr(sett, 'own_modules', {'plugins.constants'})
+	for obj_name, obj in crontab.__dict__.items():
+		if not (
+			hasattr(obj, '__module__')
+			and obj.__module__ != 'crontab'
+			and not obj.__module__.startswith('pyimod')
+			and hasattr(sys.modules[obj.__module__], '__file__')
+		): continue
+		try:
+			if os.path.relpath(
+				inspect.getfile(sys.modules[obj.__module__])
+			).startswith('.'):
+				continue
+			sett.own_modules.add(obj.__module__)
+		except ValueError:
+			continue
+	for mdl_name in sett.own_modules:
+		prev_mdl = sys.modules.pop(mdl_name)
+		try:
+			tmp_mdl = importlib.import_module(mdl_name)
+		except PermissionError:
+			con_log(f'permission error: {mdl_name}')
+		except ModuleNotFoundError:
+			if traceback.format_exc().rstrip().endswith("_patch'"):
+				con_log(f'patch removed: {mdl_name}')
+			else:
+				raise
+		except:
+			sys.modules[mdl_name] = prev_mdl
+			trace_full, trace_short = _exc_texts()
+			con_log(
+				lang.warn_mod_reload.format(mdl_name)
+				+ str_indent(trace_full)
+			)
+			warning(
+				'{}:\n\n{}'.format(
+					lang.warn_mod_reload.format(mdl_name)
+					, trace_short
+				)
+				, title=lang.menu_reload
+			)
+			continue
+		del tmp_mdl
+		del prev_mdl
+		del sys.modules[mdl_name]
+		mdl = importlib.import_module(mdl_name)
+		for obj_name, obj in mdl.__dict__.items():
+			if (
+				obj_name.startswith('_')
+				or ( isinstance(object, types.ModuleType) )
+				or (mdl_name != getattr(obj, '__module__', mdl_name) )
+			):
+				continue
+			if not isinstance(obj, types.FunctionType):
+				setattr(crontab, obj_name, obj)
+				continue
+			for mdl_name_own in sett.own_modules:
+				if hasattr(sys.modules.get(mdl_name_own), obj_name):
+					setattr(sys.modules[mdl_name_own]
+						, obj_name, decor_except_status(obj))
+			if hasattr(crontab, obj_name):
+				setattr(crontab, obj_name, decor_except_status(obj))
+		sys.modules[mdl_name] = mdl
+
+class Task:
+	def __init__(self):
+		self.name:str = ''
+		self.every:str|tuple|list = ''
+		self.func = None
+		self.menu:bool = True
+		self.submenu:str = ''
+		self.status
 
 def create_menu_item(menu, task, func=None, parent_menu=None):
 	r'''

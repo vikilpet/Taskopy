@@ -360,9 +360,12 @@ def proc_kill(process, cmd_filter:str=''):
 		)
 
 def free_ram(unit:str='percent')->float:
-	'''
+	r'''
 	Returns free RAM size.  
 	*unit* - 'gb', 'mb'... or 'percent'  
+
+		asrt( benchmark(free_ram, b_iter=3), 7_000_000, "<" )
+
 	'''
 	e = _SIZE_UNITS.get(unit.lower(), 1)
 	if unit == 'percent':

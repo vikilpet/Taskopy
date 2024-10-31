@@ -48,7 +48,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2024-10-19'
+APP_VERSION = 'v2024-10-31'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
@@ -153,14 +153,12 @@ class SuppressPrint:
 class TQueue(Queue):
 	r'''
 	A queue that sends everything to the consumer in a different thread.  
-	To stop the consumer thread put a `.stop` in queue:
 
 		q = TQueue()
 		q.put(1)
-		q.put(q.stop)
+		q.stop()
 
 	'''
-
 	def __init__(self, consumer:Callable=print, max_size:int=0)->None:
 		super().__init__(maxsize=max_size)
 		self._stop_sentinel:object = object()
@@ -172,7 +170,6 @@ class TQueue(Queue):
 		while True:
 			item = self.get()
 			if item is self._stop_sentinel:
-				tdebug('consumer_thread stopped')
 				return
 			try:
 				self.consumer(item)
@@ -604,11 +601,18 @@ def date_last_day_of_month(date:datetime.datetime)->datetime.datetime:
 def time_sleep(interval, unit:str=''):
 	r'''
 	Pauses for specified amount of time.  
-	*interval* - number of seconds or `str` with unit like '5 min'
+	*interval* - number of seconds (float) or `str` with unit like '5 min'
 	or tuple with (start, stop) for random interval (you should
 	provide unit in this case). Example:
 
 		time_sleep( (2,10), 'sec' )
+		time_sleep('2 sec')
+	
+	The minimum possible interval must be at least 2 milliseconds
+	if the interval is specified by a string:
+
+		asrt( benchmark(time_sleep, a=('1 ms',)), 1_500_000, "<" )
+		asrt( benchmark(time_sleep, a=(0.000_01,)), 10_000, "<" )
 	
 	`time.sleep` isn't that cheap on its own:
 
@@ -626,9 +630,9 @@ wait = time_sleep
 
 def clip_set(txt):
 	r'''
-	Place something on the text clipboard.
+	Поместите текст в текстовый буфер обмена.
 
-		asrt( benchmark(clip_set, ('test',), b_iter=3), 24_000_000, "<" )
+		asrt( benchmark(clip_set, ('test',), b_iter=3), 30_000_000, "<" )
 		
 	'''
 	pyperclip.copy(str(txt))
@@ -779,7 +783,8 @@ def msgbox(msg:str, title:str=None
 			if hwnd:
 				if dis_timeout:
 					thread_start(dis_buttons, args=(hwnd, dis_timeout))
-				thread_start(title_countdown, args=(hwnd, timeout, title))
+				thread_start(title_countdown, args=(hwnd, timeout, title)
+				, ident=str_short('title_countdown: ' + msg, 20))
 			while not result: time.sleep(0.01)
 			if result:
 				return result[0]
