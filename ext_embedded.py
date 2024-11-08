@@ -92,7 +92,7 @@ def embedded__add_to_startup(caller=''):
 
 @task_add
 def embedded__Create_AppID(appid:str=APP_NAME, appname:str=APP_NAME
-, icon:str=path_get((app_dir(), APP_ICON_ICO)) ):
+, icon:str='app'):
 	r'''
 	Adds the *AppID* to the registry for use with `toast` notifications.  
 	*icon* - an *.ico* file.  
@@ -103,6 +103,7 @@ def embedded__Create_AppID(appid:str=APP_NAME, appname:str=APP_NAME
 
 	'''
 	KEY_ROOT = 'HKEY_CURRENT_USER\\SOFTWARE\\Classes\\AppUserModelId\\'
+	if icon == 'app': icon = path_get((app_dir(), APP_ICON_ICO))
 	if icon:
 		assert file_exists(icon), 'Icon file does not exist'
 		assert file_ext(icon) == 'ico', 'Icon file must be of type .ico'

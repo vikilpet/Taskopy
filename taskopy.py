@@ -18,7 +18,7 @@ import win32evtlog
 import uptime
 from plugins.constants import *
 from plugins.tools import *
-from plugins.tools import _log_file
+from plugins.tools import _tlog
 from plugins.plugin_filesystem import *
 from plugins.plugin_system import *
 from plugins.plugin_process import *
@@ -183,7 +183,7 @@ class Tasks:
 		self.task_list_idle = []
 		self.task_list_crontab_load = []
 		self.task_list_exit = []
-		self.dir_change_stop = []
+		self.dir_change_stop = {}
 		self.event_handlers = []
 		self.idle_min = 0
 		self.http_server = None
@@ -284,7 +284,7 @@ class Tasks:
 					task_opts['rule'] = (task_opts['rule'], )
 				for rule in task_opts['rule']:
 					if not isinstance(rule, Callable):
-						warning(lang.warn_rule_type.format(
+						msg_warn(lang.warn_rule_type.format(
 							task_opts['task_name_full']
 						))
 		self.task_list_menu.sort( key=lambda k: k['task_name'].lower() )
@@ -293,7 +293,7 @@ class Tasks:
 			subm[1].sort( key=lambda k: k['task_name'].lower() )
 		left_click_tasks_count = len(self.task_list_left_click)
 		if left_click_tasks_count > 1:
-			warning(
+			msg_warn(
 				lang.warn_left_click.format(
 					', '.join(tuple(
 						t['task_name'] for t in self.task_list_left_click
@@ -318,8 +318,7 @@ class Tasks:
 	def add_hotkey(self, task):
 		
 		def hk_error(error):
-			con_log(error)
-			warning(
+			msg_warn(
 				lang.warn_hotkey.format(
 					task['task_name_full']
 				)
@@ -389,12 +388,15 @@ class Tasks:
 					status, data = get_dir_handle(dir_path)
 					if status: break
 					if data.winerror == 2:
-						warning(lang.warn_path_not_exist.format(path))
+						msg_warn(lang.warn_path_not_exist.format(path))
 						return
 					time.sleep(RECONNECT_TIMEOUT)
 				hDir = data
-				self.dir_change_stop.append(hDir)
+				self.dir_change_stop[hDir] = dir_path
 				while True:
+					if hDir.handle == 0:
+						dev_print('handle was closed ' + dir_path)
+						return
 					try:
 						results = win32file.ReadDirectoryChangesW(
 							hDir
@@ -404,19 +406,22 @@ class Tasks:
 							, None
 							, None
 						)
-					except pywintypes.error as err:
-						if err.winerror == 995:
+					except pywintypes.error as errp:
+						if errp.winerror == 995:
 							return
-						elif err.winerror in (6, 53, 64):
-							self.dir_change_stop.remove(hDir)
+						elif errp.winerror in (6, 53, 64):
+							self.dir_change_stop.pop(hDir, None)
 							try:
 								hDir.Close()
 							except Exception as err_cl:
 								dev_print(f'hDir close exception: {err_cl}')
 							break
 						else:
-							tprint(f'pywintypes error: {err.args}')
-							raise err
+							dev_print(f'pywintypes error: {errp.args}')
+							raise errp
+					except Exception as errg:
+						dev_print(f'general error: {errg}')
+						raise errg
 					if prev_file[0]:
 						pfile, ptime = prev_file
 						try:
@@ -424,7 +429,7 @@ class Tasks:
 						except:
 							if is_dev():
 								dev_print(f'{prev_file=}, {results=}, exception:\n{exc_text()}\n')
-								dialog(
+								msg_warn(
 									f'Exception in "dir_watch":\n\n{exc_text()}'
 									, timeout='5 min'
 								)
@@ -468,14 +473,13 @@ class Tasks:
 	def add_every(self, task:dict):
 
 		def exc_rep(e):
-			con_log(repr(e))
-			warning(
+			msg_warn(
 				lang.warn_schedule.format(task['task_name_full'])
 			)
 			
 		status, data = every_parse(task['every'])
 		if not status:
-			warning(lang.warn_every.format(
+			msg_warn(lang.warn_every.format(
 				task['task_name'], task['every']
 			))
 			return
@@ -527,9 +531,7 @@ class Tasks:
 				except Exception as e:
 					exc_rep(e)
 			else:
-				warning(
-					lang.warn_schedule.format(task['task_name_full'])
-				)
+				msg_warn(lang.warn_schedule.format(task['task_name_full']))
 
 	def add_schedule(self, task):
 		'''
@@ -545,8 +547,7 @@ class Tasks:
 				)
 				eval(sched_rule)
 			except Exception as e:
-				con_log(repr(e))
-				warning(
+				msg_warn(
 					lang.warn_schedule.format(task['task_name_full'])
 					+ ':\n' + inter
 				)
@@ -564,7 +565,7 @@ class Tasks:
 		if isinstance(dates, str): dates = [dates]
 		for date in dates:
 			if not (matches := self.REGEX_DATE.findall(date)):
-				warning(
+				msg_warn(
 					lang.warn_date_format.format(
 						task['task_name_full']
 						, date
@@ -623,7 +624,8 @@ class Tasks:
 			catcher).
 		'''
 		def run_task_inner(result:list=None):
-			
+			ERROR_OFTEN = '30 sec'
+
 			def catcher(result:list=None):
 				try:
 					self.task_opt_set(task['task_func_name']
@@ -652,7 +654,7 @@ class Tasks:
 						dev_print(f'"tasks" not exists for the task {task["task_func_name"]}')
 					self.task_opt_set(task['task_func_name'], 'err_counter', 0)
 					if wait_event: wait_event.set()
-				except Exception:
+				except:
 					try:
 						if ( t := tasks.task_dict.get(task['task_func_name'], {}) ):
 							t['running'] = False
@@ -660,41 +662,19 @@ class Tasks:
 					except NameError:
 						dev_print('task stopped after reload: '
 						+ task['task_func_name'])
-					err_counter = self.task_opt_get(
-						task['task_func_name']
-						, 'err_counter'
-					) + 1
-					trace_full, trace_short = _exc_texts()
-					con_log(
-						lang.warn_task_error.format(task['task_name_full'])
-						+ str_indent(trace_full)
-					)
-					if not result is None:
-						result.append('task error')
-					if err_counter > self.task_opt_get(
-						task['task_func_name']
-						, 'err_threshold'
-					):
-						dev_print(f'err_counter={err_counter}')
+					err_counter = self.task_opt_get(task['task_func_name']
+					, 'err_counter') + 1
+					if not result is None: result.append('task error')
+					if err_counter <= self.task_opt_get(task['task_func_name']
+					, 'err_threshold'):
 						self.task_opt_set(task['task_func_name']
-							, 'err_counter', 0)
-						if is_often(
-							'__' + task['task_func_name'] + ' exception'
-							, '30 sec'
-						):
-							dev_print(
-								'[often] ' 
-								+ task['task_func_name'] + ' exception: '
-								+ exc_name()
-							)
-						else:
-							warning(
-								lang.warn_task_error.format(task['task_name_full'])
-								+ f'\n\n{trace_short}'
-							)
-					else:
-						self.task_opt_set(task['task_func_name']
-							, 'err_counter', err_counter)
+						, 'err_counter', err_counter)
+						dev_print('exception msg suppressed'
+						, tname=task['task_func_name'])
+						return
+					self.task_opt_set(task['task_func_name']
+					, 'err_counter', 0)
+					msg_err(lang.warn_task_error.format(task['task_name_full']))
 			if (
 				(not self.enabled)
 				and ( not task['hyperactive'])
@@ -706,13 +686,8 @@ class Tasks:
 					try:
 						if not rule():
 							return
-					except Exception as e:
-						msg = f'task {task["task_name"]} rule exception: {e}'
-						if not is_often(msg, '1 min'):
-							con_log(msg)
-							warning(
-								lang.warn_rule_exc.format(task["task_name"], e)
-							)
+					except:
+						msg_err(lang.warn_rule_exc.format(task["task_name"]))
 						return
 			if task['log']:
 				cs = f' ({caller})' if caller else ''
@@ -789,9 +764,7 @@ class Tasks:
 				)
 			)
 		except:
-			warning(
-				lang.warn_event_format.format( task['task_name_full'] )
-			)
+			msg_warn( lang.warn_event_format.format( task['task_name_full'] ) )
 
 	def run_scheduler(self):
 		time.sleep(0.01)
@@ -848,12 +821,28 @@ class Tasks:
 				eh.close()
 			except Exception as e:
 				dev_print(f'event close error: {e}')
-		for hDir in self.dir_change_stop:
+		for hDir, dir_path in self.dir_change_stop.items():
+
+			msg = [dir_path]
 			try:
 				CancelIoEx(hDir.handle, None)
+				dev_print('CancelIoEx ok')
+			except OSError as err:
+				if err.winerror == 1168:
+					msg.append('1168')
+				else:
+					msg.append(f'CancelIoEx: {repr(err)}')
+			except Exception as err:
+					msg.append(f'CancelIoEx general: {repr(err)}')
+			try:
+				dev_print('Close...')
 				hDir.Close()
-			except Exception as e:
-				dev_print(f'dir_change_stop exception: {e}')
+				dev_print('... Close ok')
+			except Exception as err:
+				msg.append(f'Close: {repr(err)}')
+			if is_dev() and len(msg) > 1:
+				dev_print(str_indent('\n'.join(msg)))
+				msg_warn('\n'.join(msg), title='Tasks close')
 		dev_print('close time: ' + time_diff_str(start, no_ms=False))
 tasks:Tasks = None
 
@@ -877,12 +866,8 @@ def load_crontab(event=None)->bool:
 					time.sleep(.01)
 				except:
 					sys.modules['crontab'] = prev_crontab
-					trace_full, trace_short = _exc_texts()
-					con_log(lang.warn_crontab_reload + str_indent(trace_full))
-					warning(
-						f'{lang.warn_crontab_reload}\n\n{trace_short}'
-						, title=lang.menu_reload
-					)
+					msg_err(lang.warn_crontab_reload, title=lang.menu_reload
+					, source='load_crontab')
 					return False
 			else:
 				raise Exception('No more attempts to reload crontab')
@@ -913,12 +898,7 @@ def load_crontab(event=None)->bool:
 		dev_print('load time: ' + time_diff_str(start, no_ms=False))
 		return True
 	except:
-		trace_full, trace_short = _exc_texts()
-		con_log( lang.warn_crontab_reload + str_indent(trace_full) )
-		warning(
-			f'{lang.warn_crontab_reload}\n\n{trace_short}'
-			, title=lang.menu_reload
-		)
+		msg_err(lang.warn_crontab_reload, title=lang.menu_reload)
 		return False
 	
 def load_modules():
@@ -957,18 +937,8 @@ def load_modules():
 				raise
 		except:
 			sys.modules[mdl_name] = prev_mdl
-			trace_full, trace_short = _exc_texts()
-			con_log(
-				lang.warn_mod_reload.format(mdl_name)
-				+ str_indent(trace_full)
-			)
-			warning(
-				'{}:\n\n{}'.format(
-					lang.warn_mod_reload.format(mdl_name)
-					, trace_short
-				)
-				, title=lang.menu_reload
-			)
+			msg_err(lang.warn_mod_reload.format(mdl_name)
+			, title=lang.menu_reload, source='load_modules')
 			continue
 		del tmp_mdl
 		del prev_mdl
@@ -1146,24 +1116,24 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		return True
 
 	def running_tasks(self, show_msg:bool= True
-	, event=None)->list:
+	, event=None)->tuple:
 		r'''
 		Prints running tasks and shows dialog
 		(if show_msg == True).  
-		Returns the list of running task names.  
+		Returns a tuple of names of running tasks.  
 		'''
 		TASKS_MSG_MAX = 10
 		running_tasks = tuple(
 			t for t in tasks.task_dict.values() if t['running']
 		)
-		if is_dev(): app_threads_print()
+		if is_dev():
+			app_threads_print()
+			app_win_show()
 		if not running_tasks:
 			if show_msg:
-				dialog(lang.warn_no_run_tasks
-					, title=lang.menu_list_run_tasks
-					, timeout=3
-					, wait=False)
-			return []
+				dialog(lang.warn_no_run_tasks, title=lang.menu_list_run_tasks
+				, timeout=3, wait=False)
+			return ()
 		os_threads:dict[str, int] = {}
 		for thr in threading.enumerate():
 			if thr._target is None: continue
@@ -1184,8 +1154,10 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 				duration = str(
 					time_now() - t['last_start']
 				).split('.')[0]
+			module = t['task_func'].__module__
+			module = '' if module == 'crontab' else module + '/' 
 			table.append((
-				t['task_func'].__module__ + '/' + t['task_func_name']
+				module + t['task_func_name']
 				, thr_name
 				, os_threads.get(t['thread'], '?')
 				, last_start
@@ -1259,14 +1231,14 @@ class App(wx.App):
 		elif len(hwnd_list) > 1:
 			self.app_hwnd = hwnd_list[0]
 			if not sett.dev:
-				warning(
+				msg_warn(
 					lang.warn_too_many_win.format(
 					APP_NAME, len(hwnd_list) )
 				)
 		else:
 			self.app_hwnd = 0
 			if sett.dev:
-				warning(f'None of {APP_NAME} windows was found')
+				msg_warn(f'None of {APP_NAME} windows was found')
 		return True
 
 	def InitLocale(self):
@@ -1319,12 +1291,6 @@ def every_parse(every:str|list|tuple)->tuple[bool, list]:
 			return False, []
 	return True, result
 
-def _exc_texts()->tuple:
-	' Get full and short text of exception '
-	trace_full = traceback.format_exc().strip()
-	trace_short = '\n'.join(trace_full.splitlines()[-3:])
-	return trace_full, trace_short
-
 def main():
 	global app
 	global tasks
@@ -1333,9 +1299,8 @@ def main():
 	set_title(APP_NAME)
 	try:
 		sett = Settings(def_sett=APP_SETTINGS)
-	except Exception as e:
-		qprint(f'Cannot load settings:\n{repr(e)}')
-		warning(f'Cannot load settings:\n{repr(e)}')
+	except:
+		msg_err(f'Cannot load settings')
 		return
 	__builtins__.sett = sett
 	lang = Language(sett.language)
@@ -1350,7 +1315,7 @@ def main():
 		app = App(False)
 		__builtins__.app = app
 		app.que_print:TQueue = TQueue(consumer=print)
-		app.que_log:TQueue = TQueue(consumer=_log_file)
+		app.que_log:TQueue = TQueue(consumer=_tlog)
 		app.load_crontab = load_crontab
 		app.show_window = app.taskbaricon.on_left_down
 		app.dir = APP_PATH
@@ -1358,15 +1323,12 @@ def main():
 			tasks.run_at_startup()
 			tasks.run_at_sys_startup()
 		app.MainLoop()
-	except Exception as e:
-		trace_full, _ = _exc_texts()
-		msg = f'General exception:\n\n{trace_full}'
-		qprint('\n ' + msg)
-		warning(msg)
-		input('Press Enter to exit...')
 	except KeyboardInterrupt:
 		tprint('interrupted by keyboard')
 		time.sleep(2)
+	except:
+		msg_err('General exception')
+		input('Press Enter to exit...')
 
 
 if __name__ == '__main__': main()

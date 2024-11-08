@@ -28,6 +28,7 @@ import random
 import functools
 import importlib
 import string
+import json
 import win32gui
 import win32con
 import win32com.client
@@ -48,13 +49,13 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2024-10-31'
+APP_VERSION = 'v2024-11-08'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
 APP_ICON_ICO = r'resources\icon.ico'
-_app_log:list = []
-_app_log_limit:int = 10_000
+_app_log:list[tuple[str, str]] = []
+_APP_LOG_LIMIT:int = 10_000
 _DEFAULT_INI = r'''[General]
 language=en
 editor=notepad.exe
@@ -174,7 +175,7 @@ class TQueue(Queue):
 			try:
 				self.consumer(item)
 			except:
-				pass
+				qprint(self.consumer.__name__, 'exception:', exc_text(3))
 			self.task_done()
 	
 	def stop(self):
@@ -283,7 +284,8 @@ def task_name(is_human:bool=False)->str:
 	'''
 	MAX_LVL = 30
 	SKIP = ('tprint', 'dev_print', 'tdebug', 'con_log', 'dialog'
-	, 'msgbox', 'inputbox', 'file_dialog', 'dir_dialog')
+	, 'msgbox', 'inputbox', 'file_dialog', 'dir_dialog', 'wrapper'
+	, 'run', '_bootstrap', '_bootstrap_inner')
 	tname = ''
 	first_name = ''
 	try:
@@ -293,7 +295,6 @@ def task_name(is_human:bool=False)->str:
 	except AttributeError:
 		return '<console>'
 	except:
-		print(f'tprint exception: {exc_text()}')
 		return ''
 	for lvl in range(1, MAX_LVL):
 		try:
@@ -304,7 +305,7 @@ def task_name(is_human:bool=False)->str:
 			if not first_name:
 				if not fn in SKIP: first_name = fn
 		except ValueError:
-			tname = first_name
+			tname = first_name if first_name else APP_NAME
 			break
 	else:
 		pass
@@ -338,10 +339,12 @@ def dev_print(*msg, **kwargs):
 	r'''
 	For debug.
 
-		asrt( benchmark(lambda: dev_print('bench'), b_iter=3), 550_000, "<" )
+		asrt( benchmark(lambda: dev_print('bench'), b_iter=3), 600_000, "<" )
 	
 	'''
 	if is_dev() or tdebug(): tprint(*msg, **kwargs)
+
+_is_dev_cache:bool|None = None
 
 def is_dev()->bool:
 	r'''
@@ -350,41 +353,61 @@ def is_dev()->bool:
 		asrt( benchmark(is_dev), 455, "<" )
 
 	'''
-	return ('--developer' in sys.argv) or hasattr(sys, 'ps1')
+	global _is_dev_cache
+	if not _is_dev_cache is None: return _is_dev_cache
+	_is_dev_cache = ('--developer' in sys.argv) or hasattr(sys, 'ps1')
+	return _is_dev_cache
 
-def _log_file(str_fname:tuple[str, str]):
+def _log_file(msg:str, fname:str):
 	r'''
 	Append the string to a log file.  
 	*str_fname* - first is a log message, second is log file name.  
 	'''
-	for _ in range(2):
+	for _ in (1, 2):
 		try:
-			with open(f'{app.dir}\\log\\{str_fname[1]}.log', 'ta+'
+			with open(f'{app.dir}\\log\\{fname}.log', 'ta+'
 			, encoding='utf-8') as f:
-				f.write(str_fname[0])
+				f.write(msg)
 			return 
 		except FileNotFoundError:
 			os.makedirs( app.dir + '\\log' )
 			continue
 		except:
-			print(f'logging to a file exception: {exc_text()}')
+			qprint(f'logging to a file exception: {exc_text()}')
 			return
+
+def _tlog(now_msgs:tuple[dtime, tuple]):
+	global _app_log
+	msg = ' '.join(map(str, now_msgs[1]))
+	_app_log.append((now_msgs[0].replace(microsecond=0).isoformat(), msg))
+	del _app_log[:-_APP_LOG_LIMIT]
+	msg = now_msgs[0].strftime(_LOG_TIME_FORMAT) + ' ' + msg + '\n'
+	fname = now_msgs[0].strftime(sett.log_file_name)
+	_log_file(msg=msg, fname=fname)
+
+def tlog(*msgs):
+	r'''
+	Write a message to the log file only (no console).  
+	'''
+	if is_con(): return
+	try:
+		app.que_log.put((dtime.now(), msgs))
+	except NameError:
+		print(
+			time_str(template=tcon.DATE_STR_HUMAN)
+			, f'[app not init]', ' '.join(map(str, msgs))
+		)
+
+
 
 def con_log(*msgs):
 	r'''
 	Outputs a message to the console and to a log file.  
 	'''
 	global _app_log
-	ltime = dtime.now()
 	msg = ' '.join(map(str, msgs))
 	tprint(msg, tname='')
-	_app_log.append((ltime, msg))
-	del _app_log[:-_app_log_limit]
-	if not (sett := __builtins__.get('sett', None)):
-		return
-	log_str = ltime.strftime(_LOG_TIME_FORMAT) + ' ' + msg + '\n'
-	fname = ltime.strftime(sett.log_file_name)
-	app.que_log.put((log_str, fname))
+	tlog(msg)
 
 def time_now_str(template:str=tcon.DATE_STR_FILE
 , use_locale:str='C', timezone=None, **delta)->str:
@@ -408,7 +431,7 @@ def time_now_str(template:str=tcon.DATE_STR_FILE
 	)
 
 def time_str(template:str=tcon.DATE_STR_FILE
-, time_val:datetime.datetime=None
+, time_val:dtime=None
 , use_locale:str='C', timezone=None)->str:
 	r'''
 	Returns time in the form of a string in specified locale.  
@@ -429,7 +452,7 @@ def time_str(template:str=tcon.DATE_STR_FILE
 	with locale_set(use_locale):
 		return time_val.strftime(template)
 
-def time_now(**delta)->datetime.datetime:
+def time_now(**delta)->dtime:
 	r'''
 	Returns datetime object.  
 	Use `datetime.timedelta` keywords to get different date/time.  
@@ -447,7 +470,7 @@ def time_now(**delta)->datetime.datetime:
 	return ( datetime.datetime.now() + datetime.timedelta(**delta) )
 
 def time_from_str(date_string:str, template:str=tcon.DATE_STR_FILE
-, use_locale:str='C')->datetime.datetime:
+, use_locale:str='C')->dtime:
 	r'''
 	Returns datetime object from string and
 	specified locale.  
@@ -467,7 +490,7 @@ def time_second()->int:
 	'''Returns current second'''
 	return datetime.datetime.now().second
 
-def time_diff(start:datetime.datetime, end:datetime.datetime|None=None
+def time_diff(start:dtime, end:dtime|None=None
 , unit:str='sec')->int:
 	r'''
 	Returns difference between dates in units.  
@@ -484,8 +507,8 @@ def time_diff(start:datetime.datetime, end:datetime.datetime|None=None
 	coef = _TIME_UNITS.get(unit, 1000) / 1000
 	return int(seconds // coef)
 
-def time_diff_str(start:datetime.datetime
-, end:datetime.datetime|None=None, str_format:str=''
+def time_diff_str(start:dtime
+, end:dtime|None=None, str_format:str=''
 , no_ms:bool=True)->str:
 	r'''
 	Returns time difference as a string like that:
@@ -506,25 +529,25 @@ def time_diff_str(start:datetime.datetime
 	delta_as_time = time.gmtime( (end - start).total_seconds() )
 	return time.strftime(str_format, delta_as_time)
 
-def _date_part(date_val:datetime.datetime=None, part:str=''):
+def _date_part(date_val:dtime=None, part:str=''):
 	if not date_val: date_val = datetime.datetime.now()
 	return getattr(date_val, part)
 
-def date_year(date_val:datetime.datetime=None)->int:
+def date_year(date_val:dtime=None)->int:
 	'''Returns year'''
 	return _date_part(part='year')
 
-def date_month(date_val:datetime.datetime=None)->int:
+def date_month(date_val:dtime=None)->int:
 	'''Returns month number'''
 	return _date_part(part='month')
 
-def date_day(date_val:datetime.datetime=None, delta:dict=None)->int:
+def date_day(date_val:dtime=None, delta:dict=None)->int:
 	''' Returns current day of months (1-31) '''
 	if not delta: return _date_part(part='day')
 	if not date_val: date_val = datetime.datetime.now()
 	return ( date_val + datetime.timedelta(**delta) ).day
 
-def date_weekday(date_val:datetime.datetime=None
+def date_weekday(date_val:dtime=None
 , template:str='%A')->str:
 	r'''
 	Returns weekday as a string.  
@@ -536,7 +559,7 @@ def date_weekday(date_val:datetime.datetime=None
 	if not date_val: date_val = datetime.date.today()
 	return date_val.strftime(template)
 
-def date_weekday_num(date_val:datetime.datetime=None)->int:
+def date_weekday_num(date_val:dtime=None)->int:
 	r'''
 	Weekday number (monday is 1).  
 	*tdate* - `None` (today) or datetime.date(2019, 6, 12)
@@ -547,7 +570,7 @@ def date_weekday_num(date_val:datetime.datetime=None)->int:
 	if not date_val: date_val = datetime.date.today()
 	return date_val.weekday() + 1
 
-def date_fill(date_dic:dict, cur_date=None)->datetime.datetime:
+def date_fill(date_dic:dict, cur_date=None)->dtime:
 	r'''
 	Fills `None` values in dictionary with current
 	datetime value.
@@ -593,7 +616,7 @@ def date_fill_str(date_str:str)->str:
 	return '{:0>4}.{:0>2}.{:0>2} {:0>2}:{:0>2}' \
 		.format(*new_date_lst)
 
-def date_last_day_of_month(date:datetime.datetime)->datetime.datetime:
+def date_last_day_of_month(date:dtime)->dtime:
 	' Returns last day of a month '
 	if date.month == 12: return date.replace(day=31)
 	return date.replace(month=date.month+1, day=1) - datetime.timedelta(days=1)
@@ -612,12 +635,12 @@ def time_sleep(interval, unit:str=''):
 	if the interval is specified by a string:
 
 		asrt( benchmark(time_sleep, a=('1 ms',)), 1_500_000, "<" )
-		asrt( benchmark(time_sleep, a=(0.000_01,)), 10_000, "<" )
+		asrt( benchmark(time_sleep, a=(0.000_01,)), 200_000, "<" )
 	
 	`time.sleep` isn't that cheap on its own:
 
 		asrt( benchmark(lambda: None if False else time.sleep(0)), 3_000, "<" )
-		asrt( benchmark(lambda: None if True else time.sleep(0)), 200, "<" )
+		asrt( benchmark(lambda: None if True else time.sleep(0)), 250, "<" )
 
 	'''
 	if isinstance(interval, (list, tuple)):
@@ -641,7 +664,7 @@ def clip_get()->str:
 	r'''
 	Returns the text from the clipboard, if any.
 
-		asrt( benchmark(clip_get), 25_000, "<" )
+		asrt( benchmark(clip_get), 30_000, "<" )
 
 	'''
 	return pyperclip.paste()
@@ -784,7 +807,7 @@ def msgbox(msg:str, title:str=None
 				if dis_timeout:
 					thread_start(dis_buttons, args=(hwnd, dis_timeout))
 				thread_start(title_countdown, args=(hwnd, timeout, title)
-				, ident=str_short('title_countdown: ' + msg, 20))
+				, ident=str_short('title_countdown: ' + msg, 40))
 			while not result: time.sleep(0.01)
 			if result:
 				return result[0]
@@ -811,13 +834,15 @@ def msgbox(msg:str, title:str=None
 				if hwnd:
 					win32gui.SetWindowText(hwnd, title)
 					thread_start(dis_buttons, args=(hwnd, dis_timeout))
-					thread_start(title_countdown, args=(hwnd, timeout, title))
+					thread_start(title_countdown, args=(hwnd, timeout, title)
+					, ident=str_short('title_countdown: ' + msg, 40))
 			else:
 				thread_start(mb_func, args=mb_args)
 				hwnd = get_hwnd(title_tmp)
 				if hwnd:
 					win32gui.SetWindowText(hwnd, title)
-					thread_start(title_countdown, args=(hwnd, timeout, title))
+					thread_start(title_countdown, args=(hwnd, timeout, title)
+					, ident=str_short('title_countdown: ' + msg, 40))
 		else:
 			if dis_timeout:
 				thread_start(mb_func, args=mb_args)
@@ -828,17 +853,77 @@ def msgbox(msg:str, title:str=None
 			else:
 				thread_start(mb_func, args=mb_args)
 
-def warning(msg:str, title:str=None):
-	if sett.kiosk:
-		con_log(f'warning: {msg}')
-		return
+def warning(msg:str, title:str='', timeout:str='30 min'):
+	r'''
+	Non-blocking error message.
+	'''
+	if not is_con():
+		if sett.kiosk:
+			con_log(f'warning: {msg}')
+			return
 	if title:
 		title = f'{APP_NAME}: {title}'
 	else:
 		title = APP_FULLNAME
-	msgbox(msg=msg, title=title
-	, ui=win32con.MB_ICONWARNING, wait=False
-	, timeout='1 hour')
+	dialog(msg=msg, timeout=timeout, icon_main=tcon.TD_ICON_ERROR
+	, title=title, wait=False)
+
+def _msg_err(msg:str, icon:int, title:str, parent:str, timeout:str):
+	r'''
+	Non-blocking error message.
+	'''
+	toast_imgs = {
+		tcon.TD_ICON_WARNING: r'c:\Windows\System32\SecurityAndMaintenance_Alert.png'
+		, tcon.TD_ICON_ERROR: r'c:\Windows\System32\SecurityAndMaintenance_Error.png'
+	}
+	if not is_con():
+		try:
+			if sett.kiosk:
+				con_log(f'{parent}{" (" + title + ")" if title else ""}: {msg}')
+				return
+		except NameError:
+			print(f'[no settings]: {msg}')
+		except:
+			raise
+	if title:
+		title = f'{APP_NAME}: {title}'
+	else:
+		title = APP_FULLNAME
+	if is_dev() and sys_ver() >= 10.0:
+		toast(msg=msg, img=toast_imgs.get(icon, '')
+		, on_click=lambda c: app_win_show())
+	else:
+		dialog(msg=msg, timeout=timeout, icon_main=icon, title=title
+		, wait=False)
+
+def msg_err(msg:str, title:str='', source:str='', timeout:str='30 min'
+, often_int:str='30 s'):
+	r'''
+	Reports important errors (exceptions). It outputs the full error text to the console
+	, writes to the log and displays a message.
+	'''
+	if is_often('__msg_err ' + source + msg, interval=often_int):
+		dev_print('error msg suppressed: ' + msg, tname=source, short=True)
+		return
+	try:
+		exc_full, exc_short = exc_texts()
+	except AttributeError:
+		pass
+	source = source if source else 'app'
+	if exc_full:
+		tprint(msg + str_indent(exc_full), tname=source)
+		tlog(msg + str_indent(exc_full, borders=False))
+	_msg_err(msg=msg + ' ' + exc_short, title=title, icon=tcon.TD_ICON_ERROR
+	, timeout=timeout, parent='msg_err')
+
+def msg_warn(msg:str, title:str='', timeout:str='30 min'):
+	r'''
+	Reports non-critical errors. Outputs to the console
+	and shows the message.
+	'''
+	tprint(msg)
+	_msg_err(msg=msg, title=title, icon=tcon.TD_ICON_WARNING, timeout=timeout
+	, parent='msg_warn')
 
 def inputbox(message:str, title:str=None
 , is_pwd:bool=False, default:str=''
@@ -849,7 +934,7 @@ def inputbox(message:str, title:str=None
 	Problem: don't use default or you will get this value
 	whatever button user will press.
 	'''
-	if tdebug():
+	if is_con():
 		if is_pwd:
 			return getpass.getpass(f'inputbox ({message}): ')
 		else:
@@ -886,13 +971,14 @@ def inputbox(message:str, title:str=None
 	return value
 
 _toast_app_icon = None
+_toast_img_cache:dict = {}
 def toast(msg:str|tuple|list, dur:str='default', img:str=''
 , often_ident:str='', often_inter:str='30 sec', on_click:Callable=None
 , appid:str=APP_NAME):
 	r'''
 	Windows toast notification.  
 	*img* - full path to a picture.  
-	*duration* - 'short'|'long'|'default'. 'default' and 'short' the same?
+	*duration* - 'short'|'long'|'default'. 'default' and 'short' are the same?
 	'long' is about 30 sec.  
 	*on_click* - an action to perform on click. It is passed an
 	argument with the click properties. If the notification has
@@ -900,8 +986,11 @@ def toast(msg:str|tuple|list, dur:str='default', img:str=''
 	, the action will be performed only if an valid *appid* is specified  
 	*appid* - custom AppID. If you want toast to have the Taskopy icon, see the `emb_appid_add` task
 	from *ext_embedded*.  
+
+	Note: *winrt* works on Windows 10, October 2018 Update or later 
 	'''
 	global _toast_app_icon
+	global _toast_img_cache
 	if dur == 'default': dur = 'Default'
 	assert dur in ('Default', 'short', 'long'), 'wrong *dur* value'
 	if on_click:
@@ -915,7 +1004,10 @@ def toast(msg:str|tuple|list, dur:str='default', img:str=''
 	newToast.duration = wtoasts.ToastDuration(dur)
 	newToast.text_fields = [msg]
 	if img:
-		newToast.AddImage( wtoasts.ToastDisplayImage.fromPath(img) )
+		if (img_obj := _toast_img_cache.get(img)) is None:
+			img_obj = wtoasts.ToastDisplayImage.fromPath(img)
+			_toast_img_cache[img] = img_obj
+		newToast.AddImage( img_obj )
 	if on_click: newToast.on_activated = on_click
 	toaster.show_toast(newToast)
 
@@ -936,7 +1028,7 @@ def file_dialog(title:str=None, multiple:bool=False
 		title = func_name_human(task_name())
 	else:
 		title = str(title)
-	if tdebug(): return input(f'File dialog ({title}): ')
+	if is_con(): return input(f'File dialog ({title}): ')
 	style = wx.FD_OPEN | wx.FD_FILE_MUST_EXIST
 	if multiple: style |= wx.FD_MULTIPLE
 	if on_top: style |= wx.STAY_ON_TOP
@@ -966,7 +1058,7 @@ def dir_dialog(title:str=None, default_dir:str='', on_top:bool=True
 		title = func_name_human(task_name())
 	else:
 		title = str(title)
-	if tdebug(): return input(f'Dir dialog ({title}): ')
+	if is_con(): return input(f'Dir dialog ({title}): ')
 	style = wx.DD_DEFAULT_STYLE
 	if must_exist: style |= wx.DD_DIR_MUST_EXIST
 	if on_top: style |= wx.STAY_ON_TOP
@@ -1128,8 +1220,8 @@ def qprint(*values):
 	Intended to be used in place of the standard `print`.  
 	Pros: non-blocking, FIFO.  
 
-		asrt( benchmark(print, ('a', 'b',), b_iter=3), 800_000, "<" )
-		asrt( benchmark(qprint, ('a', 'b',), b_iter=3), 12_000, "<" )
+		asrt( benchmark(print, ('a', 'b',), b_iter=3), 1_000_000, "<" )
+		asrt( benchmark(qprint, ('a', 'b',), b_iter=3), 600_000, "<" )
 
 	'''
 	msg = ' '.join(map(str, values))
@@ -1138,11 +1230,12 @@ def qprint(*values):
 	except:
 		print(msg)
 
-def tprint(*msgs, tname:str|None=None):
+def tprint(*msgs, tname:str|None=None, short:bool=False):
 	r'''
 	Prints the message(s) with the task name and time.  
 	*tname* - name of the caller (task name). If it
 	is `None`, then try to find the task name.  
+	Use kwarg `short=True` to apply `str_short` to the output.  
 	'''
 	msg = ' '.join(map(str, msgs))
 	if tname == None:
@@ -1150,7 +1243,24 @@ def tprint(*msgs, tname:str|None=None):
 	else:
 		if tname and (not tname.startswith('<')):
 			msg = '[' + tname + '] ' + msg
-	qprint(time.strftime('%y.%m.%d %H:%M:%S') + ' ' + msg)
+	if short:
+		qprint( str_short(time.strftime('%y.%m.%d %H:%M:%S') + ' ' + msg) )
+	else:
+		qprint(time.strftime('%y.%m.%d %H:%M:%S') + ' ' + msg)
+
+_is_con_cache:bool|None = None
+
+def is_con()->bool:
+	r'''
+	Are we in the console?
+
+		asrt( benchmark(is_con), 250, '<')
+
+	'''
+	global _is_con_cache
+	if not _is_con_cache is None: return _is_con_cache
+	_is_con_cache = hasattr(sys, 'ps1')
+	return _is_con_cache
 
 def tdebug(*msgs, **kwargs)->bool:
 	r'''
@@ -1161,7 +1271,7 @@ def tdebug(*msgs, **kwargs)->bool:
 		asrt( benchmark(tdebug), 435, "<" )
 
 	'''
-	if not hasattr(sys, 'ps1'): return False
+	if not is_con(): return False
 	if not msgs: return True
 	short = kwargs.pop('short', False)
 	sh_func = short if isinstance(short, Callable) else str_short
@@ -1178,7 +1288,7 @@ def balloon(msg:str, title:str=APP_NAME, timeout:int=None, icon:str=None):
 		icon - 'info', 'warning' or 'error'.
 	'''
 	kwargs = {'title': title, 'text': msg}
-	if tdebug():
+	if is_con():
 		tprint('<balloon>:', msg)
 		return
 	if timeout: kwargs['msec'] = timeout * 1000
@@ -1190,13 +1300,12 @@ def balloon(msg:str, title:str=APP_NAME, timeout:int=None, icon:str=None):
 		}.get(icon.lower(), wx.ICON_INFORMATION)
 	app.taskbaricon.ShowBalloon(**kwargs)
 
-def app_log_get()->str:
+def app_log()->list:
 	r'''
-	Returns current log as a string.  
+	Returns current log as list of tuples with time:str and message:str  
 	Log can't be empty.  
 	'''
-	log = [t.strftime(_LOG_TIME_FORMAT) + ' ' + m for t, m in _app_log]
-	return '\n'.join(log)
+	return _app_log
 
 def decor_except(func):
 	''' Add 'try... except' for function
@@ -1271,7 +1380,7 @@ def safe(func:Callable)->Callable:
 		except Exception as e:
 			trace_li = traceback.format_exc().splitlines()
 			trace_str = '\n'.join(trace_li[-3:])
-			if tdebug(): tprint(f'<safe>: \n{trace_str}')
+			if is_con(): tprint(f'<safe>: \n{trace_str}')
 			return False, e
 	return wrapper
 _TaskDialogIndirect = ctypes.WinDLL('comctl32.dll').TaskDialogIndirect
@@ -1282,6 +1391,7 @@ _callback_type = ctypes.WINFUNCTYPE(
 )
 
 class _TaskDialogConfig(ctypes.Structure):
+
 	class TASKDIALOG_BUTTON(ctypes.Structure):
 		_pack_ = 1
 		_fields_ = [
@@ -1290,20 +1400,22 @@ class _TaskDialogConfig(ctypes.Structure):
 		]
 
 	class DUMMYUNIONNAME(ctypes.Union):
-		_pack_ = 1
 		_fields_ = [
 			('hMainIcon', ctypes.wintypes.HICON)
 			, ('pszMainIcon', ctypes.wintypes.LPCWSTR)
 		]
 
 	class DUMMYUNIONNAME2(ctypes.Union):
-		_pack_ = 1
 		_fields_ = [
 			('hFooterIcon', ctypes.wintypes.HICON)
 			, ('sFooterIcon', ctypes.wintypes.LPCWSTR)
 		]
 
 	_pack_ = 1
+	_anonymous_ = (
+		"DUMMYUNIONNAME",
+		"DUMMYUNIONNAME2",
+	)
 	_fields_ = [
 		('cbSize', ctypes.wintypes.UINT)
 		, ('hwndParent', ctypes.wintypes.HWND)
@@ -1345,23 +1457,32 @@ def dialog(
 	, timeout:str|int=0
 	, return_button:bool=False
 	, wait:bool=True
-)->int|str|tuple:
+	, icon_main:int|None=None
+	, icon_footer:int|None=None
+)->int|str|tuple|None:
 	r'''
 	Shows dialog with multiple optional buttons.  
 	Returns ID of selected button starting with 1000
-	or 0 if timeout is over.  
-	*return_button* - returns (status, selected button value).  
-		Status == `True` if some of button was selected and
-		`False` if no button was selected (timeout or escape).
+	or `tcon.DL_TIMEOUT` if timeout is over.  
+	*return_button* - returns tuple(status:bool, selected button value):  
+		status == `True` if some of button was selected and 
+		`False` if no button was selected (timeout or cancel).  
+		You can use a dictionary as buttons, but then you have
+		to distinguish the response from the `DL_TIMEOUT` or
+		`DL_CANCEL` value yourself.  
 	*wait* - non-blocking mode. It returns c_long object
 	so it is possible to get user responce later with
-	'.value' property (=2 before user makes any choice)
+	'.value' property (2 before user makes any choice)  
+	*icon_main* - show icon. Note: the icon takes away horizontal
+	space from the message text.  
 	
 	Note: do not start button text with new line (\\n) or dialog
 	will fail silently.
 
 		assert dialog(('y', 'n'), return_button=True) == (True, 'y')
-		assert dialog({'y': 1, 'n': 2}) == 1
+		assert dialog({'y': 8, 'n': 9}) == 8
+		assert dialog({'y': 8, 'n': 9}) == tcon.DL_CANCEL
+		assert dialog({'y': 8, 'n': 9}, timeout='1 sec') == tcon.DL_TIMEOUT
 
 	'''
 	TDN_TIMER = 4
@@ -1374,7 +1495,6 @@ def dialog(
 	TDF_CALLBACK_TIMER = 2048
 	TDF_USE_COMMAND_LINKS = 16
 	TDF_EXPAND_FOOTER_AREA = 64
-	TD_ICON_INFORMATION = 104
 	
 	@_callback_type
 	def callback_timer(hwnd, uNotification:int
@@ -1393,8 +1513,7 @@ def dialog(
 			)
 			if wParam  >= lpRefData.contents.value:
 				wParam = 0
-				win32gui.SendMessage(
-					hwnd, TDM_CLICK_BUTTON, None, None)
+				win32gui.SendMessage(hwnd, TDM_CLICK_BUTTON, None, None)
 		else:
 			if not on_top_flag:
 				try:
@@ -1454,7 +1573,14 @@ def dialog(
 		tdc.cButtons = ctypes.c_uint(len(buttons))
 		if default_button >= 1000: default_button -= 1000
 		tdc.nDefaultButton = 1000 + default_button
-	tdc.pszMainIcon = TD_ICON_INFORMATION
+	if icon_main is None:
+		if buttons and len(buttons) > 1:
+			icon_main = tcon.TD_ICON_QUESTION
+		else:
+			icon_main = tcon.TD_ICON_INFORMATION
+	tdc.hMainIcon = icon_main
+	if icon_footer is None and timeout: icon_footer = tcon.TD_ICON_CROSS
+	tdc.hFooterIcon = icon_footer
 	tdc.pfCallBack = ctypes.cast(
 		callback_timer, ctypes.POINTER(_callback_type))
 	if timeout:
@@ -1466,11 +1592,11 @@ def dialog(
 	tdc.pszWindowTitle = ctypes.c_wchar_p(title)
 	tdc.pszContent = ctypes.c_wchar_p(content)
 	if wait:
-		_TaskDialogIndirect(ctypes.byref(tdc)
-			, ctypes.byref(result), None, None)
+		_TaskDialogIndirect(ctypes.byref(tdc), ctypes.byref(result)
+		, None, None)
 	else:
-		thread_start(lambda: _TaskDialogIndirect(ctypes.byref(tdc) \
-			, ctypes.byref(result), None, None), ident='_TaskDialogIndirect')
+		thread_start(_TaskDialogIndirect, args=(ctypes.byref(tdc)
+		, ctypes.byref(result), None, None), ident='_TaskDialogIndirect')
 		return
 	if buttons and return_button:
 		if result.value >= 1000:
@@ -1958,19 +2084,24 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 		nonlocal func, args, kwargs
 		try:
 			func(*args, **kwargs)
-		except Exception:
-			err_str = traceback.format_exc()
+		except:
+			err_full, err_short = exc_texts()
 			tprint(
-				f'exception in «{func.__name__}»:{str_indent(err_str)}'
+				f'Exception in thread of «{func.__name__}»:'
+					+ str_indent(err_full)
 				, tname='thread_start'
 			)
+			tlog(
+				f'Exception in thread of «{func.__name__}»:'
+				+ str_indent(err_full, borders=False)
+			)
 			if err_msg:
-				warning(
-					f'Exception in thread {func.__name__}:\n{err_str}'
+				msg_err(
+					f'Exception in thread {func.__name__}: {err_short}'
 				)
 			if err_action:
 				try:
-					err_action(err_str)
+					err_action(err_full)
 				except:
 					pass
 
@@ -2039,9 +2170,10 @@ def app_dir()->str:
 	r'''
 	Returns the application directory without the trailing slash.
 
-		asrt( benchmark(app_dir), 343, "<" )
+		asrt( benchmark(app_dir), 2000, "<" )
 		
 	'''
+	if is_con(): return os.getcwd()
 	return app.dir
 
 def app_tasks()->dict:
@@ -2253,6 +2385,22 @@ def exc_text(line_num:int=1, with_file:bool=True)->str:
 	lines = traceback.format_exc().splitlines()
 	return '\n'.join(lines[-line_num:])
 
+def exc_texts()->tuple[str, str]:
+	r'''
+	Returns the full and short texts of an exception.
+
+		try:
+			raise ZeroDivisionError
+		except:
+			f, s = exc_texts()
+			print('short:', s)
+			print('full:', f)
+
+	'''
+	full = traceback.format_exc().strip()
+	short = exc_text()
+	return full, short
+
 def exc_name()->str:
 	r'''
 	Returns exception name only:
@@ -2346,7 +2494,8 @@ def str_short(text:str, width:int=0, placeholder:str='...')->str:
 	return new_text[:(width - len(placeholder))] + placeholder
 
 _often_dct:dict[str, datetime.datetime] = {}
-def is_often(ident, interval)->bool:
+
+def is_often(ident:str, interval:str)->bool:
 	r'''
 	Is some event happening too often?  
 	The purpose is not to bother the user
@@ -2377,7 +2526,7 @@ def is_often(ident, interval)->bool:
 
 def is_app_exe()->bool:
 	r'''
-	Returns true if the application is converted to *exe*.  
+	Returns True if the application is converted to *exe*.  
 
 		asrt( is_app_exe(), False)
 		asrt( benchmark(is_app_exe), 2061, "<" )
@@ -2395,7 +2544,13 @@ def func_arg(func:Callable)->tuple:
 	'''
 	return tuple( inspect.signature(func).parameters.keys() )
 
-
+def sys_ver()->float:
+	r'''
+	Windows version as a number.  
+	https://learn.microsoft.com/en-us/windows/win32/sysinfo/operating-system-version  
+	'''
+	ver = sys.getwindowsversion()
+	return ver.major + ver.minor / 10
 
 
 if __name__ != '__main__': patch_import()

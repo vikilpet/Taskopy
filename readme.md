@@ -76,9 +76,11 @@ Download project, install requirements:
 
 	pip install -r requirements.txt
 
-Note: *wxPython* requires *Pillow*, but [Pillow > 9.5.0 no longer includes 32-bit wheels](https://pillow.readthedocs.io/en/latest/installation.html#basic-installation) so install 9.5.0:
+Note 1: *wxPython* requires *Pillow*, but [Pillow > 9.5.0 no longer includes 32-bit wheels](https://pillow.readthedocs.io/en/latest/installation.html#basic-installation) so install 9.5.0:
 
 	pip install Pillow==9.5.0
+
+Note 2: the *cryptography* module version 42.0.8 is used for compatibility with Windows 7
 
 Create a shortcut *taskopy.py* in the user's startup folder with the built-in *Add to startup* task.
 

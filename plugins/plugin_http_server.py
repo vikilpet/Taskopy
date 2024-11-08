@@ -2,12 +2,13 @@ import time
 import os
 import fnmatch
 import hashlib
+import json
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import cgi
 import urllib
 from typing import Pattern
-from .tools import dev_print, app_log_get, DataHTTPReq \
+from .tools import dev_print, app_log, DataHTTPReq \
 	, patch_import, tprint, value_to_unit, exc_text
 from .plugin_filesystem import file_b64_dec, HTTPFile
 try:
@@ -44,7 +45,6 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			super().handle_one_request()
 			req_str = str(self.raw_requestline, 'iso-8859-1')
 			if len(req_str) < 4:
-				dev_print(f'port scan from {self.client_address}')
 				return
 			req_type = req_str.split()[0].upper()
 			if not req_type in ('GET', 'POST', 'HEAD'):
@@ -84,29 +84,37 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			)
 		return False
 
-	def headers_and_page(self, page:str|HTTPFile='', status:int=200):
+	def send_content(self, content:str|dict|tuple|HTTPFile=''
+	, status:int=200, cont_type:str=''):
 		r'''
-		Write headers and page. 
-		*page* - str or HTML or HTTPFile instance.  
+		Send headers and content.  
+		*content* - page content or HTTPFile instance.  
+		If page is a `list` or `dict` then make JSON string.  
 		'''
 		CHUNK_SIZE = 1024 * 100
+		hfile:HTTPFile = None
 		self.send_response(status, 'Ok')
-		if not isinstance(page, str) and not hasattr(page, 'HTTPFile'):
-			page = str(page)
-		if hasattr(page, 'HTTPFile'):
-			self.send_header('Content-Type', page.mime_type)
-			param = 'attachment' if page.use_save_to else 'inline'
-			name = urllib.parse.quote(page.name, encoding='utf-8')
+		if isinstance(content, (dict, list)):
+			content = json.dumps(content, ensure_ascii=False, default=str)
+			if not cont_type: cont_type = tcon.MIME_JSON
+		elif hasattr(content, 'HTTPFile'):
+			hfile = content
+			cont_type = hfile.mime_type
+			param = 'attachment' if hfile.use_save_to else 'inline'
+			fname = urllib.parse.quote(hfile.name, encoding='utf-8')
 			self.send_header('Content-Disposition'
-				, f"{param}; filename*=UTF-8''{name}")
-			self.send_header('Content-Length', os.path.getsize(page.fullpath))
-		elif '<!doctype html>' in page[:30].lower():
-			self.send_header('Content-Type', tcon.MIME_HTML)
-		else:
-			self.send_header('Content-Type', tcon.MIME_TEXT)
+			, f"{param}; filename*=UTF-8''{fname}")
+			self.send_header('Content-Length'
+			, str(os.path.getsize(hfile.fullpath)))
+		elif not isinstance(content, str):
+			content = str(content)
+		elif '<!doctype html>' in content[:30].lower():
+			if not cont_type: cont_type = tcon.MIME_HTML
+		if not cont_type: cont_type = tcon.MIME_TEXT
+		self.send_header('Content-Type', cont_type)
 		self.end_headers()
-		if hasattr(page, 'HTTPFile'):
-			with open(page.fullpath, 'rb') as fd:
+		if hfile:
+			with open(hfile.fullpath, 'rb') as fd:
 				try:
 					while True:
 						chunk = fd.read(CHUNK_SIZE)
@@ -115,10 +123,10 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 				except (ConnectionResetError, ConnectionAbortedError):
 					pass
 				except Exception as e:
-					dev_print(f'connection error: {e}')
+					dev_print(f'HTTPFile connection exception: {e}')
 		else:
 			try:
-				self.wfile.write(bytes(page, 'utf-8'))
+				self.wfile.write(bytes(content, 'utf-8'))
 			except ConnectionAbortedError:
 				pass
 			except Exception as e:
@@ -154,13 +162,14 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			)
 		except Exception as e:
 			dev_print('wrong url:', self.path[:70], 'exception:', str(e))
-			self.headers_and_page('wrong url')
+			self.send_content('wrong url')
 			return
 		if self.url_path == '/log':
 			if self.white_list_check():
-				self.headers_and_page(app_log_get())
+				self.send_content(json.dumps(app_log(), ensure_ascii=False)
+				, cont_type=tcon.MIME_JSON)
 			else:
-				self.headers_and_page('403')
+				self.send_content('403')
 			return
 		try:
 			params = {
@@ -170,7 +179,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			}
 		except Exception as e:
 			self.s_print(f'Bad HTTP query format: {repr(e)}')
-			self.headers_and_page('error')
+			self.send_content('error')
 			return
 		page = 'error'
 		task_path = urllib.parse.unquote( self.url_path.strip('/') )
@@ -185,10 +194,10 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			if task: break
 		else:
 			self.s_print('task path not found: "{}"'.format( task_path[:30]) )
-			self.headers_and_page('task not found')
+			self.send_content('task not found')
 			return
 		if not self.white_list_check(task=task):
-			self.headers_and_page('403')
+			self.send_content('403')
 			return
 		self.http_dir = task['http_dir']
 		self.req_data.method = method
@@ -200,7 +209,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			status, error = self.start_data_processing()
 			if not status:
 				self.s_print(f'data_processing error: {error}')
-				self.headers_and_page('error')
+				self.send_content('error')
 				return
 		try:
 			if task['result']:
@@ -229,7 +238,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 		except:
 			self.s_print(f'HTTP task exception:\n{exc_text(6)}')
 			page = 'error'
-		self.headers_and_page(page)
+		self.send_content(page)
 
 	def do_GET(self):
 		global _FAVICON

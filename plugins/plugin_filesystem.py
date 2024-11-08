@@ -472,9 +472,8 @@ def file_size(fullpath, unit:str='b')->int:
 	return win32file.GetFileAttributesEx(fullpath)[4] // e
 
 def file_size_str(fullpath)->str:
-	'''
-	Size of file *for humans*.
-
+	r'''
+	Size of file *for humans*.  
 	Example:
 
 		file_size_str(r'c:\\my_file.bin')
