@@ -313,7 +313,7 @@ class Tasks:
 			, ident='app: http server')
 		self.sched_thread_id = thread_start(self.run_scheduler, err_msg=True
 		, ident='app: scheduler')
-		dev_print(f'Total number of tasks: {len(self.task_dict)}')
+		dev_print(f'total number of tasks: {len(self.task_dict)}', tname='app')
 	
 	def add_hotkey(self, task):
 		
@@ -428,11 +428,8 @@ class Tasks:
 							cfile, ctime = results[-1][1], time.time()
 						except:
 							if is_dev():
-								dev_print(f'{prev_file=}, {results=}, exception:\n{exc_text()}\n')
-								msg_warn(
-									f'Exception in "dir_watch":\n\n{exc_text()}'
-									, timeout='5 min'
-								)
+								msg_err(f'Exception in "dir_watch"'
+								, timeout='5 min', source='dir_watch')
 						if cfile == pfile and ( (ctime - ptime) < WAIT_SEC ):
 							prev_file = (cfile, ctime)
 							continue
@@ -624,7 +621,6 @@ class Tasks:
 			catcher).
 		'''
 		def run_task_inner(result:list=None):
-			ERROR_OFTEN = '30 sec'
 
 			def catcher(result:list=None):
 				try:
@@ -674,7 +670,8 @@ class Tasks:
 						return
 					self.task_opt_set(task['task_func_name']
 					, 'err_counter', 0)
-					msg_err(lang.warn_task_error.format(task['task_name_full']))
+					msg_err(lang.warn_task_error.format(
+						task['task_name_full']))
 			if (
 				(not self.enabled)
 				and ( not task['hyperactive'])

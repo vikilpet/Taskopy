@@ -49,7 +49,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2024-11-08'
+APP_VERSION = 'v2024-11-09'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
@@ -342,7 +342,7 @@ def dev_print(*msg, **kwargs):
 		asrt( benchmark(lambda: dev_print('bench'), b_iter=3), 600_000, "<" )
 	
 	'''
-	if is_dev() or tdebug(): tprint(*msg, **kwargs)
+	if is_dev() or is_con(): tprint(*msg, **kwargs)
 
 _is_dev_cache:bool|None = None
 
@@ -905,6 +905,8 @@ def msg_err(msg:str, title:str='', source:str='', timeout:str='30 min'
 	if is_often('__msg_err ' + source + msg, interval=often_int):
 		dev_print('error msg suppressed: ' + msg, tname=source, short=True)
 		return
+	exc_full:str=''
+	exc_short:str=''
 	try:
 		exc_full, exc_short = exc_texts()
 	except AttributeError:
@@ -991,6 +993,9 @@ def toast(msg:str|tuple|list, dur:str='default', img:str=''
 	'''
 	global _toast_app_icon
 	global _toast_img_cache
+	if sys_ver() < 10.0:
+		dialog(msg=msg)
+		return
 	if dur == 'default': dur = 'Default'
 	assert dur in ('Default', 'short', 'long'), 'wrong *dur* value'
 	if on_click:
@@ -1530,6 +1535,7 @@ def dialog(
 	if content: content = str(content)
 	if title == '':
 		title = func_name_human(task_name())
+		title = title if title else APP_NAME
 	else:
 		title = str(title)
 	if is_iter(msg):
@@ -2108,7 +2114,7 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 	thr = threading.Thread(target=wrapper, daemon=thr_daemon
 	, name=func.__name__)
 	thr.start()
-	if not tdebug():
+	if not is_con():
 		try:
 			if not ident:
 				parents = tuple(reversed(_get_parents()))[-3:]
@@ -2247,7 +2253,7 @@ def benchmark(func, a:tuple=(), ka:dict={}, b_iter:int=100
 	ns_loop_str = '{:,}'.format(ns_loop).replace(',', ' ')
 	ns_total_str = '{:,}'.format(total_ns).replace(',', ' ')
 	name = func.__name__
-	if do_print and tdebug():
+	if do_print and is_con():
 		qprint(f'{name}: {ns_loop_str} ns/loop, total={ns_total_str}, {b_iter=}')
 		args = []
 		for arg in a:
@@ -2351,6 +2357,8 @@ def asrt(value, expect, comp:str='=='):
 		raise Exception('Unknown comp')
 	raise Exception(f'does not match ({comp}):\nval: «{value}»\nexp: «{expect}»')
 
+
+
 def exc_text(line_num:int=1, with_file:bool=True)->str:
 	r'''
 	Gets the shorted text of an exception.  
@@ -2368,22 +2376,37 @@ def exc_text(line_num:int=1, with_file:bool=True)->str:
 			dialog(exc_text())
 
 	'''
-	if line_num == 1:
-		exc_type, exc_obj, exc_tb = sys.exc_info()
-		if with_file:
-			fname = os.path.basename(exc_tb.tb_frame.f_code.co_filename)
-		if isinstance(exc_obj, pywintypes.error):
-			txt = f'{exc_obj.funcname}: {exc_obj.strerror.rstrip(".")}' \
-			+ f' ({exc_obj.winerror})'
-			if with_file:
-				txt += f' at line {exc_tb.tb_lineno} in file {fname}'
-			return txt
-		if with_file:
-			return f'{exc_type.__name__} at line {exc_tb.tb_lineno} in file {fname}'
-		else:
-			return f'{exc_type.__name__} at line {exc_tb.tb_lineno}'
-	lines = traceback.format_exc().splitlines()
-	return '\n'.join(lines[-line_num:])
+	if line_num > 1:
+		lines = traceback.format_exc().splitlines()
+		return '\n'.join(lines[-line_num:])
+	exc_type, exc_value, exc_tb = sys.exc_info()
+	last_frame = traceback.extract_tb(exc_tb)[-1]
+	fullpath = last_frame.filename
+	lineno = last_frame.lineno
+	function = last_frame.name
+	line = last_frame.line
+	exc_name = exc_type.__name__
+	fname:str = ''
+	if with_file: fname = os.path.basename(fullpath)
+	if isinstance(exc_value, pywintypes.error):
+		msg = f'{function}: {exc_value.strerror.rstrip(".")}' \
+		+ f' ({exc_value.winerror})'
+		if with_file: msg += f' at line {lineno} in file {fname}'
+		return msg
+	if with_file:
+		return f'{exc_name} at line {lineno} in file {fname}'
+	else:
+		return f'{exc_name} at line {lineno}'
+
+def exc_text_test():
+	exc_type, exc_value, exc_tb = sys.exc_info()
+	last_frame = traceback.extract_tb(exc_tb)[-1]
+	filename = last_frame.filename
+	lineno = last_frame.lineno
+	function = last_frame.name
+	line = last_frame.line
+	exc_name = exc_type.__name__
+	return f"Exception: {exc_name}, File: {filename}, Line: {lineno}, Code: {line}"
 
 def exc_texts()->tuple[str, str]:
 	r'''
@@ -2397,9 +2420,7 @@ def exc_texts()->tuple[str, str]:
 			print('full:', f)
 
 	'''
-	full = traceback.format_exc().strip()
-	short = exc_text()
-	return full, short
+	return traceback.format_exc().strip(), exc_text()
 
 def exc_name()->str:
 	r'''
