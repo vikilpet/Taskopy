@@ -568,6 +568,7 @@ mil.by
 com.by
 of.by
 bz
+co.bz
 com.bz
 net.bz
 org.bz
@@ -8446,7 +8447,6 @@ lab.ms
 cdn-edges.net
 localcert.net
 localhostcert.net
-corpnet.work
 gsj.bz
 githubusercontent.com
 githubpreview.dev
@@ -8683,6 +8683,7 @@ hatenablog.jp
 hatenadiary.jp
 hatenadiary.org
 pages.it.hs-heilbronn.de
+pages-research.it.hs-heilbronn.de
 heiyu.space
 helioho.st
 heliohost.us
@@ -8910,6 +8911,12 @@ we.bs
 filegear-sg.me
 ggff.net
 *.user.localcert.dev
+lodz.pl
+pabianice.pl
+plock.pl
+sieradz.pl
+skierniewice.pl
+zgierz.pl
 loginline.app
 loginline.dev
 loginline.io

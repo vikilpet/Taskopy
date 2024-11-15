@@ -1333,7 +1333,7 @@ def shortcut_create(fullpath, dest:str|tuple, descr:str=''
 
 def file_print(fullpath, printer:str=None
 , use_alternative:bool=False)->bool:
-	'''
+	r'''
 	Prints file on specified printer. Non-blocking.  
 	Returns True on success.  
 	If no printer is specified, printing is performed

@@ -395,7 +395,9 @@ class Tasks:
 				self.dir_change_stop[hDir] = dir_path
 				while True:
 					if hDir.handle == 0:
-						dev_print('handle was closed ' + dir_path)
+						if is_dev():
+							dev_print('the handle was closed ' + dir_path)
+							tlog('the handle was closed ' + dir_path)
 						return
 					try:
 						results = win32file.ReadDirectoryChangesW(
@@ -420,7 +422,7 @@ class Tasks:
 							dev_print(f'pywintypes error: {errp.args}')
 							raise errp
 					except Exception as errg:
-						dev_print(f'general error: {errg}')
+						if is_dev(): con_log(f'general error: {errg}')
 						raise errg
 					if prev_file[0]:
 						pfile, ptime = prev_file
@@ -428,7 +430,7 @@ class Tasks:
 							cfile, ctime = results[-1][1], time.time()
 						except:
 							if is_dev():
-								msg_err(f'Exception in "dir_watch"'
+								msg_err(f'Exception in «dir_watch»'
 								, timeout='5 min', source='dir_watch')
 						if cfile == pfile and ( (ctime - ptime) < WAIT_SEC ):
 							prev_file = (cfile, ctime)
@@ -819,7 +821,6 @@ class Tasks:
 			except Exception as e:
 				dev_print(f'event close error: {e}')
 		for hDir, dir_path in self.dir_change_stop.items():
-
 			msg = [dir_path]
 			try:
 				CancelIoEx(hDir.handle, None)
@@ -838,8 +839,9 @@ class Tasks:
 			except Exception as err:
 				msg.append(f'Close: {repr(err)}')
 			if is_dev() and len(msg) > 1:
-				dev_print(str_indent('\n'.join(msg)))
+				dev_print(str_indent(', '.join(msg)))
 				msg_warn('\n'.join(msg), title='Tasks close')
+				tlog('[app] close: ' + ', '.join(msg))
 		dev_print('close time: ' + time_diff_str(start, no_ms=False))
 tasks:Tasks = None
 
@@ -1059,7 +1061,8 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 	
 
 	def on_left_down(self, event=None):
-		''' Default action on left click to tray icon
+		r'''
+		Default action when left-clicking on the tray icon.
 		'''
 		if sett.kiosk and not keyboard.is_pressed(sett.kiosk_key): return
 		if app.app_hwnd:
@@ -1163,7 +1166,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		if len(table) > 1:
 			qprint(lang.warn_runn_tasks_con + ':')
 			table_print(table, use_headers=True)
-		if not show_msg: return running_tasks
+		if (not show_msg) or is_dev(): return running_tasks
 		tasks_str = '\r\n'.join(
 			tuple(t['task_name'] for t in running_tasks)[:TASKS_MSG_MAX]
 		)

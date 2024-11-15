@@ -49,7 +49,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2024-11-09'
+APP_VERSION = 'v2024-11-15'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
@@ -902,21 +902,25 @@ def msg_err(msg:str, title:str='', source:str='', timeout:str='30 min'
 	Reports important errors (exceptions). It outputs the full error text to the console
 	, writes to the log and displays a message.
 	'''
-	if is_often('__msg_err ' + source + msg, interval=often_int):
-		dev_print('error msg suppressed: ' + msg, tname=source, short=True)
-		return
-	exc_full:str=''
-	exc_short:str=''
 	try:
-		exc_full, exc_short = exc_texts()
-	except AttributeError:
-		pass
-	source = source if source else 'app'
-	if exc_full:
-		tprint(msg + str_indent(exc_full), tname=source)
-		tlog(msg + str_indent(exc_full, borders=False))
-	_msg_err(msg=msg + ' ' + exc_short, title=title, icon=tcon.TD_ICON_ERROR
-	, timeout=timeout, parent='msg_err')
+		if is_often('__msg_err ' + source + msg, interval=often_int):
+			dev_print('error msg suppressed: ' + msg, tname=source, short=True)
+			return
+		exc_full:str=''
+		exc_short:str=''
+		try:
+			exc_full, exc_short = exc_texts()
+		except AttributeError:
+			pass
+		source = source if source else 'app'
+		if exc_full:
+			tprint(msg + str_indent(exc_full), tname=source)
+			tlog(msg + str_indent(exc_full, borders=False))
+		_msg_err(msg=msg + ' ' + exc_short, title=title, icon=tcon.TD_ICON_ERROR
+		, timeout=timeout, parent='msg_err')
+	except Exception as err:
+		print(f'\n[msg_err] «{msg}» exception:\n\n{repr(err)}\n\n')
+		_MessageBoxTimeout(None, 'msg_err exception', APP_NAME, 16, 0, 1_800_000)
 
 def msg_warn(msg:str, title:str='', timeout:str='30 min'):
 	r'''
@@ -2075,7 +2079,7 @@ class DataEvent:
 
 def thread_start(func, args:tuple=(), kwargs:dict={}
 , thr_daemon:bool=True, err_msg:bool=False, ident:str=''
-, err_action=None)->int:
+, err_action:Callable|None=None)->int:
 	r'''
 	Runs function in a thread. Returns thread id.  
 	*ident* - user-defined identifier of thread.  
@@ -2091,23 +2095,11 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 		try:
 			func(*args, **kwargs)
 		except:
-			err_full, err_short = exc_texts()
-			tprint(
-				f'Exception in thread of «{func.__name__}»:'
-					+ str_indent(err_full)
-				, tname='thread_start'
-			)
-			tlog(
-				f'Exception in thread of «{func.__name__}»:'
-				+ str_indent(err_full, borders=False)
-			)
 			if err_msg:
-				msg_err(
-					f'Exception in thread {func.__name__}: {err_short}'
-				)
+				msg_err(f'Exception in a thread with «{func.__name__}»')
 			if err_action:
 				try:
-					err_action(err_full)
+					err_action(traceback.format_exc().strip())
 				except:
 					pass
 
@@ -2169,7 +2161,9 @@ def crontab_reload():
 	return app.load_crontab()
 
 def app_win_show():
-	' Shows the application console window '
+	r'''
+	Bring the application console window to the foreground, if possible.
+	'''
 	app.show_window()
 
 def app_dir()->str:
