@@ -929,12 +929,16 @@ If you want to save something so that it survives a crontab reload, use the glob
 
 If you want to save something so that it survives a Taskopy restart, use the *file variables*: **var_get**, **var_set**, etc.
 
-### Centralization and deployment
+### Deployment and reliability
 
-How to update the task code on multiple computers.  
+**How to update the task code on multiple computers.**  
 You can define a task not only in a *crontab*, but also in an extension, using the *task_add* decorator. So, on the client computer, you can import from an extension once into *crontab*, and then update only the file with the extension that contains the task.  
 
 You can programmatically reload the crontab with **crontab_reload**. This is safe, since the crontab is actually loaded in test mode first. Even if there are gross errors in the crontab, the updated crontab will not load and the old tasks will still run.
+
+All exceptions are handled and logged. You can download logs from other computers (<http://127.0.0.1:8275/log>) in JSON format and search for exceptions by the word *Traceback*.
+
+The application can run for weeks continuously without significant memory leaks, but this of course depends on whether the user himself has made no errors in the tasks.
 
 ## Firefox extension
 https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/

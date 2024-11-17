@@ -460,10 +460,17 @@ def sys_codepage():
 
 def sys_shutdown(timeout:int=0):
 	r'''
-	Shut down this computer.  
+	Shutting down this computer.  
 	*timeout* - set the time-out period before shutdown in seconds.
 	'''
 	os.system(f'shutdown -s -t {timeout}')
+
+def is_sys_locked()->bool:
+	r'''
+	Is Windows locked?  
+	Note: seems not to be very reliable.  
+	'''
+	return win32gui.GetForegroundWindow() == 0
 
 if __name__ == '__main__':
 	_test_reg_key()

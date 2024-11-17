@@ -49,6 +49,12 @@ Examples:
 - Clear cache in *Files*
 - Clear *OpenCamera* & *Files* cache and storage in app settings
 
+## Some ADB commands
+
+Swipe up: `shell input touchscreen swipe 530 1920 530 1120`  
+Press keys: `shell input text abc`  
+Call the PIN keypad when the screen is locked: `shell input keyevent 82`  
+
 ## Links:
 
 - broadcasts: https://developer.android.com/about/versions/11/reference/broadcast-intents-30
