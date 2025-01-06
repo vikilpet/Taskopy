@@ -109,7 +109,7 @@ def examp_autoruns(exe_path:str, caller:str
 	choice = dialog(
 		f'Changes from autoruns ({len(changes)}):\n\n'
 			+ '\n'.join(
-				f'{s}: {path_short(p, 45)}'
+				f'{s}: {path_short(p, 40)}'
 				for p, s in tuple(changes.items())[0:DLG_MAX]
 			)
 		, content='More in console' if len(table) > DLG_MAX else None

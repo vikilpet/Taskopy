@@ -7,11 +7,14 @@ Download and unzip SDK command line tools:
 
 	https://developer.android.com/tools/releases/platform-tools
 
-Activate developer mode on phone (7 taps on serial number), run in cmd:
+Activate developer mode on phone (7 taps on serial number)
+Connect phone to your computer. From the curtain, open USB settings, select
+file transfer and allow connection from your computer.  
+You can make *File transfer* the default mode in the *Default USB configuration* in the developer settings.  
+Run this in CMD to find out the ID of your phone:
 
 	%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe devices
 
-and allow connection on the phone.  
 To stop server (in cmd):
 
 	%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe kill-server
@@ -58,6 +61,9 @@ Call the PIN keypad when the screen is locked: `shell input keyevent 82`
 ## Links:
 
 - broadcasts: https://developer.android.com/about/versions/11/reference/broadcast-intents-30
+- key codes: https://developer.android.com/reference/android/view/KeyEvent#KEYCODE_BUTTON_START
+- key codes web: https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_key_values
+- Google OEM USB drivers: https://developer.android.com/studio/run/oem-usb
 
 '''
 from plugins.tools import *
@@ -87,8 +93,8 @@ def adb_run(cmd:list|tuple|str, **kwargs)->tuple[bool, str]:
 	tdebug(cmd)
 	ret, out, err = proc_start(cmd, capture=True, encoding='utf-8')
 	out = err if err else out
-	if err and tdebug(): tprint(f'error: {err}')
-	return ret == 0, out
+	if err and is_con(): tprint(f'error: {err}')
+	return ret == 0, out.rstrip()
 
 def adb_dir_files(adir:str='/sdcard/', ext:str|None=None
 , afilter=None, **kwargs)->tuple:

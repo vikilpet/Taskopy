@@ -64,7 +64,7 @@ def log_watchdog_push(
 		var_set(var_name, cur_size)
 		return
 	if prev_pos > cur_size:
-		tprint('the file was truncated?')
+		tprint('the file has been truncated')
 		var_set(var_name, cur_size)
 		return
 	with open(log_file) as hnd:
@@ -91,8 +91,9 @@ def log_watchdog_poll(
 	It's just waiting for new lines.  
 	*log_file* - a file for watch.  
 	*callback* - a function that fetches new lines from a file.
-	The function must accept *str* and return *bool* -- *True*
-	on successful processing of new lines.  
+	The function must accept *str* with new lines and
+	must return *bool* -- `True` on successful processing of new lines
+	or `False` on error.  
 	'''
 	var_name = ('log_watchdog', log_file)
 	flag_var_name = f'log_watchdog {log_file}'
@@ -102,14 +103,19 @@ def log_watchdog_poll(
 		tprint('first check')
 		var_set(var_name, cur_size)
 	if prev_pos > cur_size:
-		tprint('the file was truncated?')
+		tprint('the file has been truncated')
 		var_set(var_name, cur_size)
 		prev_pos = cur_size
 	gdic[flag_var_name] = True
 	with open(log_file) as hnd:
 		hnd.seek(prev_pos)
 		while gdic[flag_var_name] == True:
-			line = hnd.readline()
+			try:
+				line = hnd.readline()
+			except PermissionError:
+				tprint('permission error')
+				gdic[flag_var_name] = True
+				break
 			if not line:
 				time_sleep(poll_timeout)
 				continue

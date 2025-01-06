@@ -32,6 +32,7 @@ import json
 import win32gui
 import win32con
 import win32com.client
+import win32clipboard
 from typing import Callable, Iterable 
 from dataclasses import dataclass, field, asdict
 from queue import Queue, SimpleQueue
@@ -41,6 +42,7 @@ import wx
 from collections import defaultdict
 import lxml
 import textwrap
+import io
 from xml.etree import ElementTree as _ElementTree
 import windows_toasts as wtoasts
 try:
@@ -49,7 +51,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2024-11-17'
+APP_VERSION = 'v2025-01-05'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
@@ -899,8 +901,8 @@ def _msg_err(msg:str, icon:int, title:str, parent:str, timeout:str):
 def msg_err(msg:str, title:str='', source:str='', timeout:str='30 min'
 , often_int:str='30 s'):
 	r'''
-	Reports important errors (exceptions). It outputs the full error text to the console
-	, writes to the log and displays a message.
+	Reports important errors (exceptions). It outputs the full error
+	text to the console, writes to the log and displays a message.  
 	'''
 	try:
 		if is_often('__msg_err ' + source + msg, interval=often_int):
@@ -2566,6 +2568,15 @@ def sys_ver()->float:
 	'''
 	ver = sys.getwindowsversion()
 	return ver.major + ver.minor / 10
+
+def clip_set_img(image):
+	r'''
+	Copies an image in `PIL.Image` format to the clipboard.
+	'''
+	win32clipboard.OpenClipboard()
+	win32clipboard.EmptyClipboard()
+	win32clipboard.SetClipboardData(win32clipboard.CF_DIB, image)
+	win32clipboard.CloseClipboard()
 
 
 if __name__ != '__main__': patch_import()

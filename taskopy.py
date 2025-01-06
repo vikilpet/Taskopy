@@ -396,7 +396,7 @@ class Tasks:
 				while True:
 					if hDir.handle == 0:
 						if is_dev():
-							dev_print('the handle was closed ' + dir_path)
+							tprint('the handle was closed ' + dir_path)
 							tlog('the handle was closed ' + dir_path)
 						return
 					try:
@@ -416,7 +416,10 @@ class Tasks:
 							try:
 								hDir.Close()
 							except Exception as err_cl:
-								dev_print(f'hDir close exception: {err_cl}')
+								if is_dev():
+									dev_print(f'hDir close exception: {err_cl}')
+									msg_err(f'hDir close exception: {err_cl}'
+									+ f'\n	{hDir.handle=}, {dir_path=}')
 							break
 						else:
 							dev_print(f'pywintypes error: {errp.args}')
@@ -1074,12 +1077,19 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			else:
 				show_app_window()
 
-	def on_exit(self, event=None, force:bool=False)->bool:
+	def on_exit(self, event=None, force:bool=False
+	, is_end_session:bool=False)->bool:
 		r'''
-		*force* - do not wait for tasks.
+		*force* - do not display a warning dialog about running tasks.  
+		*is_end_session* - logoff or shutdown.  
 		'''
 		TASKS_MSG_MAX = 10
 		running_tasks = self.running_tasks(show_msg=False)
+		if is_end_session:
+			force = True
+			if is_dev():
+				tprint(f'end of session')
+				tlog(f'end of session')
 		if running_tasks:
 			tasks_str = '\r\n'.join(
 				tuple(
@@ -1087,11 +1097,11 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 				)[:TASKS_MSG_MAX]
 			)
 			if len(running_tasks) > TASKS_MSG_MAX:
-				tasks_str += '\r\n...'
+				tasks_str += '\n...'
 			if not force:
 				if dialog(
 					lang.warn_runn_tasks_msg.format( len(running_tasks) )
-					+ '\r\n\r\n' + tasks_str
+					+ '\n\n' + tasks_str
 					, title=lang.menu_exit
 					, buttons=(lang.button_close, lang.button_cancel)
 					, return_button=True
@@ -1109,6 +1119,9 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 				tasks.run_task(task, caller=CALLER_EXIT)
 		qprint(lang.menu_exit)
 		tasks.close()
+		if is_end_session and is_dev():
+			tprint('exit tasks completed')
+			tlog('exit tasks completed')
 		app.que_log.stop()
 		app.que_print.stop()
 		wx.CallAfter(self.Destroy)
@@ -1225,6 +1238,8 @@ class App(wx.App):
 		self.frame=wx.Frame(None, style=wx.DEFAULT_FRAME_STYLE | wx.STAY_ON_TOP)
 		self.taskbaricon = TaskBarIcon(self.frame)
 		self.app_pid = os.getpid()
+		self.frame.Bind(wx.EVT_END_SESSION
+		, lambda: self.taskbaricon.on_exit(is_end_session=True) )
 		hwnd_list = win_find(APP_NAME)
 		if len(hwnd_list) == 1:
 			self.app_hwnd = hwnd_list[0]

@@ -8,6 +8,7 @@ import re
 import html
 import psutil
 import tempfile
+from io import BytesIO
 from hashlib import md5
 from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
 import json
@@ -21,11 +22,11 @@ from typing import Iterator, Tuple, Union
 import json2html
 from .tools import dev_print, exc_text, time_sleep, tdebug \
 , locale_set, safe, patch_import, re_replace \
-, median, is_iter, str_indent
+, median, is_iter, str_indent, is_con, qprint
 from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 _PUB_SUF_LST = set()
 warnings.filterwarnings('ignore', category=MarkupResemblesLocatorWarning)
@@ -918,5 +919,29 @@ def ftp_upload(fullpath, server:str
 		errors.append(exc_text())
 	return len(errors) == 0, errors
 	
+def net_speedtest(url:str)->tuple:
+	r'''
+	Download the file without saving to disk and measure
+	the average download speed.
+	'''
+	chunk_size = 1024 * 1024  # 1 MB per chunk
+	speed_measurements = []
+	total_bytes_dload = 0
+	with requests.get(url, stream=True) as response:
+		response.raise_for_status()
+		buffer = BytesIO()
+		for chunk in response.iter_content(chunk_size=chunk_size):
+			start_time = time.perf_counter_ns()
+			buffer.write(chunk)
+			end_time = time.perf_counter_ns()
+			total_bytes_dload += len(chunk)
+			dload_time_sec = (end_time - start_time) / 1e9
+			speed_mbps = (len(chunk) * 8) / (dload_time_sec * 1e6)
+			if is_con():
+				qprint(f"Downloaded 1 MB in {dload_time_sec:.3f} seconds. Speed: {speed_mbps:.3f} Mbit/s")
+			speed_measurements.append(speed_mbps)
 
-	
+	if is_con():
+		qprint(f'{total_bytes_dload=}, {speed_measurements=}')
+	median_speed = median(speed_measurements) if speed_measurements else None
+	return True, median_speed

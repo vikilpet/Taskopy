@@ -250,7 +250,7 @@ def file_log(fullpath, message:str, encoding:str='utf-8'
 
 
 def file_copy(fullpath, destination)->str:
-	'''
+	r'''
 	Copies file to destination.  
 	Destination may be a full path or directory.  
 	Returns destination full path.  
@@ -647,7 +647,7 @@ def dir_files(fullpath, subdirs:bool=True, name_only:bool=False
 def dir_rnd_files(fullpath, file_num:int=1
 , attempts:int=5, **rules)->Iterator[str]:
 	r'''
-	Gets random files from a directory or None
+	Gets random files from a directory or `None`
 	if nothing is found.  
 	*file_num* - how many files to return.  
 	*rules* - a tuple of rules from the `path_rule`.
