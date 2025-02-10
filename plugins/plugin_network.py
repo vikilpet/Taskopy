@@ -26,7 +26,7 @@ from .tools import dev_print, exc_text, time_sleep, tdebug \
 from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 _PUB_SUF_LST = set()
 warnings.filterwarnings('ignore', category=MarkupResemblesLocatorWarning)
@@ -119,34 +119,6 @@ def _rem_white(text:str)->str:
 	'''
 	if not text: return text
 	return ' '.join(text.split())
-_js_regex = re.compile(r"(\".*?\"|\'.*?\')|(/\*.*?\*/|//[^\r\n]*$)"
-, re.MULTILINE|re.DOTALL)
-def _js_remove_comments(string):
-	def _replacer(match):
-		if match.group(2) is not None:
-			return "" # so we will return empty to remove the comment
-		else: # otherwise, we will return the 1st group
-			return match.group(1) # captured quoted-string
-	return _js_regex.sub(_replacer, string)
-
-_re_html = re.compile(r'(<!--.*?-->)', flags=re.DOTALL)
-_re_css = re.compile(r'!/\*[^*]*\*+([^/][^*]*\*+)*/!')
-_re_white_space = re.compile(r">\s*<")
-_re_js = re.compile('<script>.+?</script>', flags=re.DOTALL)
-def html_minify(html:str)->str:
-	r'''
-	Removes HTML, javascript and CSS comments and whitespace.  
-	Not well tested, use at your own risk.  
-	Requires semicolons in the JS.  
-	'''
-	html = _re_html.sub('', html)
-	js_blocks = _re_js.findall(html)
-	for block in js_blocks:
-		html = html.replace(block, _js_remove_comments(block))
-	html = _re_css.sub('', html)
-	html = _re_white_space.sub('><', html)
-	return _rem_white(html)
-
 
 def file_download(url:str, destination:str=None
 , attempts:int=3, timeout:float=3.0
@@ -660,32 +632,7 @@ def http_req_status(url:str, method='HEAD', timeout:float=1.0)->int:
 	return getattr(requests, method.lower())(url, timeout=timeout).status_code
 
 if __name__ == '__main__':
-	_html = r'''
-	<!doctype html>
-	<script>
-		function count(elem) {
-			// elem.classList.remove('flash')
-			score_sound.play()
-		}
-	</script>
-	<style>
-		.score {
-			display: flex;
-			/* background-color: #333; */
-		}
-
-		/* @media (orientation: landscape) {
-			.controls { grid-template-columns: 1fr 1fr; }
-		} */
-	</style>
-	<body>
-		<div class='controls'>
-			<div class='score left' onclick='count(this)'>25</div>
-			<div class='score right' onclick='count(this)'>25</div>
-		</div>
-	</body>
-	'''
-	print(html_minify(_html))
+	pass
 else:
 	patch_import()
 
@@ -919,10 +866,11 @@ def ftp_upload(fullpath, server:str
 		errors.append(exc_text())
 	return len(errors) == 0, errors
 	
-def net_speedtest(url:str)->tuple:
+def net_speedtest(url:str):
 	r'''
 	Download the file without saving to disk and measure
 	the average download speed.
+	Returns `int` or `float`.
 	'''
 	chunk_size = 1024 * 1024  # 1 MB per chunk
 	speed_measurements = []
@@ -940,8 +888,6 @@ def net_speedtest(url:str)->tuple:
 			if is_con():
 				qprint(f"Downloaded 1 MB in {dload_time_sec:.3f} seconds. Speed: {speed_mbps:.3f} Mbit/s")
 			speed_measurements.append(speed_mbps)
-
 	if is_con():
 		qprint(f'{total_bytes_dload=}, {speed_measurements=}')
-	median_speed = median(speed_measurements) if speed_measurements else None
-	return True, median_speed
+	return median(speed_measurements) if speed_measurements else tuple()

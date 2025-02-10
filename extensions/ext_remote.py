@@ -54,7 +54,7 @@ def rmt_page(actions:dict, data:DataHTTPReq, title:str='Remote'
 	BUTTON_TEMPL = '''<div class='task' onclick="SendReq(this)">{capt}</div>'''
 	if not data.form:
 		# It's not an action request, so create a page
-		if not _RMT_HTML: _RMT_HTML = html_minify(file_read('ext_remote.html'))
+		if not _RMT_HTML: _RMT_HTML = file_read('ext_remote.html')
 		buttons = ''
 		for capt in actions.keys(): buttons += BUTTON_TEMPL.format(capt=capt)
 		page = _RMT_HTML.replace('%title%', title).replace('%buttons%', buttons)

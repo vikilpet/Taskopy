@@ -61,26 +61,27 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 					+ f' exception: {repr(e)[:150]}'
 				)
 				
-	def white_list_check(self, task=None)->bool:
+	def white_list_check(self, task:dict=dict())->bool:
 		if not sett.white_list: return True
 		if isinstance(sett.white_list, str):
 			sett.white_list = [
 				ip.strip() for ip in sett.white_list.split(',')
 			]
 		white_list = sett.white_list.copy()
-		if task and task.get('http_white_list', None):
-			if isinstance(task['http_white_list'], str):
-				wl = [ ip.strip() for ip in task['http_white_list'].split(',') ]
+		task_wlist = task.get('http_white_list', None)
+		if task_wlist:
+			if isinstance(task_wlist, str):
+				task_wlist = (ip.strip() for ip in task_wlist.split(',') )
 			else:
-				wl = task['http_white_list']
-			white_list.extend(wl)
+				task_wlist = task_wlist
+			white_list.extend(task_wlist)
+		client_ip = self.address_string()
 		for ip in white_list:
-			if fnmatch.fnmatch(self.address_string(), ip):
+			if fnmatch.fnmatch(client_ip, ip):
 				return True
 		if sett.dev:
 			self.log_message(
-				f'request from unknown IP ({self.address_string()}):' 
-				+ f' {self.path[:20]}'
+				f'request from unknown IP ({client_ip}): «{self.path[:20]}»'
 			)
 		return False
 

@@ -51,7 +51,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2025-01-05'
+APP_VERSION = 'v2025-02-10'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
@@ -1131,7 +1131,7 @@ def job_pool(jobs:list, pool_size:int=None)->list:
 	return jobs
 
 class Job:
-	'''
+	r'''
 	To use with job_batch and job_pool.
 	Example with type annotation:
 	
@@ -1174,9 +1174,8 @@ class Job:
 				self.error = True
 				self.result = f'exception: {repr(self.result)}' \
 				+ f'\nat line {self.result.__traceback__.tb_lineno}'
-		except Exception as e:
-			self.result = f'exception: {repr(e)}' \
-				+ f'\nat line {e.__traceback__.tb_lineno}'
+		except:
+			self.result = f'exception: {exc_text()}'
 			self.error = True
 		self.finished = True
 		self.time = datetime.timedelta(
@@ -1535,8 +1534,8 @@ def dialog(
 						, win32con.SWP_NOSIZE | win32con.SWP_NOMOVE
 					)
 					on_top_flag = True
-				except Exception as e:
-					raise Exception('dialog: wrong parameters')
+				except:
+					raise Exception(f'dialog: wrong parameters ({exc_text()})')
 		return S_OK
 	if content: content = str(content)
 	if title == '':
@@ -1979,9 +1978,9 @@ def xml_to_dict(xml_str:str, remove_str:str=None)->tuple:
 		parser=lxml.etree.XMLParser(recover=True)
 		tree = lxml.etree.fromstring(xml_str, parser=parser)
 		return True, _etree_to_dict(tree)
-	except Exception as e:
+	except:
 		dev_print(f'xml_str parsing error:\n\n{xml_str}\n\n')
-		return False, repr(e)
+		return False, exc_text()
 _event_xmlns = ''
 _REGEX_EVENT = re.compile(r'''(xmlns=('|").+?('|"))''')
 def _xml_to_dict_event(event_xml:str)->tuple:
@@ -2074,8 +2073,8 @@ class DataEvent:
 					self.EventData = edata
 				else:
 					self.EventData = str(edata)
-			except Exception as e:
-				dev_print(f'EventData exception: {repr(e)}')
+			except:
+				dev_print(f'EventData exception: {exc_text()}')
 				self.EventData = self._EventDataDict
 		if self.EventData: self.EventDataStr = value_to_str(self.EventData)
 

@@ -46,7 +46,7 @@ def dash_page(source:Callable, actions:dict={}, title:str='Dashboard'
 	'''
 	global _DASH_HTML
 	if not data.params:
-		if not _DASH_HTML: _DASH_HTML = html_minify(file_read(_DASH_HTML_FILE))
+		if not _DASH_HTML: _DASH_HTML = file_read(_DASH_HTML_FILE)
 		page = _DASH_HTML.replace('%title%', title)
 		return page
 	if 'd' in data.params:

@@ -171,6 +171,7 @@ def routeros_send(
 	, device_user:str='admin'
 	, device_pwd:str=''
 	, info:bool=False
+	, connect_timeout:float=_DEF_TIMEOUT
 )->tuple[bool, None|str]:
 	r'''
 	Send command 'cmd' through api.
@@ -188,7 +189,7 @@ def routeros_send(
 		af, socktype, proto, canonname, sa = res
 		try:
 			soc = socket.socket(af, socktype, proto)
-			soc.settimeout(_DEF_TIMEOUT) # seconds
+			soc.settimeout(connect_timeout) # seconds
 		except socket.error:
 			soc = None
 			continue
@@ -225,6 +226,7 @@ def routeros_find_send(
 	, device_user:str='admin'
 	, device_pwd:str=''
 	, info:bool=False
+	, connect_timeout:float=_DEF_TIMEOUT
 )->tuple[bool, None|str]:
 	''' Find id and perform command against them.
 		cmd_find - list of str to get list of id's.
@@ -250,7 +252,7 @@ def routeros_find_send(
 		af, socktype, proto, canonname, sa = res
 		try:
 			soc = socket.socket(af, socktype, proto)
-			soc.settimeout(_DEF_TIMEOUT) # seconds
+			soc.settimeout(connect_timeout)
 		except socket.error:
 			soc = None
 			continue
@@ -290,6 +292,7 @@ def routeros_query(
 	, device_user:str='admin'
 	, device_pwd:str=''
 	, info:bool=False
+	, connect_timeout:float=_DEF_TIMEOUT
 )->tuple[bool, list[dict]]:
 	''' Send query and return True, data = list of dictionaries
 		or False, 'error'
@@ -329,7 +332,7 @@ def routeros_query(
 		af, socktype, proto, canonname, sa = res
 		try:
 			soc = socket.socket(af, socktype, proto)
-			soc.settimeout(_DEF_TIMEOUT) # seconds
+			soc.settimeout(connect_timeout)
 		except socket.error:
 			soc = None
 			continue
