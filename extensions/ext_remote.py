@@ -51,7 +51,7 @@ def rmt_page(actions:dict, data:DataHTTPReq, title:str='Remote'
 	two lines.  
 	'''
 	global _RMT_HTML
-	BUTTON_TEMPL = '''<div class='task' onclick="SendReq(this)">{capt}</div>'''
+	BUTTON_TEMPL = '''<div class='task' onclick="sendReq(this)">{capt}</div>'''
 	if not data.form:
 		# It's not an action request, so create a page
 		if not _RMT_HTML: _RMT_HTML = file_read('ext_remote.html')
@@ -66,10 +66,11 @@ def rmt_page(actions:dict, data:DataHTTPReq, title:str='Remote'
 			else:
 				status_str = str(data)
 		return page.replace('%status%', str_short(status_str, max_status_len))
+	if not 'status' in actions: actions['status'] = lambda: 'fullscreen'
 	# It's an action. Let's perform it safely:
 	status, data = safe( actions.get( data.form['action'] ) )()
 	if status: return 'ok' if data == None else str_short(data, max_status_len)
 	# There is an exception:
-	tprint(data)
+	tprint('action exception:', data)
 	return 'error: ' + str_short(data, max_status_len - 7)
 

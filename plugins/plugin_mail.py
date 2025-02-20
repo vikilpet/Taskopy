@@ -14,7 +14,7 @@ import imaplib
 import mimetypes
 from .tools import Job, job_batch, tdebug \
 , patch_import, dev_print, lazy_property \
-, table_print, time_diff_str, exc_text, str_indent
+, table_print, time_diff_str, exc_text, exc_texts, str_indent, qprint
 from .plugin_filesystem import file_name_fix, file_size_str \
 , var_get, var_set, path_get
 from .plugin_network import html_clean
@@ -24,6 +24,7 @@ _FILE_EXT = 'eml'
 _MAX_ERR_STR_LEN = 200
 _LAST_NUM_VAR = 'last_mail_msg_num_in_'
 _MAX_BODY_AS_SUBJ = 20
+_EXC_LINE_LIMIT = 5
 
 class MailMsg:
 	'''
@@ -204,18 +205,18 @@ class _MailLog:
 		self.silent:bool = silent
 		self.err_lst:list = err_lst
 	
-	def log(self, msg:str):
+	def log(self, msg:str, is_error:bool=False):
 		if isinstance(msg, Exception):
 			msg = ( f'exception «{repr(msg)}»'
 			+ f' at line {msg.__traceback__.tb_lineno}' )
 		else:
 			msg = str(msg)
 		msg = f'{self.prefix} {self.login}@{self.server}: {msg}'
-		if 'error' in msg.lower(): self.err_lst.append(msg)
+		if is_error: self.err_lst.append(msg)
 		if self.silent:
 			tdebug(msg)
 		else:
-			print(msg)
+			qprint(msg)
 
 def mail_send(
 	recipient:str
@@ -276,8 +277,9 @@ def mail_send(
 	except smtplib.SMTPResponseException as e:
 		return False, e.smtp_error.decode()
 	except:
-		tdebug(str_indent( exc_text(6) ))
-		return False, exc_text()
+		exc_full, exc_short = exc_texts()
+		tdebug(str_indent( exc_full ))
+		return False, exc_short
 	return True, 'ok'
 	
 def mail_send_batch(recipients:str=''
@@ -321,8 +323,8 @@ def mail_check(server:str, login:str, password:str
 		imap = imaplib.IMAP4_SSL(server, timeout=timeout)
 		try:
 			imap.login(login, password)
-		except Exception as e:
-			log(f'login error: {repr(e)}')
+		except:
+			log(f'login exception: {exc_text(0)}', is_error=True)
 			return [], errors
 		log('login OK')
 		for folder in folders:
@@ -359,7 +361,7 @@ def mail_check(server:str, login:str, password:str
 		log(imap.close())
 		log(imap.logout())
 	except:
-		log(f'general error:{str_indent( exc_text(6) )}')
+		log(f'general exception:{exc_text(_EXC_LINE_LIMIT)}', is_error=True)
 	return msgs, errors
 
 def _get_last_index(folder:str)->int:
@@ -377,7 +379,7 @@ def _get_last_index(folder:str)->int:
 		else:
 			num = 0
 	except:
-		dev_print(f'last index error:{str_indent( exc_text(6) )}')
+		dev_print(f'last index exception:{str_indent( exc_text(_EXC_LINE_LIMIT) )}')
 		num = 0
 	return num
 
@@ -429,7 +431,7 @@ def mail_download(
 	errors = []
 	last_index = 0
 	msgs = []
-	log = _MailLog(prefix='downl', login=login, server=server
+	log = _MailLog(prefix='dload', login=login, server=server
 	, silent=silent, err_lst=errors).log
 	get_sub:bool = (folders == ['*'])
 	
@@ -439,7 +441,7 @@ def mail_download(
 		try:
 			imap.login(login, password)
 		except:
-			log(f'login error:{str_indent( exc_text(6) )}')
+			log(f'login exception: {exc_text(_EXC_LINE_LIMIT)}', is_error=True)
 			return [], errors
 		log('login OK')
 		if get_sub:
@@ -471,7 +473,8 @@ def mail_download(
 							raw_bytes = fetch_data[0][1]
 							break
 						except:
-							log(f'{msg_id=} fetch exception: «{fetch_data=}»')
+							log(f'{msg_id=} fetch exception: «{fetch_data=}»'
+							, is_error=True)
 					log(f'fetch {att=} ({status=}): {data=}')
 				else:
 					log(f'fetch failed ({status=}): {fetch_data=}')
@@ -502,11 +505,13 @@ def mail_download(
 						os.makedirs(os.path.dirname(msg.fullpath))
 						continue
 					except:
-						log(f'  file write exception:{str_indent( exc_text(6) )}')
+						log(f'  file write exception:{exc_text(_EXC_LINE_LIMIT)}'
+						, is_error=True)
 						try:
 							os.remove(msg.fullpath)
 						except:
-							log(f'  file deletion exception: {exc_text()}')
+							log(f'  file deletion exception: {exc_text()}'
+							, is_error=True)
 					break
 				if not file_ok: continue
 				msgs.append(msg)
@@ -536,7 +541,7 @@ def mail_download(
 		log(f'close: {imap.close()}')
 		log(f'logout: {imap.logout()}')
 	except:
-		log(f'general exception:{str_indent( exc_text(6) )}')
+		log(f'general exception: {exc_text(_EXC_LINE_LIMIT)}', is_error=True)
 	return msgs, errors
 
 def mail_download_batch(mailboxes:list, dst_dir:str, timeout:int=3600
@@ -550,9 +555,9 @@ def mail_download_batch(mailboxes:list, dst_dir:str, timeout:int=3600
 	Returns a list with subjects and boolean warning if too many errors
 	detected.
 	'''
-	def write_log()->tuple:
-		'''
-		Write errors to the log. Returns True and log file name.
+	def write_log()->tuple[bool, str]:
+		r'''
+		Write errors to the log. Returns (True, 'log full path').
 		'''
 		try:
 			if errors:
@@ -566,25 +571,28 @@ def mail_download_batch(mailboxes:list, dst_dir:str, timeout:int=3600
 				except FileNotFoundError:
 					pass
 			return True, log_file
-		except Exception as e:
-			return False, 'write_log exception: ' + repr(e)
+		except:
+			return False, 'write_log exception: ' + exc_text()
 		
-	def log_warning()->tuple:
-		''' Returns True and last line if there is too many errors
-			in log file.
+	def log_warning()->tuple[bool, str]:
+		r'''
+		Returns True and last line if there is too many errors in log file.
 		'''
-		if not os.path.exists(log_file): return False, None
+		if not os.path.exists(log_file): return False, ''
 		if os.path.getsize(log_file) == 0:
-			return False, None
+			return False, ''
 		try:
 			with open(log_file, 'rt') as f:
 				lines = f.readlines()
 				if len(lines) > err_thr:
 					return True, lines[-1][:-1]
 				else:
-					return False, None
-		except Exception as e:
-			return True, 'Failed to open log file: ' + str(e)
+					return False, ''
+		except:
+			return True, 'Failed to open the log file: ' + exc_text()
+
+	errors = []
+	msgs = []
 	try:
 		jobs = []
 		for box in mailboxes:
@@ -631,7 +639,7 @@ def mail_download_batch(mailboxes:list, dst_dir:str, timeout:int=3600
 				f'Too many errors! The last one: {last_error}'
 			)
 	except:
-		dev_print(f'exception:{str_indent( exc_text(6) )}')
+		dev_print(f'general exception:{exc_text(_EXC_LINE_LIMIT)}')
 		errors.append(exc_text())
 	return msgs, errors
 	

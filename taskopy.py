@@ -1168,7 +1168,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 					time_now() - t['last_start']
 				).split('.')[0]
 			module = t['task_func'].__module__
-			module = '' if module == 'crontab' else module + '/' 
+			module = '' if module == 'crontab' else module + '.' 
 			table.append((
 				module + t['task_func_name']
 				, thr_name
