@@ -14,7 +14,7 @@ import imaplib
 import mimetypes
 from .tools import Job, job_batch, tdebug \
 , patch_import, dev_print, lazy_property \
-, table_print, time_diff_str, exc_text, exc_texts, str_indent, qprint
+, table_print, time_diff_human, exc_text, exc_texts, str_indent, qprint
 from .plugin_filesystem import file_name_fix, file_size_str \
 , var_get, var_set, path_get
 from .plugin_network import html_clean
@@ -127,12 +127,11 @@ class MailMsg:
 	
 	@property
 	def date_dif(self)->str:
-		return time_diff_str(
+		return time_diff_human(
 			parsedate_to_datetime( self.h_date )
 			, end=datetime.datetime.now(
 				tz=datetime.datetime.now().astimezone().tzinfo
 			)
-			, no_ms=True
 		)
 
 	@lazy_property

@@ -22,11 +22,11 @@ from typing import Iterator, Tuple, Union
 import json2html
 from .tools import dev_print, exc_text, time_sleep, tdebug \
 , locale_set, safe, patch_import, re_replace \
-, median, is_iter, str_indent, is_con, qprint
+, median, is_iter, str_indent, is_con, qprint, str_remove_white
 from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 _PUB_SUF_LST = set()
 warnings.filterwarnings('ignore', category=MarkupResemblesLocatorWarning)
@@ -114,7 +114,7 @@ def http_req(url:str, encoding:str='utf-8', session:bool=False
 	return content
 
 def _rem_white(text:str)->str:
-	'''
+	r'''
 	Removes an excessive white space from the string.
 	'''
 	if not text: return text
@@ -239,7 +239,7 @@ def html_clean(html_str:str, sep:str=' ', is_mail:bool=False
 		asrt( html_clean('\u200b\r \n<a>t</a>\t', is_mail=True), 't')
 		asrt( html_clean('<style>{}</style><a>t</a>\t'), 't')
 		asrt( html_clean('<img>jpg</img><a>t</a>\t', del_spec=False), 'jpg t')
-		asrt( benchmark(html_clean, a=('',)), 120_000, "<" )
+		asrt( bmark(html_clean, a=('',)), 120_000 )
 
 	'''
 	SPEC_CHARS = ' \r\n\t\u200b\xa0\u200c'
@@ -257,8 +257,8 @@ def html_clean(html_str:str, sep:str=' ', is_mail:bool=False
 
 def html_element(url:str, element
 , clean:bool=True, element_num:int=0
-, attrib:str=None, **kwargs)->str:
-	'''
+, attrib:str=None, tag_sep:str=' ', **kwargs)->str:
+	r'''
 	Get text of specified page element (div).
 	Returns str or list of str.
 	
@@ -287,7 +287,7 @@ def html_element(url:str, element
 	*element_num* - number of found element. If set
 	to 'all' then returns all this elements.
 
-	XPath cheatsheet: https://devhints.io/xpath  
+	XPath cheatsheet: <https://devhints.io/xpath>  
 	More XPath examples:
 		'//div[@id="id"]/p'
 		'//div[contains(@class, "main")]/div/script'
@@ -298,6 +298,10 @@ def html_element(url:str, element
 	adds it.
 
 	'''
+	
+	def clean_white(text)->str:
+		return str_remove_white(text, algo='space')
+
 	if not url[:4].lower().startswith('http'):
 		html = url
 	else:
@@ -320,15 +324,12 @@ def html_element(url:str, element
 		if found_elem:
 			if clean:
 				if attrib:
-					return [ e.get(attrib, None) for e in found_elem ]
+					return [e.get(attrib, None) for e in found_elem]
 				else:
-					return [ 
-						_rem_white(e.get_text())
-							for e in found_elem
-					]
+					return [clean_white(e.get_text()) for e in found_elem]
 			else:
 				if attrib:
-					return [ e.get(attrib, None) for e in found_elem ]
+					return [e.get(attrib, None) for e in found_elem]
 				else:
 					return list(map(str, found_elem))
 		else:
@@ -345,7 +346,7 @@ def html_element(url:str, element
 				found_elem = parser.select(elem)
 			if found_elem:
 				if clean:
-					result.append( _rem_white(
+					result.append( clean_white(
 						found_elem[el_num].get_text()
 					))
 				else:
@@ -360,14 +361,15 @@ def html_element(url:str, element
 			found_elem = parser.xpath(elem)[el_num]
 			if isinstance(found_elem, str):
 				if clean:
-					result.append( _rem_white(found_elem) )
+					result.append( clean_white(found_elem) )
 				else:
 					result.append(found_elem)
 			else:
 				if clean:
-					result.append(
-						_rem_white(found_elem.text_content())
-					)
+					result.append( tag_sep.join(
+						clean_white(t) for t in found_elem.itertext()
+						if not t.isspace()
+					))
 				else:
 					result.append(
 						lxml.etree.tostring(found_elem, encoding=str)
@@ -473,7 +475,7 @@ def net_pc_ip()->str:
 	r'''
 	Returns the main IP address of the computer.  
 
-		asrt( benchmark(net_pc_ip), 90_000, "<" )
+		asrt( bmark(net_pc_ip), 90_000 )
 
 	'''
 	sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -493,9 +495,9 @@ def net_pc_hostname()->str:
 
 def url_hostname(url:str, sld:bool=True)->str:
 	r'''
-	Get hostname (domain name) from URL.
+	Returns the hostname (domain name) in lower case from a URL.
 
-	*sld* - if *True* then returns the second level domain
+	*sld* - if set then returns the second level domain
 	otherwise returns the full domain.
 
 		asrt( url_hostname('https://www.example.gov.uk'), 'example.gov.uk')
@@ -514,6 +516,7 @@ def url_hostname(url:str, sld:bool=True)->str:
 	'''
 	global _PUB_SUF_LST
 	LAN_DOMAINS = ('lan', 'local', 'home')
+	url = url.lower()
 	if m := re.findall(r'\D(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})[\:/]', url):
 		return m[0]
 	domain = urllib.parse.urlparse(url).netloc
@@ -531,6 +534,7 @@ def url_hostname(url:str, sld:bool=True)->str:
 	for var in variants:
 		if var in _PUB_SUF_LST: continue
 		return var
+	return ''
 
 def net_url_decode(url:str, encoding:str='utf-8')->str:
 	' Decodes URL '

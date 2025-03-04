@@ -308,7 +308,7 @@ def idle_duration(unit:str='sec')->int:
 	r'''
 	Returns idle time in specified units ('msec', 'sec', 'min', 'hour').  
 
-		asrt( benchmark(idle_duration), 10_000, "<" )
+		asrt( bmark(idle_duration), 10_000 )
 
 	'''
 	millis = (int(uptime.uptime() * 1000) - win32api.GetLastInputInfo())
@@ -453,7 +453,7 @@ def sys_codepage():
 	Returns current Windows code page for non-unicode programs.
 
 		asrt( sys_codepage(), 'cp1251' )
-		asrt( benchmark(sys_codepage), 2056, "<" )
+		asrt( bmark(sys_codepage), 2100 )
 
 	'''
 	return 'cp' + str(_GetACP())

@@ -36,6 +36,7 @@ class Language:
 		self.warn_path_not_exist = "The path doesn't exist: «{}»"
 		self.warn_file_not_exist = "The file doesn't exist: «{}»"
 		self.dlg_nx_tasks = 'Delete tasks without threads'
+		self.time_units_human = 'd,h,m,s,ms'
 
 		if not (di_str := getattr(
 			sys.modules[__name__]
@@ -101,4 +102,5 @@ warn_rule_type=Задача «{}»: правило должно быть фун�
 warn_path_not_exist=Путь не существует: «{}»
 warn_file_not_exist=Файл не существует: «{}»
 dlg_nx_tasks=Удалить задачи без потоков
+time_units_human=д,ч,м,с,мс
 '''

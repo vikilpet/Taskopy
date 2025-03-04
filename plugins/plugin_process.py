@@ -364,7 +364,7 @@ def free_ram(unit:str='percent')->float:
 	Returns free RAM size.  
 	*unit* - 'gb', 'mb'... or 'percent'  
 
-		asrt( benchmark(free_ram, b_iter=3), 7_000_000, "<" )
+		asrt( bmark(free_ram, b_iter=3), 7_000_000 )
 
 	'''
 	e = _SIZE_UNITS.get(unit.lower(), 1)
@@ -510,7 +510,7 @@ def service_list()->list[psutil._pswindows.WindowsService]:
 			if 'Microsoft' in s.description():
 				print(s)
 
-		benchmark(lambda: tuple(service_list()))
+		bmark(lambda: tuple(service_list()))
 
 	'''
 	return psutil.win_service_iter()

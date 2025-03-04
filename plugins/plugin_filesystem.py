@@ -329,7 +329,7 @@ def file_delete(fullpath)->int:
 	Deletes the file permanently.  
 	Returns *0* on success or if the file does not exist.  
 
-		benchmark(
+		bmark(
 			lambda fls: tuple(file_delete(f) for f in fls)
 			, ( tuple(temp_file(content='t') for _ in range(3)), )
 			, b_iter=1
@@ -450,7 +450,19 @@ def dir_exists(fullpath)->bool:
 	return os.path.isdir( path_get(fullpath) )
 
 def file_exists(fullpath)->bool:
-	return os.path.isfile( path_get(fullpath) )
+	r'''
+	Is file exists?
+
+		asrt( bmark(is_var_exists, (random_str(),), b_iter=3), 45_000 )
+	
+	'''
+	fullpath = path_get(fullpath)
+	try:
+		win32file.GetFileAttributesEx(fullpath)
+	except Exception as exc:
+		return False
+	return True
+
 
 def path_exists(fullpath)->bool:
 	''' Check if directory or file exist '''
@@ -463,8 +475,8 @@ def file_size(fullpath, unit:str='b')->int:
 	Gets the file size in the specified units.  
 
 		fpath = r'c:\Windows\System32\notepad.exe' # on SSD
-		benchmark(win32file.GetFileAttributesEx, fpath)
-		benchmark(os.stat, fpath)
+		bmark(win32file.GetFileAttributesEx, fpath)
+		bmark(os.stat, fpath)
 
 	'''
 	fullpath = path_get(fullpath)
@@ -662,10 +674,10 @@ def dir_rnd_files(fullpath, file_num:int=1
 	
 	Compared to `dir_files` with `random.choice`:
 
-		> benchmark(lambda: random.choice( list(dir_files(temp_dir() ) ) ), b_iter=10)
-		benchmark: 113 367 113 ns/loop
+		> bmark(lambda: random.choice( list(dir_files(temp_dir() ) ) ), b_iter=10)
+		bmark: 113 367 113 ns/loop
 
-		> benchmark(dir_rnd_files, a=(temp_dir(), ), b_iter=10)
+		> bmark(dir_rnd_files, a=(temp_dir(), ), b_iter=10)
 		620
 
 		> len( tuple( dir_files( temp_dir() ) ) )
@@ -817,7 +829,7 @@ def file_dir(fullpath)->str:
 	r'''
 	Returns directory from fullpath.  
 	
-		asrt( benchmark(file_dir, r'c:\Windows\System32\calc.exe'), 5617, "<" )
+		asrt( bmark(file_dir, r'c:\Windows\System32\calc.exe'), 5617 )
 		asrt( file_dir(r'sdcard/Music/file.mp3'), r'sdcard/Music')
 	
 	'''
@@ -861,7 +873,7 @@ def drive_free(path:str, unit:str='GB')->int:
 		asrt( drive_free('c'), 0, '>')
 		asrt( drive_free('c:\\windows'), 10, '>')
 		asrt( drive_free('c:\\windows\\'), 10, '>')
-		asrt( benchmark(drive_free, 'c'), 35_000, "<" )
+		asrt( bmark(drive_free, 'c'), 35_000 )
 
 	'''
 	e = _SIZE_UNITS.get(unit.lower(), 1073741824)
@@ -885,9 +897,8 @@ def dir_list(fullpath, **rules)->Iterator[str]:
 			, False
 		)
 		asrt(
-			benchmark(lambda d: tuple(dir_list(d)), 'log', b_iter=5)
+			bmark(lambda d: tuple(dir_list(d)), 'log', b_iter=5)
 			, 600_000
-			, '<'
 		)
 
 	'''
@@ -999,7 +1010,7 @@ def dir_size(fullpath, unit:str='b', skip_err:bool=True)->int:
 	Returns directory size (without symlinks).  
 	*skip_err* - do not raise an exeption on unavailable files.  
 
-		asrt( benchmark(dir_size, a=('logs',), b_iter=1 ) , 150_000, '<' )
+		asrt( bmark(dir_size, a=('logs',), b_iter=1 ) , 150_000 )
 
 	'''
 	fullpath = path_get(fullpath)
@@ -1242,7 +1253,7 @@ def file_date_get(fullpath)->tuple[datetime.datetime]:
 
 		fpath = temp_file(content=' ')
 		asrt( file_date_get(fpath)[2].minute, time_minute() )
-		asrt( benchmark(file_date_get, (fpath,)), 42_000, "<" )
+		asrt( bmark(file_date_get, (fpath,)), 42_000 )
 		file_delete(fpath)
 
 	'''
@@ -1259,9 +1270,9 @@ def file_date_set(fullpath, datec=None, datea=None, datem=None):
 
 		fp = temp_file(content=' ')
 		asrt(
-			benchmark(file_date_set, ka={'fullpath': fp, 'datec': time_now()}, b_iter=3)
-			, 220000
-			, "<"
+			bmark(file_date_set
+				, ka={'fullpath': fp, 'datec': time_now()}, b_iter=3)
+			, 220_000
 		)
 		file_delete(fp)
 
@@ -1581,8 +1592,8 @@ def var_lst_get(var, default=None
 	return lst
 
 def var_mod(var)->datetime.datetime:
-	'''
-	Returns the date of the last modification.
+	r'''
+	Returns the date when the file was last modified.
 	'''
 	fpath = var_fpath(var)
 	return file_date_m(fpath)
@@ -1596,6 +1607,20 @@ def var_mod_dif(var, unit:str='sec')->int:
 
 	'''
 	return time_diff(var_mod(var), unit=unit)
+
+def is_var_exists(var)->bool:
+	r'''
+	Is there a file with a variable?
+
+		asrt( bmark(is_var_exists, (random_str()), b_iter=3), 45_000 )
+
+	'''
+	var = var_fpath(var)
+	try:
+		win32file.GetFileAttributesEx(var)
+	except Exception as exc:
+		if exc.args[0] == 2: return False
+	return True
 
 def var_lst_set(var, value, encoding:str='utf-8'):
 	'''
@@ -2052,7 +2077,7 @@ class DirSync:
 				self._dst_files.add(
 					os.path.join(dirpath[4:], f)
 				)
-		tdebug('walk done in', time_diff_str(tstart))
+		tdebug('walk done in', time_diff_human(tstart))
 
 
 	def compare(self)->bool:
@@ -2082,7 +2107,7 @@ class DirSync:
 			))
 		self._dst_only_dirs = self._dst_dirs - self._src_dirs
 		self._get_new_files()
-		self.duration = time_diff_str(tstart, no_ms=True)
+		self.duration = time_diff_human(tstart)
 		tdebug('compare done in', self.duration)
 		return len(self.errors) == 0
 	
@@ -2223,7 +2248,7 @@ class DirSync:
 		self._delete_dirs()
 		self._delete_files()
 		self._copy()
-		self.duration = time_diff_str(tstart, no_ms=True)
+		self.duration = time_diff_human(tstart)
 		tdebug('done in', self.duration)
 		return len(self.errors) == 0
 
@@ -2344,7 +2369,7 @@ class DirDup:
 				self._files[fpath]['size'] = att[4]
 				self._files[fpath]['mdate'] = att[3]
 				self._files[fpath]['cdate'] = att[1]
-		tdebug(f'done in {time_diff_str(tstart)}')
+		tdebug(f'done in {time_diff_human(tstart)}')
 
 	def find_dup(self):
 		if not self._files: self.scan()
@@ -2367,7 +2392,7 @@ class DirDup:
 				for fpath in fpaths:
 					self._files[fpath]['is_unique'] = False
 			self._collect_dups()
-			tdebug(f'done in {time_diff_str(tstart)}')
+			tdebug(f'done in {time_diff_human(tstart)}')
 			return
 		for size, fpaths in self._sizes.items():
 			if len(fpaths) == 1: continue
@@ -2388,7 +2413,7 @@ class DirDup:
 						self._files[fpath]['hash']
 					) == 1
 		self._collect_dups()
-		tdebug(f'done in {time_diff_str(tstart)}')
+		tdebug(f'done in {time_diff_human(tstart)}')
 	
 	def _collect_dups(self):
 		r'''
@@ -2524,7 +2549,7 @@ def path_is_link(fullpath)->bool:
 
 		asrt( path_is_link(r'c:\Documents and Settings'), True )
 		asrt( path_is_link(r'c:\pagefile.sys'), False )
-		asrt(benchmark(path_is_link, ('c:\\Documents and Settings',)), 25_000, "<" )
+		asrt( bmark(path_is_link, ('c:\\Documents and Settings',)), 25_000 )
 		
 	'''
 	fpath = path_get(fullpath)

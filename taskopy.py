@@ -843,9 +843,8 @@ class Tasks:
 				msg.append(f'Close: {repr(err)}')
 			if is_dev() and len(msg) > 1:
 				dev_print(str_indent(', '.join(msg)))
-				msg_warn('\n'.join(msg), title='Tasks close')
 				tlog('[app] close: ' + ', '.join(msg))
-		dev_print('close time: ' + time_diff_str(start, no_ms=False))
+		dev_print('close time: ' + time_diff_human(start, with_ms=True))
 tasks:Tasks = None
 
 def load_crontab(event=None)->bool:
@@ -897,7 +896,7 @@ def load_crontab(event=None)->bool:
 		tasks.enabled = app.enabled
 		if is_dev():
 			for tn in running_tasks: tprint('still running: ' + tn)
-		dev_print('load time: ' + time_diff_str(start, no_ms=False))
+		dev_print('load time: ' + time_diff_human(start, with_ms=True))
 		return True
 	except:
 		msg_err(lang.warn_crontab_reload, title=lang.menu_reload)
@@ -1151,27 +1150,24 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		for thr in threading.enumerate():
 			if thr._target is None: continue
 			os_threads[thr.name] = thr.native_id
-		table = [('Task function', 'Thread', 'TID'
+		table = [('Task function', 'Exist', 'TID'
 		, 'Start time', 'Running time')]
 		nx_tasks:list = []
 		for t in running_tasks:
-			if t['thread'] in os_threads:
-				thr_name = t['thread']
-			else:
-				thr_name = str(t['thread']) + ' (nonexistent)'
+			exist:str = 'Y'
+			if not t['thread'] in os_threads:
+				exist = 'N'
 				nx_tasks.append(t)
 			last_start = None
 			duration = None
 			if t['last_start']:
 				last_start = t['last_start'].strftime('%Y.%m.%d %H:%M:%S')
-				duration = str(
-					time_now() - t['last_start']
-				).split('.')[0]
+				duration = time_diff_human(t['last_start'])
 			module = t['task_func'].__module__
 			module = '' if module == 'crontab' else module + '.' 
 			table.append((
 				module + t['task_func_name']
-				, thr_name
+				, exist
 				, os_threads.get(t['thread'], '?')
 				, last_start
 				, duration

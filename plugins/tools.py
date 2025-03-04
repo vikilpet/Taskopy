@@ -2,7 +2,7 @@ import sys
 import os
 import time
 import datetime
-from datetime import datetime as dtime
+from datetime import datetime as dtime, timedelta as tdelta
 import statistics
 import pytz
 import threading
@@ -28,11 +28,11 @@ import random
 import functools
 import importlib
 import string
-import json
 import win32gui
 import win32con
 import win32com.client
 import win32clipboard
+import difflib
 from typing import Callable, Iterable 
 from dataclasses import dataclass, field, asdict
 from queue import Queue, SimpleQueue
@@ -43,6 +43,7 @@ from collections import defaultdict
 import lxml
 import textwrap
 import io
+import unicodedata
 from xml.etree import ElementTree as _ElementTree
 import windows_toasts as wtoasts
 try:
@@ -51,7 +52,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2025-02-20'
+APP_VERSION = 'v2025-03-04'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
@@ -144,11 +145,16 @@ class SuppressPrint:
 		with SuppressPrint():
 
 	'''
+	def __init__(self, bypass:bool=False) -> None:
+		self._bypass:bool=bypass
+
 	def __enter__(self):
+		if self._bypass: return
 		self._original_stdout = sys.stdout
 		sys.stdout = open(os.devnull, 'w')
 
 	def __exit__(self, exc_type, exc_val, exc_tb):
+		if self._bypass: return
 		sys.stdout.close()
 		sys.stdout = self._original_stdout
 
@@ -183,17 +189,8 @@ class TQueue(Queue):
 	def stop(self):
 		' Stop consumer thread '
 		self.put(self._stop_sentinel)
+class _BmarkInt(int): pass
 
-
-if __builtins__.get('gdic', None) == None:
-	gdic = {}
-	__builtins__['gdic'] = gdic
-	if hasattr(sys, 'ps1'):
-		app:wx.App = wx.App()
-		app.que_print:TQueue = TQueue(consumer=print)
-		app.que_log:TQueue = TQueue(consumer=lambda t: _log_file(t))
-		app.dir = os.getcwd()
-		__builtins__['app'] = app
 
 def value_to_unit(value, unit:str='sec', unit_dict:dict=None
 , def_src_unit:str='sec')->float:
@@ -205,7 +202,7 @@ def value_to_unit(value, unit:str='sec', unit_dict:dict=None
 		asrt( value_to_unit('1 min', 'sec'), 60.0)
 		asrt( value_to_unit('2m', 'sec'), 120.0)
 		asrt( value_to_unit(3, 'sec'), 3.0)
-		asrt( benchmark(value_to_unit, ('1 ms',)), 1872, "<" )
+		asrt( bmark(value_to_unit, ('1 ms',)), 1872 )
 
 	'''
 	if not unit_dict: unit_dict = _TIME_UNITS
@@ -249,7 +246,7 @@ def _get_parent_func_name(parent=None, repl_undrsc:str=None)->str:
 	Get name of parent function if any.  
 
 		from plugins.tools import _get_parent_func_name
-		asrt( benchmark(_get_parent_func_name), 6328, "<" )
+		asrt( bmark(_get_parent_func_name), 6328 )
 		
 	'''
 	EXCLUDE = ('wrapper', 'run_task', 'run', 'dev_print', 'tprint'
@@ -281,7 +278,7 @@ def task_name(is_human:bool=False)->str:
 	r'''
 	Gets the name of the task from which it was called.  
 
-		asrt( benchmark(task_name), 1500, "<" )
+		asrt( bmark(task_name), 1500 )
 
 	'''
 	MAX_LVL = 30
@@ -341,7 +338,7 @@ def dev_print(*msg, **kwargs):
 	r'''
 	For debug.
 
-		asrt( benchmark(lambda: dev_print('bench'), b_iter=3), 600_000, "<" )
+		asrt( bmark(lambda: dev_print('bench'), b_iter=3), 600_000 )
 	
 	'''
 	if is_dev() or is_con(): tprint(*msg, **kwargs)
@@ -352,7 +349,7 @@ def is_dev()->bool:
 	r'''
 	Running in developer mode?
 
-		asrt( benchmark(is_dev), 455, "<" )
+		asrt( bmark(is_dev), 455 )
 
 	'''
 	global _is_dev_cache
@@ -363,7 +360,7 @@ def is_dev()->bool:
 def _log_file(msg:str, fname:str):
 	r'''
 	Append the string to a log file.  
-	*str_fname* - first is a log message, second is log file name.  
+	*fname* - log file name.  
 	'''
 	for _ in (1, 2):
 		try:
@@ -389,7 +386,7 @@ def _tlog(now_msgs:tuple[dtime, tuple]):
 
 def tlog(*msgs):
 	r'''
-	Write a message to the log file only (no console).  
+	Write the message to the log file only (no output to the console).  
 	'''
 	if is_con(): return
 	try:
@@ -416,7 +413,7 @@ def time_now_str(template:str=tcon.DATE_STR_FILE
 	r'''
 	Returns a string with current time.  
 
-		asrt( benchmark(time_now_str), 38339, "<" )
+		asrt( bmark(time_now_str), 38339 )
 	
 	'''
 	if not delta:
@@ -440,7 +437,7 @@ def time_str(template:str=tcon.DATE_STR_FILE
 	Use datetime in `time_val`. How to get yesterday's date:  
 
 		time_val = datetime.date.today() - datetime.timedelta(days=1)
-		asrt( benchmark(time_str), 43573, "<" )
+		asrt( bmark(time_str), 43573 )
 
 	'''
 	if timezone == 'utc':
@@ -461,7 +458,7 @@ def time_now(**delta)->dtime:
 	Yesterday:
 
 		time_now(days=-1)
-		asrt( benchmark(time_now), 1046, "<" )
+		asrt( bmark(time_now), 1046 )
 	
 	Use `.replace` to remove part of datetime:
 
@@ -501,7 +498,7 @@ def time_diff(start:dtime, end:dtime|None=None
 
 		ts = datetime.datetime(2023, 10, 1, 19, 40, 6, 903000)
 		te = datetime.datetime(2023, 10, 1, 20, 40, 6, 903000)
-		asrt( benchmark(time_diff, (ts, te)), 1400, "<" )
+		asrt( bmark(time_diff, (ts, te)), 1400 )
 	
 	'''
 	if not end: end = datetime.datetime.now()
@@ -515,6 +512,8 @@ def time_diff_str(start:dtime
 	r'''
 	Returns time difference as a string like that:
 	'5 days, 3:01:35.837127'  
+	See also `time_diff_human`.  
+
 	*start* and *end* should be in _datetime_ format.  
 	*str_format* - standard time formating like '%y.%m.%d %H:%M:%S'
 	(see tcon.DATE_FORMAT)  
@@ -530,6 +529,49 @@ def time_diff_str(start:dtime
 			return str(end - start)
 	delta_as_time = time.gmtime( (end - start).total_seconds() )
 	return time.strftime(str_format, delta_as_time)
+
+def time_diff_human(start:dtime|float, end:dtime|None|float=None
+, with_ms:bool=False, sep:str=':')->str:
+	r'''
+	Returns time difference as a string like that:
+	'6h:54m:30s:673ms'  
+	Rationale: lines like '5:45' are not as easy to read.
+	Is it 5 hours and 45 minutes or 5 minutes and 45 seconds?  
+
+	*end* - if omitted, use the current time.  
+	*start* and *end* should be in _datetime_ format.  
+	*with_ms* - include milliseconds in the result.  
+
+		tn = dtime.now()
+		asrt( bmark( time_diff_human, (tn,) ), 3_000 )
+
+	'''
+	if isinstance(start, float): start = dtime.fromtimestamp(start)
+	if end == None:
+		end = dtime.now()
+	elif isinstance(end, float):
+		end = dtime.fromtimestamp(end)
+	delta:tdelta = end - start
+	is_negative = delta.total_seconds() < 0
+	if is_negative: delta = -delta
+	microseconds = delta.microseconds
+	total_seconds = int(delta.total_seconds())
+	days = total_seconds // (24 * 3600)
+	total_seconds %= (24 * 3600)
+	hours = total_seconds // 3600
+	total_seconds %= 3600
+	minutes = total_seconds // 60
+	seconds = total_seconds % 60
+	time_parts = []
+	if days > 0: time_parts.append(f'{days}d')
+	if hours > 0: time_parts.append(f'{hours}h')
+	if minutes > 0: time_parts.append(f'{minutes}m')
+	if seconds > 0: time_parts.append(f'{seconds}s')
+	if with_ms: time_parts.append(f'{microseconds // 1000}ms')
+	result = sep.join(time_parts) if time_parts else '0'
+	if is_negative: result = '-' + result
+	return result
+
 
 def _date_part(date_val:dtime=None, part:str=''):
 	if not date_val: date_val = datetime.datetime.now()
@@ -549,16 +591,15 @@ def date_day(date_val:dtime=None, delta:dict=None)->int:
 	if not date_val: date_val = datetime.datetime.now()
 	return ( date_val + datetime.timedelta(**delta) ).day
 
-def date_weekday(date_val:dtime=None
-, template:str='%A')->str:
+def date_weekday(date_val:dtime|None=None, template:str='%A')->str:
 	r'''
 	Returns weekday as a string.  
 
-		asrt( date_weekday(datetime.datetime(2023, 10, 1)), 'Sunday' )
-		asrt( benchmark(date_weekday, (datetime.datetime(2023, 10, 1),)), 8_000, "<" )
+		asrt( date_weekday(dtime(2023, 10, 1)), 'Sunday' )
+		asrt( bmark(date_weekday, (dtime(2023, 10, 1),)), 8_000 )
 
 	'''
-	if not date_val: date_val = datetime.date.today()
+	if date_val == None: date_val = datetime.date.today()
 	return date_val.strftime(template)
 
 def date_weekday_num(date_val:dtime=None)->int:
@@ -581,7 +622,7 @@ def date_fill(date_dic:dict, cur_date=None)->dtime:
 		dt_dic = {'year': None, 'month': 11
 		, 'day': 31, 'hour': 23, 'minute': 24}
 		date_fill(dt_dic)
-		asrt( benchmark(date_fill, a=(dt_dic,)), 8000, '<' )
+		asrt( bmark(date_fill, a=(dt_dic,)), 8_000 )
 
 	'''
 	new_date_dic = {'year': 0, 'month': 0
@@ -603,11 +644,7 @@ def date_fill_str(date_str:str)->str:
 	Replace asterisk to current datetime value:  
 	date_fill_str('*.*.01 12:30') -> '2020.10.01 12:30'
 
-		asrt(
-			benchmark(date_fill_str, a=('*.*.01 12:30',))
-			, 8000
-			, '<'
-		)
+		asrt( bmark(date_fill_str, a=('*.*.01 12:30',)), 8_000 )
 
 	'''
 	if not '*' in date_str: return date_str
@@ -636,13 +673,13 @@ def time_sleep(interval, unit:str=''):
 	The minimum possible interval must be at least 2 milliseconds
 	if the interval is specified by a string:
 
-		asrt( benchmark(time_sleep, a=('1 ms',)), 1_500_000, "<" )
-		asrt( benchmark(time_sleep, a=(0.000_01,)), 200_000, "<" )
+		asrt( bmark(time_sleep, a=('1 ms',)), 1_500_000 )
+		asrt( bmark(time_sleep, a=(0.000_01,)), 200_000 )
 	
 	`time.sleep` isn't that cheap on its own:
 
-		asrt( benchmark(lambda: None if False else time.sleep(0)), 3_000, "<" )
-		asrt( benchmark(lambda: None if True else time.sleep(0)), 250, "<" )
+		asrt( bmark(lambda: None if False else time.sleep(0)), 3_000 )
+		asrt( bmark(lambda: None if True else time.sleep(0)), 450 )
 
 	'''
 	if isinstance(interval, (list, tuple)):
@@ -657,7 +694,7 @@ def clip_set(txt):
 	r'''
 	Поместите текст в текстовый буфер обмена.
 
-		asrt( benchmark(clip_set, ('test',), b_iter=3), 30_000_000, "<" )
+		asrt( bmark(clip_set, ('test',), b_iter=3), 30_000_000 )
 		
 	'''
 	pyperclip.copy(str(txt))
@@ -666,7 +703,7 @@ def clip_get()->str:
 	r'''
 	Returns the text from the clipboard, if any.
 
-		asrt( benchmark(clip_get), 30_000, "<" )
+		asrt( bmark(clip_get), 30_000 )
 
 	'''
 	return pyperclip.paste()
@@ -1230,8 +1267,8 @@ def qprint(*values):
 	Intended to be used in place of the standard `print`.  
 	Pros: non-blocking, FIFO.  
 
-		asrt( benchmark(print, ('a', 'b',), b_iter=3), 1_000_000, "<" )
-		asrt( benchmark(qprint, ('a', 'b',), b_iter=3), 600_000, "<" )
+		asrt( bmark(print, ('a', 'b',), b_iter=3), 1_000_000 )
+		asrt( bmark(qprint, ('a', 'b',), b_iter=3), 800_000 )
 
 	'''
 	msg = ' '.join(map(str, values))
@@ -1264,7 +1301,7 @@ def is_con()->bool:
 	r'''
 	Are we in the console?
 
-		asrt( benchmark(is_con), 250, '<')
+		asrt( bmark(is_con), 500 )
 
 	'''
 	global _is_con_cache
@@ -1278,7 +1315,7 @@ def tdebug(*msgs, **kwargs)->bool:
 	Use kwarg `short=True` to apply `str_short` to the output.  
 	For paths better use `short=path_short`  
 
-		asrt( benchmark(tdebug), 435, "<" )
+		asrt( bmark(tdebug), 600 )
 
 	'''
 	if not is_con(): return False
@@ -1288,9 +1325,10 @@ def tdebug(*msgs, **kwargs)->bool:
 	msg:str = ''
 	if kwargs.get('par', True):
 		msg = task_name()
+		if msg == '<console>': msg = ''
 		if msg: msg = f'[{msg}]: '
 	msg += ' '.join(map(str, msgs))
-	print(sh_func(msg) if short else msg)
+	qprint(sh_func(msg) if short else msg)
 	return True
 
 def balloon(msg:str, title:str=APP_NAME, timeout:int=None, icon:str=None):
@@ -1375,8 +1413,8 @@ def safe(func:Callable)->Callable:
 	and return (True, <function result>)
 	or (False, <Exception object>)
 
-		asrt( benchmark(lambda: None), 240, "<" )
-		asrt( benchmark(safe(lambda: None)), 650, "<" )
+		asrt( bmark(lambda: None), 500 )
+		asrt( bmark(safe(lambda: None)), 800 )
 
 	'''
 	@functools.wraps(func)
@@ -2087,7 +2125,7 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 	*err_action* - function to run if an exception occurs.  
 	The text of exception will be passed to the function.  
 
-		asrt( benchmark(thread_start, (lambda: None,)), 500_000, '<' )
+		asrt( bmark(thread_start, (lambda: None,)), 2_000_000 )
 
 	'''
 	
@@ -2125,12 +2163,12 @@ task_run = thread_start
 
 def app_threads_print():
 	thread: threading.Thread
-	table = [('TID', 'Dae', 'Start time', 'Running time'
+	table = [('TID', 'Dmn', 'Start time', 'Running time'
 	, 'Target', 'Identity')]
 	for ident, thr_dic in app.app_threads.items():
 		func_name = thr_dic.get('func')
 		start_time = thr_dic.get('stime')
-		run_time = time_diff_str(start_time) if start_time else None
+		run_time = time_diff_human(start_time) if start_time else None
 		thread = thr_dic.get('thread', None)
 		daemon = None
 		target = None
@@ -2171,7 +2209,7 @@ def app_dir()->str:
 	r'''
 	Returns the application directory without the trailing slash.
 
-		asrt( benchmark(app_dir), 2000, "<" )
+		asrt( bmark(app_dir), 2000 )
 		
 	'''
 	if is_con(): return os.getcwd()
@@ -2202,14 +2240,21 @@ def app_disable():
 	'''
 	app.taskbaricon.on_disable(state=False)
 
-def benchmark(func, a:tuple=(), ka:dict={}, b_iter:int=100
+def app_exit(force:bool=False):
+	r'''
+	Close the application.  
+	*force* - do not display a warning dialog about running tasks.  
+	'''
+	app.taskbaricon.on_exit(force=force)
+
+def bmark(func, a:tuple=(), ka:dict={}, b_iter:int=10
 , do_print:bool=True)->int:
 	r'''
-	Runs function `func` `b_iter` times and return time in ns.  
-	Returns nanoseconds per loop.  
+	Runs the `func` `b_iter` times and returns the number of
+	nanoseconds per cycle.  
 	Example:
 
-		asrt( benchmark(lambda i: i+1, a=(1,), b_iter=10 ) , 2_000, '<' )
+		asrt( bmark(lambda i: i+1, a=(1,), b_iter=10 ) , 2_000 )
 	
 	'''
 	
@@ -2238,24 +2283,31 @@ def benchmark(func, a:tuple=(), ka:dict={}, b_iter:int=100
 			return arg.__name__
 		else:
 			raise Exception(f'Unknown arg type: {type(arg)}')
-	start = time.perf_counter_ns()
 	if not is_iter(a): a = (a,)
-	assert isinstance(ka, dict), 'ka should be a dictionary'
+	assert isinstance(ka, dict), '*ka* should be a dictionary'
+	timings:list = []
 	for _ in range(b_iter):
+		start = time.perf_counter_ns()
 		func(*a, **ka)
-	total_ns = time.perf_counter_ns() - start
-	ns_loop = total_ns // b_iter
-	ns_loop_str = '{:,}'.format(ns_loop).replace(',', ' ')
-	ns_total_str = '{:,}'.format(total_ns).replace(',', ' ')
+		timings.append(time.perf_counter_ns() - start)
+	ns_median:int = int(median(timings))
 	name = func.__name__
 	if do_print and is_con():
-		qprint(f'{name}: {ns_loop_str} ns/loop, total={ns_total_str}, {b_iter=}')
+		ns_max = max(timings)
+		qprint(
+			'median={} ns/loop, best={}, worst={}, total={}, {} loops'.format(
+				*map(int_str, (
+					ns_median, min(timings), ns_max, sum(timings), b_iter
+				))
+			)
+		)
 		args = []
-		for arg in a:
-			args.append(arg_to_str(arg))
+		for arg in a: args.append(arg_to_str(arg))
 		args = f", ({', '.join(args)},)" if args else ''
-		qprint(f'asrt( benchmark({name}{args}), {int(ns_loop * 1.3)}, "<" )')
-	return total_ns // b_iter
+		round_digit = len(str(ns_median)) - 2
+		qprint(f'asrt( bmark({name}{args})'
+		+ f", {int_str(round(ns_median, -round_digit))} )")
+	return _BmarkInt(ns_median)
 
 def median(source):
 	r'''
@@ -2327,7 +2379,7 @@ def is_iter(obj, and_not_str:bool=True)->bool:
 	except:
 		raise
 
-def asrt(value, expect, comp:str='=='):
+def asrt(value, expect, comp:str='==', show_diff:bool=False):
 	r'''
 	Assertion showing the difference.  
 	Examples:
@@ -2335,7 +2387,10 @@ def asrt(value, expect, comp:str='=='):
 		asrt(APP_NAME, 'Taskopy')
 
 	'''
-	if comp == '==':
+	if comp == '<' or isinstance(value, _BmarkInt):
+		if value < expect: return
+		comp = '<'
+	elif comp == '==':
 		if value == expect:
 			if type(value) == type(expect):
 				return
@@ -2346,11 +2401,33 @@ def asrt(value, expect, comp:str='=='):
 				)
 	elif comp == '>':
 		if value > expect: return
-	elif comp == '<':
-		if value < expect: return
 	else:
 		raise Exception('Unknown comp')
-	raise Exception(f'does not match ({comp}):\nval: «{value}»\nexp: «{expect}»')
+	diff_str:str = ''
+	diff_num:int = 0
+	if show_diff:
+		expect = str(expect)
+		value = str(value)
+		for num, char in enumerate(value):
+			if expect[num] != char:
+				diff_num = num
+				diff_str = ' at ' + str(diff_num)
+				break
+
+	msg = 'does not match ({comp}){diff_str}:\nval: «{value}»' \
+		+ '{num_pos}\nexp: «{expect}»'
+	value_str = str(value)
+	expect_str = str(expect)
+	if isinstance(value, str): value_str = repr(value)[1:-1]
+	if isinstance(expect, str): expect_str = repr(expect)[1:-1]
+	msg = msg.format(
+		comp=comp
+		, diff_str=diff_str
+		, value=value_str
+		, num_pos=('\n' + ' ' * (diff_num + 6) + '↕') if show_diff else ''
+		, expect=expect_str
+	) 
+	raise Exception(msg)
 
 
 
@@ -2426,11 +2503,20 @@ def exc_name()->str:
 		except:
 			asrt(exc_name(), 'ZeroDivisionError')
 
-		asrt( benchmark(exc_name), 521, "<" )
+		asrt( bmark(exc_name), 800 )
 	
 	'''
 	ex_class = sys.exc_info()[0]
 	return ex_class.__name__ if ex_class else ''
+
+def int_str(value, sep:str='_')->str:
+	r'''
+	Convert a number to a string with the specified thousandth separator.
+
+		asrt( bmark(int_str, (1024,), b_iter=3), 4_000)
+
+	'''
+	return '{:,}'.format(int(value)).replace(',', sep)
 
 def str_indent(src_str, prefix:str='    '
 , borders:bool=True)->str:
@@ -2462,31 +2548,154 @@ def str_indent(src_str, prefix:str='    '
 	)
 
 
-def str_diff(text1:str, text2:str)->tuple[tuple[str]]:
+def str_diff(text1:str, text2:str, context:tuple=(5, 70)
+, ignore_whitespace:bool=True, diff_threshold:int=3)->list[tuple[str, str]]:
 	r'''
-	Returns the different lines between two texts (strings with
-	**line breaks**) as a tuple of tuples.
+	Returns the differences between two texts as a list with tuples of
+	strings. The differences are given within a context of the
+	specified size.  
+	*context* - the first number is the number of characters before
+	the difference, and the second number is the total length of the context.
+	A long context can include several differences.
+		text1 = 'This is a simple test where we compare two strings.' \
+			+ ' These strings may not have punctuation.'
+		text2 = 'This is a simple test where we compare several strings.' \
+			' The strings may not contain punctuation.'
+		asrt(
+			str_diff(text1, text2, context=(3, 55))
+			, [(
+				're two strings. These strings may not have punctuation.',
+				're several strings. The strings may not contain punctua'
+			)]
+		)
+		asrt(
+			str_diff(text1, text2, context=(3, 20))
+			, [
+				('re two strings. Thes', 're several strings. ')
+				, (' These strings may n', ' The strings may not')
+				, ('ot have punctuation.', 'ot contain punctuati')
+			]
+		)
+		asrt(
+			str_diff(text1, text2, context=(0, 0))
+			, [('two', 'several'), ('es', ''), ('have', 'contain')]
+		)
+		asrt( str_diff('last', 'last1'), [('last', 'last1')] )
+		asrt( str_diff('1first', 'first'), [('1first', 'first')] )
+		asrt( str_diff('context', 'context1'), [('ntext', 'ntext1')] )
 
 		asrt(
-			tuple(str_diff('foo\nbar', 'fooo\nbar'))
-			, (('foo', 'fooo'),)
+			bmark(str_diff, (random_str(), random_str(),))
+			, 21_000_000
 		)
-		asrt( tuple(str_diff('same\r\nlines', 'same\nlines') ), () )
-		asrt( tuple(str_diff('same\nlines', 'lines\nsame') ), () )
 
 	'''
-	lines1 = tuple(l.strip() for l in text1.splitlines() )
-	lines2 = tuple(l.strip() for l in text2.splitlines() )
-	diff1 = []
-	diff2 = []
-	for line in lines1:
-		if not line or (line in lines2): continue
-		diff1.append(line)
-	for line in lines2:
-		if not line or (line in lines1): continue
-		diff2.append(line)
-	return tuple(zip_longest(diff1, diff2, fillvalue=''))
-def str_short(text:str, width:int=0, placeholder:str='...')->str:
+	if ignore_whitespace:
+		text1 = ' '.join(text1.split())
+		text2 = ' '.join(text2.split())
+	diff = list(difflib.ndiff(text1, text2))
+	diff_len:int = len(diff)
+	diff_nums:list = []
+	diff_with_context:list = []
+	start:int = -1
+	end:int = 0
+	for num, line in enumerate(diff):
+		if line.startswith('+') or line.startswith('-'):
+			if start == -1: start = num
+			if num < (diff_len - 1): continue
+		if (line.startswith(' ') or num == (diff_len - 1)) and start > -1:
+			break_flag:bool = False
+			for thresh in reversed(range(diff_threshold + 1)):
+				if (num + thresh) < (diff_len - 1):
+					if any(
+						not d.startswith(' ') for d in diff[num:num+thresh]
+					):
+						tdebug(
+							'skip an unimportant match at', num
+							, ': "'+ ''.join(d[2:]
+								for d in diff[num:num+thresh]) + '"'
+						)
+						break_flag = True
+						break
+			tdebug(start, num)
+			if break_flag: continue
+			diff_nums.append((start, num))
+			start = -1
+	if is_con() and len(diff) < 100:
+		qprint('\n'.join(f'{n}: {l}' for n, l in enumerate(diff) ))
+	tdebug(f'nums ({len(diff_nums)}):', ', '.join(f'{n[0]}-{n[1]}'
+		for n in diff_nums))
+	cut_end:int = 0
+	context_beg:int = context[0]
+	context_length:int = context[1]
+	for start, end in diff_nums:
+		if cut_end and end < cut_end:
+			tdebug(f'skip overlaped {end=}, {cut_end=}')
+			continue
+		subs1 = ''
+		subs2 = ''
+		cut_end:int = end
+		for line in diff[start:end]:
+			if line.startswith('+'):
+				subs2 += line[2:]
+			elif line.startswith('-'):
+				subs1 += line[2:]
+			else:
+				subs1 += line[2:]
+				subs2 += line[2:]
+		tdebug(f'{subs1=}, {subs2=}')
+		subs1_len:int = len(subs1)
+		subs2_len:int = len(subs2)
+		if context_length > max(subs1_len, subs2_len):
+			short1:int = context_length - subs1_len
+			short2:int = context_length - subs2_len
+			if short1 > 1:
+				end_len:int=0
+				beg_len = min(short1, context_beg)
+				if short1 > beg_len: end_len = short1 - beg_len
+				count:int = 0
+				if start:
+					for line in diff[start - 1::-1]:
+						if not line.startswith('+'):
+							subs1 = line[2:] + subs1
+							count += 1
+							if count == beg_len: break
+				count = 0
+				if end_len:
+					for line in diff[end:]:
+						if not line.startswith('+'):
+							subs1 += line[2:]
+							count += 1
+							if count == end_len: break
+				cut_end = end + end_len
+			if short2 > 1:
+				end_len:int=0
+				beg_len = min(short2, context_beg)
+				if short2 > beg_len: end_len = short2 - beg_len
+				count:int = 0
+				if start:
+					for line in diff[start - 1::-1]:
+						if not line.startswith('-'):
+							subs2 = line[2:] + subs2
+							count += 1
+							if count == beg_len: break
+				count = 0
+				if end_len:
+					for line in diff[end:]:
+						if not line.startswith('-'):
+							subs2 += line[2:]
+							count += 1
+							if count == end_len: break
+				cut_end = min(cut_end, end + end_len)
+		tdebug(f'{start=}, {end=}, {cut_end=}, {subs1_len=}, {subs2_len=}')
+		tdebug('1: "' + subs1 + '"')
+		tdebug('2: "' + subs2 + '"')
+		tdebug('_' * context_length)
+		if ignore_whitespace and subs1.isspace() and subs2.isspace(): continue
+		diff_with_context.append((subs1, subs2))
+	return diff_with_context
+def str_short(text:str, width:int=0, placeholder:str='...'
+, whitespace:str=string.whitespace)->str:
 	r'''
 	Collapse and truncate the given text to fit in the given width.  
 	The main purpose is to shorten text for output to the console
@@ -2498,16 +2707,65 @@ def str_short(text:str, width:int=0, placeholder:str='...')->str:
 		asrt( str_short('Hello,  world! ', 12), 'Hello, wo...' )
 		asrt( str_short('Hello\nworld! ', 12), 'Hello world!' )
 		asrt( str_short('Hello\nworld! ', 11), 'Hello wo...' )
-		asrt( benchmark(str_short, ('Hello,  world! ', 5)), 5_000, '<')
+		asrt( bmark(str_short, ('Hello,  world! ', 5)), 5_000)
 
 	'''
 
 	if width == 0: width = _TERMINAL_WIDTH
 	new_text = ' '.join(
-		str(text).translate({ord(c): ' ' for c in string.whitespace}).split()
+		str(text).translate({ord(c): ' ' for c in whitespace}).split()
 	)
 	if len(new_text) <= width: return new_text
 	return new_text[:(width - len(placeholder))] + placeholder
+
+def _str_unicode_white(categories:tuple=('Zs', 'Zl', 'Zp', 'Cc')):
+	' Generate Unicode whitespace list '
+	whitespace_chars = []
+	for code_point in range(0x110000):
+		char = chr(code_point)
+		if unicodedata.category(char) in categories:
+			whitespace_chars.append(char)
+	return whitespace_chars
+
+_UNI_WHITE_ALL:list = []
+_UNI_WHITE_ALL_DICT:dict = {}
+def str_remove_white(text:str, algo:str='basic', sep:str=' ')->str:
+	r'''
+	Removes extra whitespace characters.  
+	*algo* - 'basic', 'space', 'unicode'  
+
+
+		asrt( str_remove_white(' ba  sic '), 'ba sic')
+		asrt( str_remove_white(' spa\n\tce ', 'space'), 'spa\nce')
+		asrt( str_remove_white(' no spa\n\tce ', sep=''), 'nospace')
+
+		text = random_str() + '\n' + random_str()
+		asrt( bmark(str_remove_white, (text, 'basic',)), 2_000 )
+		asrt( bmark(str_remove_white, (text, 'space',)), 2_500 )
+		asrt(bmark(str_remove_white, (text, 'unicode',)), 3_000 )
+
+	'''
+	global _UNI_WHITE_ALL, _UNI_WHITE_ALL_DICT
+	match algo:
+		case 'basic':
+			return sep.join(text.split())
+		case 'space':
+			new_line = '\r\n' if '\r\n' in text else '\n'
+			lines = text.splitlines()
+			cleaned_lines = []
+			for line in lines:
+				if not line: continue
+				cleaned_line = sep.join(line.split())
+				cleaned_lines.append(cleaned_line)
+			return new_line.join(cleaned_lines)
+		case 'unicode':
+			if not _UNI_WHITE_ALL:
+				_UNI_WHITE_ALL = _str_unicode_white()
+				_UNI_WHITE_ALL_DICT = {ord(c): ' ' for c in _UNI_WHITE_ALL}
+			tmp = text.translate(_UNI_WHITE_ALL_DICT)
+			return sep.join(tmp.split())
+		case _:
+			raise Exception('Unknown *algo*')
 
 _often_dct:dict[str, datetime.datetime] = {}
 
@@ -2523,7 +2781,7 @@ def is_often(ident:str, interval:str)->bool:
 		asrt( is_often('_', '1 ms'), True)
 		time_sleep('1 ms')
 		asrt( is_often('_', '1 ms'), False)
-		asrt( benchmark(is_often, ('_', '1 ms')), 5000, "<" )
+		asrt( bmark(is_often, ('_', '1 ms')), 5000 )
 
 	'''
 	global _often_dct
@@ -2545,7 +2803,7 @@ def is_app_exe()->bool:
 	Returns True if the application is converted to *exe*.  
 
 		asrt( is_app_exe(), False)
-		asrt( benchmark(is_app_exe), 2061, "<" )
+		asrt( bmark(is_app_exe), 2061 )
 
 	'''
 	return getattr(sys, 'frozen', False)
@@ -2555,7 +2813,7 @@ def func_arg(func:Callable)->tuple:
 	Returns a tuple of function arguments.  
 
 		asrt( func_arg(print), ('args', 'sep', 'end', 'file', 'flush') )
-		asrt( benchmark(func_arg, (print,)), 480_000, "<" )
+		asrt( bmark(func_arg, (print,)), 480_000 )
 
 	'''
 	return tuple( inspect.signature(func).parameters.keys() )
@@ -2577,5 +2835,17 @@ def clip_set_img(image):
 	win32clipboard.SetClipboardData(win32clipboard.CF_DIB, image)
 	win32clipboard.CloseClipboard()
 
-
-if __name__ != '__main__': patch_import()
+def _init():
+	if __builtins__.get('gdic', None) != None: return
+	gdic = {}
+	__builtins__['gdic'] = gdic
+	if not is_con(): return
+	app:wx.App = wx.App()
+	setattr(app, 'que_print', TQueue(consumer=print))
+	setattr(app, 'que_log', TQueue(consumer=lambda t: None) )
+	setattr(app, 'dir', os.getcwd())
+	__builtins__['app'] = app
+	
+if __name__ != '__main__':
+	patch_import()
+	_init()
