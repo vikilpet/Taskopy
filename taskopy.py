@@ -670,8 +670,8 @@ class Tasks:
 					, 'err_threshold'):
 						self.task_opt_set(task['task_func_name']
 						, 'err_counter', err_counter)
-						dev_print('exception msg suppressed'
-						, tname=task['task_func_name'])
+						dev_print(f'exception msg suppressed: {exc_text()}'
+						, tname=task['task_func_name'], short=True)
 						return
 					self.task_opt_set(task['task_func_name']
 					, 'err_counter', 0)
@@ -830,7 +830,7 @@ class Tasks:
 				dev_print('CancelIoEx ok')
 			except OSError as err:
 				if err.winerror == 1168:
-					msg.append('1168')
+					msg.append(f'{err.strerror} ({err.winerror})')
 				else:
 					msg.append(f'CancelIoEx: {repr(err)}')
 			except Exception as err:

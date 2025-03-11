@@ -421,18 +421,50 @@ def sound_vol_mute():
 	_sound_cmd(_APPCOMMAND_VOLUME_MUTE)
 
 def mouse_pos_get()->tuple:
-	' Returns mouse cursor position: (x, y) '
+	r'''
+	Returns mouse cursor position: (x, y).
+
+		asrt( bmark(mouse_pos_get), 2_300 )
+
+	'''
 	try:
 		return win32api.GetCursorPos()
 	except pywintypes.error:
 		return (0, 0)
 
 def mouse_pos_set(pos:tuple):
-	' Sets mouse cursor position '
+	r'''
+	Sets mouse cursor position.
+
+		asrt( bmark(mouse_pos_set, ((500, 500) ,)), 4_500 )
+
+	'''
 	try:
 		win32api.SetCursorPos(pos)
 	except pywintypes.error:
 		pass
+
+def mouse_lclick():
+	' Left click '
+	win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN,0,0,0,0)
+	win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP,0,0,0,0)
+
+def mouse_rclick():
+	' Right click'
+	win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTDOWN,0,0,0,0)
+	win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTUP,0,0,0,0)
+
+def mouse_move(dx:int, dy:int):
+	' Move the mouse by relative coordinates '
+	win32api.mouse_event(win32con.MOUSEEVENTF_MOVE,dx,dy,0,0)
+
+def mouse_scroll(delta:int):
+	' Vertical mouse scrolling '
+	win32api.mouse_event(win32con.MOUSEEVENTF_WHEEL,0,0,delta,0)
+
+def mouse_hscroll(delta:int):
+	' Horizontal mouse scrolling '
+	win32api.mouse_event(win32con.MOUSEEVENTF_HWHEEL,0,0,delta,0)
 def screen_size()->tuple:
 	' Returns screen size: (width, height)'
 	return (

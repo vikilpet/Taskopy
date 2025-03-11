@@ -52,7 +52,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2025-03-04'
+APP_VERSION = 'v2025-03-11'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
@@ -1063,7 +1063,7 @@ def toast(msg:str|tuple|list, dur:str='default', img:str=''
 
 def file_dialog(title:str=None, multiple:bool=False
 , default_dir:str='', default_file:str=''
-, wildcard:str='', on_top:bool=True)->str:
+, wildcard:str='', on_top:bool=True)->str|list[str]:
 	''' Shows standard file dialog
 		and returns fullpath or list of fullpaths
 		if multiple == True.
@@ -2732,7 +2732,11 @@ _UNI_WHITE_ALL_DICT:dict = {}
 def str_remove_white(text:str, algo:str='basic', sep:str=' ')->str:
 	r'''
 	Removes extra whitespace characters.  
-	*algo* - 'basic', 'space', 'unicode'  
+	*algo* - 'basic', 'space', 'unicode' where  
+		
+		- *basic* - remove standard whitespace characters
+		- *space* - same as *basic* but preserve new lines.
+		- *unicoce* - remove all whitespace characters.
 
 
 		asrt( str_remove_white(' ba  sic '), 'ba sic')
@@ -2742,7 +2746,7 @@ def str_remove_white(text:str, algo:str='basic', sep:str=' ')->str:
 		text = random_str() + '\n' + random_str()
 		asrt( bmark(str_remove_white, (text, 'basic',)), 2_000 )
 		asrt( bmark(str_remove_white, (text, 'space',)), 2_500 )
-		asrt(bmark(str_remove_white, (text, 'unicode',)), 3_000 )
+		asrt( bmark(str_remove_white, (text, 'unicode',)), 3_000 )
 
 	'''
 	global _UNI_WHITE_ALL, _UNI_WHITE_ALL_DICT
@@ -2772,8 +2776,7 @@ _often_dct:dict[str, datetime.datetime] = {}
 def is_often(ident:str, interval:str)->bool:
 	r'''
 	Is some event happening too often?  
-	The purpose is not to bother the user
-	too often with event alerts.  
+	The purpose is to protect the user from too frequent notifications.
 	*ident* - unique identifier of an event.  
 	*interval* - interval for measurement, not less than 1 ms.  
 
@@ -2782,6 +2785,7 @@ def is_often(ident:str, interval:str)->bool:
 		time_sleep('1 ms')
 		asrt( is_often('_', '1 ms'), False)
 		asrt( bmark(is_often, ('_', '1 ms')), 5000 )
+		asrt( bmark(is_often, ('_', 1)), 3500 )
 
 	'''
 	global _often_dct
@@ -2837,8 +2841,7 @@ def clip_set_img(image):
 
 def _init():
 	if __builtins__.get('gdic', None) != None: return
-	gdic = {}
-	__builtins__['gdic'] = gdic
+	__builtins__['gdic'] = {}
 	if not is_con(): return
 	app:wx.App = wx.App()
 	setattr(app, 'que_print', TQueue(consumer=print))
