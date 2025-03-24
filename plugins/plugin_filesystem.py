@@ -53,6 +53,7 @@ _FORBIDDEN_DICT = dict(
 _VAR_DIR = 'resources\\var'
 _FILE_ATTRIBUTE_REPARSE_POINT = 1024
 
+
 _MAX_PATH:int = 260
 
 def path_long(path:str, force:bool=False):
@@ -182,16 +183,14 @@ def file_ext_replace(fullpath, new_ext:str)->str:
 
 def file_rename(fullpath, dest:str
 , overwrite:bool=False)->str:
-	''' Renames path.
-		dest - fullpath or just new file name
-		without parent directory.
-		overwrite - overwrite destination file
-		if exists.
-		Returns destination.
-		Example:
+	r'''
+	Renames the file and returns the new name.  
+	*dest* - fullpath or just new file name without parent directory.  
+	*overwrite* - overwrite destination file if exists.  
+	Example:
 
-			file_rename(r'd:\\IMG_123.jpg', 'my cat.jpg')
-			>'d:\\my cat.jpg'
+		file_rename(r'd:\\IMG_123.jpg', 'my cat.jpg')
+		>'d:\\my cat.jpg'
 			
 	'''
 	fullpath = path_get(fullpath)
@@ -1089,10 +1088,10 @@ def dir_zip(fullpath, destination=None
 	return new_fullpath
 
 def file_zip(fullpath, destination=None)->str:
-	''' Compresses a file or files to archive.
-		fullpath - string with fullpath or list with fullpaths.
-		destination - full path to the archive or destination
-		directory.
+	r'''
+	Compresses a file or files to archive.  
+	*fullpath* - string with full path or list with fullpaths.  
+	*destination* - full path to the archive or destination directory.  
 	'''
 	fullpath = path_get(fullpath)
 	destination = path_get(destination)
@@ -1247,13 +1246,13 @@ def file_attr_set(fullpath
 	'''
 	win32api.SetFileAttributes(path_get(fullpath), attribute)
 
-def file_date_get(fullpath)->tuple[datetime.datetime]:
+def file_date_get(fullpath)->tuple[dtime, dtime, dtime]:
 	r'''
 	Returns tuple(creation time, access time, modification time)
 
 		fpath = temp_file(content=' ')
 		asrt( file_date_get(fpath)[2].minute, time_minute() )
-		asrt( bmark(file_date_get, (fpath,)), 42_000 )
+		asrt( bmark(file_date_get, (fpath,)), 80_000 )
 		file_delete(fpath)
 
 	'''
@@ -1261,7 +1260,7 @@ def file_date_get(fullpath)->tuple[datetime.datetime]:
 	return tuple(
 		datetime.datetime(d.year, d.month, d.day, d.hour, d.minute
 		, d.second, d.microsecond)
-		for d in pywindate
+		for d in (d.astimezone() for d in pywindate)
 	)
 
 def file_date_set(fullpath, datec=None, datea=None, datem=None):
@@ -1472,9 +1471,8 @@ def var_open(var:str)->None:
 	win32api.ShellExecute(None, 'open', var_fpath(var)
 	, None, None, 0)
 
-
 def var_get(var:str, default=None, encoding:str='utf-8'
-, as_literal:bool=False):
+, as_literal:bool=False, globals:dict|None=None):
 	'''
 	Gets the *disk variable*.  
 	*as_literal* - converts to a literal (dict, list, tuple etc).
@@ -1492,7 +1490,7 @@ def var_get(var:str, default=None, encoding:str='utf-8'
 	except FileNotFoundError:
 		return default
 	if as_literal:
-		return eval(content) if content != '' else ''
+		return eval(content, globals) if content != '' else ''
 	else:
 		return content
 

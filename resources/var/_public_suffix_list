@@ -3405,11 +3405,15 @@ rep.kp
 tra.kp
 kr
 ac.kr
+ai.kr
 co.kr
 es.kr
 go.kr
 hs.kr
+io.kr
+it.kr
 kg.kr
+me.kr
 mil.kr
 ms.kr
 ne.kr
@@ -7824,6 +7828,8 @@ csb.app
 preview.csb.app
 co.nl
 co.no
+devinapps.com
+staging.devinapps.com
 webhosting.be
 hosting-cluster.nl
 ctfcloud.net
@@ -7890,6 +7896,7 @@ you2.pl
 ondigitalocean.app
 *.digitaloceanspaces.com
 us.kg
+dpdns.org
 discordsays.com
 discordsez.com
 jozi.biz
@@ -8717,7 +8724,9 @@ apps-1and1.net
 websitebuilder.online
 app-ionos.space
 iopsys.se
+*.inbrowser.dev
 *.dweb.link
+*.inbrowser.link
 ipifony.net
 ir.md
 is-a-good.dev
@@ -9222,6 +9231,8 @@ httpbin.org
 prequalifyme.today
 xen.prgmr.com
 priv.at
+c01.kr
+eliv-dns.kr
 protonet.io
 sub.psl.hrsn.dev
 *.wc.psl.hrsn.dev
@@ -9663,7 +9674,6 @@ vercel.dev
 vusercontent.net
 now.sh
 2038.io
-router.management
 v-info.info
 deus-canvas.com
 voorloper.cloud

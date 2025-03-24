@@ -10,6 +10,5 @@ pytz==2023.3.post1
 pywin32==306
 Requests==2.32.3
 schedule==1.2.1
-uptime==3.0.1
 Windows_Toasts==1.0.2
 wxPython==4.2.1

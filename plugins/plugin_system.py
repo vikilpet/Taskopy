@@ -10,7 +10,6 @@ import win32gui
 import win32con
 import winreg
 import pywintypes
-import uptime
 from time import sleep
 import ctypes
 from .tools import *
@@ -304,26 +303,41 @@ def win_on_top(window=None, on_top:bool=True)->int:
 		except: pass
 		return hwnd
 
+
+
+def _idle_millis()->int:
+	'''
+	Returns idle time in milliseconds.
+	'''
+	C_ULONG_MAX = 4294967295
+	cur_time = win32api.GetTickCount()
+	last_input = win32api.GetLastInputInfo()
+	while cur_time > C_ULONG_MAX: cur_time -= C_ULONG_MAX
+	return cur_time - last_input
+
 def idle_duration(unit:str='sec')->int:
 	r'''
 	Returns idle time in specified units ('msec', 'sec', 'min', 'hour').  
 
-		asrt( bmark(idle_duration), 10_000 )
+		asrt( bmark(idle_duration), 2_500 )
 
 	'''
-	millis = (int(uptime.uptime() * 1000) - win32api.GetLastInputInfo())
-	return int( value_to_unit([millis, 'ms'], unit) )
+	return int( value_to_unit((_idle_millis(), 'ms'), unit=unit) )
 
-def idle_wait(interval:int='1 sec')->int:
-	' Suspends execution until user becomes active. '
-	interval = value_to_unit(interval, 'ms')
+def idle_wait(interval:int|str='1 sec')->int:
+	r'''
+	Suspends execution until user becomes active.  
+	Returns the number of milliseconds the user has been inactive.  
+	*interval* - inactivity check interval.  
+	'''
+	interval = int(value_to_unit(interval, 'ms'))
+	wait_sec:float = interval / 1000
 	millis = interval
-	prev_millis = millis
+	prev_millis:int = millis
 	while millis >= interval:
-		time_sleep(interval / 1000)
+		time.sleep(wait_sec)
 		prev_millis = millis
-		millis = (int(uptime.uptime() * 1000) - win32api.GetLastInputInfo())
-		tdebug(interval, millis)
+		millis = _idle_millis()
 	return prev_millis
 
 

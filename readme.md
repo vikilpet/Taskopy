@@ -142,6 +142,8 @@ Format: **option name** (default value) — description.
 	You can set multiple schedule at once with list:
 
 		every=('wed 18:00', 'fri 17:00')
+	
+	NOTE: tasks are not started at exactly 0 seconds, but at the second in which the crontab was loaded/reloaded.
 
 - **active** (True) — to enable-disable task.
 - **startup** (False) — run at taskopy startup.

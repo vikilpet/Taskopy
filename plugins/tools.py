@@ -52,7 +52,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2025-03-11'
+APP_VERSION = 'v2025-03-24'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
@@ -83,6 +83,7 @@ _LOCALE_LOCK = threading.Lock()
 _LOG_TIME_FORMAT = '%Y.%m.%d %H:%M:%S'
 _TERMINAL_WIDTH = os.get_terminal_size().columns - 1
 TASK_ATTR:str = '__is_task__'
+if (lambda: False)(): gdic:dict = {}
 
 
 class Settings:
@@ -674,7 +675,8 @@ def time_sleep(interval, unit:str=''):
 	if the interval is specified by a string:
 
 		asrt( bmark(time_sleep, a=('1 ms',)), 1_500_000 )
-		asrt( bmark(time_sleep, a=(0.000_01,)), 200_000 )
+		# and for `interval` as a float:
+		asrt( bmark(time_sleep, a=(0.000_001,)), 10_000 )
 	
 	`time.sleep` isn't that cheap on its own:
 
@@ -682,7 +684,10 @@ def time_sleep(interval, unit:str=''):
 		asrt( bmark(lambda: None if True else time.sleep(0)), 450 )
 
 	'''
-	if isinstance(interval, (list, tuple)):
+	if isinstance(interval, (int, float)) and not unit:
+		time.sleep(interval)
+		return
+	elif isinstance(interval, (list, tuple)):
 		interval = str( random_num(*interval) ) + ' ' + unit
 	elif unit:
 		interval = str(interval) + ' ' + unit
@@ -2007,7 +2012,7 @@ def _etree_to_dict(tree: _ElementTree.ElementTree):
 	return di
 
 def xml_to_dict(xml_str:str, remove_str:str=None)->tuple:
-	'''
+	r'''
 	Converts a XML to dictionary using lxml.etree
 	Returns (True, dict) or (False, 'exception text')
 	'''
@@ -2203,6 +2208,7 @@ def app_win_show():
 	r'''
 	Bring the application console window to the foreground, if possible.
 	'''
+	if is_con(): return
 	app.show_window()
 
 def app_dir()->str:
@@ -2215,9 +2221,12 @@ def app_dir()->str:
 	if is_con(): return os.getcwd()
 	return app.dir
 
-def app_tasks()->dict:
-	' Returns dictionary with tasks '
-	return app.tasks
+def app_tasks()->dict[str, dict]:
+	r'''
+	Returns dictionary with tasks. Keys are function names
+	, and values are a dictionary with all the properties of a task.  
+	'''
+	return app.tasks.task_dict
 
 def app_exit(force:bool=False):
 	r'''
@@ -2456,7 +2465,6 @@ def exc_text(line_num:int=1, with_file:bool=True)->str:
 	fullpath = last_frame.filename
 	lineno = last_frame.lineno
 	function = last_frame.name
-	line = last_frame.line
 	exc_name = exc_type.__name__
 	fname:str = ''
 	if with_file: fname = os.path.basename(fullpath)

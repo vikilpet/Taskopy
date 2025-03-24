@@ -15,12 +15,12 @@ import win32gui
 import win32con
 import win32file
 import win32evtlog
-import uptime
 from plugins.constants import *
 from plugins.tools import *
 from plugins.tools import _tlog
 from plugins.plugin_filesystem import *
 from plugins.plugin_system import *
+from plugins.plugin_system import _idle_millis
 from plugins.plugin_process import *
 from plugins.plugin_http_server import http_server_start
 from plugins.plugin_hotkey import GlobalHotKeys
@@ -536,8 +536,8 @@ class Tasks:
 				msg_warn(lang.warn_schedule.format(task['task_name_full']))
 
 	def add_schedule(self, task):
-		'''
-		*task* - a dict with task options.  
+		r'''
+		*task* - dictionary with task parameters.  
 		'''
 		intervals = task['schedule']
 		if isinstance(intervals, str): intervals = (intervals,)
@@ -587,7 +587,7 @@ class Tasks:
 			self.run_task(task, caller=CALLER_STARTUP)
 			
 	def run_at_sys_startup(self):
-		if uptime.uptime() < 120:
+		if win32api.GetTickCount() < 120_000:
 			for task in self.task_list_sys_startup:
 				self.run_task(task, caller=CALLER_SYS_STARTUP)
 	
@@ -779,8 +779,8 @@ class Tasks:
 		while (cur_thread_id == local_id):
 			schedule.run_pending()
 			if self.task_list_idle:
-				ms = int(uptime.uptime() * 1000) - win32api.GetLastInputInfo()
-				if ms < self.idle_min:
+				msec = _idle_millis()
+				if msec < self.idle_min:
 					if afk:
 						afk = False
 						for task in self.task_list_idle:
@@ -789,10 +789,10 @@ class Tasks:
 					afk = True
 					for task in self.task_list_idle:
 						if task['idle_done']: continue
-						if ms >= task['idle_dur']:
+						if msec >= task['idle_dur']:
 							self.run_task(task, caller=CALLER_IDLE)
 							task['idle_done'] = True
-			time.sleep(1)
+			time.sleep(1.0)
 			try:
 				cur_thread_id = tasks.sched_thread_id
 			except NameError:
@@ -1336,7 +1336,7 @@ def main():
 		app.MainLoop()
 	except KeyboardInterrupt:
 		tprint('interrupted by keyboard')
-		time.sleep(2)
+		time.sleep(2.0)
 	except:
 		msg_err('General exception')
 		input('Press Enter to exit...')

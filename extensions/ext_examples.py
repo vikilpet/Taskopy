@@ -190,8 +190,9 @@ def examp_cert_check(caller:str, codepage:str=''
 			dct[hsh[0].strip()] = name[0].strip() if name else '?'
 		return dct
 
+	VARNAME = 'cert_check_diff'
 	if not codepage: codepage = sys_codepage()
-	dump_file = temp_file(suffix=".sst")
+	dump_file = temp_file(suffix='.sst')
 	ret, out, _ = proc_start('certutil', f'-generateSSTFromWU {dump_file}'
 	, capture=True)
 	if ret:
@@ -202,8 +203,11 @@ def examp_cert_check(caller:str, codepage:str=''
 		dialog(f'certutil wu read error: {out}')
 		return
 	file_recycle(dump_file)
-	hashes_wu = parser(out)
-	hashes_pc = {}
+	hashes_wu:dict = parser(out)
+	hashes_pc:dict = {}
+	hashes_pc_only:dict = {}
+	# Difference between PC and WU:
+	diff:set = set()
 	for store in stores:
 		ret, out, _ = proc_start('certutil', f'-store {store}'
 		, capture=True, encoding=codepage)
@@ -212,17 +216,17 @@ def examp_cert_check(caller:str, codepage:str=''
 			return
 		hashes_pc.update(parser(out))
 	table = [('Src', 'Name', 'Hash')]
-	hashes_pc_only, diff = {}, set()
 	for hsh, name in hashes_pc.items():
 		if not hsh in hashes_wu:
 			hashes_pc_only[hsh] = name
 			diff.add(hsh)
-			table.append(('pc', name, hsh))
-	if caller == tcon.CALLER_MENU or diff:
+			table.append(('PC', name, hsh))
+	if caller == tcon.CALLER_MENU and diff:
 		tprint(f'{len(hashes_pc)=}, {len(hashes_wu)=}')
 		table_print(table, sorting=(0, 1))
+	# Comparing it to the previous difference between PC and WU:
 	if not set(
-		var_get('cert_check_diff', as_literal=True, default=())
+		var_get(VARNAME, as_literal=True, default=())
 	).symmetric_difference(diff):
 		if caller == tcon.CALLER_MENU:
 			dialog('No new PC-only certificates', timeout='2 sec')
@@ -232,7 +236,7 @@ def examp_cert_check(caller:str, codepage:str=''
 	# Show application window and dialog only if there is a difference:
 	app_win_show()
 	if dialog('Save the new difference?', ('No', 'Yes')) == 1001:
-		var_set('cert_check_diff', diff)
+		var_set(VARNAME, diff)
 
 # pip install pytelegrambotapi --upgrade
 # This module is not included in the standard set of *exe* distribution

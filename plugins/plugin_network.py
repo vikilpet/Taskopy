@@ -26,7 +26,7 @@ from .tools import dev_print, exc_text, time_sleep, tdebug \
 from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 _PUB_SUF_LST = set()
 warnings.filterwarnings('ignore', category=MarkupResemblesLocatorWarning)
@@ -289,10 +289,21 @@ def html_element(url:str, element
 
 	XPath cheatsheet: <https://devhints.io/xpath>  
 	More XPath examples:
+
+		# by id
 		'//div[@id="id"]/p'
+
+		# by class:
 		'//div[contains(@class, "main")]/div/script'
+
+		# second element:
 		'//table[2]/thead/tr/th[2]'
+
+		# get tag attribute:
 		'//ul[contains(@class, "pagination")]/li[1]/a/@href'
+
+		# Get the tag containing the desired text and navigate to its sibling:
+		//strong[contains(text(), "a text")]/following-sibling::strong[3]
 	
 	Note: *tbody* is often missing, but the browser automatically
 	adds it.
