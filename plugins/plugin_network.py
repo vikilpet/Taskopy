@@ -881,11 +881,10 @@ def ftp_upload(fullpath, server:str
 		errors.append(exc_text())
 	return len(errors) == 0, errors
 	
-def net_speedtest(url:str):
+def net_speedtest(url:str)->float:
 	r'''
 	Download the file without saving to disk and measure
-	the average download speed.
-	Returns `int` or `float`.
+	the average download speed.  
 	'''
 	chunk_size = 1024 * 1024  # 1 MB per chunk
 	speed_measurements = []
@@ -905,4 +904,4 @@ def net_speedtest(url:str):
 			speed_measurements.append(speed_mbps)
 	if is_con():
 		qprint(f'{total_bytes_dload=}, {speed_measurements=}')
-	return median(speed_measurements) if speed_measurements else tuple()
+	return median(speed_measurements)

@@ -699,14 +699,14 @@ class Tasks:
 			, args=(result,) if task['result'] else () )
 			thr.start()
 			app.app_threads[thr.ident] = {
-				'func': 'task: ' + task['task_name']
+				'func': 'task: ' + task['task_func_name']
 				, 'stime': dtime.now()
 				, 'thread': thr
 			}
 			if task['result']: thr.join()
 		daemon = (caller != CALLER_EXIT)
 		if task['result'] and not (result is None):
-			thread_start(run_task_inner, thr_daemon=daemon, args=(result,)
+			thread_start(run_task_inner, is_daemon=daemon, args=(result,)
 			, err_msg=True, ident='run_task_inner: ' + task['task_name'])
 		else:
 			run_task_inner()
@@ -1006,7 +1006,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		self.set_icon()
 		self.Bind(wx.adv.EVT_TASKBAR_LEFT_DOWN, self.on_left_down)
 
-	def CreatePopupMenu(self):
+	def CreatePopupMenu(self)->wx.Menu:
 		menu = wx.Menu()
 		if not sys.modules.get('crontab') is None:
 			if keyboard.is_pressed('shift'):
@@ -1221,11 +1221,6 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 				, parameters=dev
 			)
 
-	def popup_menu_hk(self):
-		app.frame.SetFocus()
-		time.sleep(0.1)
-		app.frame.PopupMenu(self.CreatePopupMenu())
-
 class App(wx.App):
 
 	def OnInit(self):
@@ -1255,12 +1250,6 @@ class App(wx.App):
 	def InitLocale(self):
 		' Override with nothing (or impliment local if actually needed)'
 		pass
-
-	def popup_menu_hk(self):
-		tprint('app menu by hotkey')
-		self.frame.SetFocus()
-		time.sleep(0.1)
-		self.frame.PopupMenu(self.taskbaricon.CreatePopupMenu())
 	
 	def exit(self, force:bool=False):
 		self.taskbaricon.on_exit(force=force)

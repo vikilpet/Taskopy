@@ -2,7 +2,7 @@ import sys
 import os
 import time
 import datetime
-from datetime import datetime as dtime, timedelta as tdelta
+from datetime import datetime as dtime, timedelta as tdelta, timezone as tzone
 import statistics
 import pytz
 import threading
@@ -52,7 +52,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2025-03-24'
+APP_VERSION = 'v2025-04-05'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
@@ -169,7 +169,7 @@ class TQueue(Queue):
 		q.stop()
 
 	'''
-	def __init__(self, consumer:Callable=print, max_size:int=0)->None:
+	def __init__(self, consumer:Callable=print, max_size:int=1024)->None:
 		super().__init__(maxsize=max_size)
 		self._stop_sentinel:object = object()
 		self.consumer:Callable=consumer
@@ -661,7 +661,7 @@ def date_last_day_of_month(date:dtime)->dtime:
 	if date.month == 12: return date.replace(day=31)
 	return date.replace(month=date.month+1, day=1) - datetime.timedelta(days=1)
 
-def time_sleep(interval, unit:str=''):
+def time_sleep(interval:str|int|float|tuple, unit:str=''):
 	r'''
 	Pauses for specified amount of time.  
 	*interval* - number of seconds (float) or `str` with unit like '5 min'
@@ -2122,10 +2122,13 @@ class DataEvent:
 		if self.EventData: self.EventDataStr = value_to_str(self.EventData)
 
 def thread_start(func, args:tuple=(), kwargs:dict={}
-, thr_daemon:bool=True, err_msg:bool=False, ident:str=''
+, is_daemon:bool=True, err_msg:bool=False, ident:str=''
 , err_action:Callable|None=None)->int:
 	r'''
 	Runs function in a thread. Returns thread id.  
+	*is_daemon* - thread runs in the background and is terminated
+	automatically when the main program exits, regardless of whether
+	the daemon thread has finished its work or not.  
 	*ident* - user-defined identifier of thread.  
 	*err_action* - function to run if an exception occurs.  
 	The text of exception will be passed to the function.  
@@ -2147,7 +2150,7 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 				except:
 					pass
 
-	thr = threading.Thread(target=wrapper, daemon=thr_daemon
+	thr = threading.Thread(target=wrapper, daemon=is_daemon
 	, name=func.__name__)
 	thr.start()
 	if not is_con():
@@ -2178,7 +2181,7 @@ def app_threads_print():
 		daemon = None
 		target = None
 		if thread != None:
-			if not (is_alive := thread.is_alive()): continue
+			if not thread.is_alive(): continue
 			daemon = thread.daemon
 			target = getattr(thread, '_target', None)
 			if target: target = getattr(target, '__name__', None)
@@ -2186,7 +2189,7 @@ def app_threads_print():
 			ident
 			, 'Y' if daemon else 'N'
 			, str(start_time).split('.')[0]
-			, run_time.split('.')[0]
+			, run_time
 			, target
 			, func_name
 		))
@@ -2264,6 +2267,8 @@ def bmark(func, a:tuple=(), ka:dict={}, b_iter:int=10
 	Example:
 
 		asrt( bmark(lambda i: i+1, a=(1,), b_iter=10 ) , 2_000 )
+		asrt( bmark(perf_counter_ns), 400 )
+		# median=400 ns/loop, best=400, worst=1_400, total=5_100, 10 loops
 	
 	'''
 	

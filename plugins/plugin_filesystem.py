@@ -314,6 +314,8 @@ def file_move(fullpath, destination)->str:
 			+ os.path.basename(fullpath)
 	else:
 		new_fullpath = destination
+	assert new_fullpath != fullpath \
+	, "You can't move the file itself into itself"
 	try:
 		file_delete(new_fullpath)
 	except FileNotFoundError:
@@ -452,13 +454,14 @@ def file_exists(fullpath)->bool:
 	r'''
 	Is file exists?
 
-		asrt( bmark(is_var_exists, (random_str(),), b_iter=3), 45_000 )
+		asrt( bmark(file_exists, (random_str(),), b_iter=3), 40_000 )
+		asrt( bmark(file_exists, (r'c:\Windows\notepad.exe',), b_iter=3), 60_000 )
 	
 	'''
 	fullpath = path_get(fullpath)
 	try:
 		win32file.GetFileAttributesEx(fullpath)
-	except Exception as exc:
+	except:
 		return False
 	return True
 

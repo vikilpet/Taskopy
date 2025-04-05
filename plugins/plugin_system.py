@@ -141,16 +141,18 @@ def win_class_name(window=None)->str:
 		return None
 
 def win_title_get(window=None)->str:
-	''' Gets the title of the window.
+	r'''
+	Gets the title of the window.
 	'''
 	hwnd = win_get(window)
 	if hwnd:
 		return win32gui.GetWindowText(hwnd)
 	else:
-		return 'error: not found'
+		return '<error: not found>'
 
 def win_title_set(window=None, new_title:str='')->int:
-	''' Sets window title, returns hwnd.
+	r'''
+	Sets window title, returns hwnd.
 	'''
 	hwnd = win_get(window)
 	if hwnd:

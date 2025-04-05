@@ -7537,6 +7537,8 @@ analytics-gateway.eu-west-1.amazonaws.com
 analytics-gateway.us-east-1.amazonaws.com
 analytics-gateway.us-east-2.amazonaws.com
 analytics-gateway.us-west-2.amazonaws.com
+appwrite.global
+*.appwrite.run
 amplifyapp.com
 *.awsapprunner.com
 webview-assets.aws-cloud9.af-south-1.amazonaws.com
@@ -9531,6 +9533,8 @@ quizzes.cx
 researched.cx
 tests.cx
 surveys.so
+ipfs.storacha.link
+ipfs.w3s.link
 storebase.store
 storipress.app
 storj.farm
