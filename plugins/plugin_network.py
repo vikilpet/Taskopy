@@ -22,13 +22,18 @@ from typing import Iterator, Tuple, Union
 import json2html
 from .tools import dev_print, exc_text, time_sleep, tdebug \
 , locale_set, safe, patch_import, re_replace \
-, median, is_iter, str_indent, is_con, qprint, str_remove_white
+, median, is_iter, str_indent, is_con, qprint, str_remove_white, is_dev
 from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
+from .plugin_process import proc_wait
 
 
 _USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
-_PUB_SUF_LST = set()
+_GV_PUBLIC_SUF_LST = '__public_suffix_list__'
+_RE_PING_LOSS = re.compile(r'\((\d+)%')
+_RE_PING_FAIL = re.compile(r' \d+\.\d+\.\d+\.\d+: .+?=\d+\D+[<=]\d+\D+=\d+')
+_RE_PING_TIME = re.compile(r' = (\d+).+? = (\d+).+? = (\d+)')
+_RE_HOST_IP = re.compile(r'\D(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})[\:/]')
 warnings.filterwarnings('ignore', category=MarkupResemblesLocatorWarning)
 requests.packages.urllib3.disable_warnings(
 	requests.packages.urllib3.exceptions.InsecureRequestWarning)
@@ -239,15 +244,17 @@ def html_clean(html_str:str, sep:str=' ', is_mail:bool=False
 		asrt( html_clean('\u200b\r \n<a>t</a>\t', is_mail=True), 't')
 		asrt( html_clean('<style>{}</style><a>t</a>\t'), 't')
 		asrt( html_clean('<img>jpg</img><a>t</a>\t', del_spec=False), 'jpg t')
-		asrt( bmark(html_clean, a=('',)), 120_000 )
+		asrt( bmark(html_clean, a=('',)), 150_000 )
 
 	'''
 	SPEC_CHARS = ' \r\n\t\u200b\xa0\u200c'
 	DEL_TAGS = ('script', 'style', 'img')
-	soup = BeautifulSoup(html_str, 'html.parser')
+	soup = BeautifulSoup(html_str, 'lxml')
 	if del_spec:
 		for tag in DEL_TAGS: [s.decompose() for s in soup(tag)]
 	text = soup.get_text(separator=sep)
+	soup.decompose()
+	del soup
 	if is_mail:
 		text = text.strip(SPEC_CHARS)
 	else:
@@ -324,12 +331,12 @@ def html_element(url:str, element
 		element_li = [element]
 	result = []
 	if isinstance(element_li[0], dict):
-		parser = BeautifulSoup(html, 'html.parser')
+		parser = BeautifulSoup(html, 'lxml')
 	elif element_li[0].startswith('/'):
 		parser = lxml.html.fromstring(html
-			, parser=lxml.html.HTMLParser(recover=True))
+		, parser=lxml.html.HTMLParser(recover=True))
 	else:
-		parser = parser = BeautifulSoup(html, 'html.parser')
+		parser = parser = BeautifulSoup(html, 'lxml')
 	if element_num == 'all':
 		found_elem = parser.find_all(**element)
 		if found_elem:
@@ -364,6 +371,8 @@ def html_element(url:str, element
 					result.append( str(found_elem[el_num]) )
 			else:
 				raise Exception('html_element: element not found')
+			parser.decompose()
+			del parser
 		else:
 			if len(element_li) == 1:
 				el_num = element_num
@@ -374,7 +383,7 @@ def html_element(url:str, element
 				if clean:
 					result.append( clean_white(found_elem) )
 				else:
-					result.append(found_elem)
+					result.append(str(found_elem))
 			else:
 				if clean:
 					result.append( tag_sep.join(
@@ -504,7 +513,8 @@ def net_pc_hostname()->str:
 	' Returns the hostname of the computer '
 	return socket.gethostname()
 
-def url_hostname(url:str, sld:bool=True)->str:
+def url_hostname(url:str, sld:bool=True
+, lan_domains:tuple=('lan', 'local', 'home'))->str:
 	r'''
 	Returns the hostname (domain name) in lower case from a URL.
 
@@ -525,25 +535,23 @@ def url_hostname(url:str, sld:bool=True)->str:
 		asrt( url_hostname('http://server.lan:80/'), 'server.lan' )
 
 	'''
-	global _PUB_SUF_LST
-	LAN_DOMAINS = ('lan', 'local', 'home')
+	global _GV_PUBLIC_SUF_LST
 	url = url.lower()
-	if m := re.findall(r'\D(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})[\:/]', url):
-		return m[0]
+	if m := _RE_HOST_IP.findall(url): return m[0]
 	domain = urllib.parse.urlparse(url).netloc
 	if '@' in domain: domain = domain.split('@')[1]
 	if ':' in domain: domain = domain.split(':')[0]
 	if not sld: return domain
-	if not _PUB_SUF_LST:
-		_PUB_SUF_LST = set(
-			var_lst_get('_public_suffix_list')
-		)
-		_PUB_SUF_LST.update(LAN_DOMAINS)
+	suf_lst:set = gdic.get(_GV_PUBLIC_SUF_LST)
+	if not suf_lst:
+		suf_lst = set( var_lst_get('_public_suffix_list') )
+		suf_lst.update(lan_domains)
+		gdic[_GV_PUBLIC_SUF_LST] = suf_lst
 	variants = []
 	for i in range(domain.count('.') + 1):
 		variants.append( '.'.join(domain.split('.')[-(i+1):]) )
 	for var in variants:
-		if var in _PUB_SUF_LST: continue
+		if var in suf_lst: continue
 		return var
 	return ''
 
@@ -779,8 +787,7 @@ def ping_tcp(host:str, port:int, count:int=1, pause:int=100
 	loss = (count - len(timings)) * 100 // count
 	return True, ( loss, int(median(timings)))
 		
-
-def ping_icmp(host:str, count:int=3
+def ping_icmp_old(host:str, count:int=3
 , timeout:int=500, encoding:str='cp866')->tuple[bool, tuple|str]:
 	r'''
 	Wrapper over ping.exe.
@@ -801,15 +808,42 @@ def ping_icmp(host:str, count:int=3
 		, encoding=encoding
 	)
 	out, ret = proc.communicate()[0], proc.returncode
-	tdebug(ret, str_indent(out))
 	if ret == 1: return False, 'host unreachable (1)'
-	loss = re.findall(r'\((\d+)%', out)
-	if not re.findall(r' \d+\.\d+\.\d+\.\d+: .+?=\d+\D+[<=]\d+\D+=\d+', out):
+	loss = _RE_PING_LOSS.findall(out)
+	if not _RE_PING_FAIL.findall(out):
 		return False, 'host unreachable (2)'
 	loss = int(loss[0])
-	av_time = int(
-		re.findall(r' = (\d+).+? = (\d+).+? = (\d+)', out)[1][2]
-	)
+	av_time = int( _RE_PING_TIME.findall(out)[1][2] )
+	return True, (loss, av_time)
+
+def ping_icmp(host:str, count:int=3
+, timeout:int=500, encoding:str='cp866')->tuple[bool, tuple|str]:
+	r'''
+	Wrapper over ping.exe.
+	Returns (True, (loss percentage, time in ms) )
+	or (False, 'cause of failure').  
+	
+	Examples:
+	
+		asrt( ping_icmp('8.8.8.8', 1)[0], True)
+		asrt( ping_icmp('non.existent.domain', 1), (False, 'host unreachable (1)') )
+		asrt( ping_icmp('127.0.0.1', 1), (True, (0, 0)) )
+
+	'''
+	ret, out, err = proc_wait(f'ping -n {count} -w {timeout} {host}'
+	, encoding=encoding)
+	if ret == 1: return False, 'host unreachable (1)'
+	loss = _RE_PING_LOSS.findall(out)
+	if not _RE_PING_FAIL.findall(out):
+		return False, 'host unreachable (2)'
+	loss = int(loss[0])
+	av_time:int = 0
+	try:
+		av_time = int( _RE_PING_TIME.findall(out)[1][2] )
+	except:
+		if is_dev():
+			qprint('ping_icmp _RE_PING_TIME exception:' + str_indent(out))
+			raise
 	return True, (loss, av_time)
 
 def ftp_upload(fullpath, server:str

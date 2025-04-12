@@ -15,6 +15,7 @@ import win32gui
 import win32con
 import win32file
 import win32evtlog
+import gc
 from plugins.constants import *
 from plugins.tools import *
 from plugins.tools import _tlog
@@ -892,11 +893,13 @@ def load_crontab(event=None)->bool:
 			task['thread'] = rtask['thread']
 			task['last_start'] = rtask['last_start']
 			task['running'] = rtask['running']
-		tasks.run_at_crontab_load()
 		tasks.enabled = app.enabled
+		thread_start(tasks.run_at_crontab_load, err_msg=True
+		, ident='app: run_at_crontab_load')
 		if is_dev():
 			for tn in running_tasks: tprint('still running: ' + tn)
 		dev_print('load time: ' + time_diff_human(start, with_ms=True))
+		gc.collect()
 		return True
 	except:
 		msg_err(lang.warn_crontab_reload, title=lang.menu_reload)
@@ -1228,7 +1231,7 @@ class App(wx.App):
 		self.app_threads = {}
 		self.frame=wx.Frame(None, style=wx.DEFAULT_FRAME_STYLE | wx.STAY_ON_TOP)
 		self.taskbaricon = TaskBarIcon(self.frame)
-		self.app_pid = os.getpid()
+		self.app_pid = win32process.GetCurrentProcessId()
 		self.frame.Bind(wx.EVT_END_SESSION
 		, lambda: self.taskbaricon.on_exit(is_end_session=True) )
 		hwnd_list = win_find(APP_NAME)
@@ -1314,8 +1317,8 @@ def main():
 	try:
 		app = App(False)
 		__builtins__.app = app
-		app.que_print:TQueue = TQueue(consumer=print)
-		app.que_log:TQueue = TQueue(consumer=_tlog)
+		app.que_print:TQueue = TQueue(consumer=print, max_size=8192)
+		app.que_log:TQueue = TQueue(consumer=_tlog, max_size=8192)
 		app.load_crontab = load_crontab
 		app.show_window = app.taskbaricon.on_left_down
 		app.dir = APP_PATH

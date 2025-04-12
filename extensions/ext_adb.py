@@ -91,10 +91,10 @@ def adb_run(cmd:list|tuple|str, **kwargs)->tuple[bool, str]:
 		cmd.insert(1, kwargs['dev_id'])
 		cmd.insert(1, '-s')
 	tdebug(cmd)
-	ret, out, err = proc_start(cmd, capture=True, encoding='utf-8')
+	ret, out, err = proc_wait(' '.join(cmd), encoding='utf-8')
 	out = err if err else out
 	if err and is_con(): tprint(f'error: {err}')
-	return ret == 0, out.rstrip()
+	return ret == 0, out.strip()
 
 def adb_dir_files(adir:str='/sdcard/', ext:str|None=None
 , afilter=None, **kwargs)->tuple:
@@ -116,7 +116,7 @@ def adb_dir_files(adir:str='/sdcard/', ext:str|None=None
 	status, data = adb_run(cmd, **kwargs)
 	if not status: return False, data
 	afiles = []
-	for apath in data.split('\n'):
+	for apath in data.splitlines():
 		if apath.startswith('/') and apath.endswith(':'):
 			cur_dir = apath[:-1] + '/'
 			continue

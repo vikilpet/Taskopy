@@ -1,4 +1,5 @@
 import subprocess
+import threading
 import os
 import sys
 import ctypes
@@ -12,6 +13,8 @@ import win32con
 import win32com
 import win32event
 import win32process
+import win32pipe
+import win32file
 import win32security
 import win32ts
 import win32serviceutil
@@ -21,7 +24,8 @@ import pywintypes
 import ctypes
 from ctypes import wintypes
 
-from .tools import DictToObj, dev_print, msgbox, tprint, patch_import
+from .tools import DictToObj, dev_print, msgbox, tprint, patch_import \
+, thread_start, str_short
 from .plugin_filesystem import path_exists, path_get
 from .plugin_system import win_list_top
 
@@ -77,6 +81,97 @@ def proc_get(process, cmd_filter:str=None)->int:
 				return proc.pid
 	return -1
 
+def _create_pipe():
+	sa = pywintypes.SECURITY_ATTRIBUTES()
+	sa.bInheritHandle = True
+	read_handle, write_handle = win32pipe.CreatePipe(sa, 0)
+	win32api.SetHandleInformation(read_handle, win32con.HANDLE_FLAG_INHERIT, 0)
+	return read_handle, write_handle
+	
+def _reader_thread(pipe, buffer_list):
+	while True:
+		try:
+			rc, chunk = win32file.ReadFile(pipe, 4096)
+			if rc == 0 and chunk:
+				buffer_list.append(chunk)
+			else:
+				break
+		except pywintypes.error as e:
+			if e.winerror == 109 or e.winerror == 6:
+				break
+			else:
+				raise
+
+def proc_wait(
+	cmd:str
+	, priority=win32process.NORMAL_PRIORITY_CLASS
+	, cwd=None
+	, env:dict|None=None
+	, make_stdin:bool=True
+	, encoding:str='utf-8'
+	, encoding_errors:str='replace'
+):
+	r'''
+	Start the process and wait for it to complete.  
+	Returns (return code, stdout, stderr)  
+	*cmd* - command line with the program and its arguments  
+	*cwd* - working directory  
+	'''
+	stdout_read, stdout_write = _create_pipe()
+	stderr_read, stderr_write = _create_pipe()
+	stdin_handle = None
+	if make_stdin:
+		stdin_handle = win32file.CreateFile(
+			'NUL',
+			win32con.GENERIC_READ,
+			win32con.FILE_SHARE_READ,
+			None,
+			win32con.OPEN_EXISTING,
+			0,
+			None
+		)
+	startup = win32process.STARTUPINFO()
+	startup.dwFlags |= win32con.STARTF_USESTDHANDLES
+	startup.hStdOutput = stdout_write
+	startup.hStdError = stderr_write
+	if make_stdin: startup.hStdInput = stdin_handle
+	startup.dwFlags |= win32con.STARTF_USESHOWWINDOW
+	startup.wShowWindow = win32con.SW_HIDE
+	creation_flags = win32con.CREATE_NEW_CONSOLE | priority
+	proc_handle, thread_handle, proc_id, thread_id = win32process.CreateProcess(
+		None,
+		cmd,
+		None,
+		None,
+		True,
+		creation_flags,
+		env,
+		cwd,
+		startup
+	)
+	win32file.CloseHandle(stdout_write)
+	win32file.CloseHandle(stderr_write)
+	if stdin_handle: win32file.CloseHandle(stdin_handle)
+	stdout_chunks = []
+	stderr_chunks = []
+	thread_start(_reader_thread, args=(stdout_read, stdout_chunks)
+	, ident='proc_wait out: ' + str_short(cmd, 30))
+	thread_start(_reader_thread, args=(stderr_read, stderr_chunks)
+	, ident='proc_wait err: ' + str_short(cmd, 30))
+	win32event.WaitForSingleObject(proc_handle, win32event.INFINITE)
+	exit_code = win32process.GetExitCodeProcess(proc_handle)
+	win32file.CloseHandle(stdout_read)
+	win32file.CloseHandle(stderr_read)
+	win32api.CloseHandle(proc_handle)
+	win32api.CloseHandle(thread_handle)
+	stdout_data = b''.join(stdout_chunks)
+	stderr_data = b''.join(stderr_chunks)
+	return (
+		exit_code
+		, stdout_data.decode(encoding=encoding, errors=encoding_errors)
+		, stderr_data.decode(encoding=encoding, errors=encoding_errors)
+	)
+
 def proc_start(
 	proc_path:Iterable
 	, args:Iterable=()
@@ -91,8 +186,8 @@ def proc_start(
 	, its_script:bool=False
 	, args_as_str:bool=False
 )->tuple|int:
-	'''
-	Starts application.
+	r'''
+	Launches the application.
 	
 	Returns:
 

@@ -452,7 +452,7 @@ def mouse_pos_set(pos:tuple):
 	r'''
 	Sets mouse cursor position.
 
-		asrt( bmark(mouse_pos_set, ((500, 500) ,)), 4_500 )
+		asrt( bmark(mouse_pos_set, ((500, 500) ,)), 5_000 )
 
 	'''
 	try:

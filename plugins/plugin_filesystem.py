@@ -77,7 +77,9 @@ def path_long(path:str, force:bool=False):
 		return path
 
 def dir_slash(dirpath:str)->str:
-	''' Adds a trailing slash if it's not there. '''
+	'''
+	Adds a trailing slash if it's not there.
+	'''
 	if dirpath.endswith('\\'): return dirpath
 	return dirpath + '\\'
 
@@ -400,7 +402,7 @@ def dir_copy(fullpath, destination:str
 		pass
 	except Exception as e:
 		err += 1
-		print(f'dir_copy exception: {repr(e)}')
+		qprint(f'dir_copy exception: {repr(e)}')
 	return err
 
 def dir_create(fullpath=None)->str:
@@ -765,7 +767,8 @@ def dir_purge(fullpath, days:int=0, subdirs:bool=True
 
 	'''
 	def print_d(fn:str, reason:str):
-		if print_del: print('dir_purge:', reason, os.path.relpath(fn, fullpath))
+		if print_del:
+			qprint('dir_purge:', reason, os.path.relpath(fn, fullpath))
 
 	def robust_remove_file(fn):
 		nonlocal counter
@@ -784,11 +787,12 @@ def dir_purge(fullpath, days:int=0, subdirs:bool=True
 	def fn_print(fn):
 		nonlocal counter
 		counter += 1
-		print(os.path.relpath(fn, fullpath))
+		qprint(os.path.relpath(fn, fullpath))
 
 	fullpath = path_get(fullpath)
 	counter = 0
-	dirs, files = (), ()
+	dirs = ()
+	files = ()
 	if subdirs:
 		files = dir_files(fullpath, subdirs=True)
 		dirs = dir_dirs(fullpath, subdirs=True)
@@ -838,8 +842,9 @@ def file_dir(fullpath)->str:
 	return os.path.dirname(path_get(fullpath))
 
 def file_dir_repl(fullpath, new_dir:str)->str:
-	''' Changes the directory of the file (in full path)
-	i'''
+	r'''
+	Changes the directory of the file (in full path)
+	'''
 	fullpath = path_get(fullpath)
 	return os.path.join(new_dir, os.path.basename(fullpath) )
 
@@ -1716,9 +1721,9 @@ def drive_io(drive_num:int=-1)->Generator[DriveIO|dict, None, None]:
 	that returns a named tuples with counters. Example:
 
 		dio = drive_io()
-		print(next(dio)[0].read_bytes)
+		qprint(next(dio)[0].read_bytes)
 		time_sleep('1 sec')
-		print(
+		qprint(
 			file_size_str(next(dio)[0].total_bytes_delta)
 		)
 
@@ -1811,6 +1816,7 @@ def path_rule(
 	to retrieve attributes (`in_link` for example).  
 
 	'''
+	
 	ex_rules = list()
 	in_rules = list()
 	if ex_ext:
@@ -2034,8 +2040,8 @@ class DirSync:
 		'''
 		*report* - print every file copy/del operation.
 		'''
-		self._src_dir = path_get(src_dir)
-		self._dst_dir = path_get(dst_dir)
+		self._src_dir = dir_slash(path_get(src_dir))
+		self._dst_dir = dir_slash(path_get(dst_dir))
 		self._report = report
 		self._rules = rules
 		self._src_files = set()
@@ -2047,11 +2053,12 @@ class DirSync:
 		self._dst_only_files = set()
 		self._max_table_width:int=max_table_width
 		self.errors = dict()
-		self.duration = ''
+		self._start:dtime = dtime.min
+		self.duration:str = ''
 	
 	def _walk(self):
 		' Reads contens of src and dst directories '
-		tstart = time_now()
+		start = dtime.now()
 		self._src_files = set()
 		self._src_dirs = set()
 		self._dst_files = set()
@@ -2078,80 +2085,101 @@ class DirSync:
 				self._dst_files.add(
 					os.path.join(dirpath[4:], f)
 				)
-		tdebug('walk done in', time_diff_human(tstart))
-
+		if is_con(): qprint('walk done in', time_diff_human(start))
 
 	def compare(self)->bool:
-		'''
+		r'''
 		Reads the directories and makes a comparison.
 		'''
-		tstart = time_now()
+		self._start = dtime.now()
+		cstart = dtime.now()
 		self.errors = dict()
 		self._walk()
-		slen = len(self._src_dir.rstrip('\\')) + 1
-		dlen = len(self._dst_dir.rstrip('\\')) + 1
+		slen = len(self._src_dir)
+		dlen = len(self._dst_dir)
 		self._src_files = set( (p[slen:] for p in self._src_files) )
 		self._dst_files = set( (p[dlen:] for p in self._dst_files) )
 		if self._rules:
+			rstart = dtime.now()
 			self._src_files = set(path_filter(
 				paths=self._src_files
 				, **self._rules
 			))
+			if is_con(): qprint('file rules done in', time_diff_human(rstart))
 		self._src_only_files = self._src_files - self._dst_files
 		self._dst_only_files = self._dst_files - self._src_files
 		self._src_dirs = set( (p[slen:] for p in self._src_dirs) )
 		self._dst_dirs = set( (p[dlen:] for p in self._dst_dirs) )
 		if self._rules:
+			rstart = dtime.now()
 			self._src_dirs = set(path_filter(
 				paths=self._src_dirs
 				, **self._rules
 			))
+			if is_con(): qprint('dir rules done in', time_diff_human(rstart))
 		self._dst_only_dirs = self._dst_dirs - self._src_dirs
 		self._get_new_files()
-		self.duration = time_diff_human(tstart)
-		tdebug('compare done in', self.duration)
+		if is_con(): qprint('compare done in', time_diff_human(cstart))
 		return len(self.errors) == 0
 	
 	def _log(self, oper:str, path:str):
 		' Print current file operation '
 		if not self._report: return
-		print(path_short( f'sync {oper}: {path}'))
+		qprint(path_short( f'sync {oper}: {path}'))
 	
 	def _get_new_files(self):
+		start = dtime.now()
 		self._new_files = set()
 		for rpath in (self._src_files.intersection(self._dst_files)):
 			try:
 				src_datem = win32file.GetFileAttributesEx(
-					path_long(dir_slash(self._src_dir)) + rpath
-				)[3].timestamp()
+					path_long(self._src_dir + rpath)
+				)[3].replace(microsecond=0)
 				dst_datem = win32file.GetFileAttributesEx(
-					path_long(dir_slash(self._dst_dir)) + rpath
-				)[3].timestamp()
-				if int(src_datem) > int(dst_datem):
-					self._new_files.add(rpath)
+					path_long(self._dst_dir + rpath)
+				)[3].replace(microsecond=0)
+				if src_datem > dst_datem: self._new_files.add(rpath)
 			except:
-				tdebug(str_short('datem error: ' + exc_text(with_file=False)))
-				tdebug('mdate error:', exc_text(with_file=False), short=True)
+				if is_con():
+					qprint(
+						str_short('datem error: ' + exc_text(with_file=False))
+					)
+				if is_con():
+					qprint(str_short(
+						'datem error: ' + exc_text(with_file=False)
+						, _TERMINAL_WIDTH
+					))
 				self.errors[rpath] = 'mdate error'
+		if is_con(): qprint('new files done in', time_diff_human(start))
 
 	def _copy(self):
 		''' Copy unique and new files from src to dst '''
 		for fileset in self._src_only_files, self._new_files:
 			for rpath in fileset:
-				try:
-					self._log('copy', rpath)
-					file_copy(
-						fullpath=(self._src_dir, rpath)
-						, destination=(self._dst_dir, rpath)
-					)
-				except:
-					if tdebug():
-						print(str_short(
-							'copy err ('
-							+ path_short(rpath, 40) + '): '
-							+ exc_text(with_file=False)
-						))
-					self.errors[rpath] = 'copy'
+				self._log('copy', rpath)
+				for _ in (1, 2):
+					try:
+						win32api.CopyFile(
+							path_long(self._src_dir + rpath)
+							, path_long(self._dst_dir + rpath)
+						)
+					except win32api.error as err:
+						if err.winerror == 3:
+							try:
+								os.makedirs(file_dir( self._dst_dir + rpath ))
+							except:
+								self.errors[rpath] = 'dir create'
+								break
+							else:
+								continue
+						if is_con():
+							qprint(str_short(
+								'copy err ('
+								+ path_short(rpath, 40) + '): '
+								+ exc_text(with_file=False)
+							))
+						self.errors[rpath] = 'copy'
+						break
 	
 	def _delete_dirs(self):
 		r'''
@@ -2164,8 +2192,8 @@ class DirSync:
 			self._log('del dir', rpath)
 			if err:
 				errors.add(rpath)
-				if tdebug():
-					print(path_short(f'dir del err {len(err)}: {rpath}'))
+				if is_con():
+					qprint(path_short(f'dir del err {len(err)}: {rpath}'))
 				self.errors[rpath] = f'dir del {len(err)}'
 		del_dirs = self._dst_only_dirs - errors
 		self._dst_only_files = set(
@@ -2179,8 +2207,8 @@ class DirSync:
 			if (err := file_delete((self._dst_dir, rpath))) == 0: 
 				self._log('del file', rpath)
 			else:
-				if tdebug():
-					print(str_short('file del err: '
+				if is_con():
+					qprint(str_short('file del err: '
 					+ exc_text(with_file=False) ) )
 				self.errors[rpath] = f'file del {err}'
 
@@ -2189,7 +2217,7 @@ class DirSync:
 		Print a table with the difference between
 		the directories.
 		'''
-		print('\nDirSync:', self._src_dir, '->', self._dst_dir)
+		qprint('\nDirSync:', self._src_dir, '->', self._dst_dir)
 		table = [('Diff', 'Path')]
 		table.extend( (('src only', p) for p in self._src_only_files) )
 		table.extend( (('dst only', p) for p in self._dst_only_files) )
@@ -2202,16 +2230,14 @@ class DirSync:
 			, sorting=(0, 1)
 			, trim_func=path_short
 		)
-		print(
-			f'Done in {self.duration}'
-			, f'src files: {len(self._src_files)}'
-			, f'src only files: {len(self._src_only_files)}'
-			, f'dst only files: {len(self._dst_only_files)}'
-			, f'dst only dirs: {len(self._dst_only_dirs)}'
-			, f'new files: {len(self._new_files)}'
-			, f'errors: {len(self.errors)}'
-			,''
-			, sep='\n'
+		qprint(
+			f'All done in {self.duration}'
+			, f'\nsrc files: {int_str(len(self._src_files))}'
+			, f'\nsrc only files: {int_str(len(self._src_only_files))}'
+			, f'\ndst only files: {int_str(len(self._dst_only_files))}'
+			, f'\ndst only dirs: {int_str(len(self._dst_only_dirs))}'
+			, f'\nnew files: {int_str(len(self._new_files))}'
+			, f'\nerrors: {int_str(len(self.errors))}\n'
 		)
 	
 	def save_diff(self, dst_file:str='')->str:
@@ -2244,13 +2270,13 @@ class DirSync:
 	
 	def sync(self)->bool:
 		' Perform synchronization '
-		tstart = time_now()
+		start = time_now()
 		self.errors = dict()
 		self._delete_dirs()
 		self._delete_files()
 		self._copy()
-		self.duration = time_diff_human(tstart)
-		tdebug('done in', self.duration)
+		self.duration = time_diff_human(self._start)
+		if is_con(): qprint('sync done in', time_diff_human(start))
 		return len(self.errors) == 0
 
 
@@ -2277,7 +2303,7 @@ def dir_sync(src_dir, dst_dir, report:bool=False
 	sync.sync()
 	if report: sync.print_diff()
 	if sync.errors and report: sync.print_errors()
-	return sync.errors
+	return sync.errors.copy()
 
 def path_short(fullpath, max_len:int=0)->str:
 	r'''
@@ -2370,7 +2396,7 @@ class DirDup:
 				self._files[fpath]['size'] = att[4]
 				self._files[fpath]['mdate'] = att[3]
 				self._files[fpath]['cdate'] = att[1]
-		tdebug(f'done in {time_diff_human(tstart)}')
+		if is_con(): qprint(f'scan done in {time_diff_human(tstart)}')
 
 	def find_dup(self):
 		if not self._files: self.scan()
@@ -2393,7 +2419,7 @@ class DirDup:
 				for fpath in fpaths:
 					self._files[fpath]['is_unique'] = False
 			self._collect_dups()
-			tdebug(f'done in {time_diff_human(tstart)}')
+			if is_con(): qprint(f'done in {time_diff_human(tstart)}')
 			return
 		for size, fpaths in self._sizes.items():
 			if len(fpaths) == 1: continue
@@ -2414,7 +2440,7 @@ class DirDup:
 						self._files[fpath]['hash']
 					) == 1
 		self._collect_dups()
-		tdebug(f'done in {time_diff_human(tstart)}')
+		if is_con(): qprint(f'done in {time_diff_human(tstart)}')
 	
 	def _collect_dups(self):
 		r'''
@@ -2481,7 +2507,7 @@ class DirDup:
 			for dup in dups:
 				size += dup['size']
 				count += 1
-		print(f'Total: {count} duplicates, {file_size_str(size)}\n')
+		qprint(f'Total: {count} duplicates, {file_size_str(size)}\n')
 
 	def clean(self, leave:str, recycle:bool=True)->tuple:
 		r'''

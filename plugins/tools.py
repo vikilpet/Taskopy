@@ -1,5 +1,6 @@
 import sys
 import os
+import gc
 import time
 import datetime
 from datetime import datetime as dtime, timedelta as tdelta, timezone as tzone
@@ -10,6 +11,7 @@ import configparser
 import psutil
 import sqlite3
 import subprocess
+from win32process import GetCurrentProcessId as _GetCurrentProcessId
 import pywintypes
 from multiprocessing.dummy import Pool as ThreadPool
 from operator import itemgetter
@@ -52,7 +54,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2025-04-05'
+APP_VERSION = 'v2025-04-12'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
@@ -138,6 +140,7 @@ class DictToObj:
 			+ ')'
 		)
 
+
 class SuppressPrint:
 	r'''
 	Suppresses outputting anything to the console.  
@@ -160,6 +163,8 @@ class SuppressPrint:
 		sys.stdout = self._original_stdout
 
 
+
+
 class TQueue(Queue):
 	r'''
 	A queue that sends everything to the consumer in a different thread.  
@@ -169,7 +174,7 @@ class TQueue(Queue):
 		q.stop()
 
 	'''
-	def __init__(self, consumer:Callable=print, max_size:int=1024)->None:
+	def __init__(self, consumer:Callable=print, max_size:int=4096)->None:
 		super().__init__(maxsize=max_size)
 		self._stop_sentinel:object = object()
 		self.consumer:Callable=consumer
@@ -513,7 +518,7 @@ def time_diff_str(start:dtime
 	r'''
 	Returns time difference as a string like that:
 	'5 days, 3:01:35.837127'  
-	See also `time_diff_human`.  
+	It is better to use `time_diff_human`.  
 
 	*start* and *end* should be in _datetime_ format.  
 	*str_format* - standard time formating like '%y.%m.%d %H:%M:%S'
@@ -676,7 +681,7 @@ def time_sleep(interval:str|int|float|tuple, unit:str=''):
 
 		asrt( bmark(time_sleep, a=('1 ms',)), 1_500_000 )
 		# and for `interval` as a float:
-		asrt( bmark(time_sleep, a=(0.000_001,)), 10_000 )
+		asrt( bmark(time_sleep, a=(0.000_001,)), 150_000 )
 	
 	`time.sleep` isn't that cheap on its own:
 
@@ -1746,7 +1751,7 @@ def table_print(
 				for _ in range(3)
 			)
 		]
-		_ = table_print(table, use_headers=('Header-1', 'Header-2', 'Header-3')
+		table_print(table, use_headers=('Header-1', 'Header-2', 'Header-3')
 		, trim_col=1)
 
 	'''
@@ -1876,7 +1881,6 @@ def table_print(
 					print_headers(True)
 		qprint(template.format(*row))
 	qprint()
-	return rows
 
 def patch_import():
 	'''
@@ -2134,6 +2138,7 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 	The text of exception will be passed to the function.  
 
 		asrt( bmark(thread_start, (lambda: None,)), 2_000_000 )
+		asrt( bmark(threading.get_ident), 400 )
 
 	'''
 	
@@ -2147,25 +2152,26 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 			if err_action:
 				try:
 					err_action(traceback.format_exc().strip())
-				except:
-					pass
+				except Exception as e:
+					dev_print(f'exception in err_action: {repr(e)}')
+		app.app_threads.pop(threading.get_ident(), None)
 
 	thr = threading.Thread(target=wrapper, daemon=is_daemon
 	, name=func.__name__)
 	thr.start()
-	if not is_con():
-		try:
-			if not ident:
-				parents = tuple(reversed(_get_parents()))[-3:]
-				ident = '>'.join(parents) + '>' + func.__name__
-			app.app_threads[thr.ident] = {
-				'func': ident
-				, 'stime': time_now()
-				, 'thread': thr
-			}
-		except:
-			dev_print('thread_start save error: ' + exc_text())
-			pass
+	try:
+		if not ident:
+			parents = list(reversed(_get_parents()))[-3:]
+			parents.append(func.__name__)
+			ident = '>'.join(parents)
+		app.app_threads[thr.ident] = {
+			'func': ident
+			, 'stime': dtime.now()
+			, 'thread': thr
+		}
+	except:
+		dev_print('thread_start save error: ' + exc_text())
+		pass
 	return thr.ident
 task_run = thread_start
 
@@ -2173,7 +2179,7 @@ def app_threads_print():
 	thread: threading.Thread
 	table = [('TID', 'Dmn', 'Start time', 'Running time'
 	, 'Target', 'Identity')]
-	for ident, thr_dic in app.app_threads.items():
+	for ident, thr_dic in tuple(app.app_threads.items()):
 		func_name = thr_dic.get('func')
 		start_time = thr_dic.get('stime')
 		run_time = time_diff_human(start_time) if start_time else None
@@ -2259,6 +2265,15 @@ def app_exit(force:bool=False):
 	'''
 	app.taskbaricon.on_exit(force=force)
 
+def app_pid()->int:
+	r'''
+	Returns current PID.
+
+		asrt( bmark(app_pid), 500 )
+
+	'''
+	return app.app_pid
+
 def bmark(func, a:tuple=(), ka:dict={}, b_iter:int=10
 , do_print:bool=True)->int:
 	r'''
@@ -2267,7 +2282,7 @@ def bmark(func, a:tuple=(), ka:dict={}, b_iter:int=10
 	Example:
 
 		asrt( bmark(lambda i: i+1, a=(1,), b_iter=10 ) , 2_000 )
-		asrt( bmark(perf_counter_ns), 400 )
+		asrt( bmark(time.perf_counter_ns), 500 )
 		# median=400 ns/loop, best=400, worst=1_400, total=5_100, 10 loops
 	
 	'''
@@ -2443,8 +2458,6 @@ def asrt(value, expect, comp:str='==', show_diff:bool=False):
 	) 
 	raise Exception(msg)
 
-
-
 def exc_text(line_num:int=1, with_file:bool=True)->str:
 	r'''
 	Gets the shorted text of an exception.  
@@ -2467,6 +2480,7 @@ def exc_text(line_num:int=1, with_file:bool=True)->str:
 		return '\n'.join(lines[-line_num:])
 	exc_type, exc_value, exc_tb = sys.exc_info()
 	last_frame = traceback.extract_tb(exc_tb)[-1]
+	del exc_tb
 	fullpath = last_frame.filename
 	lineno = last_frame.lineno
 	function = last_frame.name
@@ -2483,15 +2497,7 @@ def exc_text(line_num:int=1, with_file:bool=True)->str:
 	else:
 		return f'{exc_name} at line {lineno}'
 
-def exc_text_test():
-	exc_type, exc_value, exc_tb = sys.exc_info()
-	last_frame = traceback.extract_tb(exc_tb)[-1]
-	filename = last_frame.filename
-	lineno = last_frame.lineno
-	function = last_frame.name
-	line = last_frame.line
-	exc_name = exc_type.__name__
-	return f"Exception: {exc_name}, File: {filename}, Line: {lineno}, Code: {line}"
+
 
 def exc_texts()->tuple[str, str]:
 	r'''
@@ -2860,6 +2866,8 @@ def _init():
 	setattr(app, 'que_print', TQueue(consumer=print))
 	setattr(app, 'que_log', TQueue(consumer=lambda t: None) )
 	setattr(app, 'dir', os.getcwd())
+	setattr(app, 'app_threads', {})
+	setattr(app, 'app_pid', _GetCurrentProcessId())
 	__builtins__['app'] = app
 	
 if __name__ != '__main__':
