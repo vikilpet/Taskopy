@@ -34,8 +34,8 @@ from .plugin_system import win_list_top
 _SIZE_UNITS = {'gb':1073741824, 'mb':1048576, 'kb':1024, 'b':1, 'percent':1}
 
 def file_open(fullpath:str, parameters:str=None, operation:str='open'
-, cwd:str=None, showcmd:int=win32con.SW_SHOWNORMAL):
-	'''
+, cwd:str='', showcmd:int=win32con.SW_SHOWNORMAL):
+	r'''
 	Opens file or URL in an associated program.  
 	*parameters* - command-line parameters
 	to be passed to a program.  
@@ -52,16 +52,14 @@ def file_open(fullpath:str, parameters:str=None, operation:str='open'
 		, operation.lower()
 		, path_get(fullpath)
 		, parameters
-		, cwd
+		, path_get(cwd) if cwd else None
 		, showcmd
 	)
 
-def proc_get(process, cmd_filter:str=None)->int:
-	'''
-	Returns PID of process or *-1* if not found.
-	
-	*cmd_filter* - find process with that
-			string in command line.
+def proc_get(process, cmd_filter:str='')->int:
+	r'''
+	Returns PID of process or *-1* if not found.  
+	*cmd_filter* - find the process with this substring in the command line.  
 	
 	'''
 	if isinstance(process, int): return process
@@ -110,7 +108,7 @@ def proc_wait(
 	, make_stdin:bool=True
 	, encoding:str='utf-8'
 	, encoding_errors:str='replace'
-):
+)->tuple[int, str, str]:
 	r'''
 	Start the process and wait for it to complete.  
 	Returns (return code, stdout, stderr)  
@@ -154,16 +152,18 @@ def proc_wait(
 	if stdin_handle: win32file.CloseHandle(stdin_handle)
 	stdout_chunks = []
 	stderr_chunks = []
-	thread_start(_reader_thread, args=(stdout_read, stdout_chunks)
-	, ident='proc_wait out: ' + str_short(cmd, 30))
-	thread_start(_reader_thread, args=(stderr_read, stderr_chunks)
-	, ident='proc_wait err: ' + str_short(cmd, 30))
+	thread_out = thread_start(_reader_thread, args=(stdout_read, stdout_chunks)
+	, ident='proc_wait out: ' + cmd)
+	thread_err = thread_start(_reader_thread, args=(stderr_read, stderr_chunks)
+	, ident='proc_wait err: ' + cmd)
 	win32event.WaitForSingleObject(proc_handle, win32event.INFINITE)
 	exit_code = win32process.GetExitCodeProcess(proc_handle)
-	win32file.CloseHandle(stdout_read)
-	win32file.CloseHandle(stderr_read)
 	win32api.CloseHandle(proc_handle)
 	win32api.CloseHandle(thread_handle)
+	thread_out.join()
+	thread_err.join()
+	win32file.CloseHandle(stdout_read)
+	win32file.CloseHandle(stderr_read)
 	stdout_data = b''.join(stdout_chunks)
 	stderr_data = b''.join(stderr_chunks)
 	return (
@@ -878,8 +878,7 @@ def os_task_start(name:str)->tuple[bool, str]:
 	r'''
 	Starts a Windows task.  
 	'''
-	ret, out, err = proc_start('schtasks', f'/run /tn "{name}"'
-	, capture=True, args_as_str=True)
+	ret, out, err = proc_wait(f'schtasks /run /tn "{name}"')
 	if ret: return False, err
 	return True, out
 
@@ -903,15 +902,14 @@ def os_task_info(name:str='')->tuple[bool, list[OSTask]|str]:
 	Returns information about Windows tasks as list
 	of `OSTask` objects or (False, 'error text').  
 	*name* - to get information about one particular task.  
-	Tested not in all versions of Windows.  
+	Not tested in all versions of Windows.  
 
 		status, data = os_task_info(r'\Microsoft\Windows\CertificateServicesClient\UserTask')
 
 	'''
-	ret, out, err = proc_start(
-		'schtasks.exe'
-		, '/query /v /fo list' + (f' /tn "{name}"' if name else '')
-		, capture=True, args_as_str=True
+	ret, out, err = proc_wait(
+		'schtasks.exe /query /v /fo list'
+		+ (f' /tn "{name}"' if name else '')
 	)
 	if ret: return False, err
 	os_tasks = []

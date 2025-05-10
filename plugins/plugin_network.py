@@ -27,7 +27,7 @@ from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 from .plugin_process import proc_wait
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 _GV_PUBLIC_SUF_LST = '__public_suffix_list__'
 _RE_PING_LOSS = re.compile(r'\((\d+)%')
@@ -399,7 +399,8 @@ def html_element(url:str, element
 	else:
 		return result
 
-def json_element(source:str, element:list|tuple=[], **kwargs)->str|list|tuple|float|int|dict:
+def json_element(source:str, element:list|tuple=[]
+, **kwargs)->str|list|tuple|float|int|dict:
 	r'''
 	Download JSON from URL and get its nested element by
 	map of keys like ['list', 0, 'someitem', 1]  
@@ -786,35 +787,8 @@ def ping_tcp(host:str, port:int, count:int=1, pause:int=100
 	if not timings: return False, last_err
 	loss = (count - len(timings)) * 100 // count
 	return True, ( loss, int(median(timings)))
-		
-def ping_icmp_old(host:str, count:int=3
-, timeout:int=500, encoding:str='cp866')->tuple[bool, tuple|str]:
-	r'''
-	Wrapper over ping.exe.
-	Returns (True, (loss percentage, time in ms) )
-	or (False, 'cause of failure').  
-	
-	Examples:
-	
-		asrt( ping_icmp('8.8.8.8', 1)[0], True)
-		asrt( ping_icmp('non.existent.domain', 1), (False, 'host unreachable (1)') )
-		asrt( ping_icmp('127.0.0.1', 1), (True, (0, 0)) )
 
-	'''
-	proc = subprocess.Popen(
-		('ping', '-n', str(count), '-w', str(timeout), host)
-		, stderr=subprocess.STDOUT
-		, stdout=subprocess.PIPE
-		, encoding=encoding
-	)
-	out, ret = proc.communicate()[0], proc.returncode
-	if ret == 1: return False, 'host unreachable (1)'
-	loss = _RE_PING_LOSS.findall(out)
-	if not _RE_PING_FAIL.findall(out):
-		return False, 'host unreachable (2)'
-	loss = int(loss[0])
-	av_time = int( _RE_PING_TIME.findall(out)[1][2] )
-	return True, (loss, av_time)
+
 
 def ping_icmp(host:str, count:int=3
 , timeout:int=500, encoding:str='cp866')->tuple[bool, tuple|str]:
@@ -838,12 +812,7 @@ def ping_icmp(host:str, count:int=3
 		return False, 'host unreachable (2)'
 	loss = int(loss[0])
 	av_time:int = 0
-	try:
-		av_time = int( _RE_PING_TIME.findall(out)[1][2] )
-	except:
-		if is_dev():
-			qprint('ping_icmp _RE_PING_TIME exception:' + str_indent(out))
-			raise
+	av_time = int( _RE_PING_TIME.findall(out)[1][2] )
 	return True, (loss, av_time)
 
 def ftp_upload(fullpath, server:str

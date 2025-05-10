@@ -2305,20 +2305,6 @@ def dir_sync(src_dir, dst_dir, report:bool=False
 	if sync.errors and report: sync.print_errors()
 	return sync.errors.copy()
 
-def path_short(fullpath, max_len:int=0)->str:
-	r'''
-	Shortens a long file name to display.
-
-		path = r'c:\Windows\System32\msiexec.exe'
-		asrt(path_short(path, 22), 'c:\Windo...msiexec.exe')
-		asrt(path_short(path, 23), 'c:\Window...msiexec.exe')
-		asrt(path_short(path), path)
-
-	'''
-	if not max_len: max_len = _TERMINAL_WIDTH
-	if len(fp := fullpath) <= max_len: return fullpath
-	return fp[:( -(-max_len // 2 ) )-3] + '...' + fp[-(max_len//2):]
-
 
 
 class DirDup:

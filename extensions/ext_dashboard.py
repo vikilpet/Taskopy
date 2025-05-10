@@ -37,7 +37,6 @@ otherwise you will get 403 error.
 
 '''
 _DASH_HTML:str = ''
-_DASH_HTML_FILE:str = path_get((app_dir(), 'ext_dashboard.html'))
 
 def dash_page(source:Callable, actions:dict={}, title:str='Dashboard'
 , max_status_len:int=60, http:str='^dashboard$', data:DataHTTPReq=None)->str:
@@ -46,7 +45,8 @@ def dash_page(source:Callable, actions:dict={}, title:str='Dashboard'
 	'''
 	global _DASH_HTML
 	if not data.params:
-		if not _DASH_HTML: _DASH_HTML = file_read(_DASH_HTML_FILE)
+		if not _DASH_HTML:
+			_DASH_HTML = file_read( (app_dir(), 'ext_dashboard.html') )
 		page = _DASH_HTML.replace('%title%', title)
 		return page
 	if 'd' in data.params:
@@ -61,7 +61,3 @@ def dash_page(source:Callable, actions:dict={}, title:str='Dashboard'
 		tprint('action exception:', str_indent(data))
 		return 'error: ' + str_short(data, max_status_len - 7)
 
-@task_add
-def dash_reload_html(on_file_change=_DASH_HTML_FILE, menu=False, log=False):
-	global _DASH_HTML
-	_DASH_HTML = ''

@@ -18,7 +18,7 @@ import win32evtlog
 import gc
 from plugins.constants import *
 from plugins.tools import *
-from plugins.tools import _tlog
+from plugins.tools import _tlog, _thread_pop
 from plugins.plugin_filesystem import *
 from plugins.plugin_system import *
 from plugins.plugin_system import _idle_millis
@@ -189,7 +189,6 @@ class Tasks:
 		self.idle_min = 0
 		self.http_server = None
 		self.global_hk = None
-		self.global_hk_thread_id = None
 		for task_name in dir(crontab):
 			if task_name.startswith('_'): continue
 			task_obj = getattr(crontab, task_name)
@@ -198,7 +197,6 @@ class Tasks:
 				(not getattr(task_obj, TASK_ATTR, False))
 				and (task_obj.__module__ != 'crontab')
 			): continue
-			
 			task_opts:dict = {}
 			params = inspect.signature(task_obj).parameters
 			for opt, opt_def in TASK_OPTIONS:
@@ -265,7 +263,9 @@ class Tasks:
 					self.task_list_menu.append(task_opts)
 			if task_opts['http'] != False:
 				if task_opts['http'] == True:
-					http_re = ('^' + task_opts['task_func_name'] + '$', )
+					http_re = (
+						''.join(('^', task_opts['task_func_name'], '$')),
+					)
 				else:
 					http_re = task_opts['http']
 					if not is_iter(http_re): http_re = (task_opts['http'],)
@@ -307,14 +307,17 @@ class Tasks:
 				, app.taskbaricon.on_left_down
 			)
 		if self.global_hk:
-			self.global_hk_thread_id = thread_start(self.global_hk.listen
-			, err_msg=True, ident='app: global hotkey listener')
+			thread_start(self.global_hk.listen
+			, err_msg=True, ident='app: hotkey listener')
 		if self.task_list_http:
 			thread_start(http_server_start, args=(self,), err_msg=True
 			, ident='app: http server')
-		self.sched_thread_id = thread_start(self.run_scheduler, err_msg=True
+		thread = thread_start(self.run_scheduler, err_msg=True
 		, ident='app: scheduler')
-		dev_print(f'total number of tasks: {len(self.task_dict)}', tname='app')
+		self.sched_thread_id = thread.ident
+		if is_dev():
+			tprint(f'total number of tasks: {len(self.task_dict)}'
+			, tname='app')
 	
 	def add_hotkey(self, task):
 		
@@ -470,7 +473,7 @@ class Tasks:
 				, 'is_file': is_file
 			}
 			, err_msg=True
-			, ident='app: dir_watch ' + path_short(path, 30)
+			, ident='app: dir_watch ' + path
 		)
 
 	def add_every(self, task:dict):
@@ -597,18 +600,20 @@ class Tasks:
 			self.run_task(task, caller=CALLER_LOAD)
 	
 	def task_opt_set(self, task_func_name:str, option:str, value):
-		''' Sets the option for the task
-		'''
-		if not (task := self.task_dict.get(task_func_name)):
-			dev_print(f'task not found: {task_func_name}, option: {option}')
+		''' Sets the option for the task '''
+		task = self.task_dict.get(task_func_name)
+		if task == None:
+			if is_dev():
+				tprint(f'task not found: {task_func_name}, option: {option}')
 			return
 		task[option] = value
 
 	def task_opt_get(self, task_func_name:str, option:str):
-		''' Gets the option for the task
-		'''
-		if not (task := self.task_dict.get(task_func_name)):
-			dev_print(f'task not found: {task_func_name}, option: {option}')
+		''' Gets the option for the task '''
+		task = self.task_dict.get(task_func_name)
+		if task == None:
+			if is_dev():
+				tprint(f'task not found: {task_func_name}, option: {option}')
 			return
 		return task.get(option, 'task_opt_get error: option not found')
 
@@ -629,7 +634,12 @@ class Tasks:
 		def run_task_inner(result:list=None):
 
 			def catcher(result:list=None):
+				nonlocal thread
 				try:
+					app.app_threads[thread.ident] = {
+						'func': 'task: ' + task['task_func_name']
+						, 'stime': dtime.now(), 'thread': thread
+					}
 					self.task_opt_set(task['task_func_name']
 						, 'running', True)
 					self.task_opt_set(task['task_func_name']
@@ -658,12 +668,15 @@ class Tasks:
 					if wait_event: wait_event.set()
 				except:
 					try:
-						if ( t := tasks.task_dict.get(task['task_func_name'], {}) ):
+						if (
+							t := tasks.task_dict.get(task['task_func_name'], {})
+						):
 							t['running'] = False
 							t['thread'] = None
 					except NameError:
-						dev_print('task stopped after reload: '
-						+ task['task_func_name'])
+						if is_dev():
+							tprint('task stopped after reload: '
+							+ task['task_func_name'])
 					err_counter = self.task_opt_get(task['task_func_name']
 					, 'err_counter') + 1
 					if not result is None: result.append('task error')
@@ -671,13 +684,15 @@ class Tasks:
 					, 'err_threshold'):
 						self.task_opt_set(task['task_func_name']
 						, 'err_counter', err_counter)
-						dev_print(f'exception msg suppressed: {exc_text()}'
-						, tname=task['task_func_name'], short=True)
-						return
-					self.task_opt_set(task['task_func_name']
-					, 'err_counter', 0)
-					msg_err(lang.warn_task_error.format(
-						task['task_name_full']))
+						if is_dev():
+							tprint(f'exception msg suppressed: {exc_text()}'
+							, tname=task['task_func_name'], short=True)
+					else:
+						self.task_opt_set(task['task_func_name']
+						, 'err_counter', 0)
+						msg_err(lang.warn_task_error.format(
+						task['task_name_full']) )
+				_thread_pop('task', thread_id=thread.ident)
 			if (
 				(not self.enabled)
 				and ( not task['hyperactive'])
@@ -695,20 +710,15 @@ class Tasks:
 			if task['log']:
 				cs = f' ({caller})' if caller else ''
 				con_log(f'task{cs}: {task["task_name_full"]}')
-			thr = threading.Thread(target=catcher, daemon=daemon
+			thread = threading.Thread(target=catcher, daemon=daemon
 			, name=task['task_name']
 			, args=(result,) if task['result'] else () )
-			thr.start()
-			app.app_threads[thr.ident] = {
-				'func': 'task: ' + task['task_func_name']
-				, 'stime': dtime.now()
-				, 'thread': thr
-			}
-			if task['result']: thr.join()
+			thread.start()
+			if task['result']: thread.join()
 		daemon = (caller != CALLER_EXIT)
 		if task['result'] and not (result is None):
 			thread_start(run_task_inner, is_daemon=daemon, args=(result,)
-			, err_msg=True, ident='run_task_inner: ' + task['task_name'])
+			, err_msg=True, ident='app: run_task_inner: ' + task['task_name'])
 		else:
 			run_task_inner()
 
@@ -828,7 +838,6 @@ class Tasks:
 			msg = [dir_path]
 			try:
 				CancelIoEx(hDir.handle, None)
-				dev_print('CancelIoEx ok')
 			except OSError as err:
 				if err.winerror == 1168:
 					msg.append(f'{err.strerror} ({err.winerror})')
@@ -837,9 +846,7 @@ class Tasks:
 			except Exception as err:
 					msg.append(f'CancelIoEx general: {repr(err)}')
 			try:
-				dev_print('Close...')
 				hDir.Close()
-				dev_print('... Close ok')
 			except Exception as err:
 				msg.append(f'Close: {repr(err)}')
 			if is_dev() and len(msg) > 1:
@@ -864,7 +871,7 @@ def load_crontab(event=None)->bool:
 					tmp_crontab = importlib.import_module('crontab')
 					break
 				except PermissionError:
-					dev_print(f'permission error {attempt=}')
+					if is_dev(): qprint(f'permission error {attempt=}')
 					time.sleep(.01)
 				except:
 					sys.modules['crontab'] = prev_crontab
@@ -898,7 +905,7 @@ def load_crontab(event=None)->bool:
 		, ident='app: run_at_crontab_load')
 		if is_dev():
 			for tn in running_tasks: tprint('still running: ' + tn)
-		dev_print('load time: ' + time_diff_human(start, with_ms=True))
+			tprint('load time: ' + time_diff_human(start, with_ms=True))
 		gc.collect()
 		return True
 	except:

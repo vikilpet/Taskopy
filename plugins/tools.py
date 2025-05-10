@@ -46,6 +46,7 @@ import lxml
 import textwrap
 import io
 import unicodedata
+import multiprocessing
 from xml.etree import ElementTree as _ElementTree
 import windows_toasts as wtoasts
 try:
@@ -54,7 +55,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2025-04-12'
+APP_VERSION = 'v2025-05-10'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
@@ -86,6 +87,7 @@ _LOG_TIME_FORMAT = '%Y.%m.%d %H:%M:%S'
 _TERMINAL_WIDTH = os.get_terminal_size().columns - 1
 TASK_ATTR:str = '__is_task__'
 if (lambda: False)(): gdic:dict = {}
+_MAIN_PID = os.getpid()
 
 
 class Settings:
@@ -294,7 +296,7 @@ def task_name(is_human:bool=False)->str:
 	tname = ''
 	first_name = ''
 	try:
-		tasks:dict = app.tasks.task_dict.keys()
+		tasks = set(app.tasks.task_dict.keys())
 	except NameError:
 		return ''
 	except AttributeError:
@@ -953,7 +955,9 @@ def msg_err(msg:str, title:str='', source:str='', timeout:str='30 min'
 	'''
 	try:
 		if is_often('__msg_err ' + source + msg, interval=often_int):
-			dev_print('error msg suppressed: ' + msg, tname=source, short=True)
+			if is_dev():
+				tprint('error msg suppressed: ' + msg, tname=source
+				, short=True)
 			return
 		exc_full:str=''
 		exc_short:str=''
@@ -965,11 +969,12 @@ def msg_err(msg:str, title:str='', source:str='', timeout:str='30 min'
 		if exc_full:
 			tprint(msg + str_indent(exc_full), tname=source)
 			tlog(msg + str_indent(exc_full, borders=False))
-		_msg_err(msg=msg + ' ' + exc_short, title=title, icon=tcon.TD_ICON_ERROR
-		, timeout=timeout, parent='msg_err')
+		_msg_err(msg=msg + ' ' + exc_short, title=title
+		, icon=tcon.TD_ICON_ERROR, timeout=timeout, parent='msg_err')
 	except Exception as err:
 		print(f'\n[msg_err] «{msg}» exception:\n\n{repr(err)}\n\n')
-		_MessageBoxTimeout(None, 'msg_err exception', APP_NAME, 16, 0, 1_800_000)
+		_MessageBoxTimeout(None, 'msg_err exception', APP_NAME, 16
+		, 0, 1_800_000)
 
 def msg_warn(msg:str, title:str='', timeout:str='30 min'):
 	r'''
@@ -1284,8 +1289,10 @@ def qprint(*values):
 	msg = ' '.join(map(str, values))
 	try:
 		app.que_print.put(msg)
-	except:
+	except NameError:
 		print(msg)
+	except:
+		print('<qprint fail>', msg)
 
 def tprint(*msgs, tname:str|None=None, short:bool=False):
 	r'''
@@ -1296,14 +1303,19 @@ def tprint(*msgs, tname:str|None=None, short:bool=False):
 	'''
 	msg = ' '.join(map(str, msgs))
 	if tname == None:
-		if tname := task_name(): msg = '[' + tname + '] ' + msg
+		if tname := task_name():
+			if tname.startswith('<'):
+				msg = ''.join((tname, ' ', msg))
+			else:
+				msg = ''.join(('[', tname, '] ', msg))
 	else:
 		if tname and (not tname.startswith('<')):
-			msg = '[' + tname + '] ' + msg
+			msg = ''.join(('[', tname, '] ', msg))
+	msg = ''.join((time.strftime('%y.%m.%d %H:%M:%S'), ' ', msg))
 	if short:
-		qprint( str_short(time.strftime('%y.%m.%d %H:%M:%S') + ' ' + msg) )
+		qprint( str_short(msg) )
 	else:
-		qprint(time.strftime('%y.%m.%d %H:%M:%S') + ' ' + msg)
+		qprint(msg)
 
 _is_con_cache:bool|None = None
 
@@ -1741,7 +1753,7 @@ def table_print(
 	*trim_func* - function to shorten a long string. If not
 	set then `str_short` will be used. The function
 	receives a string and its maximum length as an input.
-	For full file paths, it is better to use `path_short`  
+	For full file paths it is better to use `path_short`  
 	
 	Example:
 
@@ -2121,15 +2133,24 @@ class DataEvent:
 				else:
 					self.EventData = str(edata)
 			except:
-				dev_print(f'EventData exception: {exc_text()}')
+				if is_dev(): tprint(f'EventData exception: {exc_text()}')
 				self.EventData = self._EventDataDict
 		if self.EventData: self.EventDataStr = value_to_str(self.EventData)
 
+def _thread_pop(src:str, thread_id:int):
+	' Delete current thread from `app.app_threads` '
+	thread = app.app_threads.pop(thread_id, None)
+	if thread is None:
+		pass
+	else:
+		del thread['thread']
+		del thread
+
 def thread_start(func, args:tuple=(), kwargs:dict={}
 , is_daemon:bool=True, err_msg:bool=False, ident:str=''
-, err_action:Callable|None=None)->int:
+, err_action:Callable|None=None)->threading.Thread:
 	r'''
-	Runs function in a thread. Returns thread id.  
+	Runs function in a thread. Returns thread object  
 	*is_daemon* - thread runs in the background and is terminated
 	automatically when the main program exits, regardless of whether
 	the daemon thread has finished its work or not.  
@@ -2143,7 +2164,12 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 	'''
 	
 	def wrapper():
-		nonlocal func, args, kwargs
+		nonlocal func, args, kwargs, thread
+		try:
+			app.app_threads[thread.ident] = {'func': ident
+			, 'stime': dtime.now(), 'thread': thread}
+		except NameError:
+			pass
 		try:
 			func(*args, **kwargs)
 		except:
@@ -2152,28 +2178,37 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 			if err_action:
 				try:
 					err_action(traceback.format_exc().strip())
-				except Exception as e:
-					dev_print(f'exception in err_action: {repr(e)}')
-		app.app_threads.pop(threading.get_ident(), None)
+				except Exception as err:
+					if is_dev():
+						tprint(f'exception in err_action: {repr(err)}')
+		_thread_pop('thread_start', thread_id=thread.ident)
 
-	thr = threading.Thread(target=wrapper, daemon=is_daemon
+	if not ident:
+		parents = list(reversed(_get_parents()))[-3:]
+		parents.append(func.__name__)
+		ident = '>'.join(parents)
+	thread = threading.Thread(target=wrapper, daemon=is_daemon
 	, name=func.__name__)
-	thr.start()
-	try:
-		if not ident:
-			parents = list(reversed(_get_parents()))[-3:]
-			parents.append(func.__name__)
-			ident = '>'.join(parents)
-		app.app_threads[thr.ident] = {
-			'func': ident
-			, 'stime': dtime.now()
-			, 'thread': thr
-		}
-	except:
-		dev_print('thread_start save error: ' + exc_text())
-		pass
-	return thr.ident
+	thread.start()
+	return thread
 task_run = thread_start
+
+def task_start(taskname:str|Callable, **kwargs):
+	r'''
+	Starts the task.  
+	This is not just a matter of launching a function in a separate
+	thread: related procedures are performed: checking if the task
+	is running, checking the rules for launching the task, etc.  
+
+	If all you want to do is just run the function in a separate thread
+	, see `thread_start`.
+	'''
+	if isinstance(taskname, Callable): taskname = taskname.__name__
+	for tname, tdic in app.tasks.task_dict.items():
+		if taskname == tname: break
+	else:
+		raise Exception('Task not found')
+	app.tasks.run_task(tdic, **kwargs)
 
 def app_threads_print():
 	thread: threading.Thread
@@ -2183,30 +2218,41 @@ def app_threads_print():
 		func_name = thr_dic.get('func')
 		start_time = thr_dic.get('stime')
 		run_time = time_diff_human(start_time) if start_time else None
-		thread = thr_dic.get('thread', None)
-		daemon = None
-		target = None
-		if thread != None:
-			if not thread.is_alive(): continue
-			daemon = thread.daemon
-			target = getattr(thread, '_target', None)
-			if target: target = getattr(target, '__name__', None)
+		thread = thr_dic.get('thread')
+		if thread is None:
+			table.append((
+				ident
+				, '?'
+				, str(start_time).split('.')[0]
+				, run_time
+				, '?'
+				, func_name
+			))
+			continue
+		is_daemon = thread.daemon
+		target = getattr(thread, '_target', None)
+		if target: target = getattr(target, '__name__', None)
 		table.append((
 			ident
-			, 'Y' if daemon else 'N'
+			, 'D' if is_daemon else '-'
 			, str(start_time).split('.')[0]
 			, run_time
 			, target
 			, func_name
 		))
-	dead = sum(1 for t in threading.enumerate() if not t.is_alive())
-	table_print(table, use_headers=True, sorting=[2])
+	tnum_thread = 0
+	tnum_dead = 0
+	for t in threading.enumerate():
+		tnum_thread += 1
+		if not t.is_alive(): tnum_dead += 1
 	tnum_sys = len(psutil.Process(pid=app.app_pid).threads())
+	tnum_app = len(app.app_threads)
+	table_print(table, use_headers=True, sorting=[2]
+	, trim_func=path_short)
 	qprint('Number of threads:')
-	qprint(f'table		{len(table) - 1}')
-	qprint(f'dead		{dead}')
-	qprint(f'threading	{len(threading.enumerate())}')
-	qprint(f'system		{tnum_sys}\n')
+	qprint(f'app		{tnum_app} (dead {tnum_dead})')
+	qprint(f'threading	{tnum_thread} ({tnum_thread - tnum_app})')
+	qprint(f'system		{tnum_sys} ({tnum_sys - tnum_app})\n')
 
 
 def crontab_reload():
@@ -2272,7 +2318,7 @@ def app_pid()->int:
 		asrt( bmark(app_pid), 500 )
 
 	'''
-	return app.app_pid
+	return _MAIN_PID
 
 def bmark(func, a:tuple=(), ka:dict={}, b_iter:int=10
 , do_print:bool=True)->int:
@@ -2321,7 +2367,7 @@ def bmark(func, a:tuple=(), ka:dict={}, b_iter:int=10
 		timings.append(time.perf_counter_ns() - start)
 	ns_median:int = int(median(timings))
 	name = func.__name__
-	if do_print and is_con():
+	if do_print:
 		ns_max = max(timings)
 		qprint(
 			'median={} ns/loop, best={}, worst={}, total={}, {} loops'.format(
@@ -2719,7 +2765,8 @@ def str_short(text:str, width:int=0, placeholder:str='...'
 	Collapse and truncate the given text to fit in the given width.  
 	The main purpose is to shorten text for output to the console
 	so extra whitespace characters are removed, including line breaks.  
-	If *width* is not specified, the current terminal width is used.
+	If *width* is not specified, the current terminal width is used.  
+	For full file paths it is better to use `path_short`  
 
 		asrt( str_short('Hello,  world! ', 13), 'Hello, world!' )
 		asrt( str_short('Hello', 13), 'Hello' )
@@ -2736,6 +2783,20 @@ def str_short(text:str, width:int=0, placeholder:str='...'
 	)
 	if len(new_text) <= width: return new_text
 	return new_text[:(width - len(placeholder))] + placeholder
+
+def path_short(fullpath, max_len:int=0)->str:
+	r'''
+	Shortens a long file name to display.
+
+		path = r'c:\Windows\System32\msiexec.exe'
+		asrt(path_short(path, 22), 'c:\Windo...msiexec.exe')
+		asrt(path_short(path, 23), 'c:\Window...msiexec.exe')
+		asrt(path_short(path), path)
+
+	'''
+	if not max_len: max_len = _TERMINAL_WIDTH
+	if len(fp := fullpath) <= max_len: return fullpath
+	return ''.join(( fp[:( -(-max_len // 2 ) )-3], '...', fp[-(max_len//2):] ))
 
 def _str_unicode_white(categories:tuple=('Zs', 'Zl', 'Zp', 'Cc')):
 	' Generate Unicode whitespace list '
@@ -2857,6 +2918,50 @@ def clip_set_img(image):
 	win32clipboard.EmptyClipboard()
 	win32clipboard.SetClipboardData(win32clipboard.CF_DIB, image)
 	win32clipboard.CloseClipboard()
+
+def is_in_child_process()->bool:
+	r'''
+	Are we working in a child process?
+	'''
+	return os.getpid() != _MAIN_PID
+
+def _target_func(func, queue, args, kwargs):
+	result = func(*args, **kwargs)
+	queue.put(result)
+
+def run_in_process(func):
+	r'''
+	Run function in a child process and get result. Blocking call.  
+	Caveats:
+	
+	- Everything must be pickle-friendly
+	- There will be an error when using *app_* functions.
+	- The function will not see changes in global variables (*gdic*).  
+
+	New process start ~ 3 seconds:
+
+		def _rip_test():
+			return 'done'
+
+		def test_run_in_process():
+			bmark( run_in_process(_rip_test) )
+
+	'''
+	@functools.wraps(func)
+	def wrapper(*args, **kwargs):
+		def target_func(q, *args, **kwargs):
+			result = func(*args, **kwargs)
+			q.put(result)
+
+		queue = multiprocessing.Queue()
+		p = multiprocessing.Process(target=_target_func
+		, args=(func, queue, args, kwargs))
+		p.start()
+		p.join()
+
+		return queue.get()
+
+	return wrapper
 
 def _init():
 	if __builtins__.get('gdic', None) != None: return

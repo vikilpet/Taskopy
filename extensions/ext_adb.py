@@ -57,6 +57,7 @@ Examples:
 Swipe up: `shell input touchscreen swipe 530 1920 530 1120`  
 Press keys: `shell input text abc`  
 Call the PIN keypad when the screen is locked: `shell input keyevent 82`  
+Lock phone: `shell input keyevent KEYCODE_POWER`  
 
 ## Links:
 
@@ -180,10 +181,11 @@ def adb_push(pcpath:str, apath:str, **kwargs)->tuple[bool, str]:
 	if is_dir := dir_exists(pcpath):
 		apath = apath + '/' + file_name(pcpath.rstrip('\\'))
 		status, data = adb_dir_create(apath, **kwargs)
-	for fp in (dir_files(pcpath) if is_dir else (pcpath,)):
-		tprint('push', file_name(fp))
+	for fpath in (dir_files(pcpath) if is_dir else (pcpath,)):
+		fname = file_name(fpath)
+		tprint('push', fname)
 		status, data = adb_run(
-			('push', fp, apath + '/' + file_name(fp))
+			('push', '"' + fpath + '"', ''.join(('"', apath, '/', fname, '"')))
 			, **kwargs
 		)
 		if not status: return False, data
