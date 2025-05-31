@@ -16,6 +16,8 @@ import win32con
 import win32file
 import win32evtlog
 import gc
+import argparse
+import msvcrt
 from plugins.constants import *
 from plugins.tools import *
 from plugins.tools import _tlog, _thread_pop
@@ -309,7 +311,7 @@ class Tasks:
 		if self.global_hk:
 			thread_start(self.global_hk.listen
 			, err_msg=True, ident='app: hotkey listener')
-		if self.task_list_http:
+		if self.task_list_http and app.cmd_args.task is None:
 			thread_start(http_server_start, args=(self,), err_msg=True
 			, ident='app: http server')
 		thread = thread_start(self.run_scheduler, err_msg=True
@@ -328,7 +330,7 @@ class Tasks:
 				)
 				+ ':\n' + task['hotkey']
 			)
-			
+		if app.cmd_args.task: return
 		if task['hotkey_suppress']:
 			try:
 				if not self.global_hk:
@@ -621,15 +623,15 @@ class Tasks:
 	, result:list=None, wait_event:threading.Event=None):
 		r'''
 		Logging, threading, error catching and other stuff.
-		task - dict with task options
-		caller - who actually launched the task.
+		*task* - dict with task options
+		*caller* - who actually launched the task.
 			It can be 'hotkey', 'menu', 'scheduler', 'http' etc.,
 			so you can find out inside the task function who
 			started function this time.
-		data - pass some data to task
-		result - list in which we will place result of task. It is
-			passed through all inner fuctions (run_task_inner and
-			catcher).
+		*data* - pass some data to task
+		*result* - list in which we will place result of task. It is
+			passed through all inner fuctions (`run_task_inner` and
+			`catcher`).
 		'''
 		def run_task_inner(result:list=None):
 
@@ -707,7 +709,7 @@ class Tasks:
 					except:
 						msg_err(lang.warn_rule_exc.format(task["task_name"]))
 						return
-			if task['log']:
+			if task['log'] and caller != CALLER_CMDLINE:
 				cs = f' ({caller})' if caller else ''
 				con_log(f'task{cs}: {task["task_name_full"]}')
 			thread = threading.Thread(target=catcher, daemon=daemon
@@ -715,7 +717,7 @@ class Tasks:
 			, args=(result,) if task['result'] else () )
 			thread.start()
 			if task['result']: thread.join()
-		daemon = (caller != CALLER_EXIT)
+		daemon = (not caller in (CALLER_EXIT, CALLER_CMDLINE)) 
 		if task['result'] and not (result is None):
 			thread_start(run_task_inner, is_daemon=daemon, args=(result,)
 			, err_msg=True, ident='app: run_task_inner: ' + task['task_name'])
@@ -904,7 +906,6 @@ def load_crontab(event=None)->bool:
 		thread_start(tasks.run_at_crontab_load, err_msg=True
 		, ident='app: run_at_crontab_load')
 		if is_dev():
-			for tn in running_tasks: tprint('still running: ' + tn)
 			tprint('load time: ' + time_diff_human(start, with_ms=True))
 		gc.collect()
 		return True
@@ -992,7 +993,8 @@ def create_menu_item(menu, task, func=None, parent_menu=None):
 		tname = task['task_name']
 		if task['hotkey']:
 			tname = f"{tname}\t{task['hotkey'].title()}"
-		func = lambda evt, temp=task: tasks.run_task(task=temp, caller=CALLER_MENU)
+		func = lambda evt, temp=task: tasks.run_task(task=temp
+		, caller=CALLER_MENU)
 	else:
 		tname = task
 	if parent_menu:
@@ -1048,8 +1050,15 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 
 	def run_command(self, event=None):
 		show_app_window()
-		cmd = input(f'{lang.menu_command_con}: ')
-		if cmd: qprint(eval(cmd))
+		print(f'{lang.menu_command_con}:')
+		with SuppressPrint(): cmd = input()
+		if not cmd: return
+		try:
+			val = eval(cmd)
+		except:
+			qprint('eval exception:', exc_name())
+			return
+		qprint(val)
 
 	def set_icon(self, dis:bool=False, text=APP_FULLNAME
 	, del_text_key=None):
@@ -1089,6 +1098,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 	def on_exit(self, event=None, force:bool=False
 	, is_end_session:bool=False)->bool:
 		r'''
+		Returns `False` if user canceled exit.  
 		*force* - do not display a warning dialog about running tasks.  
 		*is_end_session* - logoff or shutdown.  
 		'''
@@ -1216,46 +1226,45 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			con_log(f'{APP_NAME} disabled')
 		self.set_icon(dis=not state)
 	
-	def on_restart(self, event=None):
-		if not self.on_exit(): return
-		dev = ''
-		if '--developer' in sys.argv: dev = '--developer'
-		if getattr(sys, 'frozen', False):
-			file_open(
-				os.path.join(APP_PATH, APP_NAME + '.exe')
-				, parameters=dev
-			)
-		else:
-			file_open(
-				os.path.join(APP_PATH, APP_NAME + '.py')
-				, parameters=dev
-			)
+	def on_restart(self, event=None, force:bool=False):
+		ext = '.exe' if getattr(sys, 'frozen', False) else '.py'
+		fpath = os.path.join(APP_PATH, APP_NAME + ext)
+		args = ' '.join(sys.argv[1:])
+		is_exit = self.on_exit()
+		if not force and not is_exit: return
+		file_open(fpath, parameters=args)
 
 class App(wx.App):
 
 	def OnInit(self):
 		self.enabled = True
 		self.app_threads = {}
-		self.frame=wx.Frame(None, style=wx.DEFAULT_FRAME_STYLE | wx.STAY_ON_TOP)
+		self.frame=wx.Frame(None, style=wx.DEFAULT_FRAME_STYLE
+			| wx.STAY_ON_TOP)
 		self.taskbaricon = TaskBarIcon(self.frame)
+		self.show_window = self.taskbaricon.on_left_down
 		self.app_pid = win32process.GetCurrentProcessId()
+		self.app_hwnd:int = 0
 		self.frame.Bind(wx.EVT_END_SESSION
 		, lambda: self.taskbaricon.on_exit(is_end_session=True) )
+		self.cmd_args:argparse.Namespace = argparse.Namespace()
+		self.load_crontab = load_crontab
+		self.dir = APP_PATH
+		return True
+	
+	def win_save(self):
+		'Find and save handle of console window'
+		show_warn:int = (not sett.dev) \
+		and (getattr(self.cmd_args, 'task', None) == None)
 		hwnd_list = win_find(APP_NAME)
 		if len(hwnd_list) == 1:
 			self.app_hwnd = hwnd_list[0]
 		elif len(hwnd_list) > 1:
 			self.app_hwnd = hwnd_list[0]
-			if not sett.dev:
-				msg_warn(
-					lang.warn_too_many_win.format(
-					APP_NAME, len(hwnd_list) )
-				)
+			if not show_warn: return
+			msg_warn(lang.warn_too_many_win.format(APP_NAME, len(hwnd_list) ) )
 		else:
-			self.app_hwnd = 0
-			if sett.dev:
-				msg_warn(f'None of {APP_NAME} windows was found')
-		return True
+			if show_warn: msg_warn(f'None of {APP_NAME} windows was found')
 
 	def InitLocale(self):
 		' Override with nothing (or impliment local if actually needed)'
@@ -1301,22 +1310,57 @@ def every_parse(every:str|list|tuple)->tuple[bool, list]:
 			return False, []
 	return True, result
 
+def con_key_listener():
+	r'''
+	Poll the console input for keystrokes.
+	'''
+	while True:
+		if msvcrt.kbhit():
+			key = msvcrt.getch()
+			match key:
+				case b'\x11':
+					app.exit()
+					break
+				case b'\x12':
+					app.load_crontab()
+				case b'\x14':
+					app.taskbaricon.running_tasks(show_msg=False)
+				case b'\x05':
+					app.taskbaricon.run_command()
+		time.sleep(.1)
+
 def main():
 	global app
 	global tasks
 	global sett
 	global lang
 	set_title(APP_NAME)
+	cmd_parser = argparse.ArgumentParser()
+	cmd_parser.add_argument('-dev', action='store_true'
+	, help='Enable debug output')
+	cmd_parser.add_argument('-task', type=str
+	, help='A task to run and quit')
+	cmd_parser.add_argument('-data', type=str
+	, help='Any data for a task started with *-task* option')
+	try:
+		cmd_args = cmd_parser.parse_args()
+	except SystemExit:
+		if '-h' in sys.argv or '--help' in sys.argv:
+			sys.exit(0)
+		print('\nERROR: invalid command-line arguments. Quit.\n')
+		sys.exit(2)
 	try:
 		sett = Settings(def_sett=APP_SETTINGS)
-	except:
-		msg_err(f'Cannot load settings')
-		return
+	except Exception as e:
+		print(f'Settings load error: {e}')
+		msg_err('Cannot load settings')
+		sys.exit(1)
 	__builtins__.sett = sett
 	lang = Language(sett.language)
 	__builtins__.lang = lang
 	if sett.kiosk:
 		sett.dev = False
+		cmd_args.dev = False
 		sett.hide_console = True
 	print(f'{APP_NAME} {APP_VERSION} (Python {sys.version})')
 	print(lang.load_homepage)
@@ -1326,16 +1370,19 @@ def main():
 		__builtins__.app = app
 		app.que_print:TQueue = TQueue(consumer=print, max_size=8192)
 		app.que_log:TQueue = TQueue(consumer=_tlog, max_size=8192)
-		app.load_crontab = load_crontab
-		app.show_window = app.taskbaricon.on_left_down
-		app.dir = APP_PATH
+		app.cmd_args = cmd_args
+		app.win_save()
 		if load_crontab():
+			if cmd_args.task:
+				thread_start(app.MainLoop, ident='app: MainLoop')
+				task_start(cmd_args.task, caller=tcon.CALLER_CMDLINE
+				, data=cmd_args.data)
+				app.exit(force=True)
+				return
 			tasks.run_at_startup()
 			tasks.run_at_sys_startup()
+		thread_start(con_key_listener, ident='app: console key listener')
 		app.MainLoop()
-	except KeyboardInterrupt:
-		tprint('interrupted by keyboard')
-		time.sleep(2.0)
 	except:
 		msg_err('General exception')
 		input('Press Enter to exit...')

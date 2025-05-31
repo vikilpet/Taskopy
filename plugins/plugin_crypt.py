@@ -2,6 +2,7 @@ import os
 import base64
 import glob
 import warnings
+warnings.filterwarnings('ignore', category=UserWarning, module='pyimod02_importers')
 warnings.filterwarnings('ignore', category=UserWarning, module='cryptography')
 
 from cryptography.hazmat.backends import default_backend

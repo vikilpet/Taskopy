@@ -1,5 +1,4 @@
 import win32con
-import ctypes
 CALLER_HOTKEY = 'hotkey'
 CALLER_HTTP = 'http'
 CALLER_MENU = 'menu'
@@ -14,6 +13,7 @@ CALLER_EVENT = 'event'
 CALLER_EXIT = 'exit'
 CALLER_FILE_CHANGE = 'file_change'
 CALLER_DIR_CHANGE = 'dir_change'
+CALLER_CMDLINE = 'cmd_line'
 TDCBF_OK_BUTTON = 1
 TDCBF_YES_BUTTON = 2
 TDCBF_NO_BUTTON = 4

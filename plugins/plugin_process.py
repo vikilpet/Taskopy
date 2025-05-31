@@ -25,13 +25,11 @@ import ctypes
 from ctypes import wintypes
 
 from .tools import DictToObj, dev_print, msgbox, tprint, patch_import \
-, thread_start, str_short
+, thread_start, str_short, _SIZE_UNITS
 from .plugin_filesystem import path_exists, path_get
 from .plugin_system import win_list_top
 
 # https://psutil.readthedocs.io/en/latest/
-
-_SIZE_UNITS = {'gb':1073741824, 'mb':1048576, 'kb':1024, 'b':1, 'percent':1}
 
 def file_open(fullpath:str, parameters:str=None, operation:str='open'
 , cwd:str='', showcmd:int=win32con.SW_SHOWNORMAL):
@@ -459,13 +457,13 @@ def free_ram(unit:str='percent')->float:
 	Returns free RAM size.  
 	*unit* - 'gb', 'mb'... or 'percent'  
 
-		asrt( bmark(free_ram, b_iter=3), 7_000_000 )
+		asrt( bmark(free_ram, b_iter=3), 5_000_000 )
 
 	'''
-	e = _SIZE_UNITS.get(unit.lower(), 1)
 	if unit == 'percent':
 		return round(100 - psutil.virtual_memory()[2], 1)
 	else:
+		e = _SIZE_UNITS.get(unit.lower(), 1)
 		return round(psutil.virtual_memory()[4] / e, 1)
 
 def proc_threads_num(process):

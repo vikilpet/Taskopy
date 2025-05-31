@@ -35,6 +35,7 @@ import win32con
 import win32com.client
 import win32clipboard
 import difflib
+import argparse
 from typing import Callable, Iterable 
 from dataclasses import dataclass, field, asdict
 from queue import Queue, SimpleQueue
@@ -55,13 +56,16 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2025-05-10'
+APP_VERSION = 'v2025-05-31'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 APP_ICON = r'resources\icon.png'
 APP_ICON_DIS = r'resources\icon_dis.png'
 APP_ICON_ICO = r'resources\icon.ico'
 _app_log:list[tuple[str, str]] = []
 _APP_LOG_LIMIT:int = 10_000
+_SIZE_UNITS = {'tb': 1_099_511_627_776, 'gb': 1_073_741_824
+, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
+
 _DEFAULT_INI = r'''[General]
 language=en
 editor=notepad.exe
@@ -362,7 +366,10 @@ def is_dev()->bool:
 	'''
 	global _is_dev_cache
 	if not _is_dev_cache is None: return _is_dev_cache
-	_is_dev_cache = ('--developer' in sys.argv) or hasattr(sys, 'ps1')
+	try:
+		_is_dev_cache = hasattr(sys, 'ps1') or app.cmd_args.dev
+	except (NameError, AttributeError):
+		_is_dev_cache = True
 	return _is_dev_cache
 
 def _log_file(msg:str, fname:str):
@@ -404,8 +411,6 @@ def tlog(*msgs):
 			time_str(template=tcon.DATE_STR_HUMAN)
 			, f'[app not init]', ' '.join(map(str, msgs))
 		)
-
-
 
 def con_log(*msgs):
 	r'''
@@ -543,11 +548,11 @@ def time_diff_human(start:dtime|float, end:dtime|None|float=None
 	r'''
 	Returns time difference as a string like that:
 	'6h:54m:30s:673ms'  
-	Rationale: lines like '5:45' are not as easy to read.
+	Rationale: values like '5:45' are not as easy to read.
 	Is it 5 hours and 45 minutes or 5 minutes and 45 seconds?  
 
 	*end* - if omitted, use the current time.  
-	*start* and *end* should be in _datetime_ format.  
+	*start* and *end*: *datetime* or timestamp as float.  
 	*with_ms* - include milliseconds in the result.  
 
 		tn = dtime.now()
@@ -940,7 +945,7 @@ def _msg_err(msg:str, icon:int, title:str, parent:str, timeout:str):
 		title = f'{APP_NAME}: {title}'
 	else:
 		title = APP_FULLNAME
-	if is_dev() and sys_ver() >= 10.0:
+	if sys_ver() >= 10.0:
 		toast(msg=msg, img=toast_imgs.get(icon, '')
 		, on_click=lambda c: app_win_show())
 	else:
@@ -972,7 +977,7 @@ def msg_err(msg:str, title:str='', source:str='', timeout:str='30 min'
 		_msg_err(msg=msg + ' ' + exc_short, title=title
 		, icon=tcon.TD_ICON_ERROR, timeout=timeout, parent='msg_err')
 	except Exception as err:
-		print(f'\n[msg_err] «{msg}» exception:\n\n{repr(err)}\n\n')
+		print(f'\n[msg_err] «{msg}» exception:\n\n{err}\n\n')
 		_MessageBoxTimeout(None, 'msg_err exception', APP_NAME, 16
 		, 0, 1_800_000)
 
@@ -1052,7 +1057,7 @@ def toast(msg:str|tuple|list, dur:str='default', img:str=''
 	global _toast_app_icon
 	global _toast_img_cache
 	if sys_ver() < 10.0:
-		dialog(msg=msg)
+		dialog(msg=msg, wait=False, title='[Toast error]')
 		return
 	if dur == 'default': dur = 'Default'
 	assert dur in ('Default', 'short', 'long'), 'wrong *dur* value'
@@ -1072,7 +1077,10 @@ def toast(msg:str|tuple|list, dur:str='default', img:str=''
 			_toast_img_cache[img] = img_obj
 		newToast.AddImage( img_obj )
 	if on_click: newToast.on_activated = on_click
-	toaster.show_toast(newToast)
+	try:
+		toaster.show_toast(newToast)
+	except OSError:
+		dialog(msg=msg, wait=False, title='[Toast error]')
 
 
 
@@ -2283,14 +2291,6 @@ def app_tasks()->dict[str, dict]:
 	'''
 	return app.tasks.task_dict
 
-def app_exit(force:bool=False):
-	r'''
-	Closes the program.  
-	*force* - do not wait for the completion
-	of working tasks.  
-	'''
-	app.exit(force=force)
-
 def app_enable():
 	r'''
 	Enabling the application
@@ -2906,6 +2906,9 @@ def sys_ver()->float:
 	r'''
 	Windows version as a number.  
 	https://learn.microsoft.com/en-us/windows/win32/sysinfo/operating-system-version  
+
+		asrt( bmark(sys_ver), 79_000 )
+
 	'''
 	ver = sys.getwindowsversion()
 	return ver.major + ver.minor / 10
@@ -2949,10 +2952,6 @@ def run_in_process(func):
 	'''
 	@functools.wraps(func)
 	def wrapper(*args, **kwargs):
-		def target_func(q, *args, **kwargs):
-			result = func(*args, **kwargs)
-			q.put(result)
-
 		queue = multiprocessing.Queue()
 		p = multiprocessing.Process(target=_target_func
 		, args=(func, queue, args, kwargs))
@@ -2962,6 +2961,29 @@ def run_in_process(func):
 		return queue.get()
 
 	return wrapper
+
+def size_int(size:str|tuple, dst_unit:str='b')->int:
+	r'''
+	Converts a string with size to an number of the desired unit of measure.  
+	*size* - tuple of value and unit or a string with space separated
+	value and unit like '2 mb'  
+
+		asrt( size_int((1, 'mb')), 1048576 )
+		asrt( size_int('2 mb'), 2097152 )
+		asrt( size_int('2 mb', 'kb'), 2048 )
+		asrt( size_int('1.5 mb', 'kb'), 1536 )
+		asrt( size_int('3 kb', 'MB'), 0 )
+		asrt( bmark(size_int, ('3 mb', 'kb')), 1_900 )
+		asrt( bmark(size_int, ('1024.5 GB', 'MB')), 1_900 )
+
+	'''
+	if isinstance(size, (tuple, list)):
+		value, src_unit = size
+	else:
+		value, src_unit = size.split()
+	src_coef = _SIZE_UNITS[src_unit.lower()]
+	dst_coef = _SIZE_UNITS[dst_unit.lower()]
+	return int(float(value) * src_coef / dst_coef)
 
 def _init():
 	if __builtins__.get('gdic', None) != None: return
@@ -2973,6 +2995,8 @@ def _init():
 	setattr(app, 'dir', os.getcwd())
 	setattr(app, 'app_threads', {})
 	setattr(app, 'app_pid', _GetCurrentProcessId())
+	setattr(app, 'cmd_args', argparse.Namespace(dev=True))
+	setattr(app, 'tasks', {})
 	__builtins__['app'] = app
 	
 if __name__ != '__main__':

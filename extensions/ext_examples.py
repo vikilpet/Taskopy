@@ -42,7 +42,7 @@ def examp_autoruns(exe_path:str, caller:str
 	*ct* — tab-separated export.
 	With the *-s* option it will not show new files with a signature  
 	'''
-	CMD = (exe_path, '-nobanner', '-ct', '-m', '-a', '*')
+	CMD = f'{exe_path} -nobanner -ct -m -a *'
 	HASH_ALG = 'sha256'
 	# It's convient to store name for var_* in a variable:
 	VAR_NAME = 'autoruns'
@@ -70,7 +70,7 @@ def examp_autoruns(exe_path:str, caller:str
 				hashes[image_path] = 'hash error'
 		return hashes
 	
-	new_out = proc_start(CMD, capture=True, encoding='utf-16')[1]
+	new_out = proc_wait(CMD, encoding='utf-16')[1]
 	prev_out = var_get(VAR_NAME)
 	if not prev_out:
 		tprint('first run')
@@ -193,14 +193,13 @@ def examp_cert_check(caller:str, codepage:str=''
 	VARNAME = 'cert_check_diff'
 	if not codepage: codepage = sys_codepage()
 	dump_file = temp_file(suffix='.sst')
-	ret, out, _ = proc_start('certutil', f'-generateSSTFromWU {dump_file}'
-	, capture=True)
+	ret, out, _ = proc_wait(f'certutil -generateSSTFromWU "{dump_file}"')
 	if ret:
-		dialog(f'certutil wu download error: {out}')
+		toast(f'certutil wu download error: {out}')
 		return
-	ret, out, _ = proc_start('certutil', dump_file, capture=True)
+	ret, out, _ = proc_wait(f'certutil "{dump_file}"')
 	if ret:
-		dialog(f'certutil wu read error: {out}')
+		toast(f'certutil wu read error: {out}')
 		return
 	file_recycle(dump_file)
 	hashes_wu:dict = parser(out)
@@ -209,10 +208,9 @@ def examp_cert_check(caller:str, codepage:str=''
 	# Difference between PC and WU:
 	diff:set = set()
 	for store in stores:
-		ret, out, _ = proc_start('certutil', f'-store {store}'
-		, capture=True, encoding=codepage)
+		ret, out, _ = proc_wait(f'certutil -store {store}', encoding=codepage)
 		if ret:
-			dialog(f'certutil store «{store}» error: {out}')
+			toast(f'certutil store «{store}» error: {out}')
 			return
 		hashes_pc.update(parser(out))
 	table = [('Src', 'Name', 'Hash')]

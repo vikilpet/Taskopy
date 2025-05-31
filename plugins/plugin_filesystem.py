@@ -37,14 +37,12 @@ from win32com.shell import shell, shellcon
 from pathlib import Path
 from _winapi import CreateJunction
 from .tools import *
-from .tools import _TERMINAL_WIDTH
+from .tools import _TERMINAL_WIDTH, _SIZE_UNITS
 try:
 	import constants as tcon
 except ModuleNotFoundError:
 	import plugins.constants as tcon
 
-_SIZE_UNITS = {'tb': 1_099_511_627_776, 'gb': 1_073_741_824
-	, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 _FORBIDDEN_CHARS = '<>:"\\/|?*'
 _FORBIDDEN_DICT = dict(
 	**{chr(d) : '%' + hex(d)[2:] for d in range(32)}
