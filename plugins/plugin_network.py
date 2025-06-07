@@ -311,6 +311,9 @@ def html_element(url:str, element
 
 		# Get the tag containing the desired text and navigate to its sibling:
 		//strong[contains(text(), "a text")]/following-sibling::strong[3]
+
+		# Class name contains random suffix:
+		//*[@class[starts-with(., "SomeClassName_")]]
 	
 	Note: *tbody* is often missing, but the browser automatically
 	adds it.

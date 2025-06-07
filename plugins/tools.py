@@ -56,11 +56,18 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2025-05-31'
+APP_VERSION = 'v2025-06-07'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
-APP_ICON = r'resources\icon.png'
-APP_ICON_DIS = r'resources\icon_dis.png'
-APP_ICON_ICO = r'resources\icon.ico'
+if getattr(sys, 'frozen', False):
+	APP_PATH = os.path.dirname(sys.executable)
+	os.chdir(APP_PATH)
+	sys.path.append(APP_PATH)
+else:
+	APP_PATH = os.path.dirname( os.path.dirname( os.path.abspath(__file__) ) )
+
+APP_ICON = os.path.join(APP_PATH, r'resources\icon.png')
+APP_ICON_DIS = os.path.join(APP_PATH, r'resources\icon_dis.png')
+APP_ICON_ICO = os.path.join(APP_PATH, r'resources\icon.ico')
 _app_log:list[tuple[str, str]] = []
 _APP_LOG_LIMIT:int = 10_000
 _SIZE_UNITS = {'tb': 1_099_511_627_776, 'gb': 1_073_741_824
@@ -104,11 +111,12 @@ class Settings:
 		config = configparser.ConfigParser()
 		config.optionxform = str
 		if not ini_file: return
+		ini_fpath = os.path.join(APP_PATH, ini_file)
 		try:
-			with open(ini_file, 'tr', encoding='utf-8-sig') as f:
+			with open(ini_fpath, 'tr', encoding='utf-8-sig') as f:
 				config.read_file(f)
 		except FileNotFoundError:
-			create_default_ini_file()
+			_create_default_ini_file()
 			config.read(r'settings.ini', encoding='utf-8-sig')
 		for section in config._sections.values():
 			for sett_name, sett_val in section.items():
@@ -544,16 +552,17 @@ def time_diff_str(start:dtime
 	return time.strftime(str_format, delta_as_time)
 
 def time_diff_human(start:dtime|float, end:dtime|None|float=None
-, with_ms:bool=False, sep:str=':')->str:
+, with_ms:bool=False, sep:str=':', short:bool|int=True)->str:
 	r'''
 	Returns time difference as a string like that:
-	'6h:54m:30s:673ms'  
+	'6h:54m'  
 	Rationale: values like '5:45' are not as easy to read.
 	Is it 5 hours and 45 minutes or 5 minutes and 45 seconds?  
 
 	*end* - if omitted, use the current time.  
 	*start* and *end*: *datetime* or timestamp as float.  
 	*with_ms* - include milliseconds in the result.  
+	*short* - only first two units otherwise full like '6h:54m:30s:673ms'  
 
 		tn = dtime.now()
 		asrt( bmark( time_diff_human, (tn,) ), 3_000 )
@@ -581,7 +590,14 @@ def time_diff_human(start:dtime|float, end:dtime|None|float=None
 	if minutes > 0: time_parts.append(f'{minutes}m')
 	if seconds > 0: time_parts.append(f'{seconds}s')
 	if with_ms: time_parts.append(f'{microseconds // 1000}ms')
-	result = sep.join(time_parts) if time_parts else '0'
+	match short:
+		case True:
+			last = 2
+		case False:
+			last = len(time_parts)
+		case _:
+			last = short
+	result = sep.join(time_parts[:last]) if time_parts else '0'
 	if is_negative: result = '-' + result
 	return result
 
@@ -1158,11 +1174,12 @@ def app_icon_text_set(text:str=APP_FULLNAME):
 	global app
 	app.taskbaricon.set_icon(text=text)
 
-def create_default_ini_file():
-	'''
+def _create_default_ini_file():
+	r'''
 	Creates default settings.ini file.
 	'''
-	with open(app_dir() + '\\settings.ini', 'xt', encoding='utf-8-sig') as ini:
+	with open(os.path.join(APP_PATH, 'settings.ini'), 'xt'
+	, encoding='utf-8-sig') as ini:
 		ini.write(_DEFAULT_INI)
 
 def job_pool(jobs:list, pool_size:int=None)->list:
@@ -1952,18 +1969,18 @@ class DataHTTPReq(object):
 		*headers* -- {"Accept-Encoding": "gzip, deflate", ...}
 		*params* -- URL parameters as a dictionary like {'par1': '123', ...}
 		'''
-		self.client_ip = client_ip
-		self.path = path
+		self.client_ip:str = client_ip
+		self.path:str = path
 		self.method:str = method
 		self._file:str = ''
 		self._body:bytes = b''
 		self._fullpath:str = ''
-		self.host = ''
+		self.host:str = ''
 		self._md5:str = ''
-		self.accept = ''
-		self.accept_encoding = ''
-		self.accept_language = ''
-		self.referer = ''
+		self.accept:str = ''
+		self.accept_encoding:str = ''
+		self.accept_language:str = ''
+		self.referer:str = ''
 		self.headers:dict = headers
 		self.params:dict = params
 		self.form:dict = {}
@@ -1992,13 +2009,13 @@ class DataHTTPReq(object):
 				return fd.read()
 		return b''
 
-	def __str__(self)->str:
-		return (
-			self.__class__.__name__ + '('
-			+ ', '.join(f'{k}={v}' for k,v in vars(self).items())
-			+ ')'
-		)
+	def __repr__(self) -> str:
+		attrs = ', '.join(f'{k}={v!r}' for k, v in vars(self).items()
+		if not k.startswith('_'))
+		return f"{self.__class__.__name__}({attrs})"
 
+	def __str__(self) -> str:
+		return self.__repr__()
 
 class DataBrowserExt(DataHTTPReq):
 	'''
@@ -2225,7 +2242,8 @@ def app_threads_print():
 	for ident, thr_dic in tuple(app.app_threads.items()):
 		func_name = thr_dic.get('func')
 		start_time = thr_dic.get('stime')
-		run_time = time_diff_human(start_time) if start_time else None
+		run_time = time_diff_human(start_time, short=True) \
+			if start_time else None
 		thread = thr_dic.get('thread')
 		if thread is None:
 			table.append((

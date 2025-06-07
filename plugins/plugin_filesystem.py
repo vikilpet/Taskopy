@@ -32,7 +32,7 @@ from operator import itemgetter
 from zlib import crc32
 from contextlib import contextmanager
 from collections import namedtuple
-from typing import Callable, Iterator, Iterable, Generator
+from typing import Callable, Iterator, Iterable, Generator, Any
 from win32com.shell import shell, shellcon
 from pathlib import Path
 from _winapi import CreateJunction
@@ -1466,11 +1466,19 @@ def _file_name_pe(filename:str):
 	return filename
 
 def var_fpath(var)->str:
+	r'''
+	Full path of variable.
+
+		var_set('_test', 1)
+		tprint(var_fpath('_test'))
+		asrt( var_del('_test'), True)
+
+	'''
 	if isinstance(var, str) and var[1] == ':': return var
 	if is_iter(var):
-		return os.path.join(_VAR_DIR, *map(_file_name_pe, var) )
+		return os.path.join(APP_PATH, _VAR_DIR, *map(_file_name_pe, var) )
 	else:
-		return os.path.join(_VAR_DIR, _file_name_pe(var) )
+		return os.path.join(APP_PATH, _VAR_DIR, _file_name_pe(var) )
 
 def var_open(var:str)->None:
 	' Opens variable in default editor '
@@ -1478,11 +1486,11 @@ def var_open(var:str)->None:
 	, None, None, 0)
 
 def var_get(var:str, default=None, encoding:str='utf-8'
-, as_literal:bool=False, globals:dict|None=None):
-	'''
+, as_literal:bool=False, globals:dict|None=None)->Any:
+	r'''
 	Gets the *disk variable*.  
 	*as_literal* - converts to a literal (dict, list, tuple etc).
-	Dangerous! - it's just `eval`, not `ast.literal_eval`
+	Dangerous! - it's just `eval`, not `ast.literal_eval`!
 
 		var_set('_test', 1)
 		asrt( var_get('_test'), '1')

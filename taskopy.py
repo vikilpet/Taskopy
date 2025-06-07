@@ -138,12 +138,6 @@ set_title = win32api.SetConsoleTitle
 crontab:types.ModuleType|None = None
 sett:Settings = Settings(ini_file='')
 lang:Language = None
-if getattr(sys, 'frozen', False):
-	APP_PATH = os.path.dirname(sys.executable)
-	os.chdir(APP_PATH)
-	sys.path.append(APP_PATH)
-else:
-	APP_PATH = os.getcwd()
 
 PLUGIN_SOURCE = 'plugins\\*.py'
 class OVERLAPPED(ctypes.Structure):
@@ -222,12 +216,13 @@ class Tasks:
 			if task_opts['date']: self.add_schedule_date(task_opts)
 			if task_opts['hotkey']: self.add_hotkey(task_opts)
 			if task_opts['left_click']:
-				self.task_list_left_click.append(task_opts)
-				app.taskbaricon.Bind(
-					wx.adv.EVT_TASKBAR_LEFT_DOWN
-					, lambda evt, temp=task_opts:
-						self.run_task(task=temp, caller=CALLER_LEFT_CLICK)
-				)
+				if not app.is_cmd_task:
+					self.task_list_left_click.append(task_opts)
+					app.taskbaricon.Bind(
+						wx.adv.EVT_TASKBAR_LEFT_DOWN
+						, lambda evt, temp=task_opts:
+							self.run_task(task=temp, caller=CALLER_LEFT_CLICK)
+					)
 			if task_opts['startup']:
 				self.task_list_startup.append(task_opts)
 			if task_opts['sys_startup']:
@@ -311,7 +306,7 @@ class Tasks:
 		if self.global_hk:
 			thread_start(self.global_hk.listen
 			, err_msg=True, ident='app: hotkey listener')
-		if self.task_list_http and app.cmd_args.task is None:
+		if self.task_list_http and not app.is_cmd_task:
 			thread_start(http_server_start, args=(self,), err_msg=True
 			, ident='app: http server')
 		thread = thread_start(self.run_scheduler, err_msg=True
@@ -330,7 +325,8 @@ class Tasks:
 				)
 				+ ':\n' + task['hotkey']
 			)
-		if app.cmd_args.task: return
+			
+		if app.is_cmd_task: return
 		if task['hotkey_suppress']:
 			try:
 				if not self.global_hk:
@@ -467,6 +463,7 @@ class Tasks:
 							)
 						)
 					
+		if app.is_cmd_task: return
 		thread_start(
 			dir_watch
 			, kwargs={
@@ -545,6 +542,7 @@ class Tasks:
 		r'''
 		*task* - dictionary with task parameters.  
 		'''
+		if app.is_cmd_task: return
 		intervals = task['schedule']
 		if isinstance(intervals, str): intervals = (intervals,)
 		for inter in intervals:
@@ -588,7 +586,7 @@ class Tasks:
 
 	def run_at_startup(self):
 		if sett.hide_console:
-			win_hide(app.app_hwnd)
+			win32gui.ShowWindow(app.app_hwnd, win32con.SW_HIDE)
 		for task in self.task_list_startup:
 			self.run_task(task, caller=CALLER_STARTUP)
 			
@@ -632,7 +630,9 @@ class Tasks:
 		*result* - list in which we will place result of task. It is
 			passed through all inner fuctions (`run_task_inner` and
 			`catcher`).
+		*wait_event* - for signaling somewhere that the task has finished  
 		'''
+
 		def run_task_inner(result:list=None):
 
 			def catcher(result:list=None):
@@ -695,12 +695,6 @@ class Tasks:
 						msg_err(lang.warn_task_error.format(
 						task['task_name_full']) )
 				_thread_pop('task', thread_id=thread.ident)
-			if (
-				(not self.enabled)
-				and ( not task['hyperactive'])
-				and caller != tcon.CALLER_MENU
-			): return
-			if task['single'] and task['running']: return
 			if task['rule'] and (caller != tcon.CALLER_MENU):
 				for rule in task['rule']:
 					try:
@@ -717,6 +711,13 @@ class Tasks:
 			, args=(result,) if task['result'] else () )
 			thread.start()
 			if task['result']: thread.join()
+		if app.is_cmd_task and (caller != CALLER_CMDLINE): return
+		if (
+			(not self.enabled)
+			and ( not task['hyperactive'])
+			and caller != CALLER_MENU
+		): return
+		if task['single'] and task['running']: return
 		daemon = (not caller in (CALLER_EXIT, CALLER_CMDLINE)) 
 		if task['result'] and not (result is None):
 			thread_start(run_task_inner, is_daemon=daemon, args=(result,)
@@ -725,6 +726,7 @@ class Tasks:
 			run_task_inner()
 
 	def add_idle_task(self, task):
+		if app.is_cmd_task: return
 		dur = value_to_unit(task['idle'], 'ms')
 		task['idle_dur'] = int(dur)
 		task['idle_done'] = False
@@ -765,6 +767,7 @@ class Tasks:
 				, data=DataEvent(xml_str)
 			)
 
+		if app.is_cmd_task: return
 		try:
 			self.event_handlers.append(
 				win32evtlog.EvtSubscribe(
@@ -1088,8 +1091,8 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		if sett.kiosk and not keyboard.is_pressed(sett.kiosk_key): return
 		if app.app_hwnd:
 			if sett.hide_console:
-				if win_is_visible(app.app_hwnd):
-					win_hide(app.app_hwnd)
+				if win32gui.IsWindowVisible(app.app_hwnd):
+					win32gui.ShowWindow(app.app_hwnd, win32con.SW_HIDE)
 				else:
 					show_app_window()
 			else:
@@ -1103,12 +1106,14 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		*is_end_session* - logoff or shutdown.  
 		'''
 		TASKS_MSG_MAX = 10
-		running_tasks = self.running_tasks(show_msg=False)
 		if is_end_session:
 			force = True
 			if is_dev():
 				tprint(f'end of session')
 				tlog(f'end of session')
+		running_tasks = ()
+		if not app.is_cmd_task:
+			running_tasks = self.running_tasks(show_msg=False)
 		if running_tasks:
 			tasks_str = '\r\n'.join(
 				tuple(
@@ -1126,7 +1131,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 					, return_button=True
 				)[1] != lang.button_close:
 					return False
-		if tasks.task_list_exit:
+		if not app.is_cmd_task and tasks.task_list_exit:
 			tprint(
 				lang.warn_on_exit + ': '
 				 + ', '.join(
@@ -1138,9 +1143,6 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 				tasks.run_task(task, caller=CALLER_EXIT)
 		qprint(lang.menu_exit)
 		tasks.close()
-		if is_end_session and is_dev():
-			tprint('exit tasks completed')
-			tlog('exit tasks completed')
 		app.que_log.stop()
 		app.que_print.stop()
 		wx.CallAfter(self.Destroy)
@@ -1165,6 +1167,8 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			if show_msg:
 				dialog(lang.warn_no_run_tasks, title=lang.menu_list_run_tasks
 				, timeout=3, wait=False)
+			else:
+				tprint('no running tasks', tname='app')
 			return ()
 		os_threads:dict[str, int] = {}
 		for thr in threading.enumerate():
@@ -1204,9 +1208,10 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		buttons = (lang.dlg_nx_tasks,) if nx_tasks else None
 		choice = dialog(tasks_str, buttons=buttons, timeout='10 sec'
 		, wait=(True if nx_tasks else False))
-		if choice != 1000: return
+		if choice != 1000: return ()
 		for task in nx_tasks:
 			tasks.task_dict.pop(task['task_func_name'], None)
+		return ()
 
 	def on_edit_crontab(self, event=None):
 		proc_start(sett.editor, os.path.join(APP_PATH, 'crontab.py'))
@@ -1248,6 +1253,7 @@ class App(wx.App):
 		self.frame.Bind(wx.EVT_END_SESSION
 		, lambda: self.taskbaricon.on_exit(is_end_session=True) )
 		self.cmd_args:argparse.Namespace = argparse.Namespace()
+		self.is_cmd_task:bool = False
 		self.load_crontab = load_crontab
 		self.dir = APP_PATH
 		return True
@@ -1320,7 +1326,6 @@ def con_key_listener():
 			match key:
 				case b'\x11':
 					app.exit()
-					break
 				case b'\x12':
 					app.load_crontab()
 				case b'\x14':
@@ -1330,6 +1335,11 @@ def con_key_listener():
 		time.sleep(.1)
 
 def main():
+
+	def wait_exit(event, timeout=60.0):
+		event.wait(timeout)
+		app.exit(force=True)
+
 	global app
 	global tasks
 	global sett
@@ -1358,6 +1368,7 @@ def main():
 	__builtins__.sett = sett
 	lang = Language(sett.language)
 	__builtins__.lang = lang
+	if cmd_args.task: sett.kiosk = True
 	if sett.kiosk:
 		sett.dev = False
 		cmd_args.dev = False
@@ -1370,14 +1381,16 @@ def main():
 		__builtins__.app = app
 		app.que_print:TQueue = TQueue(consumer=print, max_size=8192)
 		app.que_log:TQueue = TQueue(consumer=_tlog, max_size=8192)
+		app.is_cmd_task = not cmd_args.task is None
 		app.cmd_args = cmd_args
 		app.win_save()
 		if load_crontab():
 			if cmd_args.task:
-				thread_start(app.MainLoop, ident='app: MainLoop')
-				task_start(cmd_args.task, caller=tcon.CALLER_CMDLINE
-				, data=cmd_args.data)
-				app.exit(force=True)
+				event = threading.Event()
+				thread_start(wait_exit, args=(event,), ident='app: wait_exit')
+				task_start(cmd_args.task, caller=CALLER_CMDLINE
+				, data=cmd_args.data, wait_event=event)
+				app.MainLoop()
 				return
 			tasks.run_at_startup()
 			tasks.run_at_sys_startup()
