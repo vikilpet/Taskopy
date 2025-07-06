@@ -4,7 +4,7 @@ import win32con
 import keyboard
 from collections import namedtuple
 try:
-	from .tools import warning, patch_import, time_sleep, tdebug
+	from .tools import warning, patch_import, time_sleep, qprint
 except ImportError:
 	warning = print
 
@@ -20,6 +20,9 @@ functions not always the same!
 
 Special keys for *keyboard* module:
 
+	'comma',
+	'plus',
+	'space',
 	'alt',
 	'alt gr',
 	'backspace',
@@ -45,7 +48,6 @@ Special keys for *keyboard* module:
 	'right ctrl',
 	'right windows',
 	'scroll lock',
-	'space',
 	'tab',
 	'up',
 	'windows',
@@ -157,7 +159,7 @@ class GlobalHotKeys:
 					+ f' ({kmap.vkey})'
 					+ f'\nHotkey register error: {lasterr}'
 				)
-				print(error)
+				qprint(error)
 				warning(error)
 		try:
 			msg = ctypes.wintypes.MSG()
@@ -179,10 +181,10 @@ key_release = keyboard.release
 key_wait = keyboard.wait
 
 def key_release_wait(keys:str, timeout='10 ms'):
-	'''
-	Wait until all the keys are released.
-	*keys* - a string with hotkey for a task like 'ctrl+shift+m'
-	Use this if you want to send keystrokes by hotkey.
+	r'''
+	Wait until all the keys are released.  
+	*keys* - a string with hotkey for a task like 'ctrl+shift+m'  
+	Use this if you want to send keystrokes by hotkey.  
 	'''
 	while True:
 		if any( map( keyboard.is_pressed, keys.split('+') ) ):

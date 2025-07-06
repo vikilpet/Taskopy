@@ -27,7 +27,7 @@ from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 from .plugin_process import proc_wait
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 _GV_PUBLIC_SUF_LST = '__public_suffix_list__'
 _RE_PING_LOSS = re.compile(r'\((\d+)%')
@@ -263,7 +263,7 @@ def html_clean(html_str:str, sep:str=' ', is_mail:bool=False
 	return text
 
 def html_element(url:str, element
-, clean:bool=True, element_num:int=0
+, clean:bool=True, element_num:int|str=0
 , attrib:str=None, tag_sep:str=' ', **kwargs)->str:
 	r'''
 	Get text of specified page element (div).

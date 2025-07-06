@@ -235,7 +235,7 @@ def win_act_rest(window=None)->int:
 	r'''
 	Activates the window and restores it if it is minimized.
 	'''
-	if not (hwnd := win_get(window) ): return
+	if not (hwnd := win_get(window) ): return -1
 	win_activate(hwnd)
 	if win32gui.IsIconic(hwnd): win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
 	return hwnd
@@ -381,18 +381,53 @@ def win_close(window=None, wait:bool=True)->bool:
 	return True
 
 def win_coor_get(window=None)->tuple:
-	''' Returns coordinates of window:
-		(top left x, y, bottom right x, y)
+	r'''
+	Returns coordinates of window: (top left x, y, bottom right x, y)
 	'''
 	hwnd = win_get(window)
 	if hwnd: return win32gui.GetWindowRect(hwnd)
 
+def win_exists(window=None)->bool:
+	r'''
+	Does the window still exist?  
+
+		asrt( win_exists(win_get('Taskop*')), True )
+		asrt( win_exists(win_get('Taskopyy')), False )
+		asrt( bmark(win_exists, (0,)), 1500 )
+		asrt( bmark(win_exists, ('Taskopy',)), 50_000 )
+
+	'''
+	return win32gui.IsWindow(win_get(window)) == 1
+
+def win_texts(window, child_class_name:str='')->set[str]:
+	r'''
+	Retrieves text of child controls.  
+	'''
+
+	def _enum_all(hwnd, callback):
+		callback(hwnd)
+		def _inner(child, _):
+			_enum_all(child, callback)
+		win32gui.EnumChildWindows(hwnd, _inner, None)	
+
+	def _get_texts(ch_hwnd):
+		txt = ''
+		if not child_class_name:
+			txt = win32gui.GetWindowText(ch_hwnd)
+		elif win32gui.GetClassName(ch_hwnd) == child_class_name:
+			txt = win32gui.GetWindowText(ch_hwnd)
+		if txt and not txt.isspace(): texts.add(txt)
+	texts:set[str] = set()
+	if not (hwnd := win_get(window) ): return texts
+	_enum_all(hwnd, _get_texts)
+	return texts
+
 
 
 def win_list_top()->list:
-	'''
-	Gets a list of the top-level visible windows only.
-	Returns list of tuples: (hwnd, 'title')
+	r'''
+	Gets a list of the top-level visible windows only.  
+	Returns list of tuples: (hwnd, 'title')  
 	'''
 	def w_reaper(hwnd:int, lst:list):
 		if not win32gui.IsWindowVisible(hwnd): return

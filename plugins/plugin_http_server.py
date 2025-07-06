@@ -9,7 +9,7 @@ import cgi
 import urllib
 from typing import Pattern
 from .tools import dev_print, app_log, DataHTTPReq \
-	, patch_import, tprint, value_to_unit, exc_text
+	, patch_import, tprint, value_to_unit, exc_text, qprint
 from .plugin_filesystem import file_b64_dec, HTTPFile
 try:
 	import constants as tcon
@@ -34,10 +34,10 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 
 	def s_print(self, text:str, data:str=''):
 		if self.silent:
-			print('{} {}'.format(
+			qprint('{} {}'.format(
 				time.strftime('%y.%m.%d %H:%M:%S'), text))
 		else:
-			print('{} {} {}'.format(
+			qprint('{} {} {}'.format(
 				time.strftime('%y.%m.%d %H:%M:%S'), text, data))
 	
 	def handle_one_request(self):

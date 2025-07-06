@@ -133,7 +133,6 @@ def log_watchdog_poll(
 			new_pos = hnd.tell()
 			var_set(var_name, new_pos)
 			prev_pos = new_pos
-	tprint('stop')
 
 
 def log_watchdog_poll_stop(log_file:str):

@@ -197,7 +197,7 @@ class Tasks:
 			params = inspect.signature(task_obj).parameters
 			for opt, opt_def in TASK_OPTIONS:
 				param = params.get(opt)
-				if param == None:
+				if param is None:
 					task_opts[opt] = opt_def
 				else:
 					task_opts[opt] = param.default
@@ -305,7 +305,7 @@ class Tasks:
 			)
 		if self.global_hk:
 			thread_start(self.global_hk.listen
-			, err_msg=True, ident='app: hotkey listener')
+			, err_msg=True, ident='app: global hotkey listener')
 		if self.task_list_http and not app.is_cmd_task:
 			thread_start(http_server_start, args=(self,), err_msg=True
 			, ident='app: http server')
@@ -319,18 +319,14 @@ class Tasks:
 	def add_hotkey(self, task):
 		
 		def hk_error(error):
-			msg_warn(
-				lang.warn_hotkey.format(
-					task['task_name_full']
-				)
-				+ ':\n' + task['hotkey']
-			)
+			msg_warn( lang.warn_hotkey.format(
+				task['task_name_full'], task['hotkey'], error
+			))
 			
 		if app.is_cmd_task: return
 		if task['hotkey_suppress']:
 			try:
-				if not self.global_hk:
-					self.global_hk = GlobalHotKeys()
+				if not self.global_hk: self.global_hk = GlobalHotKeys()
 				self.global_hk.register(
 					task['hotkey']
 					, func=self.run_task
@@ -344,7 +340,7 @@ class Tasks:
 					hotkey=str(task['hotkey'])
 					, callback=self.run_task
 					, suppress=False
-					, args=[task, 'hotkey']
+					, args=(task, 'hotkey')
 				)
 			except Exception as e:
 				hk_error(repr(e))
@@ -825,10 +821,7 @@ class Tasks:
 		if self.http_server:
 			self.http_server.shutdown()
 			self.http_server.socket.close()
-		try:
-			keyboard.unhook_all()
-		except:
-			dev_print('no hotkeys with keyboard module')
+		keyboard.unhook_all()
 		if self.global_hk:
 			self.global_hk.unregister()
 			self.global_hk.stop_listener()
@@ -1232,6 +1225,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		self.set_icon(dis=not state)
 	
 	def on_restart(self, event=None, force:bool=False):
+
 		ext = '.exe' if getattr(sys, 'frozen', False) else '.py'
 		fpath = os.path.join(APP_PATH, APP_NAME + ext)
 		args = ' '.join(sys.argv[1:])

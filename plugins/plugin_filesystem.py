@@ -1137,21 +1137,29 @@ def file_zip_cont(fullpath, only_files:bool=False)->list:
 		else:
 			return [f.filename for f in z.filelist]
 
+
 def temp_dir(new_dir:str='', prefix:str='', suffix:str='')->str:
 	r'''
 	Returns the full path to the user's temporary directory.  
+	No trailing slash.  
 	If *new_dir* is specified, creates this subfolder and
 	returns the path to it.  
 	*prefix*, *suffix* - add something to a directory name.  
-	If *new_dir='rnd'*, a directory with a random name is created.  
+	If *new_dir='rnd'* then a directory with a random name is created.  
+
+		# No subdirectory is created:
 		asrt( temp_dir(), os.getenv('temp') )
+		asrt( bmark(temp_dir), 1_700 )
+		# A subdirectory is created with the prefix:
+		# temp_dir(prefix='test_')
+		# > 'c:\\temp\\user\\test_0108180259UyEy'
 
 	'''
-	dst_dir = tempfile.gettempdir()
+	dst_dir = win32api.GetTempPath().rstrip('\\')
 	if all((new_dir == '', prefix == '', suffix == '')): return dst_dir
 	new_dir, prefix, suffix = str(new_dir), str(prefix), str(suffix)
-	dname:str = new_dir if new_dir else ''
-	if (dname == 'rnd') or ((dname == '') and (suffix or prefix)):
+	dname:str = str(new_dir)
+	if (dname == 'rnd') or ((dname == '') and (suffix != '' or prefix != '')):
 		dname = time.strftime("%m%d%H%M%S") + random_str(4)
 	if prefix or suffix:
 		dname = file_name_add(dname, suffix=suffix, prefix=prefix)

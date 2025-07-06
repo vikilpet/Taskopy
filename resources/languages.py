@@ -19,7 +19,7 @@ class Language:
 		self.menu_command_con = 'Enter a command'
 		self.warn_crontab_reload = 'Error when reloading the crontab'
 		self.warn_mod_reload = 'Failed to reload module «{}»'
-		self.warn_hotkey = 'Wrong hotkey syntax in task «{}»'
+		self.warn_hotkey = 'Hotkey register error in task «{}» ({}):\n{}'
 		self.warn_schedule = 'Wrong schedule syntax in task «{}»'
 		self.warn_every = 'Wrong time syntax in task «{}»: «{}»'
 		self.warn_task_error = 'Exception when executing the task «{}»'
@@ -84,7 +84,7 @@ menu_list_run_tasks=Список работающих задач
 warn_no_run_tasks=Нет работающих задач
 warn_crontab_reload=Ошибка при перезагрузке кронтаба
 warn_mod_reload=Не удалось загрузить модуль «{}»
-warn_hotkey=Неправильный формат горячей клавиши в задаче «{}»
+warn_hotkey=Ошибка регистрации горячей клавиши в задаче «{}» ({}):\n{}
 warn_schedule=Неправильный формат планировщика в задаче «{}»
 warn_every=Неправильный формат времени в задаче «{}»: «{}»
 warn_task_error=Исключение при выполнении задачи «{}»

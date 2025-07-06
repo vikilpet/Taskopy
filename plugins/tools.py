@@ -56,7 +56,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2025-06-07'
+APP_VERSION = 'v2025-07-06'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 if getattr(sys, 'frozen', False):
 	APP_PATH = os.path.dirname(sys.executable)
@@ -551,7 +551,7 @@ def time_diff_str(start:dtime
 	delta_as_time = time.gmtime( (end - start).total_seconds() )
 	return time.strftime(str_format, delta_as_time)
 
-def time_diff_human(start:dtime|float, end:dtime|None|float=None
+def time_diff_human(start:dtime|float|tdelta, end:dtime|None|float=None
 , with_ms:bool=False, sep:str=':', short:bool|int=True)->str:
 	r'''
 	Returns time difference as a string like that:
@@ -568,12 +568,16 @@ def time_diff_human(start:dtime|float, end:dtime|None|float=None
 		asrt( bmark( time_diff_human, (tn,) ), 3_000 )
 
 	'''
-	if isinstance(start, float): start = dtime.fromtimestamp(start)
-	if end == None:
-		end = dtime.now()
-	elif isinstance(end, float):
-		end = dtime.fromtimestamp(end)
-	delta:tdelta = end - start
+	delta:tdelta
+	if isinstance(start, datetime.timedelta):
+		delta = start
+	else:
+		if isinstance(start, float): start = dtime.fromtimestamp(start)
+		if end == None:
+			end = dtime.now()
+		elif isinstance(end, float):
+			end = dtime.fromtimestamp(end)
+		delta = end - start
 	is_negative = delta.total_seconds() < 0
 	if is_negative: delta = -delta
 	microseconds = delta.microseconds
@@ -1239,7 +1243,7 @@ class Job:
 		self.kwargs = kwargs
 		self.finished = False
 		self.result = None
-		self.time = 0
+		self.time:tdelta = 0
 		self.error = False
 		self.job_name = job_name
 	
@@ -2216,7 +2220,6 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 	, name=func.__name__)
 	thread.start()
 	return thread
-task_run = thread_start
 
 def task_start(taskname:str|Callable, **kwargs):
 	r'''
@@ -2328,6 +2331,13 @@ def app_exit(force:bool=False):
 	*force* - do not display a warning dialog about running tasks.  
 	'''
 	app.taskbaricon.on_exit(force=force)
+
+def app_restart(force:bool=False):
+	r'''
+	Restart the application.  
+	*force* - do not display a warning dialog about running tasks.  
+	'''
+	app.taskbaricon.on_restart(force=force)
 
 def app_pid()->int:
 	r'''
@@ -2868,6 +2878,39 @@ def str_remove_white(text:str, algo:str='basic', sep:str=' ')->str:
 			return sep.join(tmp.split())
 		case _:
 			raise Exception('Unknown *algo*')
+
+_STR_TO_FLOAT_RE = re.compile(r'(?!^-)[^0-9.]')
+def str_to_float(s:str)->float:
+	r'''
+	Parse a float from a string that may contain currency symbols,
+	spaces, commas, etc. Raises ValueError on bad input.
+
+	Examples:
+
+		asrt( str_to_float("$ 1 234.56"), 1234.56 )
+		asrt( str_to_float("-€2,500.00"), -2500.0 )
+		asrt( str_to_float("3.14159"), 3.14159 )
+
+	'''
+	s = s.strip()
+	cleaned = _STR_TO_FLOAT_RE.sub('', s)
+	return float(cleaned)
+
+_STR_TO_INT_RE = re.compile(r'(?!^-)[^\d]')
+def str_to_int(s:str)->int:
+	r'''
+	Parse an integer from a string that may contain currency symbols,
+	spaces, commas, etc. Returns `default` if parsing fails.
+
+	Examples:
+	
+		asrt( str_to_int('$ 1 234'), 1234 )
+		asrt( str_to_int('-€2,500'), -2500)
+	
+	'''
+	s = s.strip()
+	cleaned = _STR_TO_INT_RE.sub('', s)
+	return int(cleaned)
 
 _often_dct:dict[str, datetime.datetime] = {}
 

@@ -27,7 +27,7 @@ from ctypes import wintypes
 from .tools import DictToObj, dev_print, msgbox, tprint, patch_import \
 , thread_start, str_short, _SIZE_UNITS
 from .plugin_filesystem import path_exists, path_get
-from .plugin_system import win_list_top
+from .plugin_system import win_list_top, win_get
 
 # https://psutil.readthedocs.io/en/latest/
 
@@ -369,7 +369,7 @@ def proc_list(name:str='', cmd_filter:str=None
 	, username:str, fullpath:str, cmdline:list
 	, cmdline_str:str.
 
-        ad_value - is the value which gets assigned in case
+        *ad_value* - is the value which gets assigned in case
         AccessDenied or ZombieProcess exception is raised when
         retrieving that particular process information.
 
@@ -504,6 +504,26 @@ def proc_close(process, timeout:int=10
 		dev_print(f'PID {pid} was not found')
 	return False
 
+def proc_fpath(process)->str:
+	r'''
+	Retrieves the full path of the process  
+
+		asrt( bmark(proc_fpath, (17532,)), 56_000 )
+		
+	'''
+	if (pid := proc_get(process)) == -1: return ''
+	hProc = kernel32.OpenProcess(win32con.PROCESS_QUERY_LIMITED_INFORMATION
+	, False, pid)
+	if not hProc: return ''
+	try:
+		size = wintypes.DWORD(260)  # MAX_PATH
+		buf = ctypes.create_unicode_buffer(size.value)
+		ok = kernel32.QueryFullProcessImageNameW(hProc, 0, buf
+		, ctypes.byref(size))
+		return buf.value if ok else ''
+	finally:
+		kernel32.CloseHandle(hProc)
+
 def wts_user_sessionid(users:str|list|tuple, only_active:bool=True)->list:
 	r'''
 	Convert list of users to list of session id's.  
@@ -612,6 +632,20 @@ ntdll = ctypes.WinDLL('ntdll')
 kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
 advapi32 = ctypes.WinDLL('advapi32', use_last_error=True)
 user32 = ctypes.WinDLL('user32', use_last_error=True)
+kernel32.OpenProcess.argtypes = (
+	wintypes.DWORD,  # dwDesiredAccess
+	wintypes.BOOL,   # bInheritHandle
+	wintypes.DWORD   # dwProcessId
+)
+kernel32.OpenProcess.restype = wintypes.HANDLE
+kernel32.QueryFullProcessImageNameW.argtypes = (
+	wintypes.HANDLE,       # hProcess
+	wintypes.DWORD,        # dwFlags (0)
+	wintypes.LPWSTR,       # lpExeName
+	ctypes.POINTER(wintypes.DWORD)  # lpdwSize
+)
+kernel32.QueryFullProcessImageNameW.restype = wintypes.BOOL
+kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
 
 TOKEN_ADJUST_SESSIONID = 0x0100
 PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
@@ -656,8 +690,6 @@ class PROCESS_INFORMATION(ctypes.Structure):
 				('dwThreadId',  wintypes.DWORD))
 
 LPPROCESS_INFORMATION = ctypes.POINTER(PROCESS_INFORMATION)
-
-kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
 advapi32.CreateProcessWithTokenW.argtypes = (
 	wintypes.HANDLE,
 	wintypes.DWORD,
@@ -869,6 +901,21 @@ def win_by_pid(process)->tuple:
 	for hwnd, title in win_lst:
 		if win32process.GetWindowThreadProcessId(hwnd)[1] == pid:
 			return (hwnd, title)
+	else:
+		return ()
+
+def proc_fpath_by_win(window)->str:
+	r'''
+	Finds the process full path by window.  
+
+		asrt( proc_fpath_by_win('Taskopy').endswith('py.exe'), True )
+
+	'''
+	if not (hwnd := win_get(window) ): return ''
+	pid = win32process.GetWindowThreadProcessId(hwnd)[1]
+	if not pid: return ''
+	return proc_fpath(pid)
+
 
 
 
