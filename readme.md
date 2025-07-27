@@ -98,7 +98,7 @@ This is what you need to put in round brackets in task (function). It is not act
 Format: **option name** (default value) — description.
 
 - **date** (None) - date and time for the task, e.g. '2020.09.01 22:53'. You can use '\*' as a placeholder to run every year or month, etc. Note: the task will not be started exactly in the first second of the specified minute.
-- **event_log** (None) - the name of the Windows log (System, Application, Security, Setup), i.e. run the task on new events in this log. To test you can create a new event with this command in elevated cmd:
+- **event_log** (None) - the name of the Windows log (System, Application, Security, Setup), i.e. run the task on new events in this log. To test you can create a new event with this command in cmd:
 
 	eventcreate /ID 174 /L Application /T Information /D "Test"
 

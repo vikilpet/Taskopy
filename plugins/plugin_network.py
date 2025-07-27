@@ -27,7 +27,7 @@ from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 from .plugin_process import proc_wait
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 _GV_PUBLIC_SUF_LST = '__public_suffix_list__'
 _RE_PING_LOSS = re.compile(r'\((\d+)%')
@@ -579,7 +579,7 @@ def net_html_unescape(html_str:str)->str:
 
 
 def is_online(
-	sites=('http://clients3.google.com', 'http://captive.apple.com')
+	sites:tuple|str=('http://clients3.google.com', 'http://captive.apple.com')
 	, timeout:float=2.0
 )->int:
 	r'''
@@ -592,6 +592,10 @@ def is_online(
 		asrt( is_online( ('https://non.existent.domain',) ), 0 )
 
 	'''
+	if isinstance(sites, str):
+		sites = (sites, )
+	elif not isinstance(sites, (tuple, list)):
+		raise Exception(f'Incorrect data type of *sites*: {type(sites)}')
 	r = 0
 	for site in sites:
 		try:

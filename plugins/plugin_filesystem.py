@@ -75,7 +75,7 @@ def path_long(path:str, force:bool=False):
 		return path
 
 def dir_slash(dirpath:str)->str:
-	'''
+	r'''
 	Adds a trailing slash if it's not there.
 	'''
 	if dirpath.endswith('\\'): return dirpath

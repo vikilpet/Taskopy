@@ -12,6 +12,12 @@ import psutil
 import sqlite3
 import subprocess
 from win32process import GetCurrentProcessId as _GetCurrentProcessId
+import win32evtlog
+import win32gui
+import win32con
+import win32com.client
+import win32clipboard
+import win32security
 import pywintypes
 from multiprocessing.dummy import Pool as ThreadPool
 from operator import itemgetter
@@ -30,10 +36,6 @@ import random
 import functools
 import importlib
 import string
-import win32gui
-import win32con
-import win32com.client
-import win32clipboard
 import difflib
 import argparse
 from typing import Callable, Iterable 
@@ -56,7 +58,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2025-07-06'
+APP_VERSION = 'v2025-07-27'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 if getattr(sys, 'frozen', False):
 	APP_PATH = os.path.dirname(sys.executable)
@@ -193,7 +195,7 @@ class TQueue(Queue):
 		self._stop_sentinel:object = object()
 		self.consumer:Callable=consumer
 		thread_start(func=self.consumer_thread
-		, ident='TQueue ' + consumer.__name__)
+		, ident='TQueue: ' + consumer.__name__)
 	
 	def consumer_thread(self):
 		while True:
@@ -1076,6 +1078,7 @@ def toast(msg:str|tuple|list, dur:str='default', img:str=''
 	'''
 	global _toast_app_icon
 	global _toast_img_cache
+	OFTEN_IDENT_LEN = 10
 	if sys_ver() < 10.0:
 		dialog(msg=msg, wait=False, title='[Toast error]')
 		return
@@ -1084,13 +1087,17 @@ def toast(msg:str|tuple|list, dur:str='default', img:str=''
 	if on_click:
 		assert len( func_arg(on_click) ) == 1, \
 			'The `on_click` function must take 1 argument'
-	msg = ' '.join(map(str, msg)) if is_iter(msg) else str(msg)
-	often_ident = str(often_ident) if often_ident else msg[:10]
+	if is_iter(msg):
+		msg = list(str(m) for m in msg)
+		if not often_ident: often_ident = msg[0]
+	else:
+		msg = [str(msg)]
+		if not often_ident: often_ident = msg[0][:OFTEN_IDENT_LEN]
 	if is_often('_toast ' + often_ident, interval=often_inter): return 'often'
 	toaster = wtoasts.WindowsToaster(appid)
 	newToast = wtoasts.Toast()
 	newToast.duration = wtoasts.ToastDuration(dur)
-	newToast.text_fields = [msg]
+	newToast.text_fields = msg
 	if img:
 		if (img_obj := _toast_img_cache.get(img)) is None:
 			img_obj = wtoasts.ToastDisplayImage.fromPath(img)
@@ -1243,7 +1250,7 @@ class Job:
 		self.kwargs = kwargs
 		self.finished = False
 		self.result = None
-		self.time:tdelta = 0
+		self.time:tdelta = None
 		self.error = False
 		self.job_name = job_name
 	
@@ -2091,80 +2098,67 @@ def value_to_str(value, sep:str='\n')->str:
 		strings.extend((value_to_str(i) for i in value))
 	return sep.join(strings)
 
+
+
+
 class DataEvent:
 	r'''
 	Windows event as an object.
 	
-	*EventData* can be a string, a dictionary or a list.  
-	*_EventDataDict* is an ugly data converted from XML.  
 	'''
 
-	def __init__(self, xml_str:str):
-		ATTRS = ('Provider', 'EventID', 'Level', 'Task'
-		, 'TimeCreated', 'EventRecordID', 'Channel'
-		, 'Computer', 'Security')
-		
-		status, full_dict = _xml_to_dict_event(xml_str)
-		if not status:
-			return
-		di_sys = full_dict.get('Event', {}).get('System')
-		self.dict = full_dict
-		self.Provider = di_sys.get('Provider', {}).get('@Name')
-		self.EventID = 0
-		self.Level = ''
-		self.Task = 0
-		self.TimeCreatedUTC = di_sys.get('TimeCreated', {})
-		self.TimeCreatedLocal = 0
-		self.EventRecordID = 0
-		self.Channel = ''
-		self.Computer = ''
-		self.Security = None
-		self.EventData = {}
-		self.UserData = {}
-		self.EventDataStr = ''
-		self._EventDataDict = full_dict.get('Event', {}) \
-			.get('EventData', {})
-		for attr in ATTRS:
-			if ( e := di_sys.get(attr, None) ):
-				if isinstance(e, dict):
-					setattr(
-						self
-						, attr
-						, e.get('#text', getattr(self, attr, None) )
-					)
-				else:
-					setattr(self, attr, e)
-		if self.TimeCreatedUTC:
-			ts = self.TimeCreatedUTC.get('@SystemTime', '.').split('.')[0]
-			if ts:
-				self.TimeCreatedUTC = datetime.datetime.fromisoformat(ts)
-				self.TimeCreatedLocal = self.TimeCreatedUTC \
-					+ datetime.timedelta(seconds= -time.timezone)
-		for attr in ATTRS:
-			if isinstance(v := getattr(self, attr, ''), str) \
-			and v.isdigit():
-				setattr(self, attr, int(v))
-		if self.Channel == 'Security' and self._EventDataDict:
-			for di in self._EventDataDict.get('Data', {}):
-				self.EventData[di.get('@Name', '')] = di.get('#text', '')
-		elif self._EventDataDict:
-			try:
-				edata = self._EventDataDict.get('Data')
-				if isinstance(edata, dict):
-					for elem in edata:
-						if isinstance(elem, dict):
-							data_name = elem.get('attrib', {}).get('Name', '')
-							self.EventData[data_name] = elem.get('value', '')
-						elif isinstance(elem, (dict, str)):
-							self.EventData = elem
-				elif isinstance(edata, (list, str)):
-					self.EventData = edata
-				else:
-					self.EventData = str(edata)
-			except:
-				if is_dev(): tprint(f'EventData exception: {exc_text()}')
-				self.EventData = self._EventDataDict
-		if self.EventData: self.EventDataStr = value_to_str(self.EventData)
+	def __init__(self, event:list, msg:str, evt_data):
+		r'''
+		*event* - result of `win32evtlog.EvtRender`
+		with `win32evtlog.EvtRenderEventValues`  
+		'''
+		self.activity_id = event[win32evtlog.EvtSystemActivityID][0]
+		self.channel = event[win32evtlog.EvtSystemChannel][0]
+		self.computer = event[win32evtlog.EvtSystemComputer][0]
+		self.event_id = event[win32evtlog.EvtSystemEventID][0]
+		self.event_record_id = event[win32evtlog.EvtSystemEventRecordId][0]
+		self.keywords = event[win32evtlog.EvtSystemKeywords][0]
+		self.level = event[win32evtlog.EvtSystemLevel][0]
+		self.opcode = event[win32evtlog.EvtSystemOpcode][0]
+		self.process_id = event[win32evtlog.EvtSystemProcessID][0]
+		self.provider_guid = event[win32evtlog.EvtSystemProviderGuid][0]
+		self.provider_name = event[win32evtlog.EvtSystemProviderName][0]
+		self.qualifiers = event[win32evtlog.EvtSystemQualifiers][0]
+		self.related_activity_id = event[win32evtlog.EvtSystemRelatedActivityID][0]
+		self.task = event[win32evtlog.EvtSystemTask][0]
+		self.thread_id = event[win32evtlog.EvtSystemThreadID][0]
+		self.time_created = event[win32evtlog.EvtSystemTimeCreated][0]
+		self.user_id = event[win32evtlog.EvtSystemUserID][0]
+		self.version = event[win32evtlog.EvtSystemVersion][0]
+		self.msg:str = msg
+		self.event_data:list = [d[0] for d in evt_data]
+	
+	@lazy_property
+	def time_created_local(self)->dtime:
+		r'''
+		From UTC to local time.  
+		'''
+		return self.time_created + tdelta(seconds=-time.timezone)
+	
+	@lazy_property
+	def _user(self)->tuple:
+		return win32security.LookupAccountSid(None, self.user_id)
+	
+	@lazy_property
+	def user_name_short(self)->str:
+		return self._user[0]
+
+	@lazy_property
+	def user_name_full(self)->str:
+		return f'{self._user[1]}\\{self._user[0]}'
+
+	@lazy_property
+	def user_domain(self)->str:
+		return self._user[1]
+
+	def __repr__(self):
+		attrs = ', '.join(f'{k}={v!r}' for k, v in vars(self).items())
+		return f'{self.__class__.__name__}({attrs})'
 
 def _thread_pop(src:str, thread_id:int):
 	' Delete current thread from `app.app_threads` '
@@ -2187,7 +2181,7 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 	*err_action* - function to run if an exception occurs.  
 	The text of exception will be passed to the function.  
 
-		asrt( bmark(thread_start, (lambda: None,)), 2_000_000 )
+		asrt( bmark(thread_start, (lambda: None,)), 500_000 )
 		asrt( bmark(threading.get_ident), 400 )
 
 	'''
@@ -2212,10 +2206,16 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 						tprint(f'exception in err_action: {repr(err)}')
 		_thread_pop('thread_start', thread_id=thread.ident)
 
+	def err_handler(text:str):
+		if not is_dev(): return
+		tprint(f'exception in thread «{ident}»: {str_indent(text)}'
+		, tname='thread_start')
+
 	if not ident:
 		parents = list(reversed(_get_parents()))[-3:]
 		parents.append(func.__name__)
 		ident = '>'.join(parents)
+	if err_action is None: err_action = err_handler
 	thread = threading.Thread(target=wrapper, daemon=is_daemon
 	, name=func.__name__)
 	thread.start()
@@ -2386,6 +2386,7 @@ def bmark(func, a:tuple=(), ka:dict={}, b_iter:int=10
 			return arg.__name__
 		else:
 			raise Exception(f'Unknown arg type: {type(arg)}')
+	ASRT_COEF = 1.1
 	if not is_iter(a): a = (a,)
 	assert isinstance(ka, dict), '*ka* should be a dictionary'
 	timings:list = []
@@ -2409,7 +2410,7 @@ def bmark(func, a:tuple=(), ka:dict={}, b_iter:int=10
 		args = f", ({', '.join(args)},)" if args else ''
 		round_digit = len(str(ns_median)) - 2
 		qprint(f'asrt( bmark({name}{args})'
-		+ f", {int_str(round(ns_median, -round_digit))} )")
+		+ f", {int_str(round(ns_median * ASRT_COEF, -round_digit))} )")
 	return _BmarkInt(ns_median)
 
 def median(source):

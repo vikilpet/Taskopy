@@ -1,3 +1,4 @@
+
 import time
 import sys
 import os
@@ -181,8 +182,8 @@ class Tasks:
 		self.task_list_crontab_load = []
 		self.task_list_exit = []
 		self.dir_change_stop = {}
-		self.event_handlers = []
-		self.idle_min = 0
+		self.event_handlers:list = []
+		self.idle_min:int = 0
 		self.http_server = None
 		self.global_hk = None
 		for task_name in dir(crontab):
@@ -367,9 +368,9 @@ class Tasks:
 					, None
 				)
 				return True, hDir
-			except pywintypes.error as e:
-				return False, e
-			except Exception as e:
+			except pywintypes.error as err:
+				return False, err
+			except Exception as err:
 				raise
 
 		def dir_watch(task:dict, path:str, is_file:bool=False):
@@ -729,55 +730,81 @@ class Tasks:
 		self.task_list_idle.append(task)
 	
 	def add_event_handler(self, task):
-
-		def run_task_with_data(reason, context, event):
-			' Converts event XML to dictionary '
+		
+		def event_handler(evt_handle):
 			r'''
-			<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
-				<System>
-					<Provider Name="Microsoft-Windows-DistributedCOM" Guid="{1B562E86-B7AA-4131-BADC-B6F3A001407E}" EventSourceName="DCOM" /> 
-					<EventID Qualifiers="0">10010</EventID> 
-					<Version>0</Version> 
-					<Level>2</Level> 
-					<Task>0</Task> 
-					<Opcode>0</Opcode> 
-					<Keywords>0x8080000000000000</Keywords> 
-					<TimeCreated SystemTime="2021-02-10T12:24:20.581005200Z" /> 
-					<EventRecordID>729301</EventRecordID> 
-					<Correlation /> 
-					<Execution ProcessID="952" ThreadID="41804" /> 
-					<Channel>System</Channel> 
-					<Computer>DB</Computer> 
-					<Security UserID="S-1-5-20" /> 
-				</System>
-				<EventData>
-					<Data Name="param1">{AAC1009F-AB33-48F9-9A21-7F5B88426A2E}</Data> 
-				</EventData>
-			</Event>
+			We do all the work here since the handle is no longer valid after the callback completes.  
+
+			See also #event notes
 			'''
-			xml_str = win32evtlog.EvtRender(
-				event, win32evtlog.EvtRenderEventXml )
-			self.run_task(
-				task=task
-				, caller=CALLER_EVENT
-				, data=DataEvent(xml_str)
+			context_sys = win32evtlog.EvtCreateRenderContext(
+				win32evtlog.EvtRenderContextSystem
 			)
+			context_data = win32evtlog.EvtCreateRenderContext(
+				win32evtlog.EvtRenderContextUser
+			)
+			event = win32evtlog.EvtRender(evt_handle
+			, win32evtlog.EvtRenderEventValues, Context=context_sys)
+			evt_data = win32evtlog.EvtRender(evt_handle
+			, win32evtlog.EvtRenderEventValues, Context=context_data)
+			prov_name, prov_name_type = event[win32evtlog.EvtSystemProviderName]
+			msg = ''
+			if prov_name_type == win32evtlog.EvtVarTypeNull:
+				msg = '<null provider>'
+				if is_dev():
+					tprint('provider name null?', str_indent(event)
+					, tname='event_handler')
+			else:
+				try:
+					metadata = win32evtlog.EvtOpenPublisherMetadata(prov_name)
+				except:
+					msg = '<metadata exception>'
+				else:
+					try:
+						msg = win32evtlog.EvtFormatMessage(
+							metadata
+							, evt_handle
+							, win32evtlog.EvtFormatMessageEvent
+						)
+					except:
+						msg = '<message exception>'
+			self.run_task(task, caller=CALLER_EVENT
+			, data=DataEvent(event, msg, evt_data))
+			context_sys.close()
+			context_data.close()
+		
+		def event_wait():
+			while True:
+				while True:
+					try:
+						events = win32evtlog.EvtNext(sub, Count=128)
+					except pywintypes.error as err:
+						if err.winerror in (6, 4317):
+							return
+						else:
+							raise
+					if len(events) == 0: break
+					for evt in events: event_handler(evt)
+				while True:
+					wait = win32event.WaitForSingleObjectEx(signal, 1000, True)
+					if wait == win32con.WAIT_OBJECT_0: break
 
 		if app.is_cmd_task: return
 		try:
-			self.event_handlers.append(
-				win32evtlog.EvtSubscribe(
-					task['event_log']
-					, win32evtlog.EvtSubscribeToFutureEvents
-					, None
-					, run_task_with_data
-					, None
-					, task['event_xpath']
-					, None
-					, None
-				)
+			signal = win32event.CreateEvent(None, 0, 0, None)
+			sub = win32evtlog.EvtSubscribe(
+				ChannelPath=task['event_log']
+				, SignalEvent=signal
+				, Flags=win32evtlog.EvtSubscribeToFutureEvents
+				, Query=task['event_xpath']
+			)
+			self.event_handlers.append((sub, signal))
+			thread_start(
+				event_wait
+				, ident=f'app: event_wait ({task["task_func_name"]})'
 			)
 		except:
+			dev_print('EvtSubscribe exception:' + str_indent(exc_text(6)) )
 			msg_warn( lang.warn_event_format.format( task['task_name_full'] ) )
 
 	def run_scheduler(self):
@@ -827,12 +854,13 @@ class Tasks:
 			self.global_hk.stop_listener()
 			self.global_hk = None
 		schedule.clear()
-		for eh in self.event_handlers:
+		for eh, signal in self.event_handlers:
 			try:
+				win32event.SetEvent(signal)
 				eh.close()
-			except Exception as e:
-				dev_print(f'event close error: {e}')
-		for hDir, dir_path in self.dir_change_stop.items():
+			except Exception as err:
+				dev_print(f'event close error: {err}')
+		for hDir, dir_path in tuple(self.dir_change_stop.items()):
 			msg = [dir_path]
 			try:
 				CancelIoEx(hDir.handle, None)

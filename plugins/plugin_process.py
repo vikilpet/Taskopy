@@ -466,9 +466,13 @@ def free_ram(unit:str='percent')->float:
 		e = _SIZE_UNITS.get(unit.lower(), 1)
 		return round(psutil.virtual_memory()[4] / e, 1)
 
-def proc_threads_num(process):
+def proc_thread_num(process)->int:
 	if (pid := proc_get(process)) == -1: return -1
 	return len(psutil.Process(pid=pid).threads())
+
+def proc_handle_num(process)->int:
+	if (pid := proc_get(process)) == -1: return -1
+	return psutil.Process(pid=pid).num_handles()
 
 def proc_close(process, timeout:int=10
 , cmd_filter:str=None)->int:
@@ -627,6 +631,15 @@ def service_list()->list[psutil._pswindows.WindowsService]:
 
 	'''
 	return psutil.win_service_iter()
+
+def is_admin()->bool:
+	r'''
+	Checks if Taskopy is running with elevated privileges
+
+		asrt( bmark(is_admin), 15_000 )
+	
+	'''
+	return win32com.shell.shell.IsUserAnAdmin()
 # https://stackoverflow.com/questions/48051283/call-binary-without-elevated-privilege
 ntdll = ctypes.WinDLL('ntdll')
 kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)

@@ -7,10 +7,8 @@ Download and unzip SDK command line tools:
 
 	https://developer.android.com/tools/releases/platform-tools
 
-Activate developer mode on phone (7 taps on serial number)
-Connect phone to your computer. From the curtain, open USB settings, select
-file transfer and allow connection from your computer.  
-You can make *File transfer* the default mode in the *Default USB configuration* in the developer settings.  
+Activate developer mode on phone (7 taps on serial number).
+In *Developer options* enable *USB debugging*.  
 Run this in CMD to find out the ID of your phone:
 
 	%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe devices
