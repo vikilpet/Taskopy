@@ -51,7 +51,7 @@ def rmt_page(actions:dict, data:DataHTTPReq, title:str='Remote'
 	two lines.  
 	'''
 	global _RMT_HTML
-	BUTTON_TEMPL = '''<div class='task' onclick="sendReq(this)">{capt}</div>'''
+	BUTTON_TEMPL = '''<div class='task' ontouchstart="sendReq(this)">{capt}</div>'''
 	if not data.form:
 		# It's not an action request, so create a page
 		if not _RMT_HTML: _RMT_HTML = file_read('ext_remote.html')

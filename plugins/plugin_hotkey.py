@@ -108,7 +108,7 @@ class GlobalHotKeys:
 		'''
 		vkey:int = 0
 		modifier:int = 0
-		key_li = [k.strip() for k in hotkey.strip().lower().split('+')]
+		key_li = tuple(k.strip() for k in hotkey.strip().lower().split('+'))
 		if len(key_li) > 1:
 			for key in key_li:
 				if key in self.modifiers.keys():

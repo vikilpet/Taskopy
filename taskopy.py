@@ -14,6 +14,8 @@ import keyboard
 import win32api
 import win32gui
 import win32con
+from win32con import VK_MENU, VK_SHIFT, VK_CONTROL, WM_KEYDOWN, WM_KEYUP \
+, WM_SYSKEYDOWN, WM_SYSKEYUP
 import win32file
 import win32evtlog
 import gc
@@ -54,6 +56,7 @@ TASK_OPTIONS = (
 	, ('menu', True)
 	, ('hotkey', None)
 	, ('hotkey_suppress', True)
+	, ('hotkey_nb', None)
 	, ('schedule', None)
 	, ('active', True)
 	, ('startup', False)
@@ -151,6 +154,7 @@ class OVERLAPPED(ctypes.Structure):
 		('hEvent', ctypes.wintypes.HANDLE),
 	]
 
+
 def _errcheck_bool(value, func, args):
 	if not value:
 		raise ctypes.WinError()
@@ -163,6 +167,106 @@ CancelIoEx.argtypes = (
 	ctypes.wintypes.HANDLE,  # hObject
 	ctypes.POINTER(OVERLAPPED)  # lpOverlapped
 )
+class KBDLLHOOKSTRUCT(ctypes.Structure):
+	_fields_ = [
+		('vkCode',     ctypes.wintypes.DWORD),
+		('scanCode',   ctypes.wintypes.DWORD),
+		('flags',      ctypes.wintypes.DWORD),
+		('time',       ctypes.wintypes.DWORD),
+		('dwExtraInfo',ctypes.POINTER(ctypes.wintypes.ULONG)),
+	]
+LowLevelHookProc = ctypes.WINFUNCTYPE(
+	ctypes.wintypes.LPARAM,  # return LRESULT
+	ctypes.c_int,            # nCode
+	ctypes.wintypes.WPARAM,  # wParam
+	ctypes.wintypes.LPARAM,  # lParam (pointer to KBDLLHOOKSTRUCT)
+)
+
+
+class HookKB:
+
+	def __init__(self):
+		self.hook_id = None
+		self.hook_proc_ref = None
+		self.tid:int = 0
+		self.shift_is_pressed = False
+		self.ctrl_is_pressed = False
+		self.alt_is_pressed = False
+	
+	def install_hook(self):
+		r'''
+		Installs a WH_KEYBOARD_LL hook that watches for hotkeys.
+		'''
+
+		def _low_level_keyboard_proc(nCode, wParam, lParam):
+			app.que_hook.put((nCode, wParam, lParam))
+			return user32.CallNextHookEx(self.hook_id, nCode, wParam, lParam)
+
+		self.hook_proc_ref = LowLevelHookProc(_low_level_keyboard_proc)
+		module_handle = ctypes.windll.kernel32.GetModuleHandleW(None)
+		self.hook_id = user32.SetWindowsHookExW(
+			win32con.WH_KEYBOARD_LL
+			, self.hook_proc_ref
+			, module_handle
+			, 0
+		)
+		if not self.hook_id: raise ctypes.WinError(ctypes.get_last_error())
+
+WM_EVENTS = {WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP}
+DOWN_KEYS = {WM_KEYDOWN, WM_SYSKEYDOWN}
+CTRL_KEYS   = {win32con.VK_LCONTROL, win32con.VK_RCONTROL}
+SHIFT_KEYS  = {win32con.VK_LSHIFT,   win32con.VK_RSHIFT}
+ALT_KEYS    = {win32con.VK_LMENU,    win32con.VK_RMENU}
+
+def hook_consumer(data:tuple):
+	nCode, wParam, lParam = data
+	if nCode == win32con.HC_ACTION and wParam in WM_EVENTS:
+		hook_kb = tasks.hook_kb
+		key = ctypes.cast(lParam, ctypes.POINTER(KBDLLHOOKSTRUCT)).contents
+		if key.vkCode in CTRL_KEYS:
+			hook_kb.ctrl_is_pressed = wParam in DOWN_KEYS
+			return
+		if key.vkCode in SHIFT_KEYS:
+			hook_kb.shift_is_pressed = wParam in DOWN_KEYS
+			return
+		if key.vkCode in ALT_KEYS:
+			hook_kb.alt_is_pressed = wParam in DOWN_KEYS
+			return
+		if not wParam in DOWN_KEYS: return
+		candidates = tasks.hotkeys_nb.get(key.vkCode, ())
+		for modifiers, task in candidates:
+			if not modifiers:
+				if hook_kb.shift_is_pressed or hook_kb.ctrl_is_pressed \
+				or hook_kb.alt_is_pressed:
+					continue
+				tasks.run_task(task)
+				break
+			if VK_CONTROL in modifiers:
+				if not hook_kb.ctrl_is_pressed: continue
+			else:
+				if hook_kb.ctrl_is_pressed: continue
+			if VK_SHIFT in modifiers:
+				if not hook_kb.shift_is_pressed: continue
+			else:
+				if hook_kb.shift_is_pressed: continue
+			if VK_MENU in modifiers:
+				if not hook_kb.alt_is_pressed: continue
+			else:
+				if hook_kb.alt_is_pressed: continue
+			tasks.run_task(task)
+			break
+
+def msg_listener(tasks):
+	r'''
+	Runs a simple GetMessage/Translate/Dispatch loop.
+	'''
+	tasks.hook_kb = HookKB()
+	tasks.hook_kb.tid = win32api.GetCurrentThreadId()
+	tasks.hook_kb.install_hook()
+	msg = ctypes.wintypes.MSG()
+	while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) != 0:
+		user32.TranslateMessage(ctypes.byref(msg))
+		user32.DispatchMessageW(ctypes.byref(msg))
 
 
 class Tasks:
@@ -186,6 +290,8 @@ class Tasks:
 		self.idle_min:int = 0
 		self.http_server = None
 		self.global_hk = None
+		self.hotkeys_nb:dict = {}
+		self.hook_kb:HookKB = None
 		for task_name in dir(crontab):
 			if task_name.startswith('_'): continue
 			task_obj = getattr(crontab, task_name)
@@ -216,6 +322,7 @@ class Tasks:
 			if task_opts['every']: self.add_every(task_opts)
 			if task_opts['date']: self.add_schedule_date(task_opts)
 			if task_opts['hotkey']: self.add_hotkey(task_opts)
+			if task_opts['hotkey_nb']: self.add_hotkey_nb(task_opts)
 			if task_opts['left_click']:
 				if not app.is_cmd_task:
 					self.task_list_left_click.append(task_opts)
@@ -313,38 +420,57 @@ class Tasks:
 		thread = thread_start(self.run_scheduler, err_msg=True
 		, ident='app: scheduler')
 		self.sched_thread_id = thread.ident
+		if self.hotkeys_nb:
+			thread_start(msg_listener, args=(self,), err_msg=True
+			, ident='app: msg listener')
 		if is_dev():
 			tprint(f'total number of tasks: {len(self.task_dict)}'
 			, tname='app')
 	
 	def add_hotkey(self, task):
-		
-		def hk_error(error):
-			msg_warn( lang.warn_hotkey.format(
-				task['task_name_full'], task['hotkey'], error
-			))
-			
 		if app.is_cmd_task: return
-		if task['hotkey_suppress']:
-			try:
-				if not self.global_hk: self.global_hk = GlobalHotKeys()
-				self.global_hk.register(
-					task['hotkey']
-					, func=self.run_task
-					, func_args=[task, 'hotkey']
-				)
-			except Exception as e:
-				hk_error(repr(e))
-		else:
-			try:
-				keyboard.add_hotkey(
-					hotkey=str(task['hotkey'])
-					, callback=self.run_task
-					, suppress=False
-					, args=(task, 'hotkey')
-				)
-			except Exception as e:
-				hk_error(repr(e))
+		if self.global_hk is None: self.global_hk = GlobalHotKeys()
+		try:
+			self.global_hk.register(
+				task['hotkey']
+				, func=self.run_task
+				, func_args=[task, 'hotkey']
+			)
+		except Exception as err:
+			msg_warn( lang.warn_hotkey.format(
+				task['task_name_full'], task['hotkey'], repr(err)
+			))
+
+	def add_hotkey_nb(self, task):
+		MODIFIERS = {
+			'ALT': win32con.VK_MENU
+			, 'CTRL': win32con.VK_CONTROL
+			, 'SHIFT': win32con.VK_SHIFT
+		}
+		if app.is_cmd_task: return
+		try:
+			key_code = None
+			main_key = ''
+			modifiers = set()
+			key_lst = ''.join( task['hotkey_nb'].split() ).upper().split('+')
+			if len(key_lst) == 1:
+				main_key = key_lst[0]
+			else:
+				for key in key_lst:
+					if key in MODIFIERS:
+						modifiers.add(MODIFIERS[key])
+					else:
+						main_key = key
+			if main_key.isdigit():
+				key_code = int(main_key)
+			else:
+				key_code = win32con.__dict__.get('VK_' + main_key)
+				if not key_code: key_code = ord(main_key)
+			self.hotkeys_nb.setdefault(key_code, []).append((modifiers, task))
+		except Exception as err:
+			msg_warn( lang.warn_hotkey.format(
+				task['task_name_full'], task['hotkey_nb'], str(err)
+			))
 
 	def add_dir_change_watch(self, task:dict, path:str, is_file:bool):
 		' Watch for changes in directory '
@@ -418,7 +544,7 @@ class Tasks:
 								if is_dev():
 									dev_print(f'hDir close exception: {err_cl}')
 									msg_err(f'hDir close exception: {err_cl}'
-									+ f'\n	{hDir.handle=}, {dir_path=}')
+									+ f'\n {hDir.handle=}, {dir_path=}')
 							break
 						else:
 							dev_print(f'pywintypes error: {errp.args}')
@@ -790,22 +916,26 @@ class Tasks:
 					if wait == win32con.WAIT_OBJECT_0: break
 
 		if app.is_cmd_task: return
+		signal = win32event.CreateEvent(None, 0, 0, None)
 		try:
-			signal = win32event.CreateEvent(None, 0, 0, None)
 			sub = win32evtlog.EvtSubscribe(
 				ChannelPath=task['event_log']
 				, SignalEvent=signal
 				, Flags=win32evtlog.EvtSubscribeToFutureEvents
 				, Query=task['event_xpath']
 			)
-			self.event_handlers.append((sub, signal))
-			thread_start(
-				event_wait
-				, ident=f'app: event_wait ({task["task_func_name"]})'
-			)
-		except:
+		except pywintypes.error as err:
 			dev_print('EvtSubscribe exception:' + str_indent(exc_text(6)) )
-			msg_warn( lang.warn_event_format.format( task['task_name_full'] ) )
+			msg_warn(lang.warn_event_format.format(
+				task['task_name_full'], err.strerror
+			) )
+			win32event.SetEvent(signal)
+			return
+		self.event_handlers.append((sub, signal))
+		thread_start(
+			event_wait
+			, ident=f'app: event_wait ({task["task_func_name"]})'
+		)
 
 	def run_scheduler(self):
 		time.sleep(0.01)
@@ -853,6 +983,11 @@ class Tasks:
 			self.global_hk.unregister()
 			self.global_hk.stop_listener()
 			self.global_hk = None
+		if self.hook_kb:
+			win32api.PostThreadMessage(self.hook_kb.tid
+			, win32con.WM_QUIT, 0, 0)
+			user32.UnhookWindowsHookEx(self.hook_kb.hook_id)
+			self.hook_kb.hook_id = None
 		schedule.clear()
 		for eh, signal in self.event_handlers:
 			try:
@@ -1166,6 +1301,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		tasks.close()
 		app.que_log.stop()
 		app.que_print.stop()
+		app.que_hook.stop()
 		wx.CallAfter(self.Destroy)
 		self.frame.Close()
 		return True
@@ -1278,6 +1414,9 @@ class App(wx.App):
 		self.is_cmd_task:bool = False
 		self.load_crontab = load_crontab
 		self.dir = APP_PATH
+		self.que_hook:TQueue = None
+		self.que_log:TQueue = None
+		self.que_print:TQueue = None
 		return True
 	
 	def win_save(self):
@@ -1401,8 +1540,9 @@ def main():
 	try:
 		app = App(False)
 		__builtins__.app = app
-		app.que_print:TQueue = TQueue(consumer=print, max_size=8192)
-		app.que_log:TQueue = TQueue(consumer=_tlog, max_size=8192)
+		app.que_print = TQueue(consumer=print, max_size=8192)
+		app.que_log = TQueue(consumer=_tlog, max_size=8192)
+		app.que_hook = TQueue(consumer=hook_consumer, max_size=8192)
 		app.is_cmd_task = not cmd_args.task is None
 		app.cmd_args = cmd_args
 		app.win_save()

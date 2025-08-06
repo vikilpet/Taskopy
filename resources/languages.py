@@ -27,7 +27,7 @@ class Language:
 		self.warn_runn_tasks_con = 'Running tasks'
 		self.warn_runn_tasks_msg = 'Some tasks ({}) are being performed now. Close anyway?'
 		self.warn_date_format = 'Wrong date format in task «{}»: «{}»'
-		self.warn_event_format = 'Wrong event specification in task «{}»'
+		self.warn_event_format='Error subscribing to events in task «{}»: «{}»'
 		self.warn_too_many_win = 'Too many {} windows was found: {}'
 		self.warn_no_run_tasks = 'No running tasks'
 		self.warn_on_exit = 'Waiting for tasks to complete on exit'
@@ -92,7 +92,7 @@ warn_left_click=Попытка привязать левому клику бол
 warn_runn_tasks_con=Работающие задачи
 warn_runn_tasks_msg=Некоторые задачи ({} шт.) выполняются в текущий момент. Всё равно закрыть?
 warn_date_format=Неправильный формат даты в задаче «{}»: «{}»
-warn_event_format=Неправильный формат события в задаче «{}»
+warn_event_format=Ошибка подписки на события в задаче «{}»: «{}»
 warn_too_many_win=Открыто слишком много окон {}: {}
 button_close=Закрыть
 button_cancel=Отмена

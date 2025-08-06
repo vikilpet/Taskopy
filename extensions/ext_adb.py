@@ -25,6 +25,11 @@ Examples:
 
 	asrt(adb_run(r'adb shell getprop ro.build.ab_update'), (True, 'true\n'))
 
+## Connect over Wi-Fi
+
+Connect via USB and run `adb tcpip 5555` then run `adb connect 192.168.x.x:5555`
+(phone IP address). In this case *dev_id* is *192.168.x.x:5555*.  
+
 ## Naming convention:
 
 *apath* - a full path on an android device.  
@@ -39,7 +44,6 @@ Examples:
 *namespace* is one of *system, secure, global*:
 
 	print(adb_run('shell settings list namespace')[1])
-
 
 
 ## Problems:
@@ -89,7 +93,7 @@ def adb_run(cmd:list|tuple|str, **kwargs)->tuple[bool, str]:
 	if kwargs.get('dev_id'):
 		cmd.insert(1, kwargs['dev_id'])
 		cmd.insert(1, '-s')
-	tdebug(cmd)
+	if is_con(): print('adb ' + ' '.join(cmd[1:]))
 	ret, out, err = proc_wait(' '.join(cmd), encoding='utf-8')
 	out = err if err else out
 	if err and is_con(): tprint(f'error: {err}')
@@ -181,7 +185,6 @@ def adb_push(pcpath:str, apath:str, **kwargs)->tuple[bool, str]:
 		status, data = adb_dir_create(apath, **kwargs)
 	for fpath in (dir_files(pcpath) if is_dir else (pcpath,)):
 		fname = file_name(fpath)
-		tprint('push', fname)
 		status, data = adb_run(
 			('push', '"' + fpath + '"', ''.join(('"', apath, '/', fname, '"')))
 			, **kwargs
@@ -235,7 +238,7 @@ def adb_dev_list()->tuple[bool, tuple]:
 	'''
 	status, data = adb_run('devices')
 	if not status: return False, ()
-	return True, tuple(l.split()[0] for l in data.rstrip().splitlines()[1:])
+	return True, tuple( l.split()[0] for l in data.rstrip().splitlines()[1:] )
 
 def adb_screenshot(dst_dir:str='tmp', **kwargs)->str:
 	r'''
