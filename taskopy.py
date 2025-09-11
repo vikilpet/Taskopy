@@ -214,9 +214,9 @@ class HookKB:
 
 WM_EVENTS = {WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP}
 DOWN_KEYS = {WM_KEYDOWN, WM_SYSKEYDOWN}
-CTRL_KEYS   = {win32con.VK_LCONTROL, win32con.VK_RCONTROL}
-SHIFT_KEYS  = {win32con.VK_LSHIFT,   win32con.VK_RSHIFT}
-ALT_KEYS    = {win32con.VK_LMENU,    win32con.VK_RMENU}
+CTRL_KEYS = {win32con.VK_LCONTROL, win32con.VK_RCONTROL}
+SHIFT_KEYS = {win32con.VK_LSHIFT, win32con.VK_RSHIFT}
+ALT_KEYS = {win32con.VK_LMENU, win32con.VK_RMENU}
 
 def hook_consumer(data:tuple):
 	nCode, wParam, lParam = data
@@ -289,9 +289,10 @@ class Tasks:
 		self.event_handlers:list = []
 		self.idle_min:int = 0
 		self.http_server = None
-		self.global_hk = None
+		self.global_hk:GlobalHotKeys = None
 		self.hotkeys_nb:dict = {}
 		self.hook_kb:HookKB = None
+		self.version:str = dtime.now().strftime('%Y.%m.%d %H:%M:%S.%f')
 		for task_name in dir(crontab):
 			if task_name.startswith('_'): continue
 			task_obj = getattr(crontab, task_name)
@@ -318,19 +319,11 @@ class Tasks:
 			else:
 				task_opts['task_name'] = func_name_human(task_name)
 				task_opts['task_name_full'] = task_opts['task_name']
-			if task_opts['schedule']: self.add_schedule(task_opts)
-			if task_opts['every']: self.add_every(task_opts)
-			if task_opts['date']: self.add_schedule_date(task_opts)
-			if task_opts['hotkey']: self.add_hotkey(task_opts)
-			if task_opts['hotkey_nb']: self.add_hotkey_nb(task_opts)
-			if task_opts['left_click']:
-				if not app.is_cmd_task:
-					self.task_list_left_click.append(task_opts)
-					app.taskbaricon.Bind(
-						wx.adv.EVT_TASKBAR_LEFT_DOWN
-						, lambda evt, temp=task_opts:
-							self.run_task(task=temp, caller=CALLER_LEFT_CLICK)
-					)
+	
+	def start_listeners(self):
+		if app.is_cmd_task: return
+		start = dtime.now()
+		for task_opts in self.task_dict.values():
 			if task_opts['startup']:
 				self.task_list_startup.append(task_opts)
 			if task_opts['sys_startup']:
@@ -339,12 +332,25 @@ class Tasks:
 				self.task_list_crontab_load.append(task_opts)
 			if task_opts['on_exit']:
 				self.task_list_exit.append(task_opts)
+			if task_opts['schedule']: self.add_schedule(task_opts)
 			if task_opts['on_file_change']:
 				self.add_dir_change_watch(task_opts, is_file=True
 				, path=task_opts['on_file_change'])
 			if task_opts['on_dir_change']:
 				self.add_dir_change_watch(task_opts, is_file=False
 				, path=task_opts['on_dir_change'])
+			if task_opts['event_log']: self.add_event_handler(task_opts)
+			if task_opts['left_click']:
+				self.task_list_left_click.append(task_opts)
+				app.taskbaricon.Bind(
+					wx.adv.EVT_TASKBAR_LEFT_DOWN
+					, lambda evt, temp=task_opts:
+						self.run_task(task=temp, caller=CALLER_LEFT_CLICK)
+				)
+			if task_opts['every']: self.add_every(task_opts)
+			if task_opts['date']: self.add_schedule_date(task_opts)
+			if task_opts['hotkey']: self.add_hotkey(task_opts)
+			if task_opts['hotkey_nb']: self.add_hotkey_nb(task_opts)
 			if task_opts['menu']:
 				submenu = None
 				if '__' in task_opts['task_func_name']:
@@ -361,9 +367,7 @@ class Tasks:
 							m[1].append(task_opts)
 							break
 					else:
-						self.task_list_submenus.append(
-							(submenu, [task_opts])
-						)
+						self.task_list_submenus.append((submenu, [task_opts]))
 				else:
 					self.task_list_menu.append(task_opts)
 			if task_opts['http'] != False:
@@ -384,7 +388,6 @@ class Tasks:
 						for ip in wl.split(','):
 							task_opts['http_white_list'].append(ip.strip())
 			if task_opts['idle']: self.add_idle_task(task_opts)
-			if task_opts['event_log']: self.add_event_handler(task_opts)
 			if task_opts['rule'] != None:
 				if not is_iter(task_opts['rule']):
 					task_opts['rule'] = (task_opts['rule'], )
@@ -393,6 +396,9 @@ class Tasks:
 						msg_warn(lang.warn_rule_type.format(
 							task_opts['task_name_full']
 						))
+
+		thread_start(self.run_scheduler, err_msg=True
+		, ident='app: scheduler')
 		self.task_list_menu.sort( key=lambda k: k['task_name'].lower() )
 		self.task_list_submenus.sort( key=lambda k: k[0].lower() )
 		for subm in self.task_list_submenus:
@@ -414,21 +420,18 @@ class Tasks:
 		if self.global_hk:
 			thread_start(self.global_hk.listen
 			, err_msg=True, ident='app: global hotkey listener')
-		if self.task_list_http and not app.is_cmd_task:
+		if self.task_list_http:
 			thread_start(http_server_start, args=(self,), err_msg=True
 			, ident='app: http server')
-		thread = thread_start(self.run_scheduler, err_msg=True
-		, ident='app: scheduler')
-		self.sched_thread_id = thread.ident
 		if self.hotkeys_nb:
 			thread_start(msg_listener, args=(self,), err_msg=True
 			, ident='app: msg listener')
 		if is_dev():
-			tprint(f'total number of tasks: {len(self.task_dict)}'
-			, tname='app')
+			tprint(f'total number of tasks: {len(self.task_dict)}', tname='app')
+			tprint('done in', time_diff_human(start, with_ms=True))
+
 	
 	def add_hotkey(self, task):
-		if app.is_cmd_task: return
 		if self.global_hk is None: self.global_hk = GlobalHotKeys()
 		try:
 			self.global_hk.register(
@@ -447,7 +450,6 @@ class Tasks:
 			, 'CTRL': win32con.VK_CONTROL
 			, 'SHIFT': win32con.VK_SHIFT
 		}
-		if app.is_cmd_task: return
 		try:
 			key_code = None
 			main_key = ''
@@ -497,7 +499,7 @@ class Tasks:
 			except pywintypes.error as err:
 				return False, err
 			except Exception as err:
-				raise
+				return False, err
 
 		def dir_watch(task:dict, path:str, is_file:bool=False):
 			dir_path:str = file_dir(path) if is_file else path
@@ -507,14 +509,19 @@ class Tasks:
 				flags = task['on_file_change_flags']
 			else:
 				flags = task['on_dir_change_flags']
+			tasks_ver = tasks.version
 			while True:
 				status:bool = False
 				while not status:
+					if tasks_ver != tasks.version:
+						return
 					status, data = get_dir_handle(dir_path)
 					if status: break
 					if data.winerror == 2:
 						msg_warn(lang.warn_path_not_exist.format(path))
 						return
+					else:
+						pass
 					time.sleep(RECONNECT_TIMEOUT)
 				hDir = data
 				self.dir_change_stop[hDir] = dir_path
@@ -523,6 +530,11 @@ class Tasks:
 						if is_dev():
 							tprint('the handle was closed ' + dir_path)
 							tlog('the handle was closed ' + dir_path)
+						return
+					if tasks_ver != tasks.version:
+						if is_dev():
+							tprint(f'stop RDC {tasks_ver} != {tasks.version}')
+							tlog(f'stop RDC {tasks_ver} != {tasks.version}')
 						return
 					try:
 						results = win32file.ReadDirectoryChangesW(
@@ -550,7 +562,8 @@ class Tasks:
 							dev_print(f'pywintypes error: {errp.args}')
 							raise errp
 					except Exception as errg:
-						if is_dev(): con_log(f'general error: {errg}')
+						if is_dev():
+							con_log(f'RDC general error: {errg}')
 						raise errg
 					if prev_file[0]:
 						pfile, ptime = prev_file
@@ -586,7 +599,6 @@ class Tasks:
 							)
 						)
 					
-		if app.is_cmd_task: return
 		thread_start(
 			dir_watch
 			, kwargs={
@@ -665,7 +677,6 @@ class Tasks:
 		r'''
 		*task* - dictionary with task parameters.  
 		'''
-		if app.is_cmd_task: return
 		intervals = task['schedule']
 		if isinstance(intervals, str): intervals = (intervals,)
 		for inter in intervals:
@@ -849,7 +860,6 @@ class Tasks:
 			run_task_inner()
 
 	def add_idle_task(self, task):
-		if app.is_cmd_task: return
 		dur = value_to_unit(task['idle'], 'ms')
 		task['idle_dur'] = int(dur)
 		task['idle_done'] = False
@@ -915,7 +925,6 @@ class Tasks:
 					wait = win32event.WaitForSingleObjectEx(signal, 1000, True)
 					if wait == win32con.WAIT_OBJECT_0: break
 
-		if app.is_cmd_task: return
 		signal = win32event.CreateEvent(None, 0, 0, None)
 		try:
 			sub = win32evtlog.EvtSubscribe(
@@ -938,14 +947,12 @@ class Tasks:
 		)
 
 	def run_scheduler(self):
-		time.sleep(0.01)
-		local_id = tasks.sched_thread_id
+		tasks_ver = tasks.version
 		afk = True
 		if self.task_list_idle:
 			afk = False
 			self.idle_min = min((t['idle_dur'] for t in self.task_list_idle))
-		cur_thread_id = local_id
-		while (cur_thread_id == local_id):
+		while (tasks_ver == tasks.version):
 			schedule.run_pending()
 			if self.task_list_idle:
 				msec = _idle_millis()
@@ -953,7 +960,7 @@ class Tasks:
 					if afk:
 						afk = False
 						for task in self.task_list_idle:
-							task['idle_done'] = False
+							task['idle_dione'] = False
 				else:
 					afk = True
 					for task in self.task_list_idle:
@@ -962,11 +969,6 @@ class Tasks:
 							self.run_task(task, caller=CALLER_IDLE)
 							task['idle_done'] = True
 			time.sleep(1.0)
-			try:
-				cur_thread_id = tasks.sched_thread_id
-			except NameError:
-				dev_print('tasks not exists')
-				break
 
 	def close(self):
 		r'''
@@ -1053,6 +1055,7 @@ def load_crontab(event=None)->bool:
 		load_modules()
 		tasks = Tasks()
 		app.tasks = tasks
+		tasks.start_listeners()
 		running_tasks = []
 		for rtask in run_bef_reload:
 			if not (task := tasks.task_dict.get(rtask['task_func_name']) ):
@@ -1534,7 +1537,7 @@ def main():
 		sett.dev = False
 		cmd_args.dev = False
 		sett.hide_console = True
-	print(f'{APP_NAME} {APP_VERSION} (Python {sys.version})')
+	print(f'{APP_NAME} {APP_VERSION} | Python {sys.version}')
 	print(lang.load_homepage)
 	print(lang.load_donate + '\n\n')
 	try:

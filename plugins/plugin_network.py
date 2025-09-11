@@ -2,6 +2,7 @@ import os
 import time
 import socket
 import requests
+from requests.auth import HTTPBasicAuth
 import urllib
 import lxml.html
 import re
@@ -27,7 +28,7 @@ from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 from .plugin_process import proc_wait
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 _GV_PUBLIC_SUF_LST = '__public_suffix_list__'
 _RE_PING_LOSS = re.compile(r'\((\d+)%')
@@ -43,7 +44,8 @@ def http_req(url:str, encoding:str='utf-8', session:bool=False
 , http_method:str='get', json_data:str=None
 , post_file:str=None, post_hash:bool=False
 , post_form_data:dict=None, post_file_capt:str='file'
-, timeout:float=3.0, attempts:int=3, **kwargs)->str:
+, timeout:float=3.0, attempts:int=3, auth:tuple=()
+, as_json:bool=False, **kwargs)->str:
 	r'''
 	Gets content of the specified URL.
 	
@@ -60,6 +62,7 @@ def http_req(url:str, encoding:str='utf-8', session:bool=False
 	if http_method: http_method = http_method.lower()
 	args = {'url': url, 'json': json_data, 'timeout': timeout}
 	if post_form_data: args['data'] = post_form_data
+	if auth: args['auth'] = HTTPBasicAuth(*auth)
 	file_obj = None
 	post_file_hash = None
 	if post_file:
@@ -88,24 +91,24 @@ def http_req(url:str, encoding:str='utf-8', session:bool=False
 		if headers: args['headers'].update(headers)
 	for attempt in range(attempts):
 		try:
-			time_sleep(attempt)
-			req = getattr(req_obj, http_method)(**args, **kwargs)
-			if req.status_code >= 500:
+			time.sleep(attempt)
+			resp = getattr(req_obj, http_method)(**args, **kwargs)
+			if resp.status_code >= 500:
 				continue
-			elif req.status_code in [403, 404]:
+			elif resp.status_code in (403, 404):
 				break
 			else:
-			 	break
-		except Exception as e:
+				break
+		except Exception as err:
 			if session: req_obj.close()
-			if isinstance(e, requests.exceptions.SSLError):
-				return e
-			if isinstance(e, requests.exceptions.InvalidHeader):
-				return e
-			if isinstance(e, TypeError):
-				return e
+			if isinstance(err, requests.exceptions.SSLError):
+				return err
+			if isinstance(err, requests.exceptions.InvalidHeader):
+				return err
+			if isinstance(err, TypeError):
+				return err
 			tdebug(f'failed again ({attempt}).'
-				,  f'Error: {repr(e)}\nurl={url}')
+				,  f'Error: {repr(err)}\nurl={url}')
 			pass
 	else:
 		if session: req_obj.close()
@@ -114,8 +117,10 @@ def http_req(url:str, encoding:str='utf-8', session:bool=False
 		)
 	if session: req_obj.close()
 	if file_obj: file_obj.close()
-	content = str(req.content
-		, encoding=encoding, errors='ignore')
+	if as_json:
+		content = resp.json()
+	else:
+		content = str(resp.content, encoding=encoding, errors='ignore')
 	return content
 
 def _rem_white(text:str)->str:
@@ -514,7 +519,12 @@ def net_pc_ip()->str:
 	return ip
 
 def net_pc_hostname()->str:
-	' Returns the hostname of the computer '
+	r'''
+	Returns the hostname of the computer.
+
+		asrt( bmark(net_pc_hostname), 30_000 )
+
+	'''
 	return socket.gethostname()
 
 def url_hostname(url:str, sld:bool=True
@@ -822,14 +832,14 @@ def ping_icmp(host:str, count:int=3
 	av_time = int( _RE_PING_TIME.findall(out)[1][2] )
 	return True, (loss, av_time)
 
-def ftp_upload(fullpath, server:str
+def ftp_upload(fullpath:str|list|tuple, server:str
 , user:str, pwd:str, dst_dir:str='/', port:int=21
 , active:bool=True, debug_lvl:int=0, attempts:int=3
 , timeout:int=10, secure:bool=False, encoding:str='utf-8')->tuple[bool, list]:
 	r'''
 	Uploads file(s) to an FTP server.  
-	Returns (True, []) or (False, ['error1', 'error2'...])
-
+	Returns (True, []) or (False, ['error1', 'error2'...])  
+ 
 	*debug_lvl* - set to 1 to see the commands.
 	
 	Error 'EOF occurred in violation of protocol' - self signed
@@ -858,8 +868,11 @@ def ftp_upload(fullpath, server:str
 					f.strip() for f in ftp.sendcmd('FEAT').splitlines()
 				)
 				if 'UTF8' in features:
-					ftp.sendcmd('CLNT Python')
-					ftp.sendcmd('OPTS UTF8 ON')
+					try:
+						ftp.sendcmd('CLNT Python')
+						ftp.sendcmd('OPTS UTF8 ON')
+					except ftplib.error_perm:
+						pass
 			if dst_dir != '/': ftp.cwd(dst_dir)
 			for fpath in files:
 				for att in range(attempts):
@@ -890,7 +903,136 @@ def ftp_upload(fullpath, server:str
 	except:
 		errors.append(exc_text())
 	return len(errors) == 0, errors
-	
+
+import ftplib
+
+def ftp_dir_list(
+	host: str,
+	username: str,
+	password: str,
+	folder: str,
+	port: int = 21,
+	timeout: int = 30
+) -> tuple[bool, list[str] | str]:
+	r'''
+	Connects to an FTP server and retrieves a listing of files and directories in 'folder'.
+	Returns (True, [...]) on success, or (False, "error message") on failure.
+	'''
+	try:
+		ftp = ftplib.FTP()
+		ftp.connect(host, port, timeout)
+		ftp.login(username, password)
+		ftp.cwd(folder)
+
+		try:
+			listing: list[str] = [
+				name + ("/" if facts.get("type") == "dir" else "")
+				for name, facts in ftp.mlsd()
+			]
+		except (ftplib.error_perm, AttributeError):
+			listing = ftp.nlst()
+
+		ftp.quit()
+		return True, listing
+
+	except ftplib.all_errors as err:
+		return False, f"FTP error: {err}"
+
+def ftp_dir_list_time(
+	host: str,
+	username: str,
+	password: str,
+	folder: str,
+	port: int = 21,
+	timeout: int = 30,
+	debug: bool = False
+) -> tuple[bool, list[tuple[str, datetime.datetime]] | str]:
+	r'''
+	Connects to an FTP server and retrieves a list
+	of (filename, modification datetime).  
+	If `debug=True`, prints command/response traces.  
+	Returns (True, entries) on success or (False, error_message) on failure.  
+	'''
+	log_lines: list[str] = []
+	entries: dict[str, datetime.datetime] = {}
+
+	def log(cmd: str, resp: str) -> None:
+		log_lines.append(f"> {cmd}\n< {resp}")
+
+	try:
+		ftp = ftplib.FTP()
+		resp = ftp.connect(host, port, timeout)
+		log(f"CONNECT {host}:{port}", resp or "connected")
+
+		resp = ftp.login(username, password)
+		log(f"LOGIN {username}/****", resp)
+
+		resp = ftp.cwd(folder)
+		log(f"CWD {folder}", resp)
+		try:
+			resp = ftp.sendcmd("FEAT")
+			log("FEAT", resp)
+		except Exception as e:
+			log("FEAT", f"error: {e}")
+		raw: list[str] = []
+		try:
+			ftp.retrlines("MLSD", raw.append)
+			log("MLSD", "\n".join(raw))
+			for line in raw:
+				parts = line.split(" ", 1)
+				facts_part = parts[0]
+				name = parts[1] if len(parts) > 1 else ""
+				facts = {}
+				for item in facts_part.rstrip(";").split(";"):
+					if "=" in item:
+						k, v = item.split("=", 1)
+						facts[k] = v
+				mod = facts.get("modify")
+				if mod:
+					ts = datetime.datetime.strptime(mod, "%Y%m%d%H%M%S")
+					entries[name] = ts
+		except Exception as e:
+			log("MLSD", f"error: {e}")
+		try:
+			names = ftp.nlst()
+			log("NLST", ", ".join(names))
+		except Exception as e:
+			log("NLST", f"error: {e}")
+			ftp.quit()
+			log("QUIT", "connection closed")
+			if debug:
+				qprint("\n".join(log_lines))
+			return False, f"Cannot list names: {e}"
+		for name in names:
+			if name in entries:
+				continue
+			try:
+				resp = ftp.sendcmd(f"MDTM {name}")
+				log(f"MDTM {name}", resp)
+				_, mod = resp.split()
+				ts = datetime.datetime.strptime(mod, "%Y%m%d%H%M%S")
+				entries[name] = ts
+			except Exception as e:
+				log(f"MDTM {name}", f"error: {e}")
+
+		ftp.quit()
+		log("QUIT", "connection closed")
+
+		if debug:
+			qprint("\n".join(log_lines))
+
+		if entries:
+			result = list(entries.items())
+			return True, result
+		else:
+			return False, "No timestamps retrieved via MLSD or MDTM."
+
+	except ftplib.all_errors as e:
+		log("ERROR", str(e))
+		if debug:
+			qprint("\n".join(log_lines))
+		return False, f"FTP error: {e}"
+
 def net_speedtest(url:str)->float:
 	r'''
 	Download the file without saving to disk and measure

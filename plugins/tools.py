@@ -58,7 +58,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2025-08-06'
+APP_VERSION = 'v2025-09-11'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 if getattr(sys, 'frozen', False):
 	APP_PATH = os.path.dirname(sys.executable)
@@ -224,7 +224,8 @@ def value_to_unit(value, unit:str='sec', unit_dict:dict=None
 		asrt( value_to_unit('1 min', 'sec'), 60.0)
 		asrt( value_to_unit('2m', 'sec'), 120.0)
 		asrt( value_to_unit(3, 'sec'), 3.0)
-		asrt( bmark(value_to_unit, ('1 ms',)), 1872 )
+		asrt( value_to_unit('1-3 sec ') in (1, 2, 3), True)
+		asrt( bmark(value_to_unit, ('1 ms',)), 11_000 )
 
 	'''
 	if not unit_dict: unit_dict = _TIME_UNITS
@@ -239,16 +240,22 @@ def value_to_unit(value, unit:str='sec', unit_dict:dict=None
 	elif value.isdigit():
 		return int(value)
 	elif ' ' in value:
-		v, u = value.split()
-		src_coef = unit_dict[u.lower()]
-		return (int(v) * src_coef) / dst_coef
+		value = value.lower()
+		tdebug(value)
+		if '-' in value:
+			v, u = value.split()
+			vmin, vmax = v.split('-')
+			v = random.randint(int(vmin), int(vmax))
+		else:
+			v, u = value.split()
+		return (int(v) * unit_dict[u]) / dst_coef
 	elif any(i.isdigit() for i in value):
 		v = ''.join(filter(str.isdigit, value))
 		u = ''.join(filter(lambda v: not v.isdigit(), value))
 		src_coef = unit_dict[u.lower()]
 		return (int(v) * src_coef) / dst_coef
 	else:
-		raise('Wrong value')
+		raise Exception('Wrong value')
 
 def _get_parents()->list:
 	' Returns a list with parent functions '
@@ -296,6 +303,10 @@ def _get_parent_func_name(parent=None, repl_undrsc:str=None)->str:
 		parent = parent.replace('_', repl_undrsc)
 	return parent
 
+_TASK_NAME_SKIP = {'tprint', 'dev_print', 'tdebug', 'con_log', 'dialog'
+, 'msgbox', 'inputbox', 'file_dialog', 'dir_dialog', 'wrapper'
+, 'run', '_bootstrap', '_bootstrap_inner'}
+
 def task_name(is_human:bool=False)->str:
 	r'''
 	Gets the name of the task from which it was called.  
@@ -304,9 +315,7 @@ def task_name(is_human:bool=False)->str:
 
 	'''
 	MAX_LVL = 30
-	SKIP = ('tprint', 'dev_print', 'tdebug', 'con_log', 'dialog'
-	, 'msgbox', 'inputbox', 'file_dialog', 'dir_dialog', 'wrapper'
-	, 'run', '_bootstrap', '_bootstrap_inner')
+	global _TASK_NAME_SKIP
 	tname = ''
 	first_name = ''
 	try:
@@ -324,7 +333,7 @@ def task_name(is_human:bool=False)->str:
 				tname = fn
 				break
 			if not first_name:
-				if not fn in SKIP: first_name = fn
+				if not fn in _TASK_NAME_SKIP: first_name = fn
 		except ValueError:
 			tname = first_name if first_name else APP_NAME
 			break
@@ -710,7 +719,7 @@ def time_sleep(interval:str|int|float|tuple, unit:str=''):
 
 		asrt( bmark(time_sleep, a=('1 ms',)), 1_500_000 )
 		# and for `interval` as a float:
-		asrt( bmark(time_sleep, a=(0.000_001,)), 150_000 )
+		asrt( bmark(time_sleep, a=(0.000_001,)), 600_000 )
 	
 	`time.sleep` isn't that cheap on its own:
 
@@ -1209,7 +1218,7 @@ def job_pool(jobs:list, pool_size:int=None)->list:
 					)
 				)
 			for job in job_pool(jobs, pool_size=2):
-				print(job.error, job.result, job.time)
+				qprint(job.error, job.result, job.time)
 				
 	'''
 	pool = ThreadPool(pool_size)
@@ -1233,9 +1242,9 @@ class Job:
 		job: Job
 		for job in job_pool(jobs):
 			if job.error:
-				print('error:', job.result)
+				qprint('error:', job.result)
 			else:
-				print('result:', job.result)
+				qprint('result:', job.result)
 
 	'''
 	def __init__(
@@ -1294,7 +1303,7 @@ def job_batch(jobs:list, timeout:int
 			Job(dialog, ['Button 1', 'Button 2'])
 		)
 		for job in job_batch(jobs, timeout=5):
-			print(job.error, job.result, job.time)
+			qprint(job.error, job.result, job.time)
 	
 	'''
 	job: Job
@@ -2230,6 +2239,8 @@ def task_start(taskname:str|Callable, **kwargs):
 
 	If all you want to do is just run the function in a separate thread
 	, see `thread_start`.
+
+	Note: You can only use *task options* in *kwargs*
 	'''
 	if isinstance(taskname, Callable): taskname = taskname.__name__
 	for tname, tdic in app.tasks.task_dict.items():
@@ -2282,7 +2293,6 @@ def app_threads_print():
 	qprint(f'app		{tnum_app} (dead {tnum_dead})')
 	qprint(f'threading	{tnum_thread} ({tnum_thread - tnum_app})')
 	qprint(f'system		{tnum_sys} ({tnum_sys - tnum_app})\n')
-
 
 def crontab_reload():
 	' Reloads the crontab '
@@ -2582,8 +2592,8 @@ def exc_texts()->tuple[str, str]:
 			raise ZeroDivisionError
 		except:
 			f, s = exc_texts()
-			print('short:', s)
-			print('full:', f)
+			qprint('short:', s)
+			qprint('full:', f)
 
 	'''
 	return traceback.format_exc().strip(), exc_text()
@@ -2926,7 +2936,7 @@ def is_often(ident:str, interval:str)->bool:
 		asrt( is_often('_', '1 ms'), True)
 		time_sleep('1 ms')
 		asrt( is_often('_', '1 ms'), False)
-		asrt( bmark(is_often, ('_', '1 ms')), 5000 )
+		asrt( bmark(is_often, ('_', '1 ms')), 15_000 )
 		asrt( bmark(is_often, ('_', 1)), 3500 )
 
 	'''

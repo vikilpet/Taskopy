@@ -13,12 +13,12 @@ from plugins.plugin_crypt import *
 
 def examp_autoruns(exe_path:str, caller:str
 , max_table_width=80):
-	'''
+	r'''
 	Check if something new has appeared in the system autorun.
 	Wrapper for the *Sysinternals autoruns*:
 	https://docs.microsoft.com/en-us/sysinternals/downloads/autoruns  
 	*exe_path* - full path to the console version:  
-	*autorunsc64.exe* (note the *c* near the end)
+	*autorunsc64.exe* (note the *c* near the *64*)
 
 	Usage example (crontab):
 
@@ -42,7 +42,7 @@ def examp_autoruns(exe_path:str, caller:str
 	*ct* — tab-separated export.
 	With the *-s* option it will not show new files with a signature  
 	'''
-	CMD = f'{exe_path} -nobanner -ct -m -a *'
+	CMD = f'{exe_path} -nobanner -ct -m -a -accepteula *'
 	HASH_ALG = 'sha256'
 	# It's convient to store name for var_* in a variable:
 	VAR_NAME = 'autoruns'
@@ -70,7 +70,11 @@ def examp_autoruns(exe_path:str, caller:str
 				hashes[image_path] = 'hash error'
 		return hashes
 	
-	new_out = proc_wait(CMD, encoding='utf-16')[1]
+	code, new_out, _ = proc_wait(CMD, encoding='utf-16')
+	if code:
+		tprint(str_indent(new_out))
+		toast('autoruns error')
+		return
 	prev_out = var_get(VAR_NAME)
 	if not prev_out:
 		tprint('first run')
@@ -98,7 +102,7 @@ def examp_autoruns(exe_path:str, caller:str
 		if caller in (tcon.CALLER_LOAD, tcon.CALLER_MENU):
 			dialog('No change', timeout=2)
 		return
-	print(f'\nChanges ({len(changes)}):')
+	qprint(f'\nChanges ({len(changes)}):')
 	table = []
 	for path, status in changes.items():
 		table.append((status, path))

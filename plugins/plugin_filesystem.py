@@ -237,7 +237,7 @@ def dir_rename(fullpath, dest
 			raise e
 	return dest
 
-def file_log(fullpath, message:str, encoding:str='utf-8'
+def file_log(fullpath, message, encoding:str='utf-8'
 , time_format:str='%Y.%m.%d %H:%M:%S', sep:str='\t', end:str='\n'):
 	r'''
 	Logging a message.  
@@ -1171,14 +1171,18 @@ def temp_dir(new_dir:str='', prefix:str='', suffix:str='')->str:
 	return dst_dir
 
 def temp_file(prefix:str='', suffix:str=''
-, content=None, encoding='utf-8')->str:
+, content=None, encoding='utf-8', time_format:str='%m%d%H%M%S'
+, rnd_len:int=4)->str:
 	r'''
 	Returns the full name for the temporary file.
 	(the file is not created as such)  
 	If *content* is specified then writes content to the file.  
 	'''
-	fname = os.path.join(tempfile.gettempdir()
-		, prefix + time.strftime('%m%d%H%M%S') + random_str(5) + suffix)
+	fname = os.path.join(
+		tempfile.gettempdir()
+		, prefix + time.strftime(time_format)
+		+ random_str(rnd_len) + suffix
+	)
 	if content: file_write(fname, content=content, encoding=encoding)
 	return fname
 

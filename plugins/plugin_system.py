@@ -89,13 +89,9 @@ def registry_get(fullpath:str):
 		hive = getattr(winreg, hive)
 	else:
 		return 'unknown hive'
-	try:
-		with winreg.OpenKey(hive, key_path, 0
-		, winreg.KEY_READ) as reg_key:
-			value, value_type = winreg.QueryValueEx(reg_key, key_name)
-		return value
-	except:
-		return exc_text()
+	with winreg.OpenKey(hive, key_path, 0, winreg.KEY_READ) as reg_key:
+		value, value_type = winreg.QueryValueEx(reg_key, key_name)
+	return value
 
 def registry_set(fullpath:str, value, value_type=None)->bool|str:
 	r'''
