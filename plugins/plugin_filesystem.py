@@ -288,9 +288,8 @@ def file_copy(fullpath, destination)->str:
 
 def file_append(fullpath, content:str, encoding:str='utf-8')->str:
 	r'''
-	Append content to a file. Creates fullpath
-	if not specified.  
-	Returns the fullpath.  
+	Append content to a file. Creates *fullpath* if not specified.  
+	Returns the *fullpath*.  
 	'''
 	if fullpath:
 		fullpath = path_get(fullpath)
@@ -452,8 +451,9 @@ def dir_exists(fullpath)->bool:
 
 def file_exists(fullpath)->bool:
 	r'''
-	Is file exists?
+	Is file exists? It works the same way for directories.
 
+		asrt( file_exists(r'c:\Windows'), True )
 		asrt( bmark(file_exists, (random_str(),), b_iter=3), 40_000 )
 		asrt( bmark(file_exists, (r'c:\Windows\notepad.exe',), b_iter=3), 60_000 )
 	

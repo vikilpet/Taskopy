@@ -106,12 +106,15 @@ def proc_wait(
 	, make_stdin:bool=True
 	, encoding:str='utf-8'
 	, encoding_errors:str='replace'
+	, create_console:bool=True
 )->tuple[int, str, str]:
 	r'''
 	Start the process and wait for it to complete.  
-	Returns (return code, stdout, stderr)  
+	Returns k(return code, stdout, stderr)  
 	*cmd* - command line with the program and its arguments  
-	*cwd* - working directory  
+	*cwd* - current working directory  
+	*create_console* - to catch output of some programs  
+	*env* - add this to the environment (not replace all)  
 	'''
 	stdout_read, stdout_write = _create_pipe()
 	stderr_read, stderr_write = _create_pipe()
@@ -133,7 +136,10 @@ def proc_wait(
 	if make_stdin: startup.hStdInput = stdin_handle
 	startup.dwFlags |= win32con.STARTF_USESHOWWINDOW
 	startup.wShowWindow = win32con.SW_HIDE
-	creation_flags = win32con.CREATE_NEW_CONSOLE | priority
+	win_flag = win32con.CREATE_NEW_CONSOLE if create_console \
+		else win32con.CREATE_NO_WINDOW
+	creation_flags = win_flag | priority
+	if env: env = {**os.environ, **env}
 	proc_handle, thread_handle, proc_id, thread_id = win32process.CreateProcess(
 		None,
 		cmd,
@@ -181,43 +187,29 @@ def proc_start(
 	, env:dict=dict()
 	, window:str=''
 	, priority:str=''
-	, its_script:bool=False
 	, args_as_str:bool=False
 )->tuple|int:
 	r'''
-	Launches the application.
-	
+	Launches the application.  
 	Returns:
 
 		if capture - (returncode, stdout, stderr)
 		if wait - return code
 		otherwise - PID of a new process.
 	
-	proc_path - path to file or path to executable. Do not add
-	double quotes.
-	
-	args (list or str) - command-line parameters.
-
-	args_as_str - do not split args into list. Useful
-	if application command line contains quotes. It will
-	strip white space characters so you can use multiline string.
-
-	cwd - change working directory.
-	
-	wait - wait for the program to complete.
-
-	capture - capture stdout and stderr.
-
-	env - add this environments to the process
-
-	window - maximized(short - 'max'), minimized('min')
-		or hidden('hid').
-
-	priority - one of 'above', 'below', 'high', 'idle', 'normal'
-		or 'realtime'.
-
-	its_script - it's a script from python Scripts directory.
-	Examples: 'youtube-dl.exe', 'pipreqs.exe'.
+	*proc_path* - path to file or path to executable. Do not add
+	double quotes.  
+	*args:list|str* - command-line parameters.  
+	*args_as_str* - do not split args into list. Useful
+	if program command line contains quotes. It will
+	strip white space characters so you can use multiline string.  
+	*cwd* - change working directory.  
+	*wait* - wait for the program to complete.  
+	*capture* - capture stdout and stderr.  
+	*env - add this environments to the process.  
+	*window* - maximized(short - 'max'), minimized('min') or hidden('hid').  
+	*priority* - one of 'above', 'below', 'high', 'idle', 'normal'
+	or 'realtime'.  
 
 	https://docs.python.org/3/library/subprocess.html
 	'''
@@ -230,17 +222,7 @@ def proc_start(
 		, 'realtime': subprocess.REALTIME_PRIORITY_CLASS
 	}
 	if isinstance(proc_path, str):
-		if its_script:
-			if not proc_path.endswith('.exe'): proc_path += '.exe'
-			proc_path = [
-				sys.executable
-				, os.path.join(
-					os.path.dirname(sys.executable)
-					, 'Scripts', proc_path
-				)
-			]
-		else:
-			proc_path = [proc_path]
+		proc_path = [proc_path]
 	elif not isinstance(proc_path, (list, tuple)):
 		raise Exception('Unknown type of proc_path')
 	if args:
@@ -258,10 +240,7 @@ def proc_start(
 	if not args_as_str: proc_path = list( map(str, proc_path) )
 	if not cwd and not args_as_str:
 		if ':\\' in proc_path[0]:
-			if its_script:
-				cwd = os.getcwd()
-			else:
-				cwd = os.path.dirname(proc_path[0])
+			cwd = os.path.dirname(proc_path[0])
 	startupinfo = subprocess.STARTUPINFO()
 	creationflags = win32con.DETACHED_PROCESS
 	startupinfo.dwFlags = subprocess.STARTF_USESHOWWINDOW

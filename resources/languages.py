@@ -35,6 +35,7 @@ class Language:
 		self.warn_rule_type = 'Task «{}»: rule should be a function or tuple of functions'
 		self.warn_path_not_exist = "The path doesn't exist: «{}»"
 		self.warn_file_not_exist = "The file doesn't exist: «{}»"
+		self.warn_task_add_exc = 'Rule validation exception in *task_add_if*'
 		self.dlg_nx_tasks = 'Delete tasks without threads'
 		self.time_units_human = 'd,h,m,s,ms'
 
@@ -101,6 +102,7 @@ warn_rule_exc=Исключение в правиле у задачи «{}»
 warn_rule_type=Задача «{}»: правило должно быть функцией или кортежом функций
 warn_path_not_exist=Путь не существует: «{}»
 warn_file_not_exist=Файл не существует: «{}»
+warn_task_add_exc = 'Исключение при проверке правила в *task_add_if*'
 dlg_nx_tasks=Удалить задачи без потоков
 time_units_human=д,ч,м,с,мс
 '''

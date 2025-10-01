@@ -12,6 +12,7 @@ import psutil
 import sqlite3
 import subprocess
 from win32process import GetCurrentProcessId as _GetCurrentProcessId
+import win32api
 import win32evtlog
 import win32gui
 import win32con
@@ -58,7 +59,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2025-09-11'
+APP_VERSION = 'v2025-10-01'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 if getattr(sys, 'frozen', False):
 	APP_PATH = os.path.dirname(sys.executable)
@@ -241,7 +242,6 @@ def value_to_unit(value, unit:str='sec', unit_dict:dict=None
 		return int(value)
 	elif ' ' in value:
 		value = value.lower()
-		tdebug(value)
 		if '-' in value:
 			v, u = value.split()
 			vmin, vmax = v.split('-')
@@ -616,6 +616,18 @@ def time_diff_human(start:dtime|float|tdelta, end:dtime|None|float=None
 	if is_negative: result = '-' + result
 	return result
 
+def time_sys_offset()->int:
+	r'''
+	Returns the current offset from UTC in seconds.  
+	'''
+	rc, tzi = win32api.GetTimeZoneInformation()
+	Bias, StandardName, StandardDate, StandardBias, DaylightName \
+	, DaylightDate, DaylightBias = tzi
+	if rc == win32con.TIME_ZONE_ID_DAYLIGHT:
+		effective_bias = Bias + DaylightBias
+	else:
+		effective_bias = Bias + StandardBias
+	return -effective_bias * 60
 
 def _date_part(date_val:dtime=None, part:str=''):
 	if not date_val: date_val = datetime.datetime.now()
@@ -1335,7 +1347,7 @@ def qprint(*values):
 	try:
 		app.que_print.put(msg)
 	except NameError:
-		print(msg)
+		print('<no app>', msg)
 	except:
 		print('<qprint fail>', msg)
 
@@ -1761,7 +1773,7 @@ def locale_set(name:str='C'):
 
 def table_print(
 	table
-	, use_headers:bool|tuple=False
+	, use_headers:bool|tuple=True
 	, row_sep:str=''
 	, headers_sep:str='-'
 	, col_pad:str='  '

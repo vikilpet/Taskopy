@@ -21,14 +21,15 @@ import threading
 import ftplib
 from typing import Iterator, Tuple, Union
 import json2html
-from .tools import dev_print, exc_text, time_sleep, tdebug \
+from .tools import dev_print, exc_text, tdebug \
 , locale_set, safe, patch_import, re_replace \
-, median, is_iter, str_indent, is_con, qprint, str_remove_white, is_dev
+, median, is_iter, str_indent, is_con, qprint, str_remove_white \
+, value_to_unit, task_add, msg_warn, Callable
 from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 from .plugin_process import proc_wait
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 _GV_PUBLIC_SUF_LST = '__public_suffix_list__'
 _RE_PING_LOSS = re.compile(r'\((\d+)%')
@@ -518,14 +519,18 @@ def net_pc_ip()->str:
 		sock.close()
 	return ip
 
+_pc_hostname_cache:str = ''
 def net_pc_hostname()->str:
 	r'''
-	Returns the hostname of the computer.
+	Returns the hostname of the computer in lower case.
 
-		asrt( bmark(net_pc_hostname), 30_000 )
+		asrt( bmark(net_pc_hostname), 500 )
 
 	'''
-	return socket.gethostname()
+	global _pc_hostname_cache
+	if _pc_hostname_cache: return _pc_hostname_cache
+	_pc_hostname_cache = socket.gethostname().lower()
+	return _pc_hostname_cache
 
 def url_hostname(url:str, sld:bool=True
 , lan_domains:tuple=('lan', 'local', 'home'))->str:
@@ -649,8 +654,7 @@ def http_h_last_modified(url:str, **kwargs):
 		return datetime.datetime.strptime(date_str
 			, '%a, %d %b %Y %H:%M:%S GMT')
 
-def port_scan(host:str, port:int
-, timeout:int=500)->bool:
+def _port_scan(host:str, port:int, timeout:int=500)->bool:
 	r'''
 	Scans a TCP port and returns `True` on success.  
 	*timeout* - timeout in milliseconds.  
@@ -662,6 +666,20 @@ def port_scan(host:str, port:int
 	connected = sock.connect_ex((host, port)) is SUCCESS
 	sock.close()
 	return connected
+
+def port_scan(host:str, port:int, timeout:int=500
+, retry_num:int=2, retry_delay:int|str|float='100 ms')->bool:
+	r'''
+	Scans a TCP port and returns `True` on success.  
+	*timeout* - timeout in milliseconds.  
+	'''
+	if isinstance(retry_delay, str):
+		retry_delay = value_to_unit(retry_delay, 'second')
+	for attempt in range(retry_num):
+		if _port_scan(host=host, port=port, timeout=timeout): return True
+		if attempt + 1 < retry_num: time.sleep(retry_delay)
+	return False
+
 
 def http_req_status(url:str, method='HEAD', timeout:float=1.0)->int:
 	r'''
@@ -1057,3 +1075,34 @@ def net_speedtest(url:str)->float:
 	if is_con():
 		qprint(f'{total_bytes_dload=}, {speed_measurements=}')
 	return median(speed_measurements)
+
+def task_add_if(pc_name:str|set[str]
+, rule:Callable|list[Callable]|None=None):
+	r'''
+	Conditionally adds an attribute indicating that the function is a *task*.  
+	*pc_name* — checks the name of this PC (case insensitive).  
+	'''
+	if rule is None:
+		rule = []
+	elif isinstance(rule, Callable):
+		rule = [rule]
+	else:
+		msg_warn(f'Wrong type of *rule* in *task_add_if*: {type(rule)}')
+		return lambda f: f
+	if pc_name:
+		hostname = net_pc_hostname()
+		if isinstance(pc_name, str):
+			pc_name = {pc_name.lower(), }
+		else:
+			pc_name = set(p.lower() for p in pc_name)
+		rule.append(lambda: hostname in pc_name)
+	passed:bool = True
+	for func in rule:
+		try:
+			if not func():
+				passed = False
+				break
+		except:
+			passed = False
+			msg_warn('Rule validation exception in *task_add_if*', 'task_add_if')
+	return task_add if passed else lambda f: f
