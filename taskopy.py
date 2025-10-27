@@ -960,7 +960,7 @@ class Tasks:
 					if afk:
 						afk = False
 						for task in self.task_list_idle:
-							task['idle_dione'] = False
+							task['idle_done'] = False
 				else:
 					afk = True
 					for task in self.task_list_idle:

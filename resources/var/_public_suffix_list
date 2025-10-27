@@ -244,7 +244,21 @@ net.bb
 org.bb
 store.bb
 tv.bb
-*.bd
+bd
+ac.bd
+ai.bd
+co.bd
+com.bd
+edu.bd
+gov.bd
+id.bd
+info.bd
+it.bd
+mil.bd
+net.bd
+org.bd
+sch.bd
+tv.bd
 be
 ac.be
 bf
@@ -6080,7 +6094,6 @@ download
 drive
 dtv
 dubai
-dunlop
 dupont
 durban
 dvag
@@ -7793,6 +7806,7 @@ theshop.jp
 shopselect.net
 base.shop
 beagleboard.io
+bearblog.dev
 *.beget.app
 pages.gay
 bnr.la
@@ -7829,6 +7843,8 @@ cafjs.com
 canva-apps.cn
 my.canvasite.cn
 canva-apps.com
+canva-hosted-embed.com
+canvacode.com
 rice-labs.com
 canva.run
 my.canva.site
@@ -8009,6 +8025,7 @@ icp1.io
 *.raw.icp1.io
 *.icp.net
 caffeine.site
+caffeine.xyz
 dfirma.pl
 dkonto.pl
 you2.pl
@@ -8859,7 +8876,6 @@ iopsys.se
 ipifony.net
 ir.md
 is-a-good.dev
-is-a.dev
 iservschule.de
 mein-iserv.de
 schuldock.de
@@ -8945,8 +8961,9 @@ myjino.ru
 *.vps.myjino.ru
 jote.cloud
 jotelulu.cloud
-jote-dr-lt1.com
-jote-rd-lt1.com
+eu1-plenit.com
+la1-plenit.com
+us1-plenit.com
 webadorsite.com
 jouwweb.site
 *.cns.joyent.com
@@ -8999,7 +9016,6 @@ we.bs
 filegear-sg.me
 ggff.net
 *.user.localcert.dev
-localcert.net
 localtonet.com
 *.localto.net
 lodz.pl
@@ -9144,6 +9160,7 @@ x.mythic-beasts.com
 yali.mythic-beasts.com
 cust.retrosnub.co.uk
 ui.nabu.casa
+needle.run
 cloud.nospamproxy.com
 o365.cloud.nospamproxy.com
 netlib.re
@@ -9307,6 +9324,7 @@ simplesite.gr
 123website.nl
 123hjemmeside.no
 service.one
+website.one
 simplesite.pl
 123paginaweb.pt
 123minsida.se
@@ -9766,6 +9784,7 @@ p.tawk.email
 p.tawkto.email
 tche.br
 site.tb-hosting.com
+directwp.eu
 edugit.io
 s3.teckids.org
 telebit.app
@@ -9892,6 +9911,8 @@ wdh.app
 hrsn.au
 vps.hrsn.au
 hrsn.dev
+is-a.dev
+localcert.net
 windsurf.app
 windsurf.build
 panel.gg

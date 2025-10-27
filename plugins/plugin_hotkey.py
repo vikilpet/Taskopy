@@ -1,10 +1,11 @@
+import time
 import ctypes
 import ctypes.wintypes
 import win32con
 import keyboard
 from collections import namedtuple
 try:
-	from .tools import warning, patch_import, time_sleep, qprint
+	from .tools import warning, patch_import, qprint, value_to_unit
 except ImportError:
 	warning = print
 
@@ -186,9 +187,10 @@ def key_release_wait(keys:str, timeout='10 ms'):
 	*keys* - a string with hotkey for a task like 'ctrl+shift+m'  
 	Use this if you want to send keystrokes by hotkey.  
 	'''
+	timeout = value_to_unit(timeout, 'sec')
 	while True:
 		if any( map( keyboard.is_pressed, keys.split('+') ) ):
-			time_sleep(timeout)
+			time.sleep(timeout)
 		else:
 			break
 		

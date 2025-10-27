@@ -1502,7 +1502,12 @@ def var_get(var:str, default=None, encoding:str='utf-8'
 	r'''
 	Gets the *disk variable*.  
 	*as_literal* - converts to a literal (dict, list, tuple etc).
-	Dangerous! - it's just `eval`, not `ast.literal_eval`!
+	Dangerous! - it's just `eval`, not `ast.literal_eval`!  
+	*globals* - a dictionary with class names, for example for `datetime`:
+	
+		globals={'datetime': datetime}
+	
+	Examples:
 
 		var_set('_test', 1)
 		asrt( var_get('_test'), '1')
