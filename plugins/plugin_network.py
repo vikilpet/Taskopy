@@ -9,6 +9,7 @@ import re
 import html
 import psutil
 import tempfile
+import win32file
 from io import BytesIO
 from hashlib import md5
 from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
@@ -40,13 +41,13 @@ warnings.filterwarnings('ignore', category=MarkupResemblesLocatorWarning)
 requests.packages.urllib3.disable_warnings(
 	requests.packages.urllib3.exceptions.InsecureRequestWarning)
 
-def http_req(url:str, encoding:str='utf-8', session:bool=False
+def http_req(url:str, encoding:str='utf-8'
 , cookies:dict=None, headers:dict=None
-, http_method:str='get', json_data:str=None
+, http_method:str='', post_json:str=None
 , post_file:str=None, post_hash:bool=False
-, post_form_data:dict=None, post_file_capt:str='file'
+, post_form_data:dict=None, post_file_capt:str=''
 , timeout:float=3.0, attempts:int=3, auth:tuple=()
-, as_json:bool=False, **kwargs)->str:
+, as_json:bool=False, chunk_size:int=8192, **kwargs)->str:
 	r'''
 	Gets content of the specified URL.
 	
@@ -59,37 +60,54 @@ def http_req(url:str, encoding:str='utf-8', session:bool=False
 		- Header `If-Modified-Since` may result in zero file length.
 		
 	'''
-	if (post_file or post_form_data): http_method = 'POST'
-	if http_method: http_method = http_method.lower()
-	args = {'url': url, 'json': json_data, 'timeout': timeout}
+
+	def file_stream():
+		with open(post_file, 'rb') as f:
+			while True:
+				chunk = f.read(chunk_size)
+				if not chunk:
+					break
+				yield chunk
+
+	if not http_method:
+		if (post_file or post_form_data or post_json):
+			http_method = 'post'
+		else:
+			http_method = 'get'
+	http_method = http_method.lower()
+	args = {'url': url, 'json': post_json, 'timeout': timeout}
 	if post_form_data: args['data'] = post_form_data
 	if auth: args['auth'] = HTTPBasicAuth(*auth)
 	file_obj = None
 	post_file_hash = None
+	stream_headers = {}
 	if post_file:
-		if not os.path.isfile(post_file):
-			return Exception('The post file does not exist')
-		if post_hash:
-			post_file_hash = _file_hash(post_file)
-		file_obj = open(post_file, 'rb')
-		args['files'] = {post_file_capt: file_obj}
+		post_file = path_get(post_file)
+		if post_hash: post_file_hash = _file_hash(post_file)
+		if post_file_capt:
+			file_obj = open(post_file, 'rb')
+			args['files'] = {post_file_capt: file_obj}
+		else:
+			file_size = win32file.GetFileAttributesEx(post_file)[-1]
+			fname = os.path.basename(post_file)
+			fname2 = urllib.parse.quote(fname, safe='')
+			if not all(ord(ch) < 128 for ch in fname):
+				fname = fname2
+			stream_headers = {
+				'Content-Type': 'application/octet-stream'
+				, 'Content-Disposition': f'attachment; filename="{fname}"'
+					+ f'; filename*=UTF-8\'\'{fname2}'
+				, 'Content-Length': str(file_size)
+			}
+			args['data'] = file_stream()
 	else:
 		post_file_hash = False
-	if session:
-		req_obj = requests.Session()
-		req_obj.headers.update(_USER_AGENT)
-		if headers: req_obj.headers.update(headers)
-		if cookies: req_obj.cookies.update(cookies)
-		if post_file_hash:
-			req_obj.headers.update(
-				{'Content-MD5': post_file_hash})
-	else:
-		req_obj = requests
-		if cookies: args['cookies'] = cookies
-		args['headers'] = {**_USER_AGENT}
-		if post_file_hash:
-			args['headers']['Content-MD5'] = post_file_hash
-		if headers: args['headers'].update(headers)
+	req_obj = requests
+	if cookies: args['cookies'] = cookies
+	args['headers'] = {**_USER_AGENT, **stream_headers}
+	if post_file_hash:
+		args['headers']['Content-MD5'] = post_file_hash
+	if headers: args['headers'].update(headers)
 	for attempt in range(attempts):
 		try:
 			time.sleep(attempt)
@@ -101,22 +119,19 @@ def http_req(url:str, encoding:str='utf-8', session:bool=False
 			else:
 				break
 		except Exception as err:
-			if session: req_obj.close()
 			if isinstance(err, requests.exceptions.SSLError):
 				return err
 			if isinstance(err, requests.exceptions.InvalidHeader):
 				return err
 			if isinstance(err, TypeError):
 				return err
-			tdebug(f'failed again ({attempt}).'
-				,  f'Error: {repr(err)}\nurl={url}')
-			pass
+			if is_con():
+				qprint(f'failed again ({attempt}).'
+					+ f' Error: {repr(err)}\nurl={url}')
 	else:
-		if session: req_obj.close()
 		raise Exception(
 			f'no more attempts ({attempts}), host={url_hostname(url)}'
 		)
-	if session: req_obj.close()
 	if file_obj: file_obj.close()
 	if as_json:
 		content = resp.json()
@@ -858,7 +873,8 @@ def ftp_upload(fullpath:str|list|tuple, server:str
 	Uploads file(s) to an FTP server.  
 	Returns (True, []) or (False, ['error1', 'error2'...])  
  
-	*debug_lvl* - set to 1 to see the commands.
+	*debug_lvl* - set to 1 to see the commands.  
+	*timeout* - time in seconds or string like '10 sec'  
 	
 	Error 'EOF occurred in violation of protocol' - self signed
 	certificate of server?
@@ -871,6 +887,8 @@ def ftp_upload(fullpath:str|list|tuple, server:str
 		files = tuple(fullpath)
 	else:
 		raise Exception('unknown type of fullpath')
+	if isinstance(timeout, str):
+		timeout = value_to_unit(timeout, 'second')
 	errors = []
 	ftpclass = ftplib.FTP_TLS if secure else ftplib.FTP
 	try:
@@ -882,15 +900,18 @@ def ftp_upload(fullpath:str|list|tuple, server:str
 			ftp.set_pasv(not active)
 			if encoding: ftp.encoding = encoding
 			if encoding == 'utf-8':
-				features = tuple(
-					f.strip() for f in ftp.sendcmd('FEAT').splitlines()
-				)
-				if 'UTF8' in features:
-					try:
-						ftp.sendcmd('CLNT Python')
-						ftp.sendcmd('OPTS UTF8 ON')
-					except ftplib.error_perm:
-						pass
+				try:
+					feat_str = ftp.sendcmd('FEAT')
+				except ftplib.error_perm:
+					pass
+				else:
+					features = tuple( f.strip() for f in feat_str.splitlines() )
+					if 'UTF8' in features:
+						try:
+							ftp.sendcmd('CLNT Python')
+							ftp.sendcmd('OPTS UTF8 ON')
+						except ftplib.error_perm:
+							pass
 			if dst_dir != '/': ftp.cwd(dst_dir)
 			for fpath in files:
 				for att in range(attempts):

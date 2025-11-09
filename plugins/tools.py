@@ -59,7 +59,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2025-10-27'
+APP_VERSION = 'v2025-11-09'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 if getattr(sys, 'frozen', False):
 	APP_PATH = os.path.dirname(sys.executable)
@@ -720,8 +720,8 @@ def time_sleep(interval:str|int|float|tuple, unit:str=''):
 	r'''
 	Pauses for specified amount of time.  
 	*interval* - number of seconds (float) or `str` with unit like '5 min'
-	or tuple with (start, stop) for random interval (you should
-	provide unit in this case). Example:
+	, '5-10 sec' or tuple with (start:int, stop:int) for random
+	interval (you should provide unit in this case). Example:
 
 		time_sleep( (2,10), 'sec' )
 		time_sleep('2 sec')
@@ -747,6 +747,7 @@ def time_sleep(interval:str|int|float|tuple, unit:str=''):
 	elif unit:
 		interval = str(interval) + ' ' + unit
 	time.sleep( value_to_unit(interval, 'sec') )
+sleep = time_sleep
 pause = time_sleep
 wait = time_sleep
 

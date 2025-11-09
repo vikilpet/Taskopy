@@ -7,6 +7,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import cgi
 import urllib
+import email
 from typing import Pattern
 from .tools import dev_print, app_log, DataHTTPReq \
 	, patch_import, tprint, value_to_unit, exc_text, qprint
@@ -25,8 +26,8 @@ else:
 
 
 class HTTPHandlerTasks(BaseHTTPRequestHandler):
-	def __init__(self, request, client_address, server
-				, tasks):
+
+	def __init__(self, request, client_address, server, tasks):
 		self.silent = True
 		self.tasks = tasks
 		self.req_data = DataHTTPReq()
@@ -270,9 +271,19 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 	def data_processing(self)->tuple:
 		r'''
 		Reads form data or file from a POST request.  
-		Writes the file on disk (if it big enough).
+		Writes the file on disk (if it big enough).  
 		Returns (status, None) or (status, error:str)  
 		'''
+
+		def extract_filename_and_field(part_headers_bytes):
+			msg = email.message_from_bytes(b'Content-Type: text/plain\r\n'
+				+ part_headers_bytes)
+			disposition, params = msg.get_params()
+			params_dict = dict(params)
+			filename = params_dict.get('filename') or msg.get_filename()  # fallback to decoded filename*
+			field_name = params_dict.get('name')
+			return filename, field_name
+		
 		CHUNK_SIZE = 1_048_576
 		BODY_SIZE_MAX = 1_048_576
 		self.req_data._fullpath = os.path.join(self.http_dir
@@ -293,6 +304,20 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 				)
 			else:
 				cont_len = int( self.headers['Content-Length'] )
+				cont_disp = self.headers.get('Content-Disposition')
+				if cont_disp:
+					cont_disp_opt = cgi.parse_header(cont_disp)[1]
+					fname = ''
+					if 'filename*' in cont_disp_opt:
+						fname = urllib.parse.unquote(
+							cont_disp_opt['filename*'][7:]
+						)
+					elif 'filename' in cont_disp_opt:
+						fname = cont_disp_opt['filename']
+					if fname:
+						self.req_data._fullpath = os.path.join(
+							self.http_dir, fname
+						)
 				if BODY_SIZE_MAX >= cont_len:
 					self.req_data._body = self.rfile.read(cont_len)
 					return True, None

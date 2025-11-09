@@ -410,9 +410,7 @@ def dir_create(fullpath=None)->str:
 	fullpath = path_get(fullpath)
 	if not fullpath: return temp_dir('rnd')
 	fullpath = fullpath.rstrip('.').rstrip(' ')
-	try:
-		os.makedirs(fullpath)
-	except FileExistsError: pass
+	os.makedirs(fullpath, exist_ok=True)
 	return fullpath
 
 
@@ -1092,6 +1090,24 @@ def dir_zip(fullpath, destination=None
 			pass
 		shutil.move(result, new_fullpath)
 	return new_fullpath
+
+def file_unzip(fullpath, dst_dir:str)->str:
+	r'''
+	Extracts the contents of a zip file to the destination directory.  
+	Returns *fullpath*.  
+	Raises:  
+		zipfile.BadZipFile: If the file is not a valid zip file.  
+		PermissionError: If there's no permission to read/write.  
+	'''
+	fullpath = path_get(fullpath)
+	os.makedirs(dst_dir, exist_ok=True)
+	with zipfile.ZipFile(fullpath, 'r') as zip_ref:
+		for member in zip_ref.infolist():
+			target_path = os.path.join(dst_dir, member.filename)
+			if not target_path.startswith(os.path.normpath(dst_dir) + os.sep):
+				raise ValueError(f"Security risk: attempted path traversal in zip file: {member.filename}")
+		zip_ref.extractall(dst_dir)
+	return fullpath
 
 def file_zip(fullpath, destination=None)->str:
 	r'''
