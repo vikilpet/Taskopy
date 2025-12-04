@@ -23,7 +23,7 @@ import argparse
 import msvcrt
 from plugins.constants import *
 from plugins.tools import *
-from plugins.tools import _tlog, _thread_pop
+from plugins.tools import _tlog, _thread_pop, _log_cur_file
 from plugins.plugin_filesystem import *
 from plugins.plugin_system import *
 from plugins.plugin_system import _idle_millis
@@ -99,6 +99,9 @@ TASK_OPTIONS = (
 	)
 	, ('on_file_change_flags', tcon.FILE_NOTIFY_CHANGE_LAST_WRITE)
 	, ('every', ())
+	, ('_call_count', 0)
+	, ('_last_err', '')
+	, ('_params', {})
 )
 _WEEKDAY_HUMAN = {
 	'day': 'day'
@@ -239,7 +242,7 @@ def hook_consumer(data:tuple):
 				if hook_kb.shift_is_pressed or hook_kb.ctrl_is_pressed \
 				or hook_kb.alt_is_pressed:
 					continue
-				tasks.run_task(task)
+				tasks.run_task(task, caller=CALLER_HOTKEY)
 				break
 			if VK_CONTROL in modifiers:
 				if not hook_kb.ctrl_is_pressed: continue
@@ -253,7 +256,7 @@ def hook_consumer(data:tuple):
 				if not hook_kb.alt_is_pressed: continue
 			else:
 				if hook_kb.alt_is_pressed: continue
-			tasks.run_task(task)
+			tasks.run_task(task, caller=CALLER_HOTKEY)
 			break
 
 def msg_listener(tasks):
@@ -267,6 +270,12 @@ def msg_listener(tasks):
 	while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) != 0:
 		user32.TranslateMessage(ctypes.byref(msg))
 		user32.DispatchMessageW(ctypes.byref(msg))
+
+def ttprint(*msgs, **kwargs):
+	r'''
+	Just add `tname='app'`
+	'''
+	tprint(*msgs, tname='app')
 
 
 class Tasks:
@@ -302,13 +311,14 @@ class Tasks:
 				and (task_obj.__module__ != 'crontab')
 			): continue
 			task_opts:dict = {}
-			params = inspect.signature(task_obj).parameters
+			params:dict = inspect.signature(task_obj).parameters
 			for opt, opt_def in TASK_OPTIONS:
 				param = params.get(opt)
 				if param is None:
 					task_opts[opt] = opt_def
 				else:
 					task_opts[opt] = param.default
+			task_opts['_params'] = tuple(p.lower() for p in params.keys())
 			if not task_opts['task']: continue
 			if not task_opts['active']: continue
 			self.task_dict[task_name] = task_opts
@@ -323,7 +333,7 @@ class Tasks:
 	def start_listeners(self):
 		if app.is_cmd_task: return
 		start = dtime.now()
-		for task_opts in self.task_dict.values():
+		for func_name, task_opts in self.task_dict.items():
 			if task_opts['startup']:
 				self.task_list_startup.append(task_opts)
 			if task_opts['sys_startup']:
@@ -344,8 +354,8 @@ class Tasks:
 				self.task_list_left_click.append(task_opts)
 				app.taskbaricon.Bind(
 					wx.adv.EVT_TASKBAR_LEFT_DOWN
-					, lambda evt, temp=task_opts:
-						self.run_task(task=temp, caller=CALLER_LEFT_CLICK)
+					, lambda evt, t=task_opts['task_func_name']:
+						self.run_task(task_func_name=t, caller=CALLER_LEFT_CLICK)
 				)
 			if task_opts['every']: self.add_every(task_opts)
 			if task_opts['date']: self.add_schedule_date(task_opts)
@@ -427,24 +437,23 @@ class Tasks:
 			thread_start(msg_listener, args=(self,), err_msg=True
 			, ident='app: msg listener')
 		if is_dev():
-			tprint(f'total number of tasks: {len(self.task_dict)}', tname='app')
-			tprint('done in', time_diff_human(start, with_ms=True))
+			ttprint(f'total number of tasks: {len(self.task_dict)}')
 
 	
-	def add_hotkey(self, task):
+	def add_hotkey(self, task:dict):
 		if self.global_hk is None: self.global_hk = GlobalHotKeys()
 		try:
 			self.global_hk.register(
 				task['hotkey']
 				, func=self.run_task
-				, func_args=[task, 'hotkey']
+				, func_args=(task['task_func_name'], CALLER_HOTKEY)
 			)
 		except Exception as err:
 			msg_warn( lang.warn_hotkey.format(
 				task['task_name_full'], task['hotkey'], repr(err)
 			))
 
-	def add_hotkey_nb(self, task):
+	def add_hotkey_nb(self, task:dict):
 		MODIFIERS = {
 			'ALT': win32con.VK_MENU
 			, 'CTRL': win32con.VK_CONTROL
@@ -468,7 +477,9 @@ class Tasks:
 			else:
 				key_code = win32con.__dict__.get('VK_' + main_key)
 				if not key_code: key_code = ord(main_key)
-			self.hotkeys_nb.setdefault(key_code, []).append((modifiers, task))
+			self.hotkeys_nb.setdefault(key_code, []).append(
+				(modifiers, task['task_func_name'])
+			)
 		except Exception as err:
 			msg_warn( lang.warn_hotkey.format(
 				task['task_name_full'], task['hotkey_nb'], str(err)
@@ -528,12 +539,12 @@ class Tasks:
 				while True:
 					if hDir.handle == 0:
 						if is_dev():
-							tprint('the handle was closed ' + dir_path)
+							ttprint('the handle was closed ' + dir_path)
 							tlog('the handle was closed ' + dir_path)
 						return
 					if tasks_ver != tasks.version:
 						if is_dev():
-							tprint(f'stop RDC {tasks_ver} != {tasks.version}')
+							ttprint(f'stop RDC {tasks_ver} != {tasks.version}')
 							tlog(f'stop RDC {tasks_ver} != {tasks.version}')
 						return
 					try:
@@ -563,7 +574,7 @@ class Tasks:
 							raise errp
 					except Exception as errg:
 						if is_dev():
-							con_log(f'RDC general error: {errg}')
+							con_log(f'RDC general error: {errg}', tname='app')
 						raise errg
 					if prev_file[0]:
 						pfile, ptime = prev_file
@@ -583,20 +594,16 @@ class Tasks:
 							or res_action != 3
 						):
 							continue
+						caller = CALLER_FILE_CHANGE if is_file else CALLER_DIR_CHANGE
+						action = FILE_ACTIONS.get(res_action, 'unknown')
 						if is_file:
 							fullpath = path
 						else:
 							fullpath = os.path.join(path, res_relname)
 						self.run_task(
-							task=task
-							, caller=(
-								CALLER_FILE_CHANGE if is_file
-								else CALLER_DIR_CHANGE
-							)
-							, data=(
-								fullpath
-								, FILE_ACTIONS.get(res_action, 'unknown')
-							)
+							task_func_name=task['task_func_name']
+							, caller=caller
+							, data=(fullpath, action)
 						)
 					
 		thread_start(
@@ -630,7 +637,7 @@ class Tasks:
 					sched = schedule.every( int(ev_items[0]) )
 					getattr(sched, sched_unit).do(
 						self.run_task
-						, task=task
+						, task_func_name=task['task_func_name']
 						, caller=CALLER_SCHEDULER
 					)
 				except Exception as e:
@@ -643,7 +650,7 @@ class Tasks:
 					).to( int(ev_items[2]) )
 					getattr(sched, sched_unit).do(
 						self.run_task
-						, task=task
+						, task_func_name=task['task_func_name']
 						, caller=CALLER_SCHEDULER
 					)
 				except Exception as e:
@@ -654,7 +661,7 @@ class Tasks:
 					sched = schedule.every()
 					getattr(sched, sched_unit).at(ev_items[1]).do(
 						self.run_task
-						, task=task
+						, task_func_name=task['task_func_name']
 						, caller=CALLER_SCHEDULER
 					)
 				except Exception as e:
@@ -665,7 +672,7 @@ class Tasks:
 					sched = schedule.every()
 					getattr(sched, sched_unit).at(ev_items[1]).do(
 						self.run_task
-						, task=task
+						, task_func_name=task['task_func_name']
 						, caller=CALLER_SCHEDULER
 					)
 				except Exception as e:
@@ -683,7 +690,8 @@ class Tasks:
 			try:
 				sched_rule = (
 					'schedule.' + inter
-					+ f'.do(self.run_task, task=task, caller="{CALLER_SCHEDULER}")'
+					+ f".do(self.run_task, task_func_name=task['task_func_name']"
+					+ f', caller="{CALLER_SCHEDULER}")'
 				)
 				eval(sched_rule)
 			except Exception as e:
@@ -699,7 +707,8 @@ class Tasks:
 			dt_now = datetime.datetime.now().replace(second=0, microsecond=0)
 			if dt_now != date_fill(date_dic):
 				return
-			self.run_task(task=task, caller=CALLER_SCHEDULER)
+			self.run_task(task_func_name=task['task_func_name']
+			, caller=CALLER_SCHEDULER)
 		DATE_PARTS = ('year', 'month', 'day', 'hour', 'minute')
 		dates = task['date']
 		if isinstance(dates, str): dates = [dates]
@@ -722,36 +731,18 @@ class Tasks:
 		if sett.hide_console:
 			win32gui.ShowWindow(app.app_hwnd, win32con.SW_HIDE)
 		for task in self.task_list_startup:
-			self.run_task(task, caller=CALLER_STARTUP)
+			self.run_task(task['task_func_name'], caller=CALLER_STARTUP)
 			
 	def run_at_sys_startup(self):
 		if win32api.GetTickCount() < 120_000:
 			for task in self.task_list_sys_startup:
-				self.run_task(task, caller=CALLER_SYS_STARTUP)
+				self.run_task(task['task_func_name'], caller=CALLER_SYS_STARTUP)
 	
 	def run_at_crontab_load(self):
 		for task in self.task_list_crontab_load:
-			self.run_task(task, caller=CALLER_LOAD)
-	
-	def task_opt_set(self, task_func_name:str, option:str, value):
-		''' Sets the option for the task '''
-		task = self.task_dict.get(task_func_name)
-		if task == None:
-			if is_dev():
-				tprint(f'task not found: {task_func_name}, option: {option}')
-			return
-		task[option] = value
+			self.run_task(task['task_func_name'], caller=CALLER_LOAD)
 
-	def task_opt_get(self, task_func_name:str, option:str):
-		''' Gets the option for the task '''
-		task = self.task_dict.get(task_func_name)
-		if task == None:
-			if is_dev():
-				tprint(f'task not found: {task_func_name}, option: {option}')
-			return
-		return task.get(option, 'task_opt_get error: option not found')
-
-	def run_task(self, task:dict, caller:str=None, data=None
+	def run_task(self, task_func_name:str, caller:str=None, data=None
 	, result:list=None, wait_event:threading.Event=None):
 		r'''
 		Logging, threading, error catching and other stuff.
@@ -770,64 +761,54 @@ class Tasks:
 		def run_task_inner(result:list=None):
 
 			def catcher(result:list=None):
-				nonlocal thread
+				nonlocal thread, task
 				try:
+					start_time = dtime.now()
 					app.app_threads[thread.ident] = {
-						'func': 'task: ' + task['task_func_name']
-						, 'stime': dtime.now(), 'thread': thread
+						'func': 'task: ' + task_func_name
+						, 'stime': start_time, 'thread': thread
 					}
-					self.task_opt_set(task['task_func_name']
-						, 'running', True)
-					self.task_opt_set(task['task_func_name']
-						, 'thread', threading.current_thread().name)
+					task['running'] = True
+					task['_call_count'] += 1
+					task['thread'] = threading.current_thread().name
 					task_kwargs = {}
-					func_args = set(
-						k.lower()
-						for k in inspect.signature(
-							task['task_func']
-						).parameters.keys()
-					)
-					if 'caller' in func_args:
+					if 'caller' in task['_params']:
 						task_kwargs['caller'] = caller
-					if 'data' in func_args:
+					if 'data' in task['_params']:
 						task_kwargs['data'] = data
-					task['last_start'] = datetime.datetime.now()
+					task['last_start'] = start_time
 					r = task['task_func'](**task_kwargs)
 					if result != None: result.append(r)
-					try:
-						if ( t := tasks.task_dict.get(task['task_func_name'], {}) ):
-							t['running'] = False
-							t['thread'] = None
-					except NameError:
-						dev_print(f'"tasks" not exists for the task {task["task_func_name"]}')
-					self.task_opt_set(task['task_func_name'], 'err_counter', 0)
-					if wait_event: wait_event.set()
+					task = tasks.task_dict.get(task_func_name)
+					if task:
+						task['running'] = False
+						task['thread'] = None
+						task['err_counter'] = 0
 				except:
 					try:
-						if (
-							t := tasks.task_dict.get(task['task_func_name'], {})
-						):
-							t['running'] = False
-							t['thread'] = None
+						task = tasks.task_dict.get(task_func_name)
+						if task:
+							task['running'] = False
+							task['thread'] = None
 					except NameError:
 						if is_dev():
-							tprint('task stopped after reload: '
-							+ task['task_func_name'])
-					err_counter = self.task_opt_get(task['task_func_name']
-					, 'err_counter') + 1
-					if not result is None: result.append('task error')
-					if err_counter <= self.task_opt_get(task['task_func_name']
-					, 'err_threshold'):
-						self.task_opt_set(task['task_func_name']
-						, 'err_counter', err_counter)
+							ttprint(f'nx-task after reload: {task_func_name}')
+						return
+					err_counter = task['err_counter'] + 1
+					if not result is None: result.append('<task error>')
+					exc_str = exc_text()
+					task['_last_err'] = exc_str
+					if err_counter <= task['err_threshold']:
+						task['err_counter'] = err_counter
 						if is_dev():
-							tprint(f'exception msg suppressed: {exc_text()}'
-							, tname=task['task_func_name'], short=True)
+							tprint(f'exception suppressed: {exc_str}'
+							, tname=task_func_name, short=True)
 					else:
-						self.task_opt_set(task['task_func_name']
-						, 'err_counter', 0)
-						msg_err(lang.warn_task_error.format(
-						task['task_name_full']) )
+						task['err_counter'] = 0
+						msg_err( lang.warn_task_error.format(
+							task['task_name_full'])
+						)
+				if wait_event: wait_event.set()
 				_thread_pop('task', thread_id=thread.ident)
 			if task['rule'] and (caller != tcon.CALLER_MENU):
 				for rule in task['rule']:
@@ -839,13 +820,17 @@ class Tasks:
 						return
 			if task['log'] and caller != CALLER_CMDLINE:
 				cs = f' ({caller})' if caller else ''
-				con_log(f'task{cs}: {task["task_name_full"]}')
+				con_log(f'task{cs}: {task["task_name_full"]}', tname='')
 			thread = threading.Thread(target=catcher, daemon=daemon
 			, name=task['task_name']
 			, args=(result,) if task['result'] else () )
 			thread.start()
 			if task['result']: thread.join()
 		if app.is_cmd_task and (caller != CALLER_CMDLINE): return
+		task:dict = self.task_dict.get(task_func_name)
+		if task is None:
+			ttprint(f'task not found: {task_func_name}')
+			return
 		if (
 			(not self.enabled)
 			and ( not task['hyperactive'])
@@ -904,7 +889,7 @@ class Tasks:
 						)
 					except:
 						msg = '<message exception>'
-			self.run_task(task, caller=CALLER_EVENT
+			self.run_task(task['task_func_name'], caller=CALLER_EVENT
 			, data=DataEvent(event, msg, evt_data))
 			context_sys.close()
 			context_data.close()
@@ -966,7 +951,8 @@ class Tasks:
 					for task in self.task_list_idle:
 						if task['idle_done']: continue
 						if msec >= task['idle_dur']:
-							self.run_task(task, caller=CALLER_IDLE)
+							self.run_task(task['task_func_name']
+							, caller=CALLER_IDLE)
 							task['idle_done'] = True
 			time.sleep(1.0)
 
@@ -1016,13 +1002,42 @@ class Tasks:
 				dev_print(str_indent(', '.join(msg)))
 				tlog('[app] close: ' + ', '.join(msg))
 		dev_print('close time: ' + time_diff_human(start, with_ms=True))
+
+	def tasks_print(self):
+		r'''
+		Print a table with all tasks.
+		'''
+
+		@dataclass
+		class Task:
+			func:str = ''
+			call_count:int = 0
+			err_count:int = 0
+			last_start:str = ''
+			last_err:str = ''
+
+		table = []
+		for func_name, task_dic in self.task_dict.items():
+			task = Task()
+			table.append(task)
+			task.func = func_name
+			lstart = task_dic['last_start']
+			if lstart is None:
+				lstart = ''
+			else:
+				lstart = time_diff_human(lstart)
+			task.last_start = lstart
+			task.call_count = task_dic['_call_count']
+			task.err_count = task_dic['err_counter']
+			task.last_err = task_dic['_last_err']
+		table_print(table, use_headers=True)
 tasks:Tasks = None
 
 def load_crontab(event=None)->bool:
 	global tasks
 	global crontab
 	start = dtime.now()
-	con_log(f'{lang.load_crontab} {os.getcwd()}')
+	con_log(f'{lang.load_crontab} {os.getcwd()}', tname='app')
 	try:
 		run_bef_reload = []
 		if sys.modules.get('crontab') is None:
@@ -1068,7 +1083,7 @@ def load_crontab(event=None)->bool:
 		thread_start(tasks.run_at_crontab_load, err_msg=True
 		, ident='app: run_at_crontab_load')
 		if is_dev():
-			tprint('load time: ' + time_diff_human(start, with_ms=True))
+			ttprint('load time: ' + time_diff_human(start, with_ms=True))
 		gc.collect()
 		return True
 	except:
@@ -1103,12 +1118,15 @@ def load_modules():
 		try:
 			tmp_mdl = importlib.import_module(mdl_name)
 		except PermissionError:
-			con_log(f'permission error: {mdl_name}')
+			con_log(f'permission error: {mdl_name}', tname='app')
 		except ModuleNotFoundError:
 			if traceback.format_exc().rstrip().endswith("_patch'"):
-				con_log(f'patch removed: {mdl_name}')
+				con_log(f'patch removed: {mdl_name}', tname='app')
 			else:
-				raise
+				sys.modules[mdl_name] = prev_mdl
+				msg_err(lang.warn_mod_reload.format(mdl_name)
+				, title=lang.menu_reload, source='load_modules')
+				continue
 		except:
 			sys.modules[mdl_name] = prev_mdl
 			msg_err(lang.warn_mod_reload.format(mdl_name)
@@ -1155,8 +1173,10 @@ def create_menu_item(menu, task, func=None, parent_menu=None):
 		tname = task['task_name']
 		if task['hotkey']:
 			tname = f"{tname}\t{task['hotkey'].title()}"
-		func = lambda evt, temp=task: tasks.run_task(task=temp
-		, caller=CALLER_MENU)
+		func = lambda evt, t=task['task_func_name']: tasks.run_task(
+			task_func_name=t
+			, caller=CALLER_MENU
+		)
 	else:
 		tname = task
 	if parent_menu:
@@ -1268,7 +1288,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		if is_end_session:
 			force = True
 			if is_dev():
-				tprint(f'end of session')
+				ttprint(f'end of session')
 				tlog(f'end of session')
 		running_tasks = ()
 		if not app.is_cmd_task:
@@ -1291,20 +1311,24 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 				)[1] != lang.button_close:
 					return False
 		if not app.is_cmd_task and tasks.task_list_exit:
-			tprint(
+			ttprint(
 				lang.warn_on_exit + ': '
-				 + ', '.join(
+				+ ', '.join(
 					t['task_name'] for t
 					in tasks.task_list_exit
-				 )
+				)
 			)
 			for task in tasks.task_list_exit:
-				tasks.run_task(task, caller=CALLER_EXIT)
+				tasks.run_task(task['task_func_name'], caller=CALLER_EXIT)
 		qprint(lang.menu_exit)
 		tasks.close()
 		app.que_log.stop()
 		app.que_print.stop()
 		app.que_hook.stop()
+		try:
+			_log_cur_file[1].close()
+		except:
+			ttprint('error closing log file')
 		wx.CallAfter(self.Destroy)
 		self.frame.Close()
 		return True
@@ -1328,7 +1352,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 				dialog(lang.warn_no_run_tasks, title=lang.menu_list_run_tasks
 				, timeout=3, wait=False)
 			else:
-				tprint('no running tasks', tname='app')
+				ttprint('no running tasks')
 			return ()
 		os_threads:dict[str, int] = {}
 		for thr in threading.enumerate():
@@ -1385,10 +1409,10 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		app.enabled = state
 		if state:
 			set_title(APP_NAME)
-			con_log(f'{APP_NAME} enabled')
+			con_log(f'{APP_NAME} enabled', tname='app')
 		else:
 			set_title(f'{APP_NAME} (disabled)')
-			con_log(f'{APP_NAME} disabled')
+			con_log(f'{APP_NAME} disabled', tname='app')
 		self.set_icon(dis=not state)
 	
 	def on_restart(self, event=None, force:bool=False):

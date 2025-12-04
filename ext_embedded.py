@@ -1,9 +1,9 @@
+# This is the crontab extension
+
 from plugins.plugin_network import *
 from plugins.plugin_filesystem import *
 from plugins.plugin_process import *
 from plugins.plugin_system import *
-
-# This is the crontab extension
 
 # 2024.01.03 abs path
 def emb_backup_and_purge(log_days:int=30, backup_days:int=30):
@@ -72,6 +72,43 @@ def emb_app_update(caller:str):
 	if dialog(f'Download finished ({file_size_str(data)})'
 	, {'OK': '', 'Open archive': 'open'} ) == 'open':
 		file_open(data)
+
+@task_add
+def embedded__app_update_exe_start(caller:str=''):
+	' Find new exe and quit '
+	new_exe:str = ''
+	for fpath in sorted(dir_files(app_dir(), subdirs=False
+	, in_ext='exe', in_name=APP_NAME + '_')):
+		new_exe = file_name(fpath)
+	if not new_exe:
+		tprint('no new exe')
+		return
+	tprint('found', new_exe)
+	pid = app_pid()
+	file_open(
+		new_exe
+		, '-task embedded__app_update_exe_replace -data '
+			+ f'{pid};{proc_cmdline(pid)}'
+	)
+	app_exit(force=True)
+
+@task_add
+def embedded__app_update_exe_replace(caller:str='', data:str='', menu=False):
+	' Replace old exe with new '
+	pid, cmdline = data.split(';', maxsplit=1)
+	pid = int(pid)
+	for attempt in range(50):
+		if not proc_exists(pid): break
+		tprint('waiting for exit', attempt)
+	else:
+		tprint("Something's wrong, the app still hasn't closed")
+		time_sleep('5 sec')
+		app_exit()
+	app_exe = path_get((app_dir(), 'taskopy.exe'))
+	file_recycle(app_exe)
+	file_rename(sys.executable, app_exe)
+	file_open(app_exe, cmdline)
+	app_exit()
 
 # 2024.01.03 abs path
 @task_add

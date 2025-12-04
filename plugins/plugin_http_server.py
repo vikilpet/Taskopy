@@ -218,7 +218,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 				result = []
 				wait_event = threading.Event()
 				self.tasks.run_task(
-					task
+					task['task_func_name']
 					, caller=tcon.CALLER_HTTP
 					, data=self.req_data
 					, result=result
@@ -232,7 +232,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 					page = 'timeout'
 			else:
 				self.tasks.run_task(
-					task
+					task['task_func_name']
 					, caller=tcon.CALLER_HTTP
 					, data=self.req_data
 				)
@@ -353,7 +353,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			self.req_data._md5 = self.headers.get('Content-MD5', '')
 			return True, None
 		except:
-			return False, f'upload error: {exc_text(6)}'
+			return False, f'upload error: {exc_text()}'
 
 	def do_POST(self):
 		self.process_req('POST')
@@ -363,8 +363,9 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			super().log_message(msg_format, *args)
 
 def http_server_start(tasks):
-	''' Starts HTTP server that will run 'tasks'.
-		tasks - instance of 'Tasks' class.
+	r'''
+	Starts HTTP server that will run 'tasks'.  
+	*tasks* - instance of 'Tasks' class.  
 	'''
 	try:
 		httpd = ThreadingHTTPServer(

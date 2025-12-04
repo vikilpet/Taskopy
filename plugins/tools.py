@@ -40,7 +40,8 @@ import string
 import difflib
 import argparse
 from typing import Callable, Iterable 
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field, asdict, is_dataclass
+import dataclasses as dclass
 from queue import Queue, SimpleQueue
 from itertools import zip_longest
 import pythoncom
@@ -59,7 +60,7 @@ except ModuleNotFoundError:
 	import plugins.constants as tcon
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2025-11-09'
+APP_VERSION = 'v2025-12-04'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 if getattr(sys, 'frozen', False):
 	APP_PATH = os.path.dirname(sys.executable)
@@ -270,39 +271,6 @@ def _get_parents()->list:
 			break
 	return parents
 
-def _get_parent_func_name(parent=None, repl_undrsc:str=None)->str:
-	r'''
-	Get name of parent function if any.  
-
-		from plugins.tools import _get_parent_func_name
-		asrt( bmark(_get_parent_func_name), 6328 )
-		
-	'''
-	EXCLUDE = ('wrapper', 'run_task', 'run', 'dev_print', 'tprint'
-		, 'main', 'run_task_inner', 'popup_menu_hk'
-		, 'MainLoop', 'catcher', 'run_code', 'mapstar'
-		, 'run_ast_nodes', 'run_cell_async', 'run_cell'
-		, 'interact')
-	if parent: return str(parent)
-	for i in range(2, 10):
-		try:
-			parent = sys._getframe(i).f_code.co_name
-		except ValueError:
-			parent = ''
-			break
-		if parent == 'con_log': return ''
-		if (
-			not parent in EXCLUDE
-			and not parent.startswith('_')
-			and not parent.startswith('<')
-		):
-			break
-	else:
-		parent = ''
-	if repl_undrsc != None:
-		parent = parent.replace('_', repl_undrsc)
-	return parent
-
 _TASK_NAME_SKIP = {'tprint', 'dev_print', 'tdebug', 'con_log', 'dialog'
 , 'msgbox', 'inputbox', 'file_dialog', 'dir_dialog', 'wrapper'
 , 'run', '_bootstrap', '_bootstrap_inner'}
@@ -390,24 +358,40 @@ def is_dev()->bool:
 	except (NameError, AttributeError):
 		_is_dev_cache = True
 	return _is_dev_cache
+_log_cur_file:tuple = ()
 
 def _log_file(msg:str, fname:str):
 	r'''
 	Append the string to a log file.  
 	*fname* - log file name.  
 	'''
-	for _ in (1, 2):
-		try:
-			with open(f'{app.dir}\\log\\{fname}.log', 'ta+'
-			, encoding='utf-8') as f:
-				f.write(msg)
-			return 
-		except FileNotFoundError:
-			os.makedirs( app.dir + '\\log' )
-			continue
-		except:
-			qprint(f'logging to a file exception: {exc_text()}')
-			return
+	global _log_cur_file
+	file_obj = None
+	if _log_cur_file:
+		if fname == _log_cur_file[0]:
+			file_obj = _log_cur_file[1]
+		else:
+			try:
+				_log_cur_file[1].close()
+			except Exception as err:
+				tprint(f'error closing log file: {repr(err)}', tname='app')
+	if not file_obj:
+		for _ in (1, 2):
+			try:
+				file_obj = open(f'{app.dir}\\log\\{fname}.log', 'ta+'
+				, encoding='utf-8', buffering=1)
+			except FileNotFoundError:
+				os.makedirs( app.dir + '\\log' )
+				continue
+			except:
+				qprint(f'error opening log file: {exc_text()}')
+				return
+		_log_cur_file = (fname, file_obj)
+	try:
+		file_obj.write(msg)
+	except Exception as err:
+		qprint(f'error logging to file: {exc_text()}')
+		return
 
 def _tlog(now_msgs:tuple[dtime, tuple]):
 	global _app_log
@@ -431,13 +415,13 @@ def tlog(*msgs):
 			, f'[app not init]', ' '.join(map(str, msgs))
 		)
 
-def con_log(*msgs):
+def con_log(*msgs, tname:str|None=None):
 	r'''
 	Outputs a message to the console and to a log file.  
 	'''
-	global _app_log
+
 	msg = ' '.join(map(str, msgs))
-	tprint(msg, tname='')
+	tprint(msg, tname=tname)
 	tlog(msg)
 
 def time_now_str(template:str=tcon.DATE_STR_FILE
@@ -572,8 +556,9 @@ def time_diff_human(start:dtime|float|tdelta, end:dtime|None|float=None
 
 	*end* - if omitted, use the current time.  
 	*start* and *end*: *datetime* or timestamp as float.  
-	*with_ms* - include milliseconds in the result.  
-	*short* - only first two units otherwise full like '6h:54m:30s:673ms'  
+	*with_ms* - include milliseconds in the result even
+	if they are 0 (for clarity)  
+	*short* - only first two units otherwise full like '6h:54m'  
 
 		tn = dtime.now()
 		asrt( bmark( time_diff_human, (tn,) ), 3_000 )
@@ -593,6 +578,8 @@ def time_diff_human(start:dtime|float|tdelta, end:dtime|None|float=None
 	if is_negative: delta = -delta
 	microseconds = delta.microseconds
 	total_seconds = int(delta.total_seconds())
+	years = total_seconds // 31_536_000
+	total_seconds %= 31_536_000
 	days = total_seconds // (24 * 3600)
 	total_seconds %= (24 * 3600)
 	hours = total_seconds // 3600
@@ -600,6 +587,7 @@ def time_diff_human(start:dtime|float|tdelta, end:dtime|None|float=None
 	minutes = total_seconds // 60
 	seconds = total_seconds % 60
 	time_parts = []
+	if years > 0: time_parts.append(f'{years}y')
 	if days > 0: time_parts.append(f'{days}d')
 	if hours > 0: time_parts.append(f'{hours}h')
 	if minutes > 0: time_parts.append(f'{minutes}m')
@@ -1048,7 +1036,7 @@ def inputbox(message:str, title:str=None
 			return getpass.getpass(f'inputbox ({message}): ')
 		else:
 			return input(f'inputbox ({message}): ')
-	if title == None:
+	if title is None:
 		title = func_name_human(task_name())
 	else:
 		title = str(title)
@@ -1294,7 +1282,7 @@ class Job:
 
 def job_batch(jobs:list, timeout:int
 , sleep_timeout:float=0.001)->list:
-	'''
+	r'''
 	Starts functions (they do not necessarily
 	have to be the same) in parallel and waits for
 	them to be executed or timeout.
@@ -1774,7 +1762,7 @@ def locale_set(name:str='C'):
 
 def table_print(
 	table
-	, use_headers:bool|tuple=True
+	, use_headers:bool|tuple=False
 	, row_sep:str=''
 	, headers_sep:str='-'
 	, col_pad:str='  '
@@ -1845,7 +1833,8 @@ def table_print(
 		return str_short(text=src_str, width=width, placeholder=placeholder)
 
 	if not table: return table
-	headers = []
+	headers:list|tuple = []
+	if is_iter(use_headers): headers = tuple(use_headers)
 	if use_headers and not headers_sep: headers_sep = DEF_SEP
 	if row_sep_step and not row_sep: row_sep = DEF_SEP
 	if row_sep and not headers_sep: headers_sep = row_sep
@@ -1855,6 +1844,17 @@ def table_print(
 			headers = list(
 				list( table.values() )[0].keys()
 			)
+	elif is_dataclass(table[0]):
+		dc_atts = tuple(
+			f.name for f in dclass.fields( table[0] )
+			if not f.name.startswith('_')
+		)
+		rows = [ [ getattr(i, a) for a in dc_atts ] for i in table ]
+		if use_headers == True:
+			headers = list( a.capitalize() for a in dc_atts )
+		elif is_iter(use_headers):
+			assert len(use_headers) == len(dc_atts) \
+			, 'Wrong number of headers in *use_headers*'
 	elif isinstance(table[0], dict):
 		rows = [list( di.values() ) for di in table]
 		if use_headers == True: headers = list( table[0].keys() )
@@ -1862,9 +1862,7 @@ def table_print(
 		rows = [l[:] for l in table]
 	elif isinstance(table[0], tuple):
 		rows = [list(t) for t in table]
-	if is_iter(use_headers):
-		headers = tuple(use_headers)
-	elif use_headers == True:
+	if use_headers == True and not headers:
 		try:
 			headers = rows.pop(0)
 		except UnboundLocalError:
@@ -2256,11 +2254,11 @@ def task_start(taskname:str|Callable, **kwargs):
 	Note: You can only use *task options* in *kwargs*
 	'''
 	if isinstance(taskname, Callable): taskname = taskname.__name__
-	for tname, tdic in app.tasks.task_dict.items():
+	for tname in app.tasks.task_dict:
 		if taskname == tname: break
 	else:
 		raise Exception('Task not found')
-	app.tasks.run_task(tdic, **kwargs)
+	app.tasks.run_task(tname, **kwargs)
 
 def app_threads_print():
 	thread: threading.Thread
@@ -2334,6 +2332,12 @@ def app_tasks()->dict[str, dict]:
 	, and values are a dictionary with all the properties of a task.  
 	'''
 	return app.tasks.task_dict
+
+def app_tasks_print():
+	r'''
+	Prints a table with all tasks.
+	'''
+	app.tasks.tasks_print()
 
 def app_enable():
 	r'''
@@ -2472,7 +2476,7 @@ def speak(text:str, wait:bool=False):
 
 def func_name_human(func_name:str)->str:
 	r'''
-	Converts function name from crontab to a "human" name.
+	Converts function name from crontab to a *human* name.
 
 		asrt( func_name_human('my_function'), 'My function' )
 		asrt( func_name_human('My_Function'), 'My Function' )
@@ -2515,7 +2519,10 @@ def asrt(value, expect, comp:str='==', show_diff:bool=False):
 
 	'''
 	if comp == '<' or isinstance(value, _BmarkInt):
-		if value < expect: return
+		if value < expect:
+			if isinstance(value, _BmarkInt) and ((expect // value) > 2):
+				raise Exception(f'Too high expectation: {value} vs {expect}')
+			return
 		comp = '<'
 	elif comp == '==':
 		if value == expect:
@@ -2634,6 +2641,56 @@ def int_str(value, sep:str='_')->str:
 
 	'''
 	return '{:,}'.format(int(value)).replace(',', sep)
+
+def int_str_human(
+	num: int,
+	*,
+	precision: int = 1,
+	sep: str = '',
+	suffixes: dict[int, str] | None = None
+) -> str:
+	r'''
+	Converts large integer to human-readable string with suffixes.  
+	Examples:
+
+		asrt( int_str_human(4182), '4.2k')
+		asrt( int_str_human(12345 ), '12.3k')
+		asrt( int_str_human(1234567), '1.2M')
+		asrt( int_str_human(5678901234), '5.7B')
+
+	Args:  
+	*num* - Positive integer  
+	*precision* - Decimal places (1 = '1.2M', 2 = '1.23M')  
+	*sep* - Separator between number and suffix ('' or ' ')  
+	*suffixes* - Custom suffix mapping (powers of 1000)  
+	'''
+	if num < 0:
+		sign = '-'
+		num = -num
+	else:
+		sign = ''
+	if suffixes is None:
+		suffixes = {
+			0: ''
+			, 1: 'k'
+			, 2: 'M'
+			, 3: 'B'
+			, 4: 'T'
+			, 5: 'P'
+		}
+	if num < 1000: return f"{sign}{num}"
+	power = 0
+	while num >= 1000 ** (power + 1): power += 1
+	divisor = 1000 ** power
+	scaled = num / divisor
+	suffix = suffixes.get(power, '?')
+	if scaled >= 100 and precision >= 1:
+		fmt = f"{scaled:.0f}"
+	elif scaled >= 10:
+		fmt = f"{scaled:.{precision}f}".rstrip('0').rstrip('.')
+	else:
+		fmt = f"{scaled:.{precision}f}".rstrip('0').rstrip('.')
+	return f"{sign}{fmt}{sep}{suffix}"
 
 def str_indent(src_str, prefix:str='    '
 , borders:bool=True)->str:
@@ -2873,6 +2930,7 @@ def str_remove_white(text:str, algo:str='basic', sep:str=' ')->str:
 
 		asrt( str_remove_white(' ba  sic '), 'ba sic')
 		asrt( str_remove_white(' spa\n\tce ', 'space'), 'spa\nce')
+		asrt( str_remove_white(' win\r\nspace ', 'space'), 'win\r\nspace')
 		asrt( str_remove_white(' no spa\n\tce ', sep=''), 'nospace')
 
 		text = random_str() + '\n' + random_str()
@@ -2887,9 +2945,8 @@ def str_remove_white(text:str, algo:str='basic', sep:str=' ')->str:
 			return sep.join(text.split())
 		case 'space':
 			new_line = '\r\n' if '\r\n' in text else '\n'
-			lines = text.splitlines()
 			cleaned_lines = []
-			for line in lines:
+			for line in text.splitlines():
 				if not line: continue
 				cleaned_line = sep.join(line.split())
 				cleaned_lines.append(cleaned_line)
@@ -3069,6 +3126,25 @@ def size_int(size:str|tuple, dst_unit:str='b')->int:
 	src_coef = _SIZE_UNITS[src_unit.lower()]
 	dst_coef = _SIZE_UNITS[dst_unit.lower()]
 	return int(float(value) * src_coef / dst_coef)
+
+def deep_get(data:dict, path:str|tuple|list, default=None)->object:
+	r'''
+	Safely get value from nested dict using dot notation.
+	
+	Examples:
+		
+		deep_get(ddata, 'smart.device.model_name', '?')
+		deep_get(ddata, 'location.city.name', 'Unknown')
+
+	'''
+	if not path: return data if data is not None else default
+	current = data
+	if isinstance(path, str): path = path.split('.')
+	for key in path:
+		if not isinstance(current, dict) or key not in current:
+			return default
+		current = current[key]
+	return current
 
 def _init():
 	if __builtins__.get('gdic', None) != None: return

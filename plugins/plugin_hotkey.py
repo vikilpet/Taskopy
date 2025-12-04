@@ -101,7 +101,7 @@ class GlobalHotKeys:
 		):
 			self.keys[chr(key_code).lower()] = key_code
 
-	def register(self, hotkey:str, func=None, func_args:list=[]):
+	def register(self, hotkey:str, func=None, func_args:tuple=()):
 		r'''
 		*hotkey* - string like 'ctrl+shift+m'  
 		*func* - function to run on hotkey  
@@ -155,9 +155,7 @@ class GlobalHotKeys:
 				lasterr = _kernel32.GetLastError()
 				if lasterr == 1409: lasterr = 'hotkey is already registered'
 				error = (
-					'Task: «' + kmap.args[0].get('task_name_full', '?') + '»'
-					+ '\nHotkey: ' + kmap.args[0].get('hotkey', '??')
-					+ f' ({kmap.vkey})'
+					'Task: «' + kmap.args[0] + '»'
 					+ f'\nHotkey register error: {lasterr}'
 				)
 				qprint(error)

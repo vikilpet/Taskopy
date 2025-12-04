@@ -31,7 +31,7 @@ from .plugin_system import win_list_top, win_get
 
 # https://psutil.readthedocs.io/en/latest/
 
-def file_open(fullpath:str, parameters:str=None, operation:str='open'
+def file_open(fullpath, parameters:str=None, operation:str='open'
 , cwd:str='', showcmd:int=win32con.SW_SHOWNORMAL):
 	r'''
 	Opens file or URL in an associated program.  
@@ -304,6 +304,10 @@ def proc_exists(process, cmd_filter:str=None
 	command line of the process (case-insensitive).  
 	*user_filter* - only search within processes of
 	specified user. Format: pc\\username  
+	Not cheap:
+
+		asrt( bmark(proc_exists, ('explorer.exe',)), 520_000_000 )
+	
 	'''
 	if cmd_filter: cmd_filter = cmd_filter.lower()
 	if user_filter: user_filter = user_filter.lower()
@@ -907,6 +911,21 @@ def proc_fpath_by_win(window)->str:
 	pid = win32process.GetWindowThreadProcessId(hwnd)[1]
 	if not pid: return ''
 	return proc_fpath(pid)
+
+def proc_cmdline(process, full:bool=False)->str:
+	r'''
+	Returns a command line.  
+	*full* - include process path.  
+	'''
+	if (pid := proc_get(process)) == -1: return ''
+	cmdline = psutil.Process(pid).cmdline()
+	if full:
+		return ' '.join( cmdline )
+	else:
+		return ' '.join(cmdline[1:]) if len(cmdline) > 1 else ''
+
+
+
 
 
 

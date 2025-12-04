@@ -232,18 +232,18 @@ def adb_screen_rotate(value:int=2, dis_auto:bool=True, **kwargs)->bool:
 	if not adb_acc_rot(False, **kwargs): return False
 	return adb_run(f'shell settings put system user_rotation {value}', **kwargs)[0]
 
-def adb_dev_list()->tuple[bool, list]:
+def adb_dev_list()->list:
 	r'''
 	Returns list of connected Android devices.
 	'''
 	status, data = adb_run('devices')
-	if not status: return False, ()
+	if not status: return []
 	devices = []
 	for line in data.rstrip().splitlines()[1:]:
 		dev_id, mode = line.split()
 		tdebug('listing:', dev_id, mode)
 		if mode == 'device': devices.append(dev_id)
-	return True, devices
+	return devices
 
 def adb_screenshot(dst_dir:str='tmp', **kwargs)->str:
 	r'''

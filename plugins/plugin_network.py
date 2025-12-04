@@ -30,7 +30,7 @@ from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 from .plugin_process import proc_wait
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 _GV_PUBLIC_SUF_LST = '__public_suffix_list__'
 _RE_PING_LOSS = re.compile(r'\((\d+)%')
@@ -47,9 +47,11 @@ def http_req(url:str, encoding:str='utf-8'
 , post_file:str=None, post_hash:bool=False
 , post_form_data:dict=None, post_file_capt:str=''
 , timeout:float=3.0, attempts:int=3, auth:tuple=()
-, as_json:bool=False, chunk_size:int=8192, **kwargs)->str:
+, as_json:bool=False, chunk_size:int=8192, **kwargs)->str|Exception:
 	r'''
-	Gets content of the specified URL.
+	Gets content of the specified URL.  
+	*post_file_capt* - if the file should be uploaded in
+	browser default (multipart/form-data) way  
 	
 	**kwargs tips:**  
 	Skip SSL verification: `verify=False`  
@@ -285,7 +287,7 @@ def html_clean(html_str:str, sep:str=' ', is_mail:bool=False
 
 def html_element(url:str, element
 , clean:bool=True, element_num:int|str=0
-, attrib:str=None, tag_sep:str=' ', **kwargs)->str:
+, attrib:str='', tag_sep:str=' ', **kwargs)->str:
 	r'''
 	Get text of specified page element (div).
 	Returns str or list of str.
@@ -1097,12 +1099,15 @@ def net_speedtest(url:str)->float:
 		qprint(f'{total_bytes_dload=}, {speed_measurements=}')
 	return median(speed_measurements)
 
-def task_add_if(pc_name:str|set[str]
+def task_add_if(pc_name:str|set[str]=''
 , rule:Callable|list[Callable]|None=None):
 	r'''
 	Conditionally adds an attribute indicating that the function is a *task*.  
 	*pc_name* — checks the name of this PC (case insensitive).  
 	'''
+	if (not pc_name) and (not rule):
+		msg_warn(f'No *task_add_if* arguments are specified')
+		return lambda f: f
 	if rule is None:
 		rule = []
 	elif isinstance(rule, Callable):

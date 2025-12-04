@@ -138,7 +138,7 @@ def path_get(fullpath:str|tuple|list|Iterator, max_len:int=0
 	return fullpath
 
 def file_read(fullpath, encoding:str='utf-8', errors:str=None)->str:
-	'''
+	r'''
 	Returns content of file
 
 	*encoding* - if set to 'binary' then returns bytes.
@@ -194,7 +194,9 @@ def file_rename(fullpath, dest:str
 			
 	'''
 	fullpath = path_get(fullpath)
-	if not ':' in dest:
+	if is_iter(dest):
+		dest = path_get(dest)
+	elif not '\\' in dest:
 		dest = os.path.join( os.path.dirname(fullpath), dest )
 	dest = path_get(dest)
 	try:
@@ -209,7 +211,7 @@ def file_rename(fullpath, dest:str
 
 def dir_rename(fullpath, dest
 , overwrite:bool=False)->str:
-	'''
+	r'''
 	Renames path.  
 	*dest* - fullpath or just new file name
 	without parent directory.  
@@ -389,7 +391,7 @@ def dir_copy(fullpath, destination:str
 , symlinks:bool=False)->int:
 	''' Copy a folder with all content to a new location.
 		Returns number of errors.
-	'''
+	r'''
 	fullpath = path_get(fullpath)
 	destination = path_get(destination)
 	err = 0
@@ -465,7 +467,7 @@ def file_exists(fullpath)->bool:
 
 
 def path_exists(fullpath)->bool:
-	''' Check if directory or file exist '''
+	r''' Check if directory or file exist '''
 	fullpath = path_get(fullpath)
 	p = Path(fullpath)
 	return p.exists()
@@ -866,6 +868,30 @@ def file_backup(fullpath, dest_dir:str=''
 	)
 	shutil.copy2(fullpath, destination)
 	return destination
+
+def file_update(src_file, dst_file)->bool:
+	r'''
+	Overwrites the file *dst_file* with the file *src_file*
+	if the latter is newer or *dst_file* does not exists.  
+	Returns `True` if update occured.  
+	'''
+	src_file = path_get(src_file)
+	dst_file = path_get(dst_file)
+	is_copy_needed:bool = False
+	is_md_needed:bool = False
+	try:
+		win32file.GetFileAttributesEx(dst_file)
+	except:
+		is_copy_needed = True
+		is_md_needed = True
+	else:
+		is_copy_needed = win32file.GetFileAttributesEx(src_file)[3] \
+		> win32file.GetFileAttributesEx(dst_file)[3]
+	if not is_copy_needed: return False
+	if is_md_needed:
+		win32file.CreateDirectory(os.path.dirname(dst_file), None)
+	win32file.CopyFile(src_file, dst_file, False)
+	return True
 
 def drive_free(path:str, unit:str='GB')->int:
 	r'''
@@ -1508,12 +1534,12 @@ def var_fpath(var)->str:
 	else:
 		return os.path.join(APP_PATH, _VAR_DIR, _file_name_pe(var) )
 
-def var_open(var:str)->None:
+def var_open(var)->None:
 	' Opens variable in default editor '
 	win32api.ShellExecute(None, 'open', var_fpath(var)
 	, None, None, 0)
 
-def var_get(var:str, default=None, encoding:str='utf-8'
+def var_get(var, default=None, encoding:str='utf-8'
 , as_literal:bool=False, globals:dict|None=None)->Any:
 	r'''
 	Gets the *disk variable*.  
@@ -1562,8 +1588,8 @@ def var_set(var, value, encoding:str='utf-8'):
 		os.makedirs(_VAR_DIR)
 		file_write(fpath, content=value, encoding=encoding)
 
-def var_del(var:str):
-	'''
+def var_del(var):
+	r'''
 	Deletes variable. Returns True if var exists.
 
 		var_set('_test', 'a')
@@ -1577,9 +1603,9 @@ def var_del(var:str):
 	except FileNotFoundError:
 		return False
 
-def var_add(var:str, value, var_type=None
+def var_add(var, value, var_type=None
 , encoding:str='utf-8'):
-	'''
+	r'''
 	Adds the value to the previous value and returns the new value.
 
 		asrt(var_add('_test', 5, var_type=int), 5)
@@ -1668,7 +1694,7 @@ def is_var_exists(var)->bool:
 	return True
 
 def var_lst_set(var, value, encoding:str='utf-8'):
-	'''
+	r'''
 	Sets the disk list variable.
 		var_lst_set('_test', ['a', 'b', 1])
 		asrt( var_lst_get('_test'), ['a', 'b', '1'])
@@ -1709,7 +1735,7 @@ def var_lst_ext(var, value, encoding:str='utf-8')->list:
 	return lst
 
 def file_drive(fullpath)->str:
-	'''
+	r'''
 	Returns a drive letter in lowercase from a file name:
 
 		asrt( file_drive(r'c:\\pagefile.sys'), 'c' )
@@ -1720,7 +1746,7 @@ def file_drive(fullpath)->str:
 
 def file_conf_read(fullpath:str, encoding:str='utf-8'
 , lowercase:bool=True, as_literal:bool=True)->dict:
-	'''
+	r'''
 	Returns the contents of an config (.ini) file as a dictionary.
 	
 	*as_literal* - convert numeric values to numbers.
@@ -1969,7 +1995,7 @@ def path_rule(
 	return in_rules, ex_rules
 
 def _path_match(path:str, in_rules:list, ex_rules:list)->bool:
-	'''
+	r'''
 	Returns True if path matches rules from the `path_rule`.
 
 		from plugins.plugin_filesystem import _path_match
@@ -2076,7 +2102,7 @@ class DirSync:
 		, max_table_width:int=0
 		, **rules
 	):
-		'''
+		r'''
 		*report* - print every file copy/del operation.
 		'''
 		self._src_dir = dir_slash(path_get(src_dir))
@@ -2192,7 +2218,7 @@ class DirSync:
 		if is_con(): qprint('new files done in', time_diff_human(start))
 
 	def _copy(self):
-		''' Copy unique and new files from src to dst '''
+		r''' Copy unique and new files from src to dst '''
 		for fileset in self._src_only_files, self._new_files:
 			for rpath in fileset:
 				self._log('copy', rpath)
@@ -2252,7 +2278,7 @@ class DirSync:
 				self.errors[rpath] = f'file del {err}'
 
 	def print_diff(self):
-		'''
+		r'''
 		Print a table with the difference between
 		the directories.
 		'''
