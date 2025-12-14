@@ -17,10 +17,10 @@ try:
 	import constants as tcon
 except ModuleNotFoundError:
 	import plugins.constants as tcon
-LockWorkStation = ctypes.windll.user32.LockWorkStation
-_GetAncestor = ctypes.windll.user32.GetAncestor
-_SendNotifyMessage = ctypes.windll.user32.SendNotifyMessageA
-_GetACP = ctypes.cdll.kernel32.GetACP
+LockWorkStation = winapi.user32.LockWorkStation
+_GetAncestor = winapi.user32.GetAncestor
+_SendNotifyMessage = winapi.user32.SendNotifyMessageA
+_GetACP = winapi.kernel32.GetACP
 _WM_APPCOMMAND = 0x319
 _APPCOMMAND_VOLUME_MUTE = 0x80000
 _APPCOMMAND_VOLUME_DOWN = 0x90000
@@ -390,7 +390,7 @@ def win_exists(window=None)->bool:
 		asrt( win_exists(win_get('Taskop*')), True )
 		asrt( win_exists(win_get('Taskopyy')), False )
 		asrt( bmark(win_exists, (0,)), 1500 )
-		asrt( bmark(win_exists, ('Taskopy',)), 50_000 )
+		asrt( bmark(win_exists, ('Taskopy',)), 7_000 )
 
 	'''
 	return win32gui.IsWindow(win_get(window)) == 1
@@ -550,6 +550,15 @@ def is_sys_locked()->bool:
 	Note: seems not to be very reliable.  
 	'''
 	return win32gui.GetForegroundWindow() == 0
+
+def sys_is_server()->bool:
+	r'''
+	Is this computer a Windows Server?
+
+		asrt( bmark(sys_is_server), 3_700 )
+	
+	'''
+	return win32api.GetVersionEx(1)[8] != 1
 
 if __name__ == '__main__':
 	_test_reg_key()

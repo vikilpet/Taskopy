@@ -77,13 +77,16 @@ def emb_app_update(caller:str):
 def embedded__app_update_exe_start(caller:str=''):
 	' Find new exe and quit '
 	new_exe:str = ''
-	for fpath in sorted(dir_files(app_dir(), subdirs=False
-	, in_ext='exe', in_name=APP_NAME + '_')):
-		new_exe = file_name(fpath)
-	if not new_exe:
+	# There may be more than one file here:
+	new_files = sorted(dir_files(app_dir(), subdirs=False
+	, in_ext='exe', in_name=APP_NAME + '_'))
+	if not new_files:
 		tprint('no new exe')
 		return
-	tprint('found', new_exe)
+	new_exe = new_files.pop()
+	# Removing previous releases:
+	for fpath in new_files: file_recycle(fpath)
+	tprint('update to', new_exe)
 	pid = app_pid()
 	file_open(
 		new_exe

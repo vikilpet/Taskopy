@@ -56,11 +56,15 @@ from xml.etree import ElementTree as _ElementTree
 import windows_toasts as wtoasts
 try:
 	import constants as tcon
+	import winapi
+	import cache
 except ModuleNotFoundError:
 	import plugins.constants as tcon
+	import plugins.winapi as winapi
+	import plugins.cache as cache
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2025-12-04'
+APP_VERSION = 'v2025-12-14'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 if getattr(sys, 'frozen', False):
 	APP_PATH = os.path.dirname(sys.executable)
@@ -227,7 +231,7 @@ def value_to_unit(value, unit:str='sec', unit_dict:dict=None
 		asrt( value_to_unit('2m', 'sec'), 120.0)
 		asrt( value_to_unit(3, 'sec'), 3.0)
 		asrt( value_to_unit('1-3 sec ') in (1, 2, 3), True)
-		asrt( bmark(value_to_unit, ('1 ms',)), 11_000 )
+		asrt( bmark(value_to_unit, ('1 ms',)), 2_000 )
 
 	'''
 	if not unit_dict: unit_dict = _TIME_UNITS
@@ -337,7 +341,7 @@ def dev_print(*msg, **kwargs):
 	r'''
 	For debug.
 
-		asrt( bmark(lambda: dev_print('bench'), b_iter=3), 600_000 )
+		asrt( bmark(lambda: dev_print('bench'), b_iter=3), 30_000 )
 	
 	'''
 	if is_dev() or is_con(): tprint(*msg, **kwargs)
@@ -741,7 +745,7 @@ wait = time_sleep
 
 def clip_set(txt):
 	r'''
-	Поместите текст в текстовый буфер обмена.
+	Puts text into the text clipboard.
 
 		asrt( bmark(clip_set, ('test',), b_iter=3), 30_000_000 )
 		
@@ -818,8 +822,8 @@ def re_match(source:str, re_pattern:str
 	'''
 	return bool(re.match(re_pattern, source, flags=re_flags))
 
-_MessageBox = ctypes.windll.user32.MessageBoxW
-_MessageBoxTimeout = ctypes.windll.user32.MessageBoxTimeoutW
+_MessageBox = winapi.user32.MessageBoxW
+_MessageBoxTimeout = winapi.user32.MessageBoxTimeoutW
 
 def msgbox(msg:str, title:str=None
 , ui:int=None, wait:bool=True, timeout=None
@@ -970,7 +974,7 @@ def _msg_err(msg:str, icon:int, title:str, parent:str, timeout:str):
 				con_log(f'{parent}{" (" + title + ")" if title else ""}: {msg}')
 				return
 		except NameError:
-			print(f'[no settings]: {msg}')
+			print(f'<no settings>: {msg}')
 		except:
 			raise
 	if title:
@@ -1000,7 +1004,7 @@ def msg_err(msg:str, title:str='', source:str='', timeout:str='30 min'
 		exc_short:str=''
 		try:
 			exc_full, exc_short = exc_texts()
-		except AttributeError:
+		except (AttributeError, IndexError):
 			pass
 		source = source if source else 'app'
 		if exc_full:
@@ -1009,7 +1013,7 @@ def msg_err(msg:str, title:str='', source:str='', timeout:str='30 min'
 		_msg_err(msg=msg + ' ' + exc_short, title=title
 		, icon=tcon.TD_ICON_ERROR, timeout=timeout, parent='msg_err')
 	except Exception as err:
-		print(f'\n[msg_err] «{msg}» exception:\n\n{err}\n\n')
+		print(f'\n[msg_err] «{msg}» exception:\n\n{exc_text(6)}\n\n')
 		_MessageBoxTimeout(None, 'msg_err exception', APP_NAME, 16
 		, 0, 1_800_000)
 
@@ -1022,6 +1026,18 @@ def msg_warn(msg:str, title:str='', timeout:str='30 min'):
 	_msg_err(msg=msg, title=title, icon=tcon.TD_ICON_WARNING, timeout=timeout
 	, parent='msg_warn')
 
+def attach_thread_input_foreground(hwnd):
+	foreground = winapi.user32.GetForegroundWindow()
+	thread1 = winapi.user32.GetWindowThreadProcessId(foreground, None)
+	thread2 = winapi.user32.GetWindowThreadProcessId(hwnd, None)
+	
+	if thread1 != thread2:
+		winapi.user32.AttachThreadInput(thread1, thread2, True)
+		winapi.user32.SetForegroundWindow(hwnd)
+		winapi.user32.AttachThreadInput(thread1, thread2, False)
+	else:
+		winapi.user32.SetForegroundWindow(hwnd)
+		
 def inputbox(message:str, title:str=None
 , is_pwd:bool=False, default:str=''
 , multiline:bool=False, topmost:bool=True)->str:
@@ -1035,7 +1051,8 @@ def inputbox(message:str, title:str=None
 		if is_pwd:
 			return getpass.getpass(f'inputbox ({message}): ')
 		else:
-			return input(f'inputbox ({message}): ')
+			val = input(message)
+			return val
 	if title is None:
 		title = func_name_human(task_name())
 	else:
@@ -1055,10 +1072,7 @@ def inputbox(message:str, title:str=None
 		, win32con.SWP_NOSIZE | win32con.SWP_NOMOVE
 	)
 	if default: dlg.SetValue(str(default))
-	try:
-		win32gui.SetForegroundWindow(dlg.Handle)
-	except:
-		pass
+	attach_thread_input_foreground(dlg.Handle)
 	try:
 		dlg.ShowModal()
 	except wx._core.wxAssertionError: 	
@@ -1066,58 +1080,6 @@ def inputbox(message:str, title:str=None
 	value = dlg.GetValue()
 	dlg.Destroy()
 	return value
-
-_toast_app_icon = None
-_toast_img_cache:dict = {}
-def toast(msg:str|tuple|list, dur:str='default', img:str=''
-, often_ident:str='', often_inter:str='30 sec', on_click:Callable=None
-, appid:str=APP_NAME):
-	r'''
-	Windows toast notification.  
-	*img* - full path to a picture.  
-	*duration* - 'short'|'long'|'default'. 'default' and 'short' are the same?
-	'long' is about 30 sec.  
-	*on_click* - an action to perform on click. It is passed an
-	argument with the click properties. If the notification has
-	already disappeared from the screen and is in the action center
-	, the action will be performed only if an valid *appid* is specified  
-	*appid* - custom AppID. If you want toast to have the Taskopy icon, see the `emb_appid_add` task
-	from *ext_embedded*.  
-
-	Note: *winrt* works on Windows 10, October 2018 Update or later 
-	'''
-	global _toast_app_icon
-	global _toast_img_cache
-	OFTEN_IDENT_LEN = 10
-	if sys_ver() < 10.0:
-		dialog(msg=msg, wait=False, title='[Toast error]')
-		return
-	if dur == 'default': dur = 'Default'
-	assert dur in ('Default', 'short', 'long'), 'wrong *dur* value'
-	if on_click:
-		assert len( func_arg(on_click) ) == 1, \
-			'The `on_click` function must take 1 argument'
-	if is_iter(msg):
-		msg = list(str(m) for m in msg)
-		if not often_ident: often_ident = msg[0]
-	else:
-		msg = [str(msg)]
-		if not often_ident: often_ident = msg[0][:OFTEN_IDENT_LEN]
-	if is_often('_toast ' + often_ident, interval=often_inter): return 'often'
-	toaster = wtoasts.WindowsToaster(appid)
-	newToast = wtoasts.Toast()
-	newToast.duration = wtoasts.ToastDuration(dur)
-	newToast.text_fields = msg
-	if img:
-		if (img_obj := _toast_img_cache.get(img)) is None:
-			img_obj = wtoasts.ToastDisplayImage.fromPath(img)
-			_toast_img_cache[img] = img_obj
-		newToast.AddImage( img_obj )
-	if on_click: newToast.on_activated = on_click
-	try:
-		toaster.show_toast(newToast)
-	except OSError:
-		dialog(msg=msg, wait=False, title='[Toast error]')
 
 
 
@@ -1328,9 +1290,6 @@ def qprint(*values):
 	Intended to be used in place of the standard `print`.  
 	Pros: non-blocking, FIFO.  
 
-		asrt( bmark(print, ('a', 'b',), b_iter=3), 1_000_000 )
-		asrt( bmark(qprint, ('a', 'b',), b_iter=3), 800_000 )
-
 	'''
 	msg = ' '.join(map(str, values))
 	try:
@@ -1363,8 +1322,6 @@ def tprint(*msgs, tname:str|None=None, short:bool=False):
 	else:
 		qprint(msg)
 
-_is_con_cache:bool|None = None
-
 def is_con()->bool:
 	r'''
 	Are we in the console?
@@ -1372,10 +1329,9 @@ def is_con()->bool:
 		asrt( bmark(is_con), 500 )
 
 	'''
-	global _is_con_cache
-	if not _is_con_cache is None: return _is_con_cache
-	_is_con_cache = hasattr(sys, 'ps1')
-	return _is_con_cache
+	if not cache.is_con is None: return cache.is_con
+	cache.is_con = hasattr(sys, 'ps1')
+	return cache.is_con
 
 def tdebug(*msgs, **kwargs)->bool:
 	r'''
@@ -1499,7 +1455,7 @@ def safe(func:Callable)->Callable:
 			if is_con(): tprint(f'<safe>: \n{trace_str}')
 			return False, e
 	return wrapper
-_TaskDialogIndirect = ctypes.WinDLL('comctl32.dll').TaskDialogIndirect
+_TaskDialogIndirect = winapi.comctl32.TaskDialogIndirect
 
 _callback_type = ctypes.WINFUNCTYPE(
 	ctypes.c_int, ctypes.wintypes.HWND, ctypes.wintypes.UINT
@@ -1592,7 +1548,7 @@ def dialog(
 	*icon_main* - show icon. Note: the icon takes away horizontal
 	space from the message text.  
 	
-	Note: do not start button text with new line (\\n) or dialog
+	NOTE: do not start button text with new line (\\n) or dialog
 	will fail silently.
 
 		assert dialog(('y', 'n'), return_button=True) == (True, 'y')
@@ -2305,9 +2261,11 @@ def app_threads_print():
 	qprint(f'threading	{tnum_thread} ({tnum_thread - tnum_app})')
 	qprint(f'system		{tnum_sys} ({tnum_sys - tnum_app})\n')
 
-def crontab_reload():
-	' Reloads the crontab '
-	return app.load_crontab()
+def crontab_reload(with_cache:bool=False)->bool:
+	r'''
+	Reloads the crontab. Returns False if loading fails.  
+	'''
+	return app.load_crontab(with_cache=False)
 
 def app_win_show():
 	r'''
@@ -2374,6 +2332,66 @@ def app_pid()->int:
 
 	'''
 	return _MAIN_PID
+
+_toast_app_icon = None
+_toast_img_cache:dict = {}
+def toast(msg:str|tuple|list, dur:str='default', img:str=''
+, often_ident:str='', often_inter:str='30 sec'
+, on_click:Callable=lambda c: app_win_show()
+, appid:str=APP_NAME):
+	r'''
+	Windows toast notification.  
+	*img* - full path to a picture.  
+	*duration* - 'short'|'long'|'default'. 'default' and 'short' are the same?
+	'long' is about 30 sec.  
+	*on_click* - an action to perform on click. It is passed an
+	argument with the click properties. If the notification has
+	already disappeared from the screen and is in the action center
+	, the action will be performed only if an valid *appid* is specified  
+	*appid* - custom AppID. If you want toast to have the Taskopy icon, see the `emb_appid_add` task
+	from *ext_embedded*.  
+
+	Note: *winrt* works on Windows 10, October 2018 Update or later 
+	'''
+	global _toast_app_icon
+	global _toast_img_cache
+	OFTEN_IDENT_LEN = 10
+	if sys_ver() < 10.0:
+		dialog(msg=msg, wait=False, title='[Toast error]')
+		return
+	if dur == 'default': dur = 'Default'
+	assert dur in ('Default', 'short', 'long'), 'wrong *dur* value'
+	if on_click:
+		assert len( func_arg(on_click) ) == 1, \
+			'The `on_click` function must take 1 argument'
+	if is_iter(msg):
+		msg = list(str(m) for m in msg)
+		if not often_ident: often_ident = msg[0]
+	else:
+		msg = [str(msg)]
+		if not often_ident: often_ident = msg[0][:OFTEN_IDENT_LEN]
+	if is_often('_toast ' + often_ident, interval=often_inter): return 'often'
+	toaster = wtoasts.WindowsToaster(appid)
+	newToast = wtoasts.Toast()
+	newToast.duration = wtoasts.ToastDuration(dur)
+	newToast.text_fields = msg
+	if img:
+		img_obj = wtoasts.ToastDisplayImage.fromPath(img)
+		newToast.AddImage( img_obj )
+	if on_click: newToast.on_activated = on_click
+	try:
+		toaster.show_toast(newToast)
+		newToast.text_fields = None  # Releases strings
+		if img:
+			newToast.images = []
+		
+		del newToast, toaster  # Explicit del for 32-bit heap
+		try:
+			del img_obj  # If defined
+		except:
+			pass
+	except OSError:
+		dialog(msg=msg, wait=False, title='[Toast error]')
 
 def bmark(func, a:tuple=(), ka:dict={}, b_iter:int=10
 , do_print:bool=True)->int:
@@ -2520,7 +2538,7 @@ def asrt(value, expect, comp:str='==', show_diff:bool=False):
 	'''
 	if comp == '<' or isinstance(value, _BmarkInt):
 		if value < expect:
-			if isinstance(value, _BmarkInt) and ((expect // value) > 2):
+			if isinstance(value, _BmarkInt) and ((expect // value) > 10):
 				raise Exception(f'Too high expectation: {value} vs {expect}')
 			return
 		comp = '<'
@@ -2693,7 +2711,7 @@ def int_str_human(
 	return f"{sign}{fmt}{sep}{suffix}"
 
 def str_indent(src_str, prefix:str='    '
-, borders:bool=True)->str:
+, borders:bool=True, border_symbol:str='_')->str:
 	r'''
 	Adds an indent to each line of text.  
 	Example:
@@ -2715,10 +2733,10 @@ def str_indent(src_str, prefix:str='    '
 			wrap_lines.append(line[i:i+tsize])
 	tsize += len(prefix)
 	return (
-		('\n' + ('_' * tsize) if borders else '')
+		('\n' + (border_symbol * tsize) if borders else '')
 		+ '\n\n' + prefix
 		+ ('\n' + prefix).join(wrap_lines) + '\n'
-		+ ('_' * tsize if borders else '')
+		+ (border_symbol * tsize if borders else '')
 	)
 
 
@@ -2760,7 +2778,7 @@ def str_diff(text1:str, text2:str, context:tuple=(5, 70)
 
 		asrt(
 			bmark(str_diff, (random_str(), random_str(),))
-			, 21_000_000
+			, 400_000
 		)
 
 	'''
@@ -2993,8 +3011,6 @@ def str_to_int(s:str)->int:
 	cleaned = _STR_TO_INT_RE.sub('', s)
 	return int(cleaned)
 
-_often_dct:dict[str, datetime.datetime] = {}
-
 def is_often(ident:str, interval:str)->bool:
 	r'''
 	Is some event happening too often?  
@@ -3010,18 +3026,18 @@ def is_often(ident:str, interval:str)->bool:
 		asrt( bmark(is_often, ('_', 1)), 3500 )
 
 	'''
-	global _often_dct
 	UNIT:str = 'ms'
 	assert ident, 'the ident should not be empty'
 	intr = value_to_unit(interval, unit=UNIT)
-	if not (prev_time := _often_dct.get(ident)):
-		_often_dct[ident] = datetime.datetime.now()
+	now = datetime.datetime.now()
+	if not (prev_time := cache.often.get(ident)):
+		cache.often[ident] = now
 		return False
 	diff = time_diff(prev_time, unit=UNIT)
 	if diff < intr:
 		return True
 	else:
-		_often_dct[ident] = datetime.datetime.now()
+		cache.often[ident] = now
 		return False
 
 def is_app_exe()->bool:

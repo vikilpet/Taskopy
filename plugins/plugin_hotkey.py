@@ -6,8 +6,10 @@ import keyboard
 from collections import namedtuple
 try:
 	from .tools import warning, patch_import, qprint, value_to_unit
+	import plugins.winapi as winapi
 except ImportError:
 	warning = print
+	import winapi
 
 r'''
 Key codes: https://docs.microsoft.com/en-us/windows/desktop/inputdev/virtual-key-codes
@@ -63,9 +65,6 @@ How to find a key name (exit on *space*):
 		if keyboard_event.name == 'space': break
 
 '''
-
-_user32 = ctypes.windll.user32
-_kernel32 = ctypes.windll.kernel32
 
 _KeyMap = namedtuple('KeyMap', ('vkey', 'modifier', 'func', 'args'))
 
@@ -137,22 +136,22 @@ class GlobalHotKeys:
 		Stop the current listening thread.
 		'''
 		WM_QUIT = 0x0012
-		_user32.PostThreadMessageW(self.thread_id, WM_QUIT, 0, 0)
+		winapi.user32.PostThreadMessageW(self.thread_id, WM_QUIT, 0, 0)
 
 	def unregister(self):
 		for index, _ in enumerate(self.key_mapping):
-			_user32.UnregisterHotKey(None, index)
+			winapi.user32.UnregisterHotKey(None, index)
 
 	def listen(self):
 		r'''
 		Start listening for hotkeys.
 		'''
-		self.thread_id = _kernel32.GetCurrentThreadId()
+		self.thread_id = winapi.kernel32.GetCurrentThreadId()
 		kmap:_KeyMap
 		for index, kmap in enumerate(self.key_mapping):
-			if not _user32.RegisterHotKey(None, index, kmap.modifier
+			if not winapi.user32.RegisterHotKey(None, index, kmap.modifier
 			, kmap.vkey):
-				lasterr = _kernel32.GetLastError()
+				lasterr = winapi.kernel32.GetLastError()
 				if lasterr == 1409: lasterr = 'hotkey is already registered'
 				error = (
 					'Task: «' + kmap.args[0] + '»'
@@ -162,13 +161,13 @@ class GlobalHotKeys:
 				warning(error)
 		try:
 			msg = ctypes.wintypes.MSG()
-			while _user32.GetMessageW(ctypes.byref(msg), None, 0, 0) != 0:
+			while winapi.user32.GetMessageW(ctypes.byref(msg), None, 0, 0) != 0:
 				if msg.message == win32con.WM_HOTKEY:
 					kmap = self.key_mapping[msg.wParam]
 					if not kmap.func: break
 					kmap.func(*kmap.args)
-				_user32.TranslateMessage(ctypes.byref(msg))
-				_user32.DispatchMessageA(ctypes.byref(msg))
+				winapi.user32.TranslateMessage(ctypes.byref(msg))
+				winapi.user32.DispatchMessageA(ctypes.byref(msg))
 		finally:
 			self.unregister()
 key_pressed = keyboard.is_pressed

@@ -136,7 +136,7 @@ _TIME_UNIT_HUMAN = {
 }
 _EVERY_PATTERNS = {
 	re.compile(rf'^(\d+)\s*({"|".join(_TIME_UNIT_HUMAN)})$'): 'time_int'
-	, re.compile(rf'^(\d+)\s*(to)\s*(\d+)\s*({"|".join(_TIME_UNIT_HUMAN)})$'): 'time_int_rnd'
+	, re.compile(rf'^(\d+)\s*(to|-)\s*(\d+)\s*({"|".join(_TIME_UNIT_HUMAN)})$'): 'time_int_rnd'
 	, re.compile(rf'^({"|".join(_WEEKDAY_HUMAN)})\s+(\d{{2}}:\d{{2}})$'): 'day'
 	, re.compile(r'^(m|min|minute|h|hr|hour)\s*(\:\d+)$'): 'time_day'
 }
@@ -163,7 +163,7 @@ def _errcheck_bool(value, func, args):
 		raise ctypes.WinError()
 	return args
 
-CancelIoEx = ctypes.windll.kernel32.CancelIoEx
+CancelIoEx = winapi.kernel32.CancelIoEx
 CancelIoEx.restype = ctypes.wintypes.BOOL
 CancelIoEx.errcheck = _errcheck_bool
 CancelIoEx.argtypes = (
@@ -203,17 +203,17 @@ class HookKB:
 
 		def _low_level_keyboard_proc(nCode, wParam, lParam):
 			app.que_hook.put((nCode, wParam, lParam))
-			return user32.CallNextHookEx(self.hook_id, nCode, wParam, lParam)
+			return winapi.user32.CallNextHookEx(self.hook_id, nCode, wParam, lParam)
 
 		self.hook_proc_ref = LowLevelHookProc(_low_level_keyboard_proc)
-		module_handle = ctypes.windll.kernel32.GetModuleHandleW(None)
-		self.hook_id = user32.SetWindowsHookExW(
+		module_handle = winapi.kernel32.GetModuleHandleW(None)
+		self.hook_id = winapi.user32.SetWindowsHookExW(
 			win32con.WH_KEYBOARD_LL
 			, self.hook_proc_ref
 			, module_handle
 			, 0
 		)
-		if not self.hook_id: raise ctypes.WinError(ctypes.get_last_error())
+		if not self.hook_id: raise Exception(winapi.get_last_error())
 
 WM_EVENTS = {WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP}
 DOWN_KEYS = {WM_KEYDOWN, WM_SYSKEYDOWN}
@@ -267,9 +267,9 @@ def msg_listener(tasks):
 	tasks.hook_kb.tid = win32api.GetCurrentThreadId()
 	tasks.hook_kb.install_hook()
 	msg = ctypes.wintypes.MSG()
-	while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) != 0:
-		user32.TranslateMessage(ctypes.byref(msg))
-		user32.DispatchMessageW(ctypes.byref(msg))
+	while winapi.user32.GetMessageW(ctypes.byref(msg), None, 0, 0) != 0:
+		winapi.user32.TranslateMessage(ctypes.byref(msg))
+		winapi.user32.DispatchMessageW(ctypes.byref(msg))
 
 def ttprint(*msgs, **kwargs):
 	r'''
@@ -974,7 +974,7 @@ class Tasks:
 		if self.hook_kb:
 			win32api.PostThreadMessage(self.hook_kb.tid
 			, win32con.WM_QUIT, 0, 0)
-			user32.UnhookWindowsHookEx(self.hook_kb.hook_id)
+			winapi.user32.UnhookWindowsHookEx(self.hook_kb.hook_id)
 			self.hook_kb.hook_id = None
 		schedule.clear()
 		for eh, signal in self.event_handlers:
@@ -1033,7 +1033,7 @@ class Tasks:
 		table_print(table, use_headers=True)
 tasks:Tasks = None
 
-def load_crontab(event=None)->bool:
+def load_crontab(event=None, with_cache:bool=False)->bool:
 	global tasks
 	global crontab
 	start = dtime.now()
@@ -1067,7 +1067,7 @@ def load_crontab(event=None)->bool:
 			del sys.modules['crontab']
 			del crontab
 			crontab = importlib.import_module('crontab')
-		load_modules()
+		load_modules(with_cache=False)
 		tasks = Tasks()
 		app.tasks = tasks
 		tasks.start_listeners()
@@ -1090,13 +1090,14 @@ def load_crontab(event=None)->bool:
 		msg_err(lang.warn_crontab_reload, title=lang.menu_reload)
 		return False
 	
-def load_modules():
-	'''
-	(Re)Loads all application plugins and
-	crontab extensions if any.
+def load_modules(with_cache:bool=False):
+	r'''
+	(Re)Loads all application plugins and crontab extensions if any.  
+	*with_cache* - with *static* modules.  
 	'''
 
 	global crontab
+	DO_NOT_RELOAD = {'winapi', 'cache'}
 	setattr(sett, 'own_modules', {'plugins.constants'})
 	for obj_name, obj in crontab.__dict__.items():
 		if not (
@@ -1113,7 +1114,12 @@ def load_modules():
 			sett.own_modules.add(obj.__module__)
 		except ValueError:
 			continue
-	for mdl_name in sett.own_modules:
+	if with_cache:
+		rel_mod = sett.own_modules
+	else:
+		rel_mod = sett.own_modules - DO_NOT_RELOAD
+	for mdl_name in rel_mod:
+		if with_cache: dev_print(f'reload module: {mdl_name}')
 		prev_mdl = sys.modules.pop(mdl_name)
 		try:
 			tmp_mdl = importlib.import_module(mdl_name)
@@ -1470,7 +1476,7 @@ class App(wx.App):
 def show_app_window():
 	try:
 		win32gui.ShowWindow(app.app_hwnd, win32con.SW_RESTORE)
-		win32gui.SetForegroundWindow(app.app_hwnd)
+		attach_thread_input_foreground(app.app_hwnd)
 	except Exception as e:
 		dev_print(f'show window exception: {e}')
 

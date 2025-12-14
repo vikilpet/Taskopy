@@ -404,6 +404,15 @@ def dir_copy(fullpath, destination:str
 		qprint(f'dir_copy exception: {repr(e)}')
 	return err
 
+def _dir_create(directory:str):
+	r'''
+	Safely create a director even if the directory already exists.
+	'''
+	try:
+		win32file.CreateDirectory(directory, None)
+	except win32file.error as err:
+		if err.winerror != 183: raise
+
 def dir_create(fullpath=None)->str:
 	r'''
 	Creates new dir and returns full path.  
@@ -888,8 +897,7 @@ def file_update(src_file, dst_file)->bool:
 		is_copy_needed = win32file.GetFileAttributesEx(src_file)[3] \
 		> win32file.GetFileAttributesEx(dst_file)[3]
 	if not is_copy_needed: return False
-	if is_md_needed:
-		win32file.CreateDirectory(os.path.dirname(dst_file), None)
+	if is_md_needed: _dir_create(os.path.dirname(dst_file))
 	win32file.CopyFile(src_file, dst_file, False)
 	return True
 
@@ -927,7 +935,7 @@ def dir_list(fullpath, **rules)->Iterator[str]:
 		)
 		asrt(
 			bmark(lambda d: tuple(dir_list(d)), 'log', b_iter=5)
-			, 600_000
+			, 100_000
 		)
 
 	'''
@@ -2025,10 +2033,10 @@ def path_filter(
 		, name_only=True, subdirs=False) )
 		asrt( tuple( pf(files, ex_dir='__pycache__'))[0], 'constants.py')
 		asrt( tuple( pf(files, ex_ext='pyc'))[0], 'constants.py')
-		asrt( tuple( pf(files, ex_ext='pyc', ex_path='_TOOLS_patc'))[-1], 'tools.py')
+		asrt( tuple( pf(files, ex_ext='pyc', ex_path='_TOOLS_patc'))[-1], 'winapi.py')
 		asrt( tuple( pf(files, ex_ext=('pyc', 'py') ) ), ())
 		asrt( tuple( pf(files, in_ext='txt' ) ), ())
-		asrt( tuple( pf(files, in_ext='py', ex_path='_TOOLS_patc'))[-1], 'tools.py')
+		asrt( tuple( pf(files, in_ext='py', ex_path='_TOOLS_patc'))[-1], 'winapi.py')
 		asrt( tuple( pf(files, in_path='constants.py'))[0], 'constants.py')
 		asrt( tuple( pf(files, in_name='crypt') )[0], 'plugin_crypt.py')
 		asrt(
@@ -2041,7 +2049,7 @@ def path_filter(
 		)
 		asrt(
 			tuple( pf(files, ex_rule=lambda p: '_' in p ) )
-			, ('constants.py', 'tools.py')
+			, ('constants.py', 'tools.py', 'winapi.py')
 		)
 		asrt(
 			tuple( pf(files, in_rule=(

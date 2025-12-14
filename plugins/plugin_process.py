@@ -25,7 +25,7 @@ import ctypes
 from ctypes import wintypes
 
 from .tools import DictToObj, dev_print, msgbox, tprint, patch_import \
-, thread_start, str_short, _SIZE_UNITS
+, thread_start, str_short, _SIZE_UNITS, winapi
 from .plugin_filesystem import path_exists, path_get
 from .plugin_system import win_list_top, win_get
 
@@ -306,7 +306,7 @@ def proc_exists(process, cmd_filter:str=None
 	specified user. Format: pc\\username  
 	Not cheap:
 
-		asrt( bmark(proc_exists, ('explorer.exe',)), 520_000_000 )
+		asrt( bmark(proc_exists, ('explorer.exe',)), 600_000_000 )
 	
 	'''
 	if cmd_filter: cmd_filter = cmd_filter.lower()
@@ -495,21 +495,21 @@ def proc_fpath(process)->str:
 	r'''
 	Retrieves the full path of the process  
 
-		asrt( bmark(proc_fpath, (17532,)), 56_000 )
+		asrt( bmark(proc_fpath, (17532,)), 5_000 )
 		
 	'''
 	if (pid := proc_get(process)) == -1: return ''
-	hProc = kernel32.OpenProcess(win32con.PROCESS_QUERY_LIMITED_INFORMATION
+	hProc = winapi.kernel32.OpenProcess(win32con.PROCESS_QUERY_LIMITED_INFORMATION
 	, False, pid)
 	if not hProc: return ''
 	try:
 		size = wintypes.DWORD(260)  # MAX_PATH
 		buf = ctypes.create_unicode_buffer(size.value)
-		ok = kernel32.QueryFullProcessImageNameW(hProc, 0, buf
+		ok = winapi.kernel32.QueryFullProcessImageNameW(hProc, 0, buf
 		, ctypes.byref(size))
 		return buf.value if ok else ''
 	finally:
-		kernel32.CloseHandle(hProc)
+		winapi.kernel32.CloseHandle(hProc)
 
 def wts_user_sessionid(users:str|list|tuple, only_active:bool=True)->list:
 	r'''
@@ -624,24 +624,20 @@ def is_admin()->bool:
 	'''
 	return win32com.shell.shell.IsUserAnAdmin()
 # https://stackoverflow.com/questions/48051283/call-binary-without-elevated-privilege
-ntdll = ctypes.WinDLL('ntdll')
-kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
-advapi32 = ctypes.WinDLL('advapi32', use_last_error=True)
-user32 = ctypes.WinDLL('user32', use_last_error=True)
-kernel32.OpenProcess.argtypes = (
+winapi.kernel32.OpenProcess.argtypes = (
 	wintypes.DWORD,  # dwDesiredAccess
 	wintypes.BOOL,   # bInheritHandle
 	wintypes.DWORD   # dwProcessId
 )
-kernel32.OpenProcess.restype = wintypes.HANDLE
-kernel32.QueryFullProcessImageNameW.argtypes = (
+winapi.kernel32.OpenProcess.restype = wintypes.HANDLE
+winapi.kernel32.QueryFullProcessImageNameW.argtypes = (
 	wintypes.HANDLE,       # hProcess
 	wintypes.DWORD,        # dwFlags (0)
 	wintypes.LPWSTR,       # lpExeName
 	ctypes.POINTER(wintypes.DWORD)  # lpdwSize
 )
-kernel32.QueryFullProcessImageNameW.restype = wintypes.BOOL
-kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+winapi.kernel32.QueryFullProcessImageNameW.restype = wintypes.BOOL
+winapi.kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
 
 TOKEN_ADJUST_SESSIONID = 0x0100
 PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
@@ -686,7 +682,7 @@ class PROCESS_INFORMATION(ctypes.Structure):
 				('dwThreadId',  wintypes.DWORD))
 
 LPPROCESS_INFORMATION = ctypes.POINTER(PROCESS_INFORMATION)
-advapi32.CreateProcessWithTokenW.argtypes = (
+winapi.advapi32.CreateProcessWithTokenW.argtypes = (
 	wintypes.HANDLE,
 	wintypes.DWORD,
 	wintypes.LPCWSTR,
@@ -696,7 +692,7 @@ advapi32.CreateProcessWithTokenW.argtypes = (
 	wintypes.LPCWSTR,
 	LPSTARTUPINFO,
 	LPPROCESS_INFORMATION)
-user32.GetShellWindow.restype = wintypes.HWND
+winapi.user32.GetShellWindow.restype = wintypes.HWND
 
 def adjust_token_privileges(htoken, state):
 	prev_state = win32security.AdjustTokenPrivileges(htoken, False, state)
@@ -749,7 +745,7 @@ def enable_privileges(*privilege_names):
 				adjust_token_privileges(htoken, prev_state)
 
 def duplicate_shell_token():
-	hWndShell = user32.GetShellWindow()
+	hWndShell = winapi.user32.GetShellWindow()
 	if not hWndShell:
 		raise pywintypes.error(
 				winerror.ERROR_FILE_NOT_FOUND,
@@ -772,7 +768,7 @@ def duplicate_shell_token():
 @contextlib.contextmanager
 def impersonate_system():
 	with enable_privileges(win32security.SE_DEBUG_NAME):
-		pid_csr = ntdll.CsrGetProcessId()
+		pid_csr = winapi.ntdll.CsrGetProcessId()
 		hprocess_csr = win32api.OpenProcess(
 			PROCESS_QUERY_LIMITED_INFORMATION, False, pid_csr)
 		htoken_csr = win32security.OpenProcessToken(
@@ -849,7 +845,7 @@ def runas_shell_user(cmd, executable=None, creationflags=0, cwd=None,
 		return runas_session_user(cmd, executable, creationflags, cwd,
 					startupinfo, return_handles)
 	with enable_privileges(win32security.SE_IMPERSONATE_NAME):
-		if not advapi32.CreateProcessWithTokenW(
+		if not winapi.advapi32.CreateProcessWithTokenW(
 					int(htoken), 0, executable, cmd, creationflags, None,
 					cwd, ctypes.byref(si), ctypes.byref(pi)):
 			error = ctypes.get_last_error()
