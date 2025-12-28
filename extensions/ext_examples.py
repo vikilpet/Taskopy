@@ -225,7 +225,7 @@ def examp_cert_check(caller:str, codepage:str=''
 			table.append(('PC', name, hsh))
 	if caller == tcon.CALLER_MENU and diff:
 		tprint(f'{len(hashes_pc)=}, {len(hashes_wu)=}')
-		table_print(table, sorting=(0, 1))
+		table_print(table, sorting=(0, 1), use_headers=True)
 	# Comparing it to the previous difference between PC and WU:
 	if not set(
 		var_get(VARNAME, as_literal=True, default=())

@@ -921,7 +921,7 @@ def drive_free(path:str, unit:str='GB')->int:
 	except:
 		return -1
 
-def dir_list(fullpath, **rules)->Iterator[str]:
+def dir_list(fullpath, subdirs:bool=True, **rules)->Iterator[str]:
 	r'''
 	Returns all directory content (dirs and files).  
 	*rules* - rules for the `path_rule` function.  
@@ -966,6 +966,7 @@ def dir_list(fullpath, **rules)->Iterator[str]:
 					yield fpath[4:]
 			else:
 				yield fpath[4:]
+		if not subdirs: return
 
 def dir_find(fullpath, only_files:bool=False)->list:
 	'''

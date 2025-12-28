@@ -21,6 +21,7 @@ import win32evtlog
 import gc
 import argparse
 import msvcrt
+import queue
 from plugins.constants import *
 from plugins.tools import *
 from plugins.tools import _tlog, _thread_pop, _log_cur_file
@@ -1331,6 +1332,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		app.que_log.stop()
 		app.que_print.stop()
 		app.que_hook.stop()
+		app.que_wxdialog.stop()
 		try:
 			_log_cur_file[1].close()
 		except:
@@ -1450,6 +1452,7 @@ class App(wx.App):
 		self.que_hook:TQueue = None
 		self.que_log:TQueue = None
 		self.que_print:TQueue = None
+		self.que_wxdialog:TQueue = None
 		return True
 	
 	def win_save(self):
@@ -1528,6 +1531,13 @@ def con_key_listener():
 					app.taskbaricon.run_command()
 		time.sleep(.1)
 
+def _dialog_consumer(task):
+	r'''
+	This runs in the TQueue worker thread, but immediately marshals
+	to main GUI thread
+	'''
+	wx.CallAfter(task)
+
 def main():
 
 	def wait_exit(event, timeout=60.0):
@@ -1576,6 +1586,7 @@ def main():
 		app.que_print = TQueue(consumer=print, max_size=8192)
 		app.que_log = TQueue(consumer=_tlog, max_size=8192)
 		app.que_hook = TQueue(consumer=hook_consumer, max_size=8192)
+		app.que_wxdialog = TQueue(consumer=_dialog_consumer)
 		app.is_cmd_task = not cmd_args.task is None
 		app.cmd_args = cmd_args
 		app.win_save()

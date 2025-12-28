@@ -64,7 +64,7 @@ except ModuleNotFoundError:
 	import plugins.cache as cache
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2025-12-14'
+APP_VERSION = 'v2025-12-28'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 if getattr(sys, 'frozen', False):
 	APP_PATH = os.path.dirname(sys.executable)
@@ -1037,15 +1037,13 @@ def attach_thread_input_foreground(hwnd):
 		winapi.user32.AttachThreadInput(thread1, thread2, False)
 	else:
 		winapi.user32.SetForegroundWindow(hwnd)
-		
-def inputbox(message:str, title:str=None
-, is_pwd:bool=False, default:str=''
-, multiline:bool=False, topmost:bool=True)->str:
+
+def inputbox(message:str, title:str='', is_pwd:bool=False, default:str=''
+, multiline:bool=False, topmost:bool=True)->str|None:
 	r'''
 	Request input from user.  
+	Returns `None` on cancel.  
 	*is_pwd* - use password dialog (hide input).
-	Problem: don't use default or you will get this value
-	whatever button user will press.
 	'''
 	if is_con():
 		if is_pwd:
@@ -1053,10 +1051,45 @@ def inputbox(message:str, title:str=None
 		else:
 			val = input(message)
 			return val
-	if title is None:
+	if not title:
 		title = func_name_human(task_name())
 	else:
 		title = str(title)
+	result = [None]
+	done_event = threading.Event()
+
+	def show_dialog():
+		' This runs entirely in the main GUI thread.'
+		if is_pwd:
+			dlg_class = wx.PasswordEntryDialog
+		else:
+			dlg_class = wx.TextEntryDialog
+		style = (wx.OK | wx.CANCEL | wx.CENTRE)
+		if topmost:
+			style |= wx.STAY_ON_TOP
+		if multiline:
+			style |= wx.TE_MULTILINE
+		dlg = dlg_class(app.frame, message, title, style=style)
+		if default: dlg.SetValue(str(default))
+		if topmost:
+			dlg.SetWindowStyleFlag(dlg.GetWindowStyle() | wx.STAY_ON_TOP)
+		status = dlg.ShowModal()
+		if status == wx.ID_OK: result[0] = dlg.GetValue()
+		dlg.Destroy()
+		done_event.set()
+
+	app.que_wxdialog.put_nowait(show_dialog)
+	done_event.wait()
+	return result[0]
+
+
+
+
+
+
+
+
+
 	if is_pwd:
 		box_func = wx.PasswordEntryDialog
 	else:
@@ -1080,6 +1113,8 @@ def inputbox(message:str, title:str=None
 	value = dlg.GetValue()
 	dlg.Destroy()
 	return value
+
+
 
 
 
@@ -2333,37 +2368,30 @@ def app_pid()->int:
 	'''
 	return _MAIN_PID
 
-_toast_app_icon = None
-_toast_img_cache:dict = {}
 def toast(msg:str|tuple|list, dur:str='default', img:str=''
 , often_ident:str='', often_inter:str='30 sec'
-, on_click:Callable=lambda c: app_win_show()
+, on_click:Callable=None
 , appid:str=APP_NAME):
 	r'''
 	Windows toast notification.  
-	*img* - full path to a picture.  
+	*img* - a full path to a picture.  
 	*duration* - 'short'|'long'|'default'. 'default' and 'short' are the same?
 	'long' is about 30 sec.  
 	*on_click* - an action to perform on click. It is passed an
 	argument with the click properties. If the notification has
 	already disappeared from the screen and is in the action center
 	, the action will be performed only if an valid *appid* is specified  
-	*appid* - custom AppID. If you want toast to have the Taskopy icon, see the `emb_appid_add` task
-	from *ext_embedded*.  
+	*appid* - custom AppID. If you want toast to have the Taskopy icon
+	, see the `emb_appid_add` task from the *ext_embedded*.  
 
 	Note: *winrt* works on Windows 10, October 2018 Update or later 
 	'''
-	global _toast_app_icon
-	global _toast_img_cache
 	OFTEN_IDENT_LEN = 10
 	if sys_ver() < 10.0:
-		dialog(msg=msg, wait=False, title='[Toast error]')
+		dialog(msg=msg, wait=False, title='<Toast message>')
 		return
 	if dur == 'default': dur = 'Default'
 	assert dur in ('Default', 'short', 'long'), 'wrong *dur* value'
-	if on_click:
-		assert len( func_arg(on_click) ) == 1, \
-			'The `on_click` function must take 1 argument'
 	if is_iter(msg):
 		msg = list(str(m) for m in msg)
 		if not often_ident: often_ident = msg[0]
@@ -2371,27 +2399,32 @@ def toast(msg:str|tuple|list, dur:str='default', img:str=''
 		msg = [str(msg)]
 		if not often_ident: often_ident = msg[0][:OFTEN_IDENT_LEN]
 	if is_often('_toast ' + often_ident, interval=often_inter): return 'often'
-	toaster = wtoasts.WindowsToaster(appid)
+	if not appid in cache.toast_toasters:
+		cache.toast_toasters[appid] = wtoasts.WindowsToaster(appid)
+	toaster = cache.toast_toasters[appid]
 	newToast = wtoasts.Toast()
 	newToast.duration = wtoasts.ToastDuration(dur)
 	newToast.text_fields = msg
+	if on_click:
+		assert len( func_arg(on_click) ) == 1, \
+			'The `on_click` function must take 1 argument'
+		newToast.on_activated = on_click
+	else:
+		newToast.on_activated = lambda c: app_win_show()
 	if img:
-		img_obj = wtoasts.ToastDisplayImage.fromPath(img)
-		newToast.AddImage( img_obj )
-	if on_click: newToast.on_activated = on_click
+		if img not in cache.toast_imgs:
+			try:
+				cache.toast_imgs[img] = wtoasts.ToastDisplayImage.fromPath(img)
+			except Exception:
+				pass
+		if img in cache.toast_imgs: newToast.AddImage(cache.toast_imgs[img])
 	try:
 		toaster.show_toast(newToast)
-		newToast.text_fields = None  # Releases strings
-		if img:
-			newToast.images = []
-		
-		del newToast, toaster  # Explicit del for 32-bit heap
-		try:
-			del img_obj  # If defined
-		except:
-			pass
 	except OSError:
-		dialog(msg=msg, wait=False, title='[Toast error]')
+		dialog(msg=msg, wait=False, title='<Toast message>')
+	newToast.text_fields = None
+	newToast.images = []
+	del newToast
 
 def bmark(func, a:tuple=(), ka:dict={}, b_iter:int=10
 , do_print:bool=True)->int:
