@@ -994,9 +994,6 @@ edu.gy
 gov.gy
 net.gy
 org.gy
-onhercules.app
-hercules-app.com
-hercules-dev.com
 hk
 com.hk
 edu.hk
@@ -5043,7 +5040,6 @@ com.sn
 edu.sn
 gouv.sn
 org.sn
-perso.sn
 univ.sn
 so
 com.so
@@ -7068,6 +7064,7 @@ auth.us-west-1.amazoncognito.com
 auth-fips.us-west-1.amazoncognito.com
 auth.us-west-2.amazoncognito.com
 auth-fips.us-west-2.amazoncognito.com
+auth.cognito-idp.eusc-de-east-1.on.amazonwebservices.eu
 *.compute.amazonaws.com.cn
 *.compute.amazonaws.com
 *.compute-1.amazonaws.com
@@ -7537,6 +7534,7 @@ s3.dualstack.us-gov-east-1.amazonaws.com
 s3-accesspoint.dualstack.us-gov-east-1.amazonaws.com
 s3-accesspoint-fips.dualstack.us-gov-east-1.amazonaws.com
 s3-fips.dualstack.us-gov-east-1.amazonaws.com
+s3-website.dualstack.us-gov-east-1.amazonaws.com
 s3.us-gov-east-1.amazonaws.com
 s3-accesspoint.us-gov-east-1.amazonaws.com
 s3-accesspoint-fips.us-gov-east-1.amazonaws.com
@@ -7547,6 +7545,7 @@ s3.dualstack.us-gov-west-1.amazonaws.com
 s3-accesspoint.dualstack.us-gov-west-1.amazonaws.com
 s3-accesspoint-fips.dualstack.us-gov-west-1.amazonaws.com
 s3-fips.dualstack.us-gov-west-1.amazonaws.com
+s3-website.dualstack.us-gov-west-1.amazonaws.com
 s3.us-gov-west-1.amazonaws.com
 s3-accesspoint.us-gov-west-1.amazonaws.com
 s3-accesspoint-fips.us-gov-west-1.amazonaws.com
@@ -7810,6 +7809,7 @@ transfer-webapp.ap-southeast-2.on.aws
 transfer-webapp.ap-southeast-3.on.aws
 transfer-webapp.ap-southeast-4.on.aws
 transfer-webapp.ap-southeast-5.on.aws
+transfer-webapp.ap-southeast-7.on.aws
 transfer-webapp.ca-central-1.on.aws
 transfer-webapp.ca-west-1.on.aws
 transfer-webapp.eu-central-1.on.aws
@@ -7823,6 +7823,7 @@ transfer-webapp.eu-west-3.on.aws
 transfer-webapp.il-central-1.on.aws
 transfer-webapp.me-central-1.on.aws
 transfer-webapp.me-south-1.on.aws
+transfer-webapp.mx-central-1.on.aws
 transfer-webapp.sa-east-1.on.aws
 transfer-webapp.us-east-1.on.aws
 transfer-webapp.us-east-2.on.aws
@@ -7874,10 +7875,8 @@ potager.org
 sweetpepper.org
 myasustor.com
 cdn.prod.atlassian-dev.net
-translated.page
 myfritz.link
 myfritz.net
-onavstack.net
 *.awdev.ca
 *.advisor.ws
 ecommerce-shop.pl
@@ -7926,6 +7925,7 @@ radio.am
 radio.fm
 cdn.bubble.io
 bubbleapps.io
+*.bwcloud-os-instance.de
 uk0.bigv.io
 dh.bytemark.co.uk
 vm.bytemark.co.uk
@@ -7972,6 +7972,7 @@ uk.net
 ae.org
 com.se
 cx.ua
+discourse.diy
 discourse.group
 discourse.team
 clerk.app
@@ -8060,6 +8061,7 @@ edu.ru
 gov.ru
 int.ru
 mil.ru
+corespeed.app
 dyn.cosidns.de
 dnsupdater.de
 dynamisches-dns.de
@@ -8111,6 +8113,8 @@ deno.net
 dedyn.io
 deta.app
 deta.dev
+deuxfleurs.eu
+deuxfleurs.page
 *.at.ply.gg
 d6.ply.gg
 joinmc.link
@@ -8880,6 +8884,9 @@ heiyu.space
 helioho.st
 heliohost.us
 hepforge.org
+onhercules.app
+hercules-app.com
+hercules-dev.com
 herokuapp.com
 heyflow.page
 heyflow.site
@@ -8925,7 +8932,6 @@ wphostedmail.com
 wpmucdn.com
 tempurl.host
 wpmudev.host
-indevs.in
 dyn-berlin.de
 in-berlin.de
 in-brb.de
@@ -9089,6 +9095,8 @@ ezproxy.kuleuven.be
 kuleuven.cloud
 ae.kg
 keymachine.de
+kiloapps.ai
+kiloapps.io
 kinghost.net
 uni5.net
 knightpoint.systems
@@ -9097,6 +9105,8 @@ webthings.io
 krellian.net
 oya.to
 co.de
+shiptoday.app
+shiptoday.build
 laravel.cloud
 on-forge.com
 on-vapor.com
@@ -9255,6 +9265,8 @@ routingthecloud.org
 same-app.com
 same-preview.com
 csx.cc
+miren.app
+miren.systems
 mydbserver.com
 webspaceconfig.de
 mittwald.info
@@ -9474,7 +9486,6 @@ tech.orange
 can.re
 authgear-staging.com
 authgearapps.com
-skygearapp.com
 outsystemscloud.com
 *.hosting.ovh.net
 *.webpaas.ovh.net
@@ -9518,6 +9529,7 @@ prequalifyme.today
 xen.prgmr.com
 priv.at
 c01.kr
+eliv-api.kr
 eliv-cdn.kr
 eliv-dns.kr
 mmv.kr
@@ -9809,6 +9821,7 @@ my.at
 my.de
 *.nxa.eu
 nx.gw
+spawnbase.app
 customer.speedpartner.de
 myspreadshop.at
 myspreadshop.com.au
@@ -9839,6 +9852,7 @@ stackit.gg
 stackit.rocks
 stackit.run
 stackit.zone
+indevs.in
 musician.io
 novecore.site
 api.stdlib.com
@@ -9965,19 +9979,6 @@ site.transip.me
 *.transurl.nl
 tunnelmole.net
 tuxfamily.org
-dd-dns.de
-dray-dns.de
-draydns.de
-dyn-vpn.de
-dynvpn.de
-mein-vigor.de
-my-vigor.de
-my-wan.de
-syno-ds.de
-synology-diskstation.de
-synology-ds.de
-diskstation.eu
-diskstation.org
 typedream.app
 pro.typeform.com
 uber.space
@@ -10049,6 +10050,8 @@ windsurf.app
 windsurf.build
 panel.gg
 daemon.panel.gg
+base44.app
+base44-sandbox.com
 wixsite.com
 wixstudio.com
 editorx.io

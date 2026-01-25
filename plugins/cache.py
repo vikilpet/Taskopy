@@ -1,6 +1,7 @@
 import datetime
 from collections import OrderedDict
 import windows_toasts as wtoasts
+import functools
 
 
 class LRUCache(dict):
@@ -34,8 +35,25 @@ class LRUCache(dict):
 			self._order.move_to_end(key)
 
 
-is_con:bool|None = None
-often:dict[str, datetime.datetime] = {}
-toast_toasters:dict[str, wtoasts.WindowsToaster] = {}
+class lazy_property(object):
+	r'''
+	Meant to be used for lazy evaluation of an object attribute.
+	Property should represent non-mutable data, as it replaces itself.
+	'''
+
+	def __init__(self, fget):
+		self.fget = fget
+		functools.update_wrapper(self, fget)
+
+	def __get__(self, obj, cls):
+		if obj is None: return self
+		value = self.fget(obj)
+		setattr(obj, self.fget.__name__, value)
+		return value
+
+
+often:dict[str, datetime.datetime] = dict()
+toast_toasters:dict[str, wtoasts.WindowsToaster] = dict()
 toast_imgs = LRUCache(max_items=16)
+public_suffix_list:set = set()
 

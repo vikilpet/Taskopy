@@ -1110,8 +1110,7 @@ def dir_zip(fullpath, destination=None
 		if base_name.lower().endswith('.zip'):
 			base_name = base_name[:-4]
 	root_dir = os.path.dirname(fullpath)
-	base_dir = os.path.basename(
-		fullpath.strip(os.sep))
+	base_dir = os.path.basename( fullpath.strip(os.sep) )
 	if do_cwd:
 		with working_directory(os.path.dirname(new_fullpath)):
 			result = shutil.make_archive(base_name, format=EXT

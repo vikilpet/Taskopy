@@ -10,6 +10,7 @@ import threading
 import configparser
 import psutil
 import sqlite3
+import json
 import subprocess
 from win32process import GetCurrentProcessId as _GetCurrentProcessId
 import win32api
@@ -40,7 +41,7 @@ import string
 import difflib
 import argparse
 from typing import Callable, Iterable 
-from dataclasses import dataclass, field, asdict, is_dataclass
+from dataclasses import dataclass, field, asdict, is_dataclass as is_dclass
 import dataclasses as dclass
 from queue import Queue, SimpleQueue
 from itertools import zip_longest
@@ -54,6 +55,7 @@ import unicodedata
 import multiprocessing
 from xml.etree import ElementTree as _ElementTree
 import windows_toasts as wtoasts
+import weakref
 try:
 	import constants as tcon
 	import winapi
@@ -64,7 +66,7 @@ except ModuleNotFoundError:
 	import plugins.cache as cache
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2025-12-28'
+APP_VERSION = 'v2026-01-25'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 if getattr(sys, 'frozen', False):
 	APP_PATH = os.path.dirname(sys.executable)
@@ -346,22 +348,18 @@ def dev_print(*msg, **kwargs):
 	'''
 	if is_dev() or is_con(): tprint(*msg, **kwargs)
 
-_is_dev_cache:bool|None = None
-
+@functools.cache
 def is_dev()->bool:
 	r'''
 	Running in developer mode?
 
-		asrt( bmark(is_dev), 455 )
+		asrt( bmark(is_dev), 400 )
 
 	'''
-	global _is_dev_cache
-	if not _is_dev_cache is None: return _is_dev_cache
 	try:
-		_is_dev_cache = hasattr(sys, 'ps1') or app.cmd_args.dev
+		return hasattr(sys, 'ps1') or app.cmd_args.dev
 	except (NameError, AttributeError):
-		_is_dev_cache = True
-	return _is_dev_cache
+		return True
 _log_cur_file:tuple = ()
 
 def _log_file(msg:str, fname:str):
@@ -1357,16 +1355,15 @@ def tprint(*msgs, tname:str|None=None, short:bool=False):
 	else:
 		qprint(msg)
 
+@functools.cache
 def is_con()->bool:
 	r'''
 	Are we in the console?
 
-		asrt( bmark(is_con), 500 )
+		asrt( bmark(is_con), 400 )
 
 	'''
-	if not cache.is_con is None: return cache.is_con
-	cache.is_con = hasattr(sys, 'ps1')
-	return cache.is_con
+	return hasattr(sys, 'ps1')
 
 def tdebug(*msgs, **kwargs)->bool:
 	r'''
@@ -1731,7 +1728,7 @@ def hint(text:str, position:tuple=None)->int:
 		, '--text', str(text)
 	]
 	if position: args += '--position', '{}_{}'.format(*position)
-	if getattr(sys, 'frozen', False):
+	if is_app_exe():
 		mdl = importlib.import_module('resources.hint')
 		thread_start(
 			mdl.main
@@ -1835,7 +1832,7 @@ def table_print(
 			headers = list(
 				list( table.values() )[0].keys()
 			)
-	elif is_dataclass(table[0]):
+	elif is_dclass(table[0]):
 		dc_atts = tuple(
 			f.name for f in dclass.fields( table[0] )
 			if not f.name.startswith('_')
@@ -1962,28 +1959,18 @@ def patch_import():
 			+ ', '.join(patch_items)
 	)
 
-class lazy_property(object):
-	'''
-	Meant to be used for lazy evaluation of an object attribute.
-	Property should represent non-mutable data, as it replaces itself.
-	'''
-	def __init__(self, fget):
-		self.fget = fget
-		functools.update_wrapper(self, fget)
-
-	def __get__(self, obj, cls):
-		if obj is None:
-			return self
-
-		value = self.fget(obj)
-		setattr(obj, self.fget.__name__, value)
-		return value
-
 
 class DataHTTPReq(object):
 	r'''
 	HTTP client request data.  
+	*path* -- '/task_name'  
+	*headers* -- {"Accept-Encoding": "gzip, deflate", ...}  
+	*params* -- URL parameters as a dictionary like {'par1': '123', ...}  
+	
+	You can access data from *Send To Taskopy* as a dictionary via `.form`
+	and as object via `.ext`.
 	'''
+
 	def __init__(self, client_ip:str='', path:str=''
 	, headers:dict={}, params:dict={}, method:str='GET'):
 		r'''
@@ -2005,16 +1992,22 @@ class DataHTTPReq(object):
 		self.referer:str = ''
 		self.headers:dict = headers
 		self.params:dict = params
-		self.form:dict = {}
+		self.form:dict = dict()
+		self.ext:DataBrowserExtForm = None
 	
-	def _form_upd(self):
+	def _ext_fill(self):
 		try:
-			self.__dict__.update(self.form)
+			self.ext = DataBrowserExtForm(**self.form)
+			try:
+				self.ext.cookies = json.loads(self.form.get('cookies', '{}'))
+				self.ext.params = json.loads(self.form.get('params', '{}'))
+				self.ext.frame_id = int(self.ext.frame_id)
+			except:
+				tprint('DataHTTPReq: parsing error')
 		except:
-			dev_print('DataHTTPReq: not a dict')
 			pass
 	
-	@lazy_property
+	@cache.lazy_property
 	def file(self)->str:
 		if self._file:
 			return self._file
@@ -2023,7 +2016,7 @@ class DataHTTPReq(object):
 				fd.write(self.body)
 			return self._fullpath
 	
-	@lazy_property
+	@cache.lazy_property
 	def body(self)->bytes:
 		if self._body: return self._body
 		if self._file:
@@ -2039,18 +2032,33 @@ class DataHTTPReq(object):
 	def __str__(self) -> str:
 		return self.__repr__()
 
-class DataBrowserExt(DataHTTPReq):
-	'''
-	HTTP request data helper for the 'SendToTaskopy'
-	browser extension.
-	'''
-	def __init__(self):
-		self.link_url:str = ''
-		self.page_url:str = ''
-		self.editable:bool = False
-		self.media_type:str = ''
-		self.src_url:str = ''
-		self.selection:str = ''
+
+@dataclass
+class DataBrowserExtForm:
+	host:str
+	hostname:str
+	path:str
+	params:dict
+	page_url:str
+	page_html:str
+	link_url:str
+	selection:str
+	editable:bool
+	media_type:str
+	media_url:str
+	cookies:dict
+	frame_id:int
+	@cache.lazy_property
+	def domain(self)->str:
+		r'''
+		Second level domain of the *hostname*.  
+		'''
+		try:
+			from plugin_network import url_hostname
+		except ModuleNotFoundError:
+			from plugins.plugin_network import url_hostname
+		return url_hostname(self.hostname)
+
 
 def _etree_to_dict(tree: _ElementTree.ElementTree):
 	di = {tree.tag: {} if tree.attrib else None}
@@ -2144,26 +2152,26 @@ class DataEvent:
 		self.msg:str = msg
 		self.event_data:list = [d[0] for d in evt_data]
 	
-	@lazy_property
+	@cache.lazy_property
 	def time_created_local(self)->dtime:
 		r'''
 		From UTC to local time.  
 		'''
 		return self.time_created + tdelta(seconds=-time.timezone)
 	
-	@lazy_property
+	@cache.lazy_property
 	def _user(self)->tuple:
 		return win32security.LookupAccountSid(None, self.user_id)
 	
-	@lazy_property
+	@cache.lazy_property
 	def user_name_short(self)->str:
 		return self._user[0]
 
-	@lazy_property
+	@cache.lazy_property
 	def user_name_full(self)->str:
 		return f'{self._user[1]}\\{self._user[0]}'
 
-	@lazy_property
+	@cache.lazy_property
 	def user_domain(self)->str:
 		return self._user[1]
 
@@ -2309,6 +2317,7 @@ def app_win_show():
 	if is_con(): return
 	app.show_window()
 
+@functools.cache
 def app_dir()->str:
 	r'''
 	Returns the application directory without the trailing slash.
@@ -2462,6 +2471,8 @@ def bmark(func, a:tuple=(), ka:dict={}, b_iter:int=10
 			return 'None'
 		elif isinstance(arg, Callable):
 			return arg.__name__
+		elif is_dclass(arg):
+			return repr(arg)
 		else:
 			raise Exception(f'Unknown arg type: {type(arg)}')
 	ASRT_COEF = 1.1
@@ -2705,7 +2716,7 @@ def int_str_human(
 	Examples:
 
 		asrt( int_str_human(4182), '4.2k')
-		asrt( int_str_human(12345 ), '12.3k')
+		asrt( int_str_human(12345), '12.3k')
 		asrt( int_str_human(1234567), '1.2M')
 		asrt( int_str_human(5678901234), '5.7B')
 
@@ -3073,12 +3084,13 @@ def is_often(ident:str, interval:str)->bool:
 		cache.often[ident] = now
 		return False
 
+@functools.cache
 def is_app_exe()->bool:
 	r'''
 	Returns True if the application is converted to *exe*.  
 
 		asrt( is_app_exe(), False)
-		asrt( bmark(is_app_exe), 2061 )
+		asrt( bmark(is_app_exe), 400 )
 
 	'''
 	return getattr(sys, 'frozen', False)
@@ -3194,6 +3206,50 @@ def deep_get(data:dict, path:str|tuple|list, default=None)->object:
 			return default
 		current = current[key]
 	return current
+
+def dclass_str(instance, template:str='{} = {}'
+, line_sep:str='\n', short:int=0)->str:
+	r'''
+	Makes a string from fields and values of dataclass.  
+	Example:
+
+		@dataclass
+		class _Test:
+			field1:int
+			field2:str
+
+		t = _Test(field1=1, field2='a')
+		asrt(
+			dclass_str(t, line_sep=', ')
+			, "field1 = 1, field2 = 'a'"
+		)
+		asrt( bmark(dclass_str, a=(t,)), 4000)
+
+	'''
+	lines = []
+	for field in dclass.fields(instance):
+		lines.append(template.format(
+			field.name, repr( getattr(instance, field.name) )
+		))
+	if short > 0: lines = list(str_short(l, short) for l in lines)
+	return line_sep.join(lines)
+
+def dict_str(dct:dict, template:str='{}: {}'
+, line_sep:str='\n', short:int=0)->str:
+	r'''
+	Makes a string from fields and values of dataclass.  
+	Example:
+
+		d = {'f1': 1, 'f2': 'a'}
+		asrt( dict_str(d, line_sep=', '), "'f1': 1, 'f2': 'a'")
+		asrt( bmark(dict_str, (d,)), 2_700 )
+
+	'''
+	lines = []
+	for key, value in dct.items():
+		lines.append(template.format( repr(key), repr(value) ))
+	if short > 0: lines = list(str_short(l, short) for l in lines)
+	return line_sep.join(lines)
 
 def _init():
 	if __builtins__.get('gdic', None) != None: return

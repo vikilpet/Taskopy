@@ -22,17 +22,18 @@ import threading
 import ftplib
 from typing import Iterator, Tuple, Union
 import json2html
+import idna
 from .tools import dev_print, exc_text, tdebug \
 , locale_set, safe, patch_import, re_replace \
 , median, is_iter, str_indent, is_con, qprint, str_remove_white \
-, value_to_unit, task_add, msg_warn, Callable
+, value_to_unit, task_add, msg_warn, Callable, cache
 from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 from .plugin_process import proc_wait
 
 
 _USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
-_GV_PUBLIC_SUF_LST = '__public_suffix_list__'
+LAN_DOMAINS = ('lan', 'local', 'home')
 _RE_PING_LOSS = re.compile(r'\((\d+)%')
 _RE_PING_FAIL = re.compile(r' \d+\.\d+\.\d+\.\d+: .+?=\d+\D+[<=]\d+\D+=\d+')
 _RE_PING_TIME = re.compile(r' = (\d+).+? = (\d+).+? = (\d+)')
@@ -549,8 +550,7 @@ def net_pc_hostname()->str:
 	_pc_hostname_cache = socket.gethostname().lower()
 	return _pc_hostname_cache
 
-def url_hostname(url:str, sld:bool=True
-, lan_domains:tuple=('lan', 'local', 'home'))->str:
+def url_hostname(url:str, sld:bool=True)->str:
 	r'''
 	Returns the hostname (domain name) in lower case from a URL.
 
@@ -569,27 +569,31 @@ def url_hostname(url:str, sld:bool=True
 		asrt( url_hostname('http://abc.example.com:443/api?ip=1.2.3.4') \
 		, 'example.com')
 		asrt( url_hostname('http://server.lan:80/'), 'server.lan' )
+		asrt( url_hostname('www.example.lan'), 'example.lan' )
+		asrt( bmark(url_hostname, ('http://server.lan:80/',)), 50_000)
+		asrt( bmark(url_hostname, ('https://www.example.gov.uk',)), 50_000)
 
 	'''
-	global _GV_PUBLIC_SUF_LST
 	url = url.lower()
 	if m := _RE_HOST_IP.findall(url): return m[0]
-	domain = urllib.parse.urlparse(url).netloc
+	if '://' in url:
+		domain = urllib.parse.urlparse(url).netloc
+	else:
+		domain = url
 	if '@' in domain: domain = domain.split('@')[1]
 	if ':' in domain: domain = domain.split(':')[0]
+	domain = idna.decode(domain, uts46=True)
 	if not sld: return domain
-	suf_lst:set = gdic.get(_GV_PUBLIC_SUF_LST)
-	if not suf_lst:
-		suf_lst = set( var_lst_get('_public_suffix_list') )
-		suf_lst.update(lan_domains)
-		gdic[_GV_PUBLIC_SUF_LST] = suf_lst
+	if not cache.public_suffix_list:
+		cache.public_suffix_list = set( var_lst_get('_public_suffix_list') )
+		cache.public_suffix_list.update(LAN_DOMAINS)
 	variants = []
 	for i in range(domain.count('.') + 1):
 		variants.append( '.'.join(domain.split('.')[-(i+1):]) )
 	for var in variants:
-		if var in suf_lst: continue
+		if var in cache.public_suffix_list: continue
 		return var
-	return ''
+	return '<?>'
 
 def net_url_decode(url:str, encoding:str='utf-8')->str:
 	' Decodes URL '

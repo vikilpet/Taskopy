@@ -13,7 +13,7 @@ from email.utils import parsedate_to_datetime
 import imaplib
 import mimetypes
 from .tools import Job, job_batch, tdebug \
-, patch_import, dev_print, lazy_property \
+, patch_import, dev_print, cache \
 , table_print, time_diff_human, exc_text, exc_texts, str_indent, qprint
 from .plugin_filesystem import file_name_fix, file_size_str \
 , var_get, var_set, path_get
@@ -48,7 +48,7 @@ class MailMsg:
 		self.check_only:bool = check_only
 		self.sub_rule:Callable = sub_rule if sub_rule else lambda m: ''
 	
-	@lazy_property
+	@cache.lazy_property
 	def as_str(self)->str:
 		'''
 		Returns the entire message (including headers)
@@ -56,18 +56,18 @@ class MailMsg:
 		'''
 		return self._message.as_string()
 
-	@lazy_property
+	@cache.lazy_property
 	def _message(self)->Message:
 		return message_from_bytes(self.raw_bytes)
 	
-	@lazy_property
+	@cache.lazy_property
 	def _subj_fname(self)->str:
 		'''
 		Subject as a filesystem safe string (not a full path)
 		'''
 		return file_name_fix(self.h_subject)
 
-	@lazy_property
+	@cache.lazy_property
 	def body(self)->str:
 		'''
 		Returns message body as text.
@@ -118,7 +118,7 @@ class MailMsg:
 			dev_print(hdr_str := f'header "{header}" error: {repr(e)}')
 		return status, hdr_str
 
-	@lazy_property
+	@cache.lazy_property
 	def h_date(self)->str:
 		'''
 		Returns decoded *Date* header.
@@ -134,7 +134,7 @@ class MailMsg:
 			)
 		)
 
-	@lazy_property
+	@cache.lazy_property
 	def h_subject(self)->str:
 		'''
 		Returns decoded *Subject* header.  
@@ -147,21 +147,21 @@ class MailMsg:
 		if not body: return 'empty'
 		return body[:_MAX_BODY_AS_SUBJ] + '...'
 
-	@lazy_property
+	@cache.lazy_property
 	def h_to(self)->str:
 		'''
 		Returns decoded *To* header.
 		'''
 		return self._get_header('To')[1]
 
-	@lazy_property
+	@cache.lazy_property
 	def h_from(self)->str:
 		'''
 		Returns decoded *From* header.
 		'''
 		return self._get_header('From')[1]
 
-	@lazy_property
+	@cache.lazy_property
 	def body_text(self)->str:
 		'''
 		Returns the email body text cleaned of HTML tags
@@ -169,7 +169,7 @@ class MailMsg:
 		'''
 		return html_clean(self.body, is_mail=True)
 	
-	@lazy_property
+	@cache.lazy_property
 	def fullpath(self)->str:
 		' Full path for the message file '
 		return path_get(

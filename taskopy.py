@@ -1068,7 +1068,7 @@ def load_crontab(event=None, with_cache:bool=False)->bool:
 			del sys.modules['crontab']
 			del crontab
 			crontab = importlib.import_module('crontab')
-		load_modules(with_cache=False)
+		load_modules(with_cache=with_cache)
 		tasks = Tasks()
 		app.tasks = tasks
 		tasks.start_listeners()

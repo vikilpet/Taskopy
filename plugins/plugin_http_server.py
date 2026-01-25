@@ -339,7 +339,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 					self.req_data.form[key] = None
 				else:
 					self.req_data.form[key] = form_obj.getfirst(key)
-			self.req_data._form_upd()
+			self.req_data._ext_fill()
 			if form_obj.getvalue('file', None):
 				if form_obj['file'].file is None:
 					return False, 'error: form file is None'
