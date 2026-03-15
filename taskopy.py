@@ -515,7 +515,7 @@ class Tasks:
 
 		def dir_watch(task:dict, path:str, is_file:bool=False):
 			dir_path:str = file_dir(path) if is_file else path
-			filename = file_name(path)
+			fname = file_name(path)
 			prev_file = ('', time.time())
 			if is_file:
 				flags = task['on_file_change_flags']
@@ -583,7 +583,7 @@ class Tasks:
 							cfile, ctime = results[-1][1], time.time()
 						except:
 							if is_dev():
-								msg_err(f'Exception in «dir_watch»'
+								msg_err(f'Exception in «dir_watch» ({fname})'
 								, timeout='5 min', source='dir_watch')
 						if cfile == pfile and ( (ctime - ptime) < WAIT_SEC ):
 							prev_file = (cfile, ctime)
@@ -591,7 +591,7 @@ class Tasks:
 					prev_file = (results[-1][1], time.time())
 					for res_action, res_relname in results[:1]:
 						if is_file and (
-							res_relname != filename
+							res_relname != fname
 							or res_action != 3
 						):
 							continue

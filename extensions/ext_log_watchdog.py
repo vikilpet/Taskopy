@@ -60,11 +60,11 @@ def log_watchdog_push(
 	prev_pos:int = var_get(var_name, default=0, as_literal=True)
 	cur_size = file_size(log_file)
 	if not prev_pos:
-		tprint('first check')
+		dev_print('first check')
 		var_set(var_name, cur_size)
 		return
 	if prev_pos > cur_size:
-		tprint('the file has been truncated')
+		dev_print('the file has been truncated')
 		var_set(var_name, cur_size)
 		return
 	with open(log_file) as hnd:
@@ -86,26 +86,31 @@ def log_watchdog_poll(
 	, callback:Callable=log_watchdog_callback_demo
 	, poll_timeout:str='1 sec'
 	, fail_timeout:str='11 sec'
+	, empty_threshold:int=61
 ):
 	r'''
 	It's just waiting for new lines.  
 	*log_file* - a file for watch.  
-	*callback* - a function that fetches new lines from a file.
-	The function must accept *str* with new lines and
-	must return *bool* -- `True` on successful processing of new lines
-	or `False` on error.  
+	*callback* - a function that processes a new line from the file.
+	The function must accept a *str* with a new line and
+	must return *bool* -- `True` on successful processing of the new line
+	or `False` on error so that `log_watchdog_poll` will not move further.  
+	*empty_threshold* - after how many empty lines should you check whether
+	the file was truncated?
 	'''
+	fname = file_name(log_file)
 	var_name = ('log_watchdog', log_file)
 	flag_var_name = f'log_watchdog {log_file}'
 	prev_pos:int = var_get(var_name, default=0, as_literal=True)
 	cur_size = file_size(log_file)
 	if not prev_pos:
-		tprint('first check')
+		dev_print('new file:', fname)
 		var_set(var_name, cur_size)
 	if prev_pos > cur_size:
-		tprint('the file has been truncated')
-		var_set(var_name, cur_size)
-		prev_pos = cur_size
+		dev_print('the file has been truncated before polling:', fname)
+		var_set(var_name, '0')
+		prev_pos = 0
+	empty_count:int = 0
 	gdic[flag_var_name] = True
 	with open(log_file) as hnd:
 		hnd.seek(prev_pos)
@@ -113,11 +118,23 @@ def log_watchdog_poll(
 			try:
 				line = hnd.readline()
 			except PermissionError:
-				tprint('permission error')
-				gdic[flag_var_name] = True
+				dev_print('permission error:', fname)
+				gdic[flag_var_name] = False
 				break
 			if not line:
-				time_sleep(poll_timeout)
+				empty_count += 1
+				if empty_count < empty_threshold:
+					time_sleep(poll_timeout)
+					continue
+				else:
+					empty_count = 0
+					cur_size = os.fstat(hnd.fileno()).st_size
+					if cur_size < prev_pos:
+						dev_print('the file has been truncated during polling:'
+						, fname)
+						var_set(var_name, '0')
+						gdic[flag_var_name] = False
+						break
 				continue
 			status:bool = False
 			data:bool = False
@@ -136,4 +153,8 @@ def log_watchdog_poll(
 
 
 def log_watchdog_poll_stop(log_file:str):
+	if gdic.get(f'log_watchdog {log_file}') is None:
+		msg_err(f'No flag for file: «{log_file}»'
+		, 'Log watchdog poll stop')
+		return
 	gdic[f'log_watchdog {log_file}'] = False

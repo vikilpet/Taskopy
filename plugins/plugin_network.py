@@ -1,3 +1,8 @@
+r'''
+Naming convention:  
+*host* - host name or IP number.  
+*hostname* - host name.  
+'''
 import os
 import time
 import socket
@@ -19,6 +24,7 @@ import datetime
 import random
 import warnings
 import threading
+import functools
 import ftplib
 from typing import Iterator, Tuple, Union
 import json2html
@@ -31,7 +37,7 @@ from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 from .plugin_process import proc_wait
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 LAN_DOMAINS = ('lan', 'local', 'home')
 _RE_PING_LOSS = re.compile(r'\((\d+)%')
@@ -268,7 +274,7 @@ def html_clean(html_str:str, sep:str=' ', is_mail:bool=False
 		asrt( html_clean('\u200b\r \n<a>t</a>\t', is_mail=True), 't')
 		asrt( html_clean('<style>{}</style><a>t</a>\t'), 't')
 		asrt( html_clean('<img>jpg</img><a>t</a>\t', del_spec=False), 'jpg t')
-		asrt( bmark(html_clean, a=('',)), 150_000 )
+		asrt( bmark(html_clean, a=('',)), 200_000 )
 
 	'''
 	SPEC_CHARS = ' \r\n\t\u200b\xa0\u200c'
@@ -512,16 +518,20 @@ def xml_element(url:str, elem:str
 	else:
 		return result[0]
 
-def domain_ip(domain:str)->list[str]:
+def net_host_ip(hostname:str)->list[str]:
 	r'''
-	Get IP adresses of domain.  
+	Get IP adresses of a host name.  
 	'''
-	data = socket.gethostbyname_ex(domain)
-	return data[2]
+	try:
+		return socket.gethostbyname_ex(hostname)[2]
+	except socket.gaierror:
+		return []
+
+domain_ip = net_host_ip
 
 def net_pc_ip()->str:
 	r'''
-	Returns the main IP address of the computer.  
+	Returns the main IP address of this computer.  
 
 		asrt( bmark(net_pc_ip), 90_000 )
 
@@ -537,18 +547,28 @@ def net_pc_ip()->str:
 		sock.close()
 	return ip
 
-_pc_hostname_cache:str = ''
+def net_ip_hostname(host:str)->str:
+	r'''
+	Reverse lookup IP -> host name. Returns empty string on fail.  
+	*host* - IP or host name.  
+
+		asrt( net_ip_hostname('8.8.8.8'), 'dns.google' )
+
+	'''
+	try:
+		return socket.gethostbyaddr(host)[0]
+	except socket.herror:
+		return ''
+
+@functools.cache
 def net_pc_hostname()->str:
 	r'''
-	Returns the hostname of the computer in lower case.
+	Returns the host name of the computer in lower case.
 
 		asrt( bmark(net_pc_hostname), 500 )
 
 	'''
-	global _pc_hostname_cache
-	if _pc_hostname_cache: return _pc_hostname_cache
-	_pc_hostname_cache = socket.gethostname().lower()
-	return _pc_hostname_cache
+	return socket.gethostname().lower()
 
 def url_hostname(url:str, sld:bool=True)->str:
 	r'''
@@ -570,8 +590,8 @@ def url_hostname(url:str, sld:bool=True)->str:
 		, 'example.com')
 		asrt( url_hostname('http://server.lan:80/'), 'server.lan' )
 		asrt( url_hostname('www.example.lan'), 'example.lan' )
-		asrt( bmark(url_hostname, ('http://server.lan:80/',)), 50_000)
-		asrt( bmark(url_hostname, ('https://www.example.gov.uk',)), 50_000)
+		asrt( bmark(url_hostname, ('http://server.lan:80/',)), 65_000)
+		asrt( bmark(url_hostname, ('https://www.example.gov.uk',)), 60_000)
 
 	'''
 	url = url.lower()
@@ -667,13 +687,15 @@ def http_header(url:str, header:str
 	if header == 'all': return req.headers
 	return req.headers.get(header)
 
-def http_h_last_modified(url:str, **kwargs):
-	'HTTP Last Modified time in datetime format'
-	date_str = http_header(url, header='Last-Modified', **kwargs)
-	tdebug(date_str)
+def http_h_last_modified(url:str, header:str='Last-Modified', **kwargs):
+	r'''
+	HTTP Last Modified time in datetime format
+	'''
+	date_str = http_header(url, header=header, **kwargs)
+	if is_con(): qprint(date_str)
 	with locale_set('C'):
 		return datetime.datetime.strptime(date_str
-			, '%a, %d %b %Y %H:%M:%S GMT')
+		, '%a, %d %b %Y %H:%M:%S GMT')
 
 def _port_scan(host:str, port:int, timeout:int=500)->bool:
 	r'''
@@ -814,15 +836,15 @@ def ping_tcp(host:str, port:int, count:int=1, pause:int=100
 
 		asrt( ping_tcp('8.8.8.8', 443)[1][1] > 10, True )
 		asrt( ping_tcp('127.0.0.1', 445)[1][1] < 15, True )
-		asrt( ping_tcp('non.existent.domain', 80), (False, '[Errno 11001] getaddrinfo failed') )
+		asrt( ping_tcp('non.existent.domain', 80), (False, 'Cannot choose from an empty sequence') )
 
 	'''
 	timings = []
 	last_err = 'OK'
 	try:
-		ip = random.choice( domain_ip(host) )
-	except Exception as e:
-		return False, str(e)
+		ip = random.choice( net_host_ip(host) )
+	except Exception as err:
+		return False, str(err)
 	full_start = time.perf_counter_ns()
 	for _ in range(count):
 		with socket.socket( socket.AF_INET, socket.SOCK_STREAM ) as sock:

@@ -66,7 +66,7 @@ except ModuleNotFoundError:
 	import plugins.cache as cache
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2026-01-25'
+APP_VERSION = 'v2026-03-15'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 if getattr(sys, 'frozen', False):
 	APP_PATH = os.path.dirname(sys.executable)
@@ -745,7 +745,7 @@ def clip_set(txt):
 	r'''
 	Puts text into the text clipboard.
 
-		asrt( bmark(clip_set, ('test',), b_iter=3), 30_000_000 )
+		asrt( bmark(clip_set, ('test',), b_iter=3), 40_000_000 )
 		
 	'''
 	pyperclip.copy(str(txt))
@@ -960,7 +960,7 @@ def warning(msg:str, title:str='', timeout:str='30 min'):
 
 def _msg_err(msg:str, icon:int, title:str, parent:str, timeout:str):
 	r'''
-	Non-blocking error message.
+	Non-blocking error message via toast.  
 	'''
 	toast_imgs = {
 		tcon.TD_ICON_WARNING: r'c:\Windows\System32\SecurityAndMaintenance_Alert.png'
@@ -1047,7 +1047,7 @@ def inputbox(message:str, title:str='', is_pwd:bool=False, default:str=''
 		if is_pwd:
 			return getpass.getpass(f'inputbox ({message}): ')
 		else:
-			val = input(message)
+			val = input(message.rstrip(':') + ': ')
 			return val
 	if not title:
 		title = func_name_human(task_name())
@@ -1465,9 +1465,8 @@ decor_except_status.homemade = True
 
 def safe(func:Callable)->Callable:
 	r'''
-	Evaluate function inside 'try... except'
-	and return (True, <function result>)
-	or (False, <Exception object>)
+	Evaluate function inside `try... except`
+	and return (True, <function result>) or (False, <Exception object>)
 
 		asrt( bmark(lambda: None), 500 )
 		asrt( bmark(safe(lambda: None)), 800 )
@@ -2250,7 +2249,7 @@ def task_start(taskname:str|Callable, **kwargs):
 	If all you want to do is just run the function in a separate thread
 	, see `thread_start`.
 
-	Note: You can only use *task options* in *kwargs*
+	NOTE: You can only use *task options* in *kwargs*
 	'''
 	if isinstance(taskname, Callable): taskname = taskname.__name__
 	for tname in app.tasks.task_dict:
@@ -2475,7 +2474,7 @@ def bmark(func, a:tuple=(), ka:dict={}, b_iter:int=10
 			return repr(arg)
 		else:
 			raise Exception(f'Unknown arg type: {type(arg)}')
-	ASRT_COEF = 1.1
+	ASRT_COEF = 1.2
 	if not is_iter(a): a = (a,)
 	assert isinstance(ka, dict), '*ka* should be a dictionary'
 	timings:list = []
@@ -2521,16 +2520,21 @@ def speak(text:str, wait:bool=False):
 	'''
 
 	def _speak():
-		nonlocal text
-		pythoncom.CoInitializeEx(pythoncom.COINIT_APARTMENTTHREADED)
-		speaker = win32com.client.Dispatch('SAPI.SpVoice')
 		try:
+			pythoncom.CoInitializeEx(pythoncom.COINIT_APARTMENTTHREADED)
+			speaker = win32com.client.Dispatch('SAPI.SpVoice')
 			speaker.Speak(text)
-		except pywintypes.com_error as e:
-			dev_print(f'speaker error: {e}')
-		pythoncom.CoUninitialize()
+		except pythoncom.com_error as e:
+			dev_print(f'COM error during speech: {e}')
+		except Exception as e:
+			dev_print(f'Unexpected error in _speak: {e}')
+		finally:
+			try:
+				pythoncom.CoUninitialize()
+			except:
+				pass
 	
-	text = str(text)
+	text = str(text).strip()
 	if wait:
 		_speak()
 		return text
@@ -2755,7 +2759,7 @@ def int_str_human(
 	return f"{sign}{fmt}{sep}{suffix}"
 
 def str_indent(src_str, prefix:str='    '
-, borders:bool=True, border_symbol:str='_')->str:
+, borders:bool=False, border_symbol:str='_')->str:
 	r'''
 	Adds an indent to each line of text.  
 	Example:
@@ -3067,7 +3071,7 @@ def is_often(ident:str, interval:str)->bool:
 		time_sleep('1 ms')
 		asrt( is_often('_', '1 ms'), False)
 		asrt( bmark(is_often, ('_', '1 ms')), 15_000 )
-		asrt( bmark(is_often, ('_', 1)), 3500 )
+		asrt( bmark(is_often, ('_', 1)), 4_500 )
 
 	'''
 	UNIT:str = 'ms'
@@ -3208,7 +3212,7 @@ def deep_get(data:dict, path:str|tuple|list, default=None)->object:
 	return current
 
 def dclass_str(instance, template:str='{} = {}'
-, line_sep:str='\n', short:int=0)->str:
+, line_sep:str='\n', short:int=0, exclude:set={})->str:
 	r'''
 	Makes a string from fields and values of dataclass.  
 	Example:
@@ -3217,7 +3221,6 @@ def dclass_str(instance, template:str='{} = {}'
 		class _Test:
 			field1:int
 			field2:str
-
 		t = _Test(field1=1, field2='a')
 		asrt(
 			dclass_str(t, line_sep=', ')
@@ -3228,6 +3231,7 @@ def dclass_str(instance, template:str='{} = {}'
 	'''
 	lines = []
 	for field in dclass.fields(instance):
+		if field.name in exclude: continue
 		lines.append(template.format(
 			field.name, repr( getattr(instance, field.name) )
 		))

@@ -560,6 +560,15 @@ def sys_is_server()->bool:
 	'''
 	return win32api.GetVersionEx(1)[8] != 1
 
+def sys_start_time()->dtime:
+	r'''
+	Returns system startup time (local time).
+
+		asrt( bmark(sys_start_time), 1_800 )
+
+	'''
+	return dtime.fromtimestamp(psutil.boot_time())
+
 if __name__ == '__main__':
 	_test_reg_key()
 else:

@@ -35,6 +35,7 @@ from collections import namedtuple
 from typing import Callable, Iterator, Iterable, Generator, Any
 from win32com.shell import shell, shellcon
 from pathlib import Path
+import itertools
 from _winapi import CreateJunction
 from .tools import *
 from .tools import _TERMINAL_WIDTH, _SIZE_UNITS
@@ -137,12 +138,10 @@ def path_get(fullpath:str|tuple|list|Iterator, max_len:int=0
 		fullpath = path_long(fullpath)
 	return fullpath
 
-def file_read(fullpath, encoding:str='utf-8', errors:str=None)->str:
+def file_read(fullpath, encoding:str='utf-8', errors:str|None=None)->str|bytes:
 	r'''
-	Returns content of file
-
-	*encoding* - if set to 'binary' then returns bytes.
-	
+	Returns content of file  
+	*encoding* - if set to 'binary' then returns bytes.  
 	'''
 	fullpath = path_get(fullpath)
 	if encoding == 'binary':
@@ -151,6 +150,47 @@ def file_read(fullpath, encoding:str='utf-8', errors:str=None)->str:
 	else:
 		with open(fullpath, 'tr', encoding=encoding, errors=errors) as f:
 			return f.read()
+
+def file_readlines(fullpath, encoding:str='utf-8', errors:str|None=None
+, strip_newlines:bool=True, max_lines:int|None=None
+, skip_first:int|None=None)->Iterator[str] | Iterator[bytes]:
+	r'''
+	Returns a generator yielding lines from the file (memory efficient).  
+	*encoding* - if set to 'binary' then yields bytes lines
+	(with line endings preserved)  
+	*strip_newlines* - when True (default), removes trailing newline
+	characters ('\n', '\r\n') has no effect in binary mode.  
+	*max_lines* - if set, yields at most this many lines
+	(efficient for large files)  
+
+		next(file_readlines(r'c:\Windows\System32\drivers\etc\hosts'))
+
+	Example: read the first 10 lines from the file, process them and 
+	write them to a new file line by line:
+
+		file_writelines(
+			dst_file
+			, (
+				'{} {}'.format( *itemgetter(0, 4)( l.split() ) )
+				for l in file_readlines(fpath, max_lines=10)
+			)
+		)
+	
+	'''
+	fullpath = path_get(fullpath)
+	if encoding == 'binary':
+		with open(fullpath, 'rb') as f:
+			lines_iter = f
+			if max_lines or skip_first:
+				lines_iter = itertools.islice(lines_iter, skip_first, max_lines)
+			yield from lines_iter
+	else:
+		with open(fullpath, 'tr', encoding=encoding, errors=errors) as f:
+			lines_iter = (line.rstrip('\r\n') if strip_newlines
+				else line for line in f)
+			if max_lines or skip_first:
+				lines_iter = itertools.islice(lines_iter, skip_first, max_lines)
+			yield from lines_iter
 
 def file_write(fullpath, content:str
 , encoding:str='utf-8')->str:
@@ -176,6 +216,28 @@ def file_write(fullpath, content:str
 	with open(fullpath, **open_args) as f:
 		f.write(content)
 	return fullpath
+
+def file_writelines(fullpath,lines: list|tuple|Iterator, encoding:str='utf-8'
+, errors:str|None = None, line_ending:str|None|bytes='\n', mode:str='w')->None:
+	r'''
+	Writes an iterable of lines to a file line by line (memory efficient).  
+	*lines*     - iterable of strings (or bytes when encoding='binary')
+	*encoding*  - 'binary' → writes bytes without encoding
+	*line_ending*   - line terminator to use (None = no terminator added)
+				common values: '\n', '\r\n', '' (no extra newline)
+	*mode*      - 'w' (overwrite), 'a' (append), 'x' (create exclusive)
+	'''
+	fullpath = path_get(fullpath)
+	if encoding == 'binary':
+		if isinstance(line_ending, str):
+			line_ending = line_ending.encode('ascii')
+		with open(fullpath, mode + 'b') as f:
+			for line in lines:
+				f.write(line + line_ending)
+	else:
+		with open(fullpath, mode, encoding=encoding, errors=errors, newline='') as f:
+			for line in lines:
+				f.write(line + line_ending)
 
 def file_ext_replace(fullpath, new_ext:str)->str:
 	' Replaces file extension '
@@ -630,7 +692,7 @@ def dir_files(fullpath, subdirs:bool=True, name_only:bool=False
 		)
 		asrt(
 			tuple(dir_files( pdir, name_only=True, in_ext='py') )[0]
-			, 'constants.py'
+			, 'cache.py'
 		)
 		asrt(
 			tuple( dir_files(pdir, ex_ext='pyc') )
@@ -935,7 +997,7 @@ def dir_list(fullpath, subdirs:bool=True, **rules)->Iterator[str]:
 		)
 		asrt(
 			bmark(lambda d: tuple(dir_list(d)), 'log', b_iter=5)
-			, 100_000
+			, 200_000
 		)
 
 	'''
@@ -2031,17 +2093,17 @@ def path_filter(
 		pf = path_filter
 		files = tuple( dir_files((app_dir(), 'plugins')
 		, name_only=True, subdirs=False) )
-		asrt( tuple( pf(files, ex_dir='__pycache__'))[0], 'constants.py')
-		asrt( tuple( pf(files, ex_ext='pyc'))[0], 'constants.py')
+		asrt( tuple( pf(files, ex_dir='__pycache__'))[0], 'cache.py')
+		asrt( tuple( pf(files, ex_ext='pyc'))[0], 'cache.py')
 		asrt( tuple( pf(files, ex_ext='pyc', ex_path='_TOOLS_patc'))[-1], 'winapi.py')
 		asrt( tuple( pf(files, ex_ext=('pyc', 'py') ) ), ())
 		asrt( tuple( pf(files, in_ext='txt' ) ), ())
 		asrt( tuple( pf(files, in_ext='py', ex_path='_TOOLS_patc'))[-1], 'winapi.py')
-		asrt( tuple( pf(files, in_path='constants.py'))[0], 'constants.py')
+		asrt( tuple( pf(files, in_path='cache.py'))[0], 'cache.py')
 		asrt( tuple( pf(files, in_name='crypt') )[0], 'plugin_crypt.py')
 		asrt(
 			tuple( pf(files, in_ext='py', ex_name=('plug', 'const')) )[0]
-			, r'tools.py'
+			, r'cache.py'
 		)
 		asrt(
 			tuple( pf(files, in_rule=lambda p: 'mail' in p ) )
@@ -2049,7 +2111,7 @@ def path_filter(
 		)
 		asrt(
 			tuple( pf(files, ex_rule=lambda p: '_' in p ) )
-			, ('constants.py', 'tools.py', 'winapi.py')
+			, ('cache.py', 'constants.py', 'tools.py', 'winapi.py')
 		)
 		asrt(
 			tuple( pf(files, in_rule=(

@@ -13,7 +13,7 @@ from email.utils import parsedate_to_datetime
 import imaplib
 import mimetypes
 from .tools import Job, job_batch, tdebug \
-, patch_import, dev_print, cache \
+, patch_import, dev_print, cache, is_con \
 , table_print, time_diff_human, exc_text, exc_texts, str_indent, qprint
 from .plugin_filesystem import file_name_fix, file_size_str \
 , var_get, var_set, path_get
@@ -308,10 +308,10 @@ def mail_check(server:str, login:str, password:str
 , folders:list=['inbox'], msg_status:str='UNSEEN'
 , headers:tuple=('subject', 'from', 'to', 'date')
 , silent:bool=True, timeout:int=180)->tuple[ list[MailMsg], list[str] ]:
-	'''
+	r'''
 	Returns list of MailMsg and list of errors.  
 	*headers* - message headers to fetch. You can access them later
-	in MailMsg attributes.  
+	in `MailMsg` attributes.  
 
 	'''
 	msgs:list = []
@@ -360,7 +360,10 @@ def mail_check(server:str, login:str, password:str
 		log(imap.close())
 		log(imap.logout())
 	except:
-		log(f'general exception:{exc_text(_EXC_LINE_LIMIT)}', is_error=True)
+		if is_con():
+			raise
+		else:
+			log(f'general exception:{exc_text(_EXC_LINE_LIMIT)}', is_error=True)
 	return msgs, errors
 
 def _get_last_index(folder:str)->int:
@@ -548,7 +551,7 @@ def mail_download_batch(mailboxes:list, dst_dir:str, timeout:int=3600
 , silent:bool=True)->tuple[ list[MailMsg], list[str] ]:
 	r'''
 	Downloads (or checks) all mailboxes in list of dictionaries
-	with parameters for mail_download or mail_check.  
+	with parameters for `mail_download` or `mail_check`.  
 	In mailboxes *check_only* argument - do not download body
 	, only get headers with **mail_check**.  
 	Returns a list with subjects and boolean warning if too many errors

@@ -17,7 +17,7 @@ To stop server (in cmd):
 
 	%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe kill-server
 
-Add the server to startup:
+Start server:
 
 	%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe start-server
 

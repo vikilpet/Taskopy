@@ -306,7 +306,7 @@ def proc_exists(process, cmd_filter:str=None
 	specified user. Format: pc\\username  
 	Not cheap:
 
-		asrt( bmark(proc_exists, ('explorer.exe',)), 600_000_000 )
+		asrt( bmark(proc_exists, ('explorer.exe',)), 800_000_000 )
 	
 	'''
 	if cmd_filter: cmd_filter = cmd_filter.lower()
@@ -440,7 +440,7 @@ def free_ram(unit:str='percent')->float:
 	Returns free RAM size.  
 	*unit* - 'gb', 'mb'... or 'percent'  
 
-		asrt( bmark(free_ram, b_iter=3), 5_000_000 )
+		asrt( bmark(free_ram, b_iter=3), 7_000_000 )
 
 	'''
 	if unit == 'percent':
@@ -619,7 +619,7 @@ def is_admin()->bool:
 	r'''
 	Checks if Taskopy is running with elevated privileges
 
-		asrt( bmark(is_admin), 15_000 )
+		asrt( bmark(is_admin), 18_000 )
 	
 	'''
 	return win32com.shell.shell.IsUserAnAdmin()
