@@ -37,7 +37,7 @@ from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 from .plugin_process import proc_wait
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 LAN_DOMAINS = ('lan', 'local', 'home')
 _RE_PING_LOSS = re.compile(r'\((\d+)%')
@@ -63,6 +63,8 @@ def http_req(url:str, encoding:str='utf-8'
 	**kwargs tips:**  
 	Skip SSL verification: `verify=False`  
 	Follow redirects: `allow_redirects=True`  
+	Socks proxy: `proxies = {'https': 'socks5h://127.0.0.1:1080'}`  
+	where *h* means to perform DNS queries via proxy  
 
 	Caveats:
 

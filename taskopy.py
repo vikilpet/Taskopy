@@ -103,6 +103,7 @@ TASK_OPTIONS = (
 	, ('_call_count', 0)
 	, ('_last_err', '')
 	, ('_params', {})
+	, ('on_any_key', False)
 )
 _WEEKDAY_HUMAN = {
 	'day': 'day'
@@ -203,7 +204,9 @@ class HookKB:
 		'''
 
 		def _low_level_keyboard_proc(nCode, wParam, lParam):
-			app.que_hook.put((nCode, wParam, lParam))
+			if nCode == 0: app.que_hook.put((wParam, lParam))
+			if nCode != 0:
+				dev_print(f'			NON-ZERO {nCode=}, {wParam=}, {lParam=}')
 			return winapi.user32.CallNextHookEx(self.hook_id, nCode, wParam, lParam)
 
 		self.hook_proc_ref = LowLevelHookProc(_low_level_keyboard_proc)
@@ -222,21 +225,57 @@ CTRL_KEYS = {win32con.VK_LCONTROL, win32con.VK_RCONTROL}
 SHIFT_KEYS = {win32con.VK_LSHIFT, win32con.VK_RSHIFT}
 ALT_KEYS = {win32con.VK_LMENU, win32con.VK_RMENU}
 
+def get_key_name(key: KBDLLHOOKSTRUCT) -> str:
+	"""Returns nice name: 'shift', 'ctrl', 'alt', 'a', 'enter', ..."""
+	
+	vk = key.vkCode
+	scan = key.scanCode
+	extended = bool(key.flags & 0x01)   # LLKHF_EXTENDED
+	if vk in (win32con.VK_RSHIFT, win32con.VK_RCONTROL, win32con.VK_RMENU):
+		extended = False                # ← this is the key fix
+	lparam = (scan << 16)
+	if extended:
+		lparam |= (1 << 24)
+
+	buf = ctypes.create_unicode_buffer(32)
+	length = winapi.user32.GetKeyNameTextW(lparam, buf, len(buf))
+
+	if length > 0:
+		name = buf.value.strip()
+		if len(name) == 1 and name.isalpha():
+			name = name.lower()
+		elif name.lower() in {"shift", "ctrl", "control", "alt", "menu", "win"}:
+			name = name.lower().replace("control", "ctrl")
+
+		return name
+	return f"VK_{vk:02X}"
+
 def hook_consumer(data:tuple):
-	nCode, wParam, lParam = data
-	if nCode == win32con.HC_ACTION and wParam in WM_EVENTS:
+
+	def run_any_key_task():
+		for task in tasks.on_any_key:
+			tasks.run_task(task, caller=CALLER_HOTKEY
+			, data=(key, wParam))
+		
+	wParam, lParam = data
+	if wParam in WM_EVENTS:
 		hook_kb = tasks.hook_kb
 		key = ctypes.cast(lParam, ctypes.POINTER(KBDLLHOOKSTRUCT)).contents
 		if key.vkCode in CTRL_KEYS:
 			hook_kb.ctrl_is_pressed = wParam in DOWN_KEYS
+			run_any_key_task()
 			return
 		if key.vkCode in SHIFT_KEYS:
 			hook_kb.shift_is_pressed = wParam in DOWN_KEYS
+			run_any_key_task()
 			return
 		if key.vkCode in ALT_KEYS:
 			hook_kb.alt_is_pressed = wParam in DOWN_KEYS
+			run_any_key_task()
 			return
-		if not wParam in DOWN_KEYS: return
+		if not wParam in DOWN_KEYS:
+			run_any_key_task()
+			return
 		candidates = tasks.hotkeys_nb.get(key.vkCode, ())
 		for modifiers, task in candidates:
 			if not modifiers:
@@ -259,6 +298,7 @@ def hook_consumer(data:tuple):
 				if hook_kb.alt_is_pressed: continue
 			tasks.run_task(task, caller=CALLER_HOTKEY)
 			break
+		run_any_key_task()
 
 def msg_listener(tasks):
 	r'''
@@ -303,6 +343,7 @@ class Tasks:
 		self.hotkeys_nb:dict = {}
 		self.hook_kb:HookKB = None
 		self.version:str = dtime.now().strftime('%Y.%m.%d %H:%M:%S.%f')
+		self.on_any_key:list = []
 		for task_name in dir(crontab):
 			if task_name.startswith('_'): continue
 			task_obj = getattr(crontab, task_name)
@@ -407,6 +448,8 @@ class Tasks:
 						msg_warn(lang.warn_rule_type.format(
 							task_opts['task_name_full']
 						))
+			if task_opts['on_any_key']:
+				self.on_any_key.append(task_opts['task_func_name'])
 
 		thread_start(self.run_scheduler, err_msg=True
 		, ident='app: scheduler')

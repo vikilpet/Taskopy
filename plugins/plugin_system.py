@@ -569,6 +569,20 @@ def sys_start_time()->dtime:
 	'''
 	return dtime.fromtimestamp(psutil.boot_time())
 
+def sys_is_defender_on()->bool:
+	r'''
+	Is real-time protection is on?  
+	Not cheap:
+
+		asrt( bmark(sys_is_defender_on, b_iter=3), 79_000_000 )
+		
+	'''
+	defender = win32com.client.GetObject('winmgmts:\\\\.\\root\\Microsoft\\Windows\\Defender')
+	status = defender.ExecQuery('SELECT * FROM MSFT_MpComputerStatus')[0]
+	enabled = bool(status.RealTimeProtectionEnabled)
+	defender = None
+	return enabled
+
 if __name__ == '__main__':
 	_test_reg_key()
 else:

@@ -66,7 +66,7 @@ except ModuleNotFoundError:
 	import plugins.cache as cache
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2026-03-15'
+APP_VERSION = 'v2026-04-10'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 if getattr(sys, 'frozen', False):
 	APP_PATH = os.path.dirname(sys.executable)
@@ -147,24 +147,6 @@ class Settings:
 			self.__dict__.setdefault(setname, setval)
 
 
-class DictToObj:
-	''' Converts dictionary to object.
-		Convert back: use vars() built-in function.
-	'''
-	def __init__(self, di:dict):
-		self.__dict__.update(di)
-
-	def __getattr__(self, name):
-		return 'DictToObj - unknown key'
-	
-	def __str__(self)->str:
-		return (
-			self.__class__.__name__ + '('
-			+ ', '.join(f'{k}={v}' for k,v in vars(self).items())
-			+ ')'
-		)
-
-
 class SuppressPrint:
 	r'''
 	Suppresses outputting anything to the console.  
@@ -198,7 +180,8 @@ class TQueue(Queue):
 		q.stop()
 
 	'''
-	def __init__(self, consumer:Callable=print, max_size:int=4096)->None:
+	def __init__(self, consumer:Callable=lambda v: qprint(v)
+	, max_size:int=4096)->None:
 		super().__init__(maxsize=max_size)
 		self._stop_sentinel:object = object()
 		self.consumer:Callable=consumer
@@ -457,6 +440,7 @@ def time_str(template:str=tcon.DATE_STR_FILE
 		time_val = datetime.date.today() - datetime.timedelta(days=1)
 		asrt( bmark(time_str), 43573 )
 
+	Print all timezones: `print(*pytz.all_timezones, sep='\n')`
 	'''
 	if timezone == 'utc':
 		timezone = pytz.utc

@@ -1,11 +1,10 @@
 import subprocess
-import threading
 import os
-import sys
 import ctypes
 import psutil
 import time
 from typing import Iterable
+import functools
 from dataclasses import dataclass
 import win32gui
 import win32api
@@ -23,10 +22,9 @@ import winerror
 import pywintypes
 import ctypes
 from ctypes import wintypes
-
-from .tools import DictToObj, dev_print, msgbox, tprint, patch_import \
-, thread_start, str_short, _SIZE_UNITS, winapi
-from .plugin_filesystem import path_exists, path_get
+from .tools import dev_print, tprint, patch_import \
+, thread_start, _SIZE_UNITS, winapi, cache, is_con
+from .plugin_filesystem import path_get
 from .plugin_system import win_list_top, win_get
 
 # https://psutil.readthedocs.io/en/latest/
@@ -336,57 +334,84 @@ def proc_exists(process, cmd_filter:str=None
 			dev_print(f'proc_exists access denied: {process}')
 	return False
 
-def proc_list(name:str='', cmd_filter:str=None
-, ad_value=None)->list:
+
+@dataclass
+class Process:
+	_proc:psutil.Process
+	sessionid:int = -1
+	strip_pc:bool=True
+
+	def _safe(self, method:str, default=None):
+		try:
+			return getattr(self._proc, method)()
+		except Exception as exc:
+			return default
+
+	@functools.cached_property
+	def pid(self)->int:
+		return self._proc.pid
+	
+	@functools.cached_property
+	def cmdline_list(self)->list[str]:
+		' Command line as a list '
+		return self._safe('cmdline', [])
+	
+	@functools.cached_property
+	def cmdline(self)->str:
+		' Command line as a string'
+		return ' '.join(self.cmdline_list)
+
+	@functools.cached_property
+	def name(self)->str:
+		' Process exe name '
+		return self._safe('name')
+	
+	@functools.cached_property
+	def username(self)->str:
+		if self.strip_pc:
+			return self._safe('username').split('\\')[1]
+		else:
+			return self._safe('username')
+
+	@functools.cached_property
+	def fullpath(self)->str:
+		' Full path to the exe file '
+		return self._safe('exe')
+	def uptime(self)->float:
+		' Uptime in seconds '
+		return time.time() - self._safe('create_time')
+	
+	def kill(self):
+		' Kill the current process with SIGKILL '
+		return self._proc.kill()
+
+
+def proc_list(name:str='', cmd_filter:str=''
+, strip_pc:bool=True)->list[Process]:
 	r'''
-	Returns list of DictToObj with process information.
-	*name* - image name. If not specified then list all
+	Returns list of `Process` objects.  
+	*name* - image name (case-insensitive). If not specified then list all
 	processes.  
 	*cmd_filter* - a substring to look for in command
-	line (case-insensitive).
+	line (case-insensitive).  
 
-	Note: while iterating through the process list, the
-	process may cease to exist.  
-	
-	Process information includes: pid:int, name:str
-	, username:str, fullpath:str, cmdline:list
-	, cmdline_str:str.
+		asrt( bmark( lambda: len(proc_list()), b_iter=3), 760_000_000 )
 
-        *ad_value* - is the value which gets assigned in case
-        AccessDenied or ZombieProcess exception is raised when
-        retrieving that particular process information.
-
-		You may need admin rights to read info for every
-		process.
-		All strings in lowercase.
-	
 	'''
-	ATTRS=['pid', 'name', 'username', 'exe', 'cmdline']
+	result:list[Process] = []
 	name = name.lower()
 	if cmd_filter: cmd_filter = cmd_filter.lower()
-	proc_list = []
-	for proc in psutil.process_iter():
+	for psproc in psutil.process_iter():
+		proc = Process(_proc=psproc, strip_pc=strip_pc)
 		if name:
 			try:
-				if proc.name().lower() != name: continue
+				if proc.name.lower() != name: continue
 			except psutil.AccessDenied as e:
 				dev_print('proc_list error: ' + repr(e))
-		di = proc.as_dict(attrs=ATTRS, ad_value=ad_value)
-		for key in di:
-			if isinstance(di[key], str):
-				di[key] = di[key].lower()
-		if di['cmdline']:
-			li = [i.lower() for i in di['cmdline']]
-			di['cmdline'] = li
-			di['cmdline_str'] = ' '.join(li)
-			if cmd_filter:
-				if not cmd_filter in di['cmdline_str']:
-					continue
-		if di['username']:
-			di['username'] = di['username'].split('\\')[1]
-		di['fullpath'] = di.get('exe', None)
-		proc_list.append( DictToObj(di) )
-	return proc_list
+		if cmd_filter:
+			if not cmd_filter in proc.cmdline.lower(): continue
+		result.append(proc)
+	return result
 
 def proc_cpu(process, interval:float=1.0)->float:
 	r'''
@@ -559,30 +584,21 @@ def wts_logoff(sessionid:int, wait:bool=False)->int:
 	If the function fails, the return value is zero.
 	'''
 	return win32ts.WTSLogoffSession(0, sessionid, wait)
-	
-def wts_proc_list(process:str=None)->list:
-	'''
-	Returns list of DictToObj objects with properties:
-	.sessionid:int, .pid:int, .process:str (name of exe file)
-	, .pysid:obj, .username:str, .cmdline:list  
-	*process* - filter by process name.
+
+def wts_proc_list(process:str='', strip_pc:bool=True)->list[Process]:
+	r'''
+	Returns list of `Process` objects with additional *sessionid* property.  
 	'''
 	if process: process = process.lower()
-	proc_tup = win32ts.WTSEnumerateProcesses()
-	proc_li = []
-	for tup in proc_tup:
+	result:list[Process] = []
+	for tup in win32ts.WTSEnumerateProcesses():
+		sessionid, pid, name, pysid = tup
 		if process:
-			if tup[2].lower() != process: continue
-		di = {}
-		di['sessionid'], di['pid'], di['process'], _ = tup
-		di['process'] = di['process'].lower()
-		proc = psutil.Process(di['pid'])
-		di['username'] = proc.username()
-		if di['username']:
-			di['username'] = di['username'].split('\\')[1].lower()
-		di['cmdline'] = proc.cmdline()
-		proc_li.append(DictToObj(di))
-	return proc_li
+			if name.lower() != process: continue
+		proc = Process(_proc = psutil.Process(pid), strip_pc=strip_pc)
+		proc.sessionid = sessionid
+		result.append(proc)
+	return result
 
 def service_running(service:str)->bool:
 	'''Returns True if servise is running.'''
@@ -901,6 +917,7 @@ def proc_fpath_by_win(window)->str:
 	Finds the process full path by window.  
 
 		asrt( proc_fpath_by_win('Taskopy').endswith('py.exe'), True )
+		asrt( bmark(proc_fpath_by_win, ('Taskopy*',)), 4_500_000 )
 
 	'''
 	if not (hwnd := win_get(window) ): return ''
