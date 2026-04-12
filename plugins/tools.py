@@ -12,7 +12,7 @@ import psutil
 import sqlite3
 import json
 import subprocess
-from win32process import GetCurrentProcessId as _GetCurrentProcessId
+import win32process
 import win32api
 import win32evtlog
 import win32gui
@@ -66,7 +66,7 @@ except ModuleNotFoundError:
 	import plugins.cache as cache
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2026-04-10'
+APP_VERSION = 'v2026-04-12'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 if getattr(sys, 'frozen', False):
 	APP_PATH = os.path.dirname(sys.executable)
@@ -544,7 +544,7 @@ def time_diff_human(start:dtime|float|tdelta, end:dtime|None|float=None
 	*start* and *end*: *datetime* or timestamp as float.  
 	*with_ms* - include milliseconds in the result even
 	if they are 0 (for clarity)  
-	*short* - only first two units otherwise full like '6h:54m'  
+	*short* - only first two units otherwise full like '6h:54m:30s'  
 
 		tn = dtime.now()
 		asrt( bmark( time_diff_human, (tn,) ), 3_000 )
@@ -1159,17 +1159,17 @@ def dir_dialog(title:str=None, default_dir:str='', on_top:bool=True
 	return fullpath
 random_num = random.randint
 
-def random_str(string_len:int=10, string_source:str=None)->str:
-	''' Generate a random string of fixed length
+def random_str(string_len:int=10, string_source:str|None=None)->str:
+	r'''
+	Generates a random string of fixed length
 	'''
-	if not string_source:
+	if string_source is None:
 		string_source = string.ascii_letters + string.digits
-	return ''.join(
-		random.choice(string_source) for i in range(string_len)
-	)
+	return ''.join( random.choice(string_source) for _ in range(string_len) )
 
 def app_icon_text_set(text:str=APP_FULLNAME):
-	''' Set hint text for taskbar icon.
+	r'''
+	Set hint text for taskbar icon.
 	'''
 	global app
 	app.taskbaricon.set_icon(text=text)
@@ -2173,7 +2173,8 @@ def _thread_pop(src:str, thread_id:int):
 
 def thread_start(func, args:tuple=(), kwargs:dict={}
 , is_daemon:bool=True, err_msg:bool=False, ident:str=''
-, err_action:Callable|None=None)->threading.Thread:
+, err_action:Callable|None=None
+, priority:int=win32con.THREAD_PRIORITY_NORMAL)->threading.Thread:
 	r'''
 	Runs function in a thread. Returns thread object  
 	*is_daemon* - thread runs in the background and is terminated
@@ -2221,7 +2222,41 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 	thread = threading.Thread(target=wrapper, daemon=is_daemon
 	, name=func.__name__)
 	thread.start()
+	if priority != win32con.THREAD_PRIORITY_NORMAL:
+		thread_priority_set(thread.native_id, priority=priority)
 	return thread
+
+def thread_priority_get(native_id:int|None=None)->None|int:
+	r'''
+	Gets own thread priority.  
+	*native_id* - a `threading.Thread().native_id`.  
+	You can use the `tcon.THREAD_PRIORITY` for human-readable string:
+
+		qprint( tcon.THREAD_PRIORITY.get(thread_priority_get()) )
+		asrt( bmark(thread_priority_get), 8_800 )
+		
+	'''
+	if native_id is None: native_id = win32api.GetCurrentThreadId()
+	handle = win32api.OpenThread(win32con.THREAD_QUERY_INFORMATION
+	, False, native_id)
+	if not handle:
+		dev_print(f'Failed to open thread handle: {native_id}')
+		return None
+	try:
+		return win32process.GetThreadPriority(handle)
+	finally:
+		win32api.CloseHandle(handle)
+
+def thread_priority_set(native_id:int, priority:int):
+	r'''
+	Sets own thread priority.  
+	*native_id* - a `threading.Thread().native_id`  
+	*priority* - a constant like `win32con.THREAD_PRIORITY_NORMAL`  
+	'''
+	handle = win32api.OpenThread(win32con.THREAD_SET_INFORMATION, False
+	, native_id)
+	win32process.SetThreadPriority(handle, priority)
+	win32api.CloseHandle(handle)
 
 def task_start(taskname:str|Callable, **kwargs):
 	r'''
@@ -3248,7 +3283,7 @@ def _init():
 	setattr(app, 'que_log', TQueue(consumer=lambda t: None) )
 	setattr(app, 'dir', os.getcwd())
 	setattr(app, 'app_threads', {})
-	setattr(app, 'app_pid', _GetCurrentProcessId())
+	setattr(app, 'app_pid', win32process.GetCurrentProcessId())
 	setattr(app, 'cmd_args', argparse.Namespace(dev=True))
 	setattr(app, 'tasks', {})
 	__builtins__['app'] = app

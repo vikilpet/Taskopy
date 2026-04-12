@@ -149,43 +149,7 @@ sett:Settings = Settings(ini_file='')
 lang:Language = None
 
 PLUGIN_SOURCE = 'plugins\\*.py'
-class OVERLAPPED(ctypes.Structure):
-	_fields_ = [
-		('Internal', ctypes.wintypes.LPVOID),
-		('InternalHigh', ctypes.wintypes.LPVOID),
-		('Offset', ctypes.wintypes.DWORD),
-		('OffsetHigh', ctypes.wintypes.DWORD),
-		('Pointer', ctypes.wintypes.LPVOID),
-		('hEvent', ctypes.wintypes.HANDLE),
-	]
 
-
-def _errcheck_bool(value, func, args):
-	if not value:
-		raise ctypes.WinError()
-	return args
-
-CancelIoEx = winapi.kernel32.CancelIoEx
-CancelIoEx.restype = ctypes.wintypes.BOOL
-CancelIoEx.errcheck = _errcheck_bool
-CancelIoEx.argtypes = (
-	ctypes.wintypes.HANDLE,  # hObject
-	ctypes.POINTER(OVERLAPPED)  # lpOverlapped
-)
-class KBDLLHOOKSTRUCT(ctypes.Structure):
-	_fields_ = [
-		('vkCode',     ctypes.wintypes.DWORD),
-		('scanCode',   ctypes.wintypes.DWORD),
-		('flags',      ctypes.wintypes.DWORD),
-		('time',       ctypes.wintypes.DWORD),
-		('dwExtraInfo',ctypes.POINTER(ctypes.wintypes.ULONG)),
-	]
-LowLevelHookProc = ctypes.WINFUNCTYPE(
-	ctypes.wintypes.LPARAM,  # return LRESULT
-	ctypes.c_int,            # nCode
-	ctypes.wintypes.WPARAM,  # wParam
-	ctypes.wintypes.LPARAM,  # lParam (pointer to KBDLLHOOKSTRUCT)
-)
 
 
 class HookKB:
@@ -194,22 +158,22 @@ class HookKB:
 		self.hook_id = None
 		self.hook_proc_ref = None
 		self.tid:int = 0
-		self.shift_is_pressed = False
-		self.ctrl_is_pressed = False
-		self.alt_is_pressed = False
+		self.shift_is_pressed:bool = False
+		self.ctrl_is_pressed:bool = False
+		self.alt_is_pressed:bool = False
 	
 	def install_hook(self):
 		r'''
-		Installs a WH_KEYBOARD_LL hook that watches for hotkeys.
+		Installs a `WH_KEYBOARD_LL` hook that watches for hotkeys.
 		'''
 
 		def _low_level_keyboard_proc(nCode, wParam, lParam):
-			if nCode == 0: app.que_hook.put((wParam, lParam))
-			if nCode != 0:
-				dev_print(f'			NON-ZERO {nCode=}, {wParam=}, {lParam=}')
-			return winapi.user32.CallNextHookEx(self.hook_id, nCode, wParam, lParam)
+			if nCode == win32con.HC_ACTION:
+				app.que_hook.put((wParam, lParam))
+			return winapi.user32.CallNextHookEx(0, nCode
+			, wParam, lParam)
 
-		self.hook_proc_ref = LowLevelHookProc(_low_level_keyboard_proc)
+		self.hook_proc_ref = winapi.LowLevelHookProc(_low_level_keyboard_proc)
 		module_handle = winapi.kernel32.GetModuleHandleW(None)
 		self.hook_id = winapi.user32.SetWindowsHookExW(
 			win32con.WH_KEYBOARD_LL
@@ -220,35 +184,9 @@ class HookKB:
 		if not self.hook_id: raise Exception(winapi.get_last_error())
 
 WM_EVENTS = {WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP}
-DOWN_KEYS = {WM_KEYDOWN, WM_SYSKEYDOWN}
 CTRL_KEYS = {win32con.VK_LCONTROL, win32con.VK_RCONTROL}
 SHIFT_KEYS = {win32con.VK_LSHIFT, win32con.VK_RSHIFT}
 ALT_KEYS = {win32con.VK_LMENU, win32con.VK_RMENU}
-
-def get_key_name(key: KBDLLHOOKSTRUCT) -> str:
-	"""Returns nice name: 'shift', 'ctrl', 'alt', 'a', 'enter', ..."""
-	
-	vk = key.vkCode
-	scan = key.scanCode
-	extended = bool(key.flags & 0x01)   # LLKHF_EXTENDED
-	if vk in (win32con.VK_RSHIFT, win32con.VK_RCONTROL, win32con.VK_RMENU):
-		extended = False                # ← this is the key fix
-	lparam = (scan << 16)
-	if extended:
-		lparam |= (1 << 24)
-
-	buf = ctypes.create_unicode_buffer(32)
-	length = winapi.user32.GetKeyNameTextW(lparam, buf, len(buf))
-
-	if length > 0:
-		name = buf.value.strip()
-		if len(name) == 1 and name.isalpha():
-			name = name.lower()
-		elif name.lower() in {"shift", "ctrl", "control", "alt", "menu", "win"}:
-			name = name.lower().replace("control", "ctrl")
-
-		return name
-	return f"VK_{vk:02X}"
 
 def hook_consumer(data:tuple):
 
@@ -256,49 +194,51 @@ def hook_consumer(data:tuple):
 		for task in tasks.on_any_key:
 			tasks.run_task(task, caller=CALLER_HOTKEY
 			, data=(key, wParam))
-		
+
 	wParam, lParam = data
-	if wParam in WM_EVENTS:
-		hook_kb = tasks.hook_kb
-		key = ctypes.cast(lParam, ctypes.POINTER(KBDLLHOOKSTRUCT)).contents
-		if key.vkCode in CTRL_KEYS:
-			hook_kb.ctrl_is_pressed = wParam in DOWN_KEYS
-			run_any_key_task()
-			return
-		if key.vkCode in SHIFT_KEYS:
-			hook_kb.shift_is_pressed = wParam in DOWN_KEYS
-			run_any_key_task()
-			return
-		if key.vkCode in ALT_KEYS:
-			hook_kb.alt_is_pressed = wParam in DOWN_KEYS
-			run_any_key_task()
-			return
-		if not wParam in DOWN_KEYS:
-			run_any_key_task()
-			return
-		candidates = tasks.hotkeys_nb.get(key.vkCode, ())
-		for modifiers, task in candidates:
-			if not modifiers:
-				if hook_kb.shift_is_pressed or hook_kb.ctrl_is_pressed \
-				or hook_kb.alt_is_pressed:
-					continue
-				tasks.run_task(task, caller=CALLER_HOTKEY)
-				break
-			if VK_CONTROL in modifiers:
-				if not hook_kb.ctrl_is_pressed: continue
-			else:
-				if hook_kb.ctrl_is_pressed: continue
-			if VK_SHIFT in modifiers:
-				if not hook_kb.shift_is_pressed: continue
-			else:
-				if hook_kb.shift_is_pressed: continue
-			if VK_MENU in modifiers:
-				if not hook_kb.alt_is_pressed: continue
-			else:
-				if hook_kb.alt_is_pressed: continue
+	if not wParam in WM_EVENTS: return
+	key = ctypes.cast(lParam, ctypes.POINTER(winapi.KBDLLHOOKSTRUCT)).contents
+	if key.flags & (win32con.LLKHF_INJECTED | win32con.LLKHF_LOWER_IL_INJECTED):
+		return
+	hook_kb = tasks.hook_kb
+	if key.vkCode in CTRL_KEYS:
+		hook_kb.ctrl_is_pressed = wParam in KEY_DOWN
+		run_any_key_task()
+		return
+	if key.vkCode in SHIFT_KEYS:
+		hook_kb.shift_is_pressed = wParam in KEY_DOWN
+		run_any_key_task()
+		return
+	if key.vkCode in ALT_KEYS:
+		hook_kb.alt_is_pressed = wParam in KEY_DOWN
+		run_any_key_task()
+		return
+	if not wParam in KEY_DOWN:
+		run_any_key_task()
+		return
+	candidates = tasks.hotkeys_nb.get(key.vkCode, ())
+	for modifiers, task in candidates:
+		if not modifiers:
+			if hook_kb.shift_is_pressed or hook_kb.ctrl_is_pressed \
+			or hook_kb.alt_is_pressed:
+				continue
 			tasks.run_task(task, caller=CALLER_HOTKEY)
 			break
-		run_any_key_task()
+		if VK_CONTROL in modifiers:
+			if not hook_kb.ctrl_is_pressed: continue
+		else:
+			if hook_kb.ctrl_is_pressed: continue
+		if VK_SHIFT in modifiers:
+			if not hook_kb.shift_is_pressed: continue
+		else:
+			if hook_kb.shift_is_pressed: continue
+		if VK_MENU in modifiers:
+			if not hook_kb.alt_is_pressed: continue
+		else:
+			if hook_kb.alt_is_pressed: continue
+		tasks.run_task(task, caller=CALLER_HOTKEY)
+		break
+	run_any_key_task()
 
 def msg_listener(tasks):
 	r'''
@@ -478,8 +418,13 @@ class Tasks:
 			thread_start(http_server_start, args=(self,), err_msg=True
 			, ident='app: http server')
 		if self.hotkeys_nb:
-			thread_start(msg_listener, args=(self,), err_msg=True
-			, ident='app: msg listener')
+			thread_start(
+				msg_listener
+				, args=(self,)
+				, err_msg=True
+				, ident='app: msg listener'
+				, priority=win32con.THREAD_PRIORITY_ABOVE_NORMAL
+			)
 		if is_dev():
 			ttprint(f'total number of tasks: {len(self.task_dict)}')
 
@@ -1030,7 +975,7 @@ class Tasks:
 		for hDir, dir_path in tuple(self.dir_change_stop.items()):
 			msg = [dir_path]
 			try:
-				CancelIoEx(hDir.handle, None)
+				winapi.CancelIoEx(hDir.handle, None)
 			except OSError as err:
 				if err.winerror == 1168:
 					msg.append(f'{err.strerror} ({err.winerror})')
@@ -1204,6 +1149,7 @@ def load_modules(with_cache:bool=False):
 				setattr(crontab, obj_name, decor_except_status(obj))
 		sys.modules[mdl_name] = mdl
 
+
 class Task:
 	def __init__(self):
 		self.name:str = ''
@@ -1239,6 +1185,7 @@ def create_menu_item(menu, task, func=None, parent_menu=None):
 	else:
 		menu.Bind(wx.EVT_MENU, func, id=item.GetId())
 	menu.Append(item)
+
 
 class TaskBarIcon(wx.adv.TaskBarIcon):
 	def __init__(self, frame):
@@ -1474,6 +1421,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		is_exit = self.on_exit()
 		if not force and not is_exit: return
 		file_open(fpath, parameters=args)
+
 
 class App(wx.App):
 

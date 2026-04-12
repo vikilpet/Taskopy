@@ -5,7 +5,8 @@ import win32con
 import keyboard
 from collections import namedtuple
 try:
-	from .tools import warning, patch_import, qprint, value_to_unit
+	from .tools import warning, patch_import, qprint, value_to_unit \
+	, tcon
 	import plugins.winapi as winapi
 except ImportError:
 	warning = print
@@ -190,8 +191,62 @@ def key_release_wait(keys:str, timeout='10 ms'):
 			time.sleep(timeout)
 		else:
 			break
-		
 
+def key_name(key)->str:
+	r'''
+	Returns nice name: 'shift', 'ctrl', 'alt', 'a', 'enter', ...
+	The difference between the right and left keys is ignored.  
+	*key* - `winapi.KBDLLHOOKSTRUCT` instance.  
+	'''
+	key:winapi.KBDLLHOOKSTRUCT
+	vk = key.vkCode
+	scan = key.scanCode
+	extended = bool(key.flags & 0x01)
+	if vk in (win32con.VK_RSHIFT, win32con.VK_RCONTROL, win32con.VK_RMENU):
+		extended = False
+	if 0x41 <= vk <= 0x5A:
+		return chr(vk).lower()
+	if 0x30 <= vk <= 0x39:
+		return chr(vk)
+	oem_map = {
+		tcon.VK_OEM_1:      ';',
+		tcon.VK_OEM_2:      '/',
+		tcon.VK_OEM_3:      '`',
+		tcon.VK_OEM_4:      '[',
+		tcon.VK_OEM_5:      '\\',
+		tcon.VK_OEM_6:      ']',
+		tcon.VK_OEM_7:      "'",
+		tcon.VK_OEM_PLUS:   '=',
+		tcon.VK_OEM_MINUS:  '-',
+		tcon.VK_OEM_PERIOD: '.',
+		tcon.VK_OEM_COMMA:  ',',
+		tcon.VK_OEM_102:    '<',
+	}
+	if vk in oem_map: return oem_map[vk]
+	lparam_raw = ((scan << 16) | (int(extended) << 24)) & 0xFFFFFFFF
+	if lparam_raw & 0x80000000:
+		lparam = lparam_raw - 0x100000000
+	else:
+		lparam = lparam_raw
+	buf = ctypes.create_unicode_buffer(64)
+	length = winapi.user32.GetKeyNameTextW(
+			ctypes.c_long(lparam),
+			buf,
+			len(buf)
+		)
+	if length > 0:
+		name = buf.value.strip()
+		if len(name) == 1:
+			name = name.lower()
+		else:
+			name = (
+				name.lower()
+				.replace('control', 'ctrl')
+				.replace('right ', '')
+				.replace('left ', '')
+			)
+		return name
+	return f'VK_{vk:02X}'
 
 if __name__ == '__main__':
 	r'''
