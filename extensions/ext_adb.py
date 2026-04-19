@@ -278,4 +278,17 @@ def adb_server_restart(**kwargs)->tuple[bool, str]:
 		return False, data
 	return True, data
 
+def adb_is_locked(dev_id:str)->tuple[bool, bool|str]:
+	r'''
+	Is device locked?  
+	'''
+	status, data = adb_run('shell dumpsys window', dev_id=dev_id)
+	if not status:
+		if is_con(): tprint('status is False:' + str_indent(data))
+		return False, data
+	if not 'mDreamingLockscreen' in data:
+		if is_con(): tprint('not found:', str_indent(data))
+		return False, data
+	return True, 'mDreamingLockscreen=true' in data
+
 if __name__ != '__main__': patch_import()

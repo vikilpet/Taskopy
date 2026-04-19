@@ -6,6 +6,8 @@ ntdll = ctypes.WinDLL('ntdll', use_last_error=True)
 kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
 advapi32 = ctypes.WinDLL('advapi32', use_last_error=True)
 comctl32 = ctypes.WinDLL('comctl32', use_last_error=True)
+import ctypes
+from ctypes import wintypes
 
 
 class OVERLAPPED(ctypes.Structure):

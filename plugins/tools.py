@@ -43,7 +43,8 @@ import argparse
 from typing import Callable, Iterable 
 from dataclasses import dataclass, field, asdict, is_dataclass as is_dclass
 import dataclasses as dclass
-from queue import Queue, SimpleQueue
+from queue import Queue
+import queue
 from itertools import zip_longest
 import pythoncom
 import wx
@@ -55,7 +56,6 @@ import unicodedata
 import multiprocessing
 from xml.etree import ElementTree as _ElementTree
 import windows_toasts as wtoasts
-import weakref
 try:
 	import constants as tcon
 	import winapi
@@ -66,7 +66,7 @@ except ModuleNotFoundError:
 	import plugins.cache as cache
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2026-04-12'
+APP_VERSION = 'v2026-04-19'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 if getattr(sys, 'frozen', False):
 	APP_PATH = os.path.dirname(sys.executable)
@@ -78,10 +78,10 @@ else:
 APP_ICON = os.path.join(APP_PATH, r'resources\icon.png')
 APP_ICON_DIS = os.path.join(APP_PATH, r'resources\icon_dis.png')
 APP_ICON_ICO = os.path.join(APP_PATH, r'resources\icon.ico')
-_app_log:list[tuple[str, str]] = []
+
 _APP_LOG_LIMIT:int = 10_000
-_SIZE_UNITS = {'tb': 1_099_511_627_776, 'gb': 1_073_741_824
-, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
+_SIZE_UNITS = {'pb': 1_125_899_906_842_624, 'tb': 1_099_511_627_776
+, 'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 
 _DEFAULT_INI = r'''[General]
 language=en
@@ -109,6 +109,7 @@ _TERMINAL_WIDTH = os.get_terminal_size().columns - 1
 TASK_ATTR:str = '__is_task__'
 if (lambda: False)(): gdic:dict = {}
 _MAIN_PID = os.getpid()
+_ITS_CONSOLE:str = '<console>'
 
 
 class Settings:
@@ -196,11 +197,20 @@ class TQueue(Queue):
 			try:
 				self.consumer(item)
 			except:
-				qprint(self.consumer.__name__, 'exception:', exc_text(3))
+				dev_print(self.consumer.__name__
+				, 'exception:' + str_indent(exc_text(3) ) )
 			self.task_done()
 	
-	def stop(self):
-		' Stop consumer thread '
+	def stop(self, timeout:float=0.0, polling_interval:float=0.001):
+		r'''
+		Stop consumer thread  
+		*timeout* - we'll wait this many seconds until the queue clears.  
+		'''
+		if timeout:
+			start = time.time()
+			while not self.empty():
+				if time.time() - start >= timeout: break
+				time.sleep(polling_interval)
 		self.put(self._stop_sentinel)
 class _BmarkInt(int): pass
 
@@ -247,52 +257,74 @@ def value_to_unit(value, unit:str='sec', unit_dict:dict=None
 	else:
 		raise Exception('Wrong value')
 
-def _get_parents()->list:
+def _get_parents(limit:int=6)->list:
 	' Returns a list with parent functions '
-	SKIP_LIST = ('thread_start', '<module>', '__init__')
+	SKIP_LIST = {'thread_start', '<module>', '__init__'}
 	parents = []
-	for lvl in range(1, 10):
+	for lvl in range(1, limit):
 		try:
 			parent = sys._getframe(lvl).f_code.co_name
 			if parent in SKIP_LIST: continue
 			parents.append(parent)
 		except ValueError:
 			break
+	parents.reverse()
 	return parents
 
 _TASK_NAME_SKIP = {'tprint', 'dev_print', 'tdebug', 'con_log', 'dialog'
 , 'msgbox', 'inputbox', 'file_dialog', 'dir_dialog', 'wrapper'
-, 'run', '_bootstrap', '_bootstrap_inner'}
+, 'run', '_bootstrap', '_bootstrap_inner', '<module>'}
 
-def task_name(is_human:bool=False)->str:
+def task_name(is_human:bool=False, with_parent:bool=False)->str:
 	r'''
 	Gets the name of the task from which it was called.  
+	*with_parent* - get also the first function in stack.  
 
-		asrt( bmark(task_name), 1500 )
+		asrt( bmark(task_name), 5_000 )
 
 	'''
 	MAX_LVL = 30
 	global _TASK_NAME_SKIP
-	tname = ''
-	first_name = ''
+
+	def get_parent()->str:
+		r'''
+		We know that it's a somewhat last resort so it's better
+		to include the file name.
+		'''
+		parent:str = ''
+		for lvl in range(2, MAX_LVL):
+			frame = sys._getframe(lvl)
+			module_name = (frame.f_code.co_filename.rsplit('\\', 1)[-1]
+				.rsplit('/', 1)[-1]
+				.rsplit('.', 1)[0])
+			funame = frame.f_code.co_name
+			if not funame in _TASK_NAME_SKIP:
+				parent = module_name + '.' + funame
+				break
+		return parent
+
+	tname:str = ''
+	parent:str = ''
 	try:
 		tasks = set(app.tasks.task_dict.keys())
 	except NameError:
 		return ''
 	except AttributeError:
-		return '<console>'
+		return get_parent()
 	except:
 		return ''
 	for lvl in range(1, MAX_LVL):
 		try:
-			fn = sys._getframe(lvl).f_code.co_name
-			if fn in tasks:
-				tname = fn
+			funame = sys._getframe(lvl).f_code.co_name
+			if funame in tasks:
+				tname = funame
+				if with_parent and parent:
+					tname = tname + '>' + parent
 				break
-			if not first_name:
-				if not fn in _TASK_NAME_SKIP: first_name = fn
+			if not parent:
+				if not funame in _TASK_NAME_SKIP: parent = funame
 		except ValueError:
-			tname = first_name if first_name else APP_NAME
+			tname = parent or APP_NAME
 			break
 	else:
 		pass
@@ -324,12 +356,12 @@ def sound_play(sound:str|tuple|list|set, wait=False):
 
 def dev_print(*msg, **kwargs):
 	r'''
-	For debug.
+	For debug purposes.
 
-		asrt( bmark(lambda: dev_print('bench'), b_iter=3), 30_000 )
+		asrt( bmark(lambda: dev_print('bench'), b_iter=3), 90_000 )
 	
 	'''
-	if is_dev() or is_con(): tprint(*msg, **kwargs)
+	if is_dev() or is_con(): tprint(*msg, with_parent=True, **kwargs)
 
 @functools.cache
 def is_dev()->bool:
@@ -343,35 +375,36 @@ def is_dev()->bool:
 		return hasattr(sys, 'ps1') or app.cmd_args.dev
 	except (NameError, AttributeError):
 		return True
-_log_cur_file:tuple = ()
 
 def _log_file(msg:str, fname:str):
 	r'''
 	Append the string to a log file.  
 	*fname* - log file name.  
 	'''
-	global _log_cur_file
 	file_obj = None
-	if _log_cur_file:
-		if fname == _log_cur_file[0]:
-			file_obj = _log_cur_file[1]
+	if app.log_file:
+		if fname == app.log_file[0]:
+			file_obj = app.log_file[1]
 		else:
 			try:
-				_log_cur_file[1].close()
+				app.log_file[1].close()
 			except Exception as err:
-				tprint(f'error closing log file: {repr(err)}', tname='app')
+				tprint(f'error closing previous log file: {repr(err)}'
+				, tname='app')
 	if not file_obj:
 		for _ in (1, 2):
 			try:
 				file_obj = open(f'{app.dir}\\log\\{fname}.log', 'ta+'
 				, encoding='utf-8', buffering=1)
+				break
 			except FileNotFoundError:
+				dev_print('make log dir')
 				os.makedirs( app.dir + '\\log' )
 				continue
 			except:
 				qprint(f'error opening log file: {exc_text()}')
 				return
-		_log_cur_file = (fname, file_obj)
+		app.log_file = (fname, file_obj)
 	try:
 		file_obj.write(msg)
 	except Exception as err:
@@ -379,10 +412,10 @@ def _log_file(msg:str, fname:str):
 		return
 
 def _tlog(now_msgs:tuple[dtime, tuple]):
-	global _app_log
+	log_memory:list = app.log_memory
 	msg = ' '.join(map(str, now_msgs[1]))
-	_app_log.append((now_msgs[0].replace(microsecond=0).isoformat(), msg))
-	del _app_log[:-_APP_LOG_LIMIT]
+	log_memory.append((now_msgs[0].replace(microsecond=0).isoformat(), msg))
+	del log_memory[:-_APP_LOG_LIMIT]
 	msg = now_msgs[0].strftime(_LOG_TIME_FORMAT) + ' ' + msg + '\n'
 	fname = now_msgs[0].strftime(sett.log_file_name)
 	_log_file(msg=msg, fname=fname)
@@ -1021,11 +1054,13 @@ def attach_thread_input_foreground(hwnd):
 		winapi.user32.SetForegroundWindow(hwnd)
 
 def inputbox(message:str, title:str='', is_pwd:bool=False, default:str=''
-, multiline:bool=False, topmost:bool=True)->str|None:
+, multiline:bool=False, topmost:bool=True
+, lang:str='')->str|None:
 	r'''
 	Request input from user.  
 	Returns `None` on cancel.  
-	*is_pwd* - use password dialog (hide input).
+	*is_pwd* - use password dialog (hide input).  
+	*lang* - switch keyboard to specific language like 'en-us'.  
 	'''
 	if is_con():
 		if is_pwd:
@@ -1039,6 +1074,9 @@ def inputbox(message:str, title:str='', is_pwd:bool=False, default:str=''
 		title = str(title)
 	result = [None]
 	done_event = threading.Event()
+	if lang:
+		from plugins.plugin_system import sys_kboard_lang_set, sys_kboard_lang_get
+		sys_kboard_lang_set(lang)
 
 	def show_dialog():
 		' This runs entirely in the main GUI thread.'
@@ -1063,38 +1101,6 @@ def inputbox(message:str, title:str='', is_pwd:bool=False, default:str=''
 	app.que_wxdialog.put_nowait(show_dialog)
 	done_event.wait()
 	return result[0]
-
-
-
-
-
-
-
-
-
-	if is_pwd:
-		box_func = wx.PasswordEntryDialog
-	else:
-		box_func = wx.TextEntryDialog
-	style=(wx.OK | wx.CANCEL | wx.CENTRE | wx.STAY_ON_TOP)
-	if multiline: style += wx.TE_MULTILINE
-	dlg = box_func(app.frame, message, title, style=style)
-	win32gui.SetWindowPos(
-		dlg.Handle
-		, win32con.HWND_TOPMOST \
-			if topmost else win32con.HWND_TOP
-		, 0, 0, 0, 0
-		, win32con.SWP_NOSIZE | win32con.SWP_NOMOVE
-	)
-	if default: dlg.SetValue(str(default))
-	attach_thread_input_foreground(dlg.Handle)
-	try:
-		dlg.ShowModal()
-	except wx._core.wxAssertionError: 	
-		pass
-	value = dlg.GetValue()
-	dlg.Destroy()
-	return value
 
 
 
@@ -1316,7 +1322,7 @@ def qprint(*values):
 	except:
 		print('<qprint fail>', msg)
 
-def tprint(*msgs, tname:str|None=None, short:bool=False):
+def tprint(*msgs, tname:str|None=None, short:bool=False, with_parent:bool=False):
 	r'''
 	Prints the message(s) with the task name and time.  
 	*tname* - name of the caller (task name). If it
@@ -1325,14 +1331,17 @@ def tprint(*msgs, tname:str|None=None, short:bool=False):
 	'''
 	msg = ' '.join(map(str, msgs))
 	if tname == None:
-		if tname := task_name():
+		if tname := task_name(with_parent=with_parent):
 			if tname.startswith('<'):
 				msg = ''.join((tname, ' ', msg))
 			else:
 				msg = ''.join(('[', tname, '] ', msg))
 	else:
 		if tname and (not tname.startswith('<')):
-			msg = ''.join(('[', tname, '] ', msg))
+			if with_parent:
+				msg = ''.join(('[', tname, '] ', msg))
+			else:
+				msg = ''.join(('[', tname, '] ', msg))
 	msg = ''.join((time.strftime('%y.%m.%d %H:%M:%S'), ' ', msg))
 	if short:
 		qprint( str_short(msg) )
@@ -1365,7 +1374,7 @@ def tdebug(*msgs, **kwargs)->bool:
 	msg:str = ''
 	if kwargs.get('par', True):
 		msg = task_name()
-		if msg == '<console>': msg = ''
+		if msg == _ITS_CONSOLE: msg = ''
 		if msg: msg = f'[{msg}]: '
 	msg += ' '.join(map(str, msgs))
 	qprint(sh_func(msg) if short else msg)
@@ -1388,12 +1397,16 @@ def balloon(msg:str, title:str=APP_NAME, timeout:int=None, icon:str=None):
 		}.get(icon.lower(), wx.ICON_INFORMATION)
 	app.taskbaricon.ShowBalloon(**kwargs)
 
-def app_log()->list:
+def app_log()->list[tuple[str, str ]]:
 	r'''
-	Returns current log as list of tuples with time:str and message:str  
+	Returns current log as list of tuples with *time:str* and *message:str*  
 	Log can't be empty.  
+	It is also used in the HTTP server:  
+
+		http://127.0.0.1:8275/log
+	
 	'''
-	return _app_log
+	return app.log_memory
 
 def decor_except(func):
 	''' Add 'try... except' for function
@@ -1986,7 +1999,7 @@ class DataHTTPReq(object):
 				self.ext.params = json.loads(self.form.get('params', '{}'))
 				self.ext.frame_id = int(self.ext.frame_id)
 			except:
-				tprint('DataHTTPReq: parsing error')
+				tprint('DataHTTPReq: parsing error', with_parent=True)
 		except:
 			pass
 	
@@ -2101,11 +2114,9 @@ def value_to_str(value, sep:str='\n')->str:
 	return sep.join(strings)
 
 
-
-
 class DataEvent:
 	r'''
-	Windows event as an object.
+	Windows event as an object.  
 	
 	'''
 
@@ -2206,7 +2217,8 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 					err_action(traceback.format_exc().strip())
 				except Exception as err:
 					if is_dev():
-						tprint(f'exception in err_action: {repr(err)}')
+						tprint(f'exception in err_action: {repr(err)}'
+						, with_parent=True)
 		_thread_pop('thread_start', thread_id=thread.ident)
 
 	def err_handler(text:str):
@@ -2215,7 +2227,7 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 		, tname='thread_start')
 
 	if not ident:
-		parents = list(reversed(_get_parents()))[-3:]
+		parents = _get_parents()[-3:]
 		parents.append(func.__name__)
 		ident = '>'.join(parents)
 	if err_action is None: err_action = err_handler
@@ -2397,7 +2409,7 @@ def app_pid()->int:
 
 def toast(msg:str|tuple|list, dur:str='default', img:str=''
 , often_ident:str='', often_inter:str='30 sec'
-, on_click:Callable=None
+, on_click:Callable|None=None
 , appid:str=APP_NAME):
 	r'''
 	Windows toast notification.  
@@ -2532,32 +2544,19 @@ def median(source):
 	'''
 	return statistics.median(source)
 
-def speak(text:str, wait:bool=False):
-	r'''
-	Pronouns text using the Windows built-in speech engine.  
-	If *wait* then returns *text*.  
-	'''
 
-	def _speak():
-		try:
-			pythoncom.CoInitializeEx(pythoncom.COINIT_APARTMENTTHREADED)
-			speaker = win32com.client.Dispatch('SAPI.SpVoice')
-			speaker.Speak(text)
-		except pythoncom.com_error as e:
-			dev_print(f'COM error during speech: {e}')
-		except Exception as e:
-			dev_print(f'Unexpected error in _speak: {e}')
-		finally:
-			try:
-				pythoncom.CoUninitialize()
-			except:
-				pass
-	
+
+def speak(text:str):
+	r'''
+	Pronounces text using the Windows built-in speech engine.  
+	Non-blocking.  
+	'''
 	text = str(text).strip()
-	if wait:
-		_speak()
-		return text
-	thread_start(_speak, ident='speak «' + str_short(text, 30) + '»')
+	try:
+		app.que_speech.put(text, block=False)
+	except queue.Full:
+		tprint(f'queue is full, discard text=«{text}»'
+		, short=True, with_parent=True)
 
 def func_name_human(func_name:str)->str:
 	r'''

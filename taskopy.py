@@ -22,9 +22,10 @@ import gc
 import argparse
 import msvcrt
 import queue
+import pythoncom
 from plugins.constants import *
 from plugins.tools import *
-from plugins.tools import _tlog, _thread_pop, _log_cur_file
+from plugins.tools import _tlog, _thread_pop
 from plugins.plugin_filesystem import *
 from plugins.plugin_system import *
 from plugins.plugin_system import _idle_millis
@@ -256,7 +257,7 @@ def ttprint(*msgs, **kwargs):
 	r'''
 	Just add `tname='app'`
 	'''
-	tprint(*msgs, tname='app')
+	tprint(*msgs, tname='app', with_parent=True)
 
 
 class Tasks:
@@ -1317,16 +1318,17 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			)
 			for task in tasks.task_list_exit:
 				tasks.run_task(task['task_func_name'], caller=CALLER_EXIT)
-		qprint(lang.menu_exit)
+		con_log(lang.menu_exit, tname='app')
 		tasks.close()
 		app.que_log.stop()
-		app.que_print.stop()
 		app.que_hook.stop()
 		app.que_wxdialog.stop()
+		app.que_speech.put(None)
 		try:
-			_log_cur_file[1].close()
-		except:
-			ttprint('error closing log file')
+			app.log_file[1].close()
+		except Exception as exc:
+			ttprint('error closing log file: ' + repr(exc))
+		app.que_print.stop(timeout=0.1)
 		wx.CallAfter(self.Destroy)
 		self.frame.Close()
 		return True
@@ -1444,6 +1446,9 @@ class App(wx.App):
 		self.que_log:TQueue = None
 		self.que_print:TQueue = None
 		self.que_wxdialog:TQueue = None
+		self.que_speech:queue.Queue = None
+		self.log_memory:list[tuple[str, str]] = list()
+		self.log_file:tuple[str, object] = tuple()
 		return True
 	
 	def win_save(self):
@@ -1529,6 +1534,31 @@ def _dialog_consumer(task):
 	'''
 	wx.CallAfter(task)
 
+def _speech_worker():
+	speak_fun = lambda t: qprint(f'<speak> «{t}»')
+	try:
+		pythoncom.CoInitializeEx(pythoncom.COINIT_APARTMENTTHREADED)
+		speaker = win32com.client.Dispatch('SAPI.SpVoice')
+		speak_fun = speaker.Speak
+	except Exception as exc:
+		dev_print('CoInitializeEx exception:' + str_indent(exc))
+	try:
+		while True:
+			text = app.que_speech.get()
+			if text == None:
+				break
+			try:
+				speak_fun(text)
+			except Exception as e:
+				dev_print(f'exception: {repr(e)}')
+			finally:
+				app.que_speech.task_done()
+	finally:
+		try:
+			pythoncom.CoUninitialize()
+		except Exception as exc:
+			print(f'_speech_worker CoUninitialize exception: {exc}')
+
 def main():
 
 	def wait_exit(event, timeout=60.0):
@@ -1578,6 +1608,8 @@ def main():
 		app.que_log = TQueue(consumer=_tlog, max_size=8192)
 		app.que_hook = TQueue(consumer=hook_consumer, max_size=8192)
 		app.que_wxdialog = TQueue(consumer=_dialog_consumer)
+		app.que_speech = Queue(maxsize=16)
+		thread_start(_speech_worker, ident='app: _speech_worker')
 		app.is_cmd_task = not cmd_args.task is None
 		app.cmd_args = cmd_args
 		app.win_save()

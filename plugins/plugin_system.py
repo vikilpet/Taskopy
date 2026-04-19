@@ -4,19 +4,20 @@ A *window* argument in function can be a
 - *str* - it will find hwnd of window with that title;
 - *None* - it will find hwnd of a foreground window.
 '''
+import os
 import ctypes
 import win32api
 import win32gui
 import win32con
+import win32com
 import winreg
 import pywintypes
-from time import sleep
+from datetime import datetime as dtime
 import ctypes
-from .tools import *
-try:
-	import constants as tcon
-except ModuleNotFoundError:
-	import plugins.constants as tcon
+import time
+import psutil
+from .tools import tprint, winapi, tcon, value_to_unit, dev_print \
+, exc_text, app_pid
 LockWorkStation = winapi.user32.LockWorkStation
 _GetAncestor = winapi.user32.GetAncestor
 _SendNotifyMessage = winapi.user32.SendNotifyMessageA
@@ -27,7 +28,7 @@ _APPCOMMAND_VOLUME_DOWN = 0x90000
 _APPCOMMAND_VOLUME_UP = 0xA0000
 WIN_TASKBAR_CLS = 'Shell_TrayWnd'
 
-def win_get(window=None, class_name:str=None)->int:
+def win_get(window=None, class_name:str|None=None)->int:
 	r'''
 	Returns window handle. If window is not specified then
 	finds foreground window.
@@ -128,7 +129,7 @@ def registry_set(fullpath:str, value, value_type=None)->bool|str:
 	except:
 		return exc_text()
 
-def win_class_name(window=None)->str:
+def win_class_name(window=None)->str|None:
 	''' Gets the name of the window class '''
 	hwnd = win_get(window)
 	if hwnd:
@@ -150,13 +151,11 @@ def win_title_set(window=None, new_title:str='')->int:
 	r'''
 	Sets window title, returns hwnd.
 	'''
-	hwnd = win_get(window)
-	if hwnd:
-		win32gui.SetWindowText(hwnd, new_title)
-		return hwnd
+	if not (hwnd := win_get(window)): return 0
+	win32gui.SetWindowText(hwnd, new_title)
+	return hwnd
 
-def win_list(title_filter:str=None
-, class_filter:str=None
+def win_list(title_filter:str='', class_filter:str=''
 , case_sensitive:bool=False)->list:
 	r'''
 	List titles of all the windows that have non-empty titles.  
@@ -179,15 +178,9 @@ def win_list(title_filter:str=None
 	if title_filter:
 		if case_sensitive:
 			title_filter = title_filter.lower()
-			titles = [
-				t for t in titles
-					if title_filter in t.lower()
-			]
+			titles = [ t for t in titles if title_filter in t.lower() ]
 		else:
-			titles = [
-				t for t in titles
-					if title_filter in t
-			]
+			titles = [ t for t in titles if title_filter in t ]
 	return titles
 
 def win_find(title:str, exact:bool=True)->list:
@@ -200,7 +193,7 @@ def win_find(title:str, exact:bool=True)->list:
 		nonlocal result
 		wtitle = win32gui.GetWindowText(hwnd)
 		if title == '':
-			dev_print(f'win32gui.GetWindowText empty')
+			pass
 		if exact:
 			if wtitle == title: result.append(hwnd)
 		else:
@@ -212,8 +205,7 @@ def win_find(title:str, exact:bool=True)->list:
 
 def win_activate(window=None)->int:
 	''' Brings window to front, returns hwnd.'''
-	hwnd = win_get(window)
-	if not hwnd: return 0
+	if not (hwnd := win_get(window)): return 0
 	try:
 		win32gui.SetForegroundWindow(hwnd)
 	except pywintypes.error:
@@ -255,51 +247,50 @@ def win_minimize(window=None)->int:
 	return hwnd
 	
 def win_maximize(window=None)->int:
-	''' Maximize window. Returns hwnd.
+	r'''
+	Maximize window. Returns hwnd.
 	'''
-	hwnd = win_get(window)
-	if hwnd:
-		win32gui.ShowWindow(hwnd, win32con.SW_MAXIMIZE)
-		return hwnd
+	if not (hwnd := win_get(window)): return 0
+	win32gui.ShowWindow(hwnd, win32con.SW_MAXIMIZE)
+	return hwnd
 
 def win_restore(window=None)->int:
 	''' Restore window. Returns hwnd.
 	'''
-	hwnd = win_get(window)
-	if hwnd:
-		win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-		return hwnd
+	if not (hwnd := win_get(window)): return 0
+	win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+	return hwnd
 
 def win_show(window=None)->int:
-	''' Show window. Returns hwnd.
+	r'''
+	Shows window. Returns hwnd.  
 	'''
-	hwnd = win_get(window)
-	if hwnd:
-		win32gui.ShowWindow(hwnd, win32con.SW_SHOW)
-		return hwnd
+	if not (hwnd := win_get(window)): return 0
+	win32gui.ShowWindow(hwnd, win32con.SW_SHOW)
+	return hwnd
 
 def win_hide(window=None)->int:
-	''' Hide window. Returns hwnd.
+	r'''
+	Hide window. Returns hwnd.
 	'''
-	hwnd = win_get(window)
-	if hwnd:
-		win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
-		return hwnd
+	if not (hwnd := win_get(window)): return 0
+	win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
+	return hwnd
 
 def win_on_top(window=None, on_top:bool=True)->int:
-	''' Sets the window to stay always on top.
+	r'''
+	Sets the window to stay always on top.
 	'''
-	hwnd = win_get(window)
-	if hwnd:
-		try:
-			win32gui.SetWindowPos(
-				hwnd
-				, win32con.HWND_TOPMOST if on_top else win32con.HWND_NOTOPMOST
-				, 0, 0, 0, 0
-				, win32con.SWP_NOSIZE | win32con.SWP_NOMOVE
-			)
-		except: pass
-		return hwnd
+	if not (hwnd := win_get(window)): return 0
+	try:
+		win32gui.SetWindowPos(
+			hwnd
+			, win32con.HWND_TOPMOST if on_top else win32con.HWND_NOTOPMOST
+			, 0, 0, 0, 0
+			, win32con.SWP_NOSIZE | win32con.SWP_NOMOVE
+		)
+	except: pass
+	return hwnd
 
 
 
@@ -370,8 +361,7 @@ def win_close(window=None, wait:bool=True)->bool:
 	'''
 	Closes window and returns True on success.
 	'''
-	hwnd = win_get(window)
-	if not hwnd: return False
+	if not (hwnd := win_get(window)): return False
 	func = win32gui.SendMessage if wait else win32gui.PostMessage
 	func(hwnd, win32con.WM_CLOSE, 0, 0)
 	return True
@@ -380,8 +370,8 @@ def win_coor_get(window=None)->tuple:
 	r'''
 	Returns coordinates of window: (top left x, y, bottom right x, y)
 	'''
-	hwnd = win_get(window)
-	if hwnd: return win32gui.GetWindowRect(hwnd)
+	if not (hwnd := win_get(window)): return ()
+	return win32gui.GetWindowRect(hwnd)
 
 def win_exists(window=None)->bool:
 	r'''
@@ -583,7 +573,92 @@ def sys_is_defender_on()->bool:
 	defender = None
 	return enabled
 
-if __name__ == '__main__':
-	_test_reg_key()
-else:
-	patch_import()
+def sys_layout_to_lang(hkl:int)->str:
+	r'''
+	Converts the HKL (value from GetKeyboardLayout) to a two-part language code.  
+	Example:
+
+		hkl = win32api.GetKeyboardLayout()
+		qprint( sys_layout_to_lang(hkl) )
+
+	'''
+	LOCALE_SNAME = 0x0000005c
+	FALLBACK = '<fail>'
+	try:
+		lang_id = hkl & 0xFFFF
+		buffer = ctypes.create_unicode_buffer(8)
+		result = winapi.kernel32.GetLocaleInfoW(
+			lang_id
+			, LOCALE_SNAME
+			, buffer
+			, len(buffer)
+		)
+		if result > 0:
+			return buffer.value.lower()
+		else:
+			dev_print(f'bad result = {result}')
+			return FALLBACK
+	except Exception as err:
+		dev_print(err)
+		return FALLBACK
+
+def sys_kboard_lang_get()->str:
+	r'''
+	Gets current keyboard layout.  
+
+		asrt( bmark(sys_kboard_lang_get), 7_000 )
+
+	'''
+	hkl = win32api.GetKeyboardLayout()
+	return sys_layout_to_lang(hkl)
+
+def sys_lang_to_layout(lang:str)->int:
+	r'''
+	Convert a language code (e.g. "en", "ru", "en-US", "de-DE") 
+	to Windows keyboard layout ID (HKL) without any hardcoded dictionary.
+	
+	Returns the integer layout_id ready for WM_INPUTLANGCHANGEREQUEST.
+
+		asrt( bmark(sys_lang_to_layout, ('en-us',)), 5_300 )
+
+	'''
+	lang = lang.strip().lower().replace('_', '-')
+	if len(lang) == 2: lang += '-' + lang
+	lcid = winapi.kernel32.LocaleNameToLCID(ctypes.create_unicode_buffer(lang), 0)
+	if lcid == 0:
+		dev_print('fallback without country')
+		base_lang = lang.split("-")[0]
+		lcid = winapi.kernel32.LocaleNameToLCID(ctypes.create_unicode_buffer(base_lang), 0)
+	if lcid == 0:
+		raise ValueError(
+			f'Could not resolve language code "{lang}" to a valid Windows locale. '
+			'Make sure the language is installed in Windows Settings.'
+		)
+	layout_id = (lcid << 16) | lcid
+	return layout_id
+
+def sys_kboard_lang_set(layout_id_or_lang:int|str)->bool:
+	r'''
+	Change keyboard layout for the foreground window.  
+	Accepts either raw int layout_id OR language string
+	like 'en-us', 'ru-ru'.  
+	Returns `True` on success.  
+
+		asrt( bmark(sys_kboard_lang_set, ('en-us',)), 150_000 )
+
+	'''
+	if isinstance(layout_id_or_lang, str):
+		try:
+			layout_id = sys_lang_to_layout(layout_id_or_lang)
+		except ValueError as err:
+			dev_print(err)
+			return False
+	else:
+		layout_id = layout_id_or_lang
+	hwnd = win32gui.GetForegroundWindow()
+	if not hwnd:
+		dev_print('No foreground window found')
+		return False
+	result = win32api.SendMessage(hwnd, win32con.WM_INPUTLANGCHANGEREQUEST
+	, 0, layout_id)
+	return result == 0

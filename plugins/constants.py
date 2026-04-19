@@ -202,4 +202,4 @@ if __name__ != '__main__':
 		from .tools import patch_import
 		patch_import()
 	except ImportError:
-		print('import of patch_import failed')
+		print('constants: import of patch_import failed')

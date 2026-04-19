@@ -594,15 +594,18 @@ def file_ext(fullpath)->str:
 
 def file_basename(fullpath)->str:
 	r'''
-	Returns basename: file name without 
+	Returns a *basename*: file name without 
 	parent folder and extension. Example:
 
 		asrt( file_basename(r'c:\pagefile.sys'), 'pagefile')
+		asrt( bmark(file_basename, (r'c:\pagefile.sys',)), 8_000 )
 
 	'''
 	fullpath = path_get(fullpath)
 	fname = os.path.basename(fullpath)
 	return os.path.splitext(fname)[0]
+
+
 
 def file_name_add(fullpath, suffix:str='', prefix:str='')->str:
 	r'''
@@ -884,6 +887,8 @@ def dir_purge(fullpath, days:int=0, subdirs:bool=True
 		):
 			dir_func(fpath)
 	return counter
+
+
 
 def file_name(fullpath)->str:
 	r'''
@@ -1453,22 +1458,24 @@ def shortcut_create(fullpath, dest:str|tuple, descr:str=''
 	if icon_index != -1 and not icon_fullpath:
 		icon_fullpath = fullpath
 	if icon_fullpath and icon_index == -1: icon_index = 0
-	pythoncom.CoInitialize()
-	shortcut = pythoncom.CoCreateInstance (
-		shell.CLSID_ShellLink
-		, None
-		, pythoncom.CLSCTX_INPROC_SERVER
-		, shell.IID_IShellLink
-	)
-	shortcut.SetPath( os.path.abspath(fullpath) )
-	shortcut.SetDescription(descr)
-	shortcut.SetShowCmd(win_style)
-	if hotkey: shortcut.SetHotKey(hotkey)
-	if cwd: shortcut.SetWorkingDirectory(cwd)
-	if icon_index != -1: shortcut.SetIconLocation(icon_fullpath, icon_index)
-	persist_file = shortcut.QueryInterface(pythoncom.IID_IPersistFile)
-	persist_file.Save(dest, 0)
-	pythoncom.CoUninitialize()
+	pythoncom.CoInitializeEx(pythoncom.COINIT_MULTITHREADED)
+	try:
+		shortcut = pythoncom.CoCreateInstance (
+			shell.CLSID_ShellLink
+			, None
+			, pythoncom.CLSCTX_INPROC_SERVER
+			, shell.IID_IShellLink
+		)
+		shortcut.SetPath( os.path.abspath(fullpath) )
+		shortcut.SetDescription(descr)
+		shortcut.SetShowCmd(win_style)
+		if hotkey: shortcut.SetHotKey(hotkey)
+		if cwd: shortcut.SetWorkingDirectory(cwd)
+		if icon_index != -1: shortcut.SetIconLocation(icon_fullpath, icon_index)
+		persist_file = shortcut.QueryInterface(pythoncom.IID_IPersistFile)
+		persist_file.Save(dest, 0)
+	finally:
+		pythoncom.CoUninitialize()
 	return dest
 
 def file_print(fullpath, printer:str=None

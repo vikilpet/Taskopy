@@ -799,7 +799,8 @@ def net_usage(interf:str, unit='b')->Iterator[ Tuple[float] ]:
 		prev_up, prev_down, prev_time = cur_up, cur_down, cur_time
 		yield up_speed, down_speed
 
-def net_usage_str(interf:str, fract:bool=True)->Iterator[ Tuple[str] ]:
+def net_usage_str(interf:str, fract:bool=True
+, time_suffix:str='/s')->Iterator[ Tuple[str] ]:
 	r'''
 	Same as **net_usage** but in human readable format.  
 	*interf* - name of a network interface.  
@@ -817,9 +818,9 @@ def net_usage_str(interf:str, fract:bool=True)->Iterator[ Tuple[str] ]:
 		for unit in units:
 			if val < 1024.0:
 				if fract:
-					return f'{val:.1f} {unit}/s'
+					return f'{val:.1f} {unit}{time_suffix}'
 				else:
-					return f'{int(val)} {unit}/s'
+					return f'{int(val)} {unit}{time_suffix}'
 			val /= 1024.0
 
 	for up_down in net_usage(interf):

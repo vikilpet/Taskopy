@@ -36,7 +36,7 @@ Remote control:
 
 [![PotPlayer remote control](https://img.youtube.com/vi/_FTuEid0Q7U/0.jpg)](https://youtu.be/_FTuEid0Q7U)
 
-Telegram chat: https://t.me/taskopy_g
+Feel free to ask any questions on Telegram: https://t.me/taskopy_g
 
 ## Contents
 
@@ -85,6 +85,7 @@ Note 2: the *cryptography* module version 42.0.8 is used for compatibility with 
 Create a shortcut *taskopy.py* in the user's startup folder with the built-in *Add to startup* task.
 
 ## Usage
+
 Open crontab.py in your favorite text editor and create your task as function with arguments:
 
 	def demo_task_3('left_click'=True, log=False):
@@ -93,6 +94,7 @@ Open crontab.py in your favorite text editor and create your task as function wi
 Then right click on tray icon and choose *Reload crontab* and your task is ready.
 
 ## Task options
+
 This is what you need to put in round brackets in task (function). It is not actual arguments for function.
 
 Format: **option name** (default value) — description.
@@ -206,6 +208,7 @@ Format: **option name** (default value) — description.
 - **err_threshold** — do not report any errors in the task until this threshold is exceeded.
 
 ## Settings
+
 Global settings are stored in *settiings.ini* file.
 
 Format: **setting** (default value) — description.
@@ -936,13 +939,14 @@ If you want to save something so that it survives a Taskopy restart, use the *fi
 **How to update the task code on multiple computers.**  
 You can define a task not only in a *crontab*, but also in an extension, using the *task_add* decorator. So, on the client computer, you can import from an extension once into *crontab*, and then update only the file with the extension that contains the task.  
 
-You can programmatically reload the crontab with **crontab_reload**. This is safe, since the crontab is actually loaded in test mode first. Even if there are gross errors in the crontab, the updated crontab will not load and the old tasks will still run.
+You can programmatically reload the crontab with **crontab_reload**. This is safe since the crontab is actually loaded in test mode first. Even if there are gross errors in the crontab, the updated crontab will not load and the old tasks will still run.
 
 All exceptions are handled and logged. You can download logs from other computers (<http://127.0.0.1:8275/log>) in JSON format and search for exceptions by the word *Traceback*.
 
 The application can run for weeks continuously without significant memory leaks, but this of course depends on whether the user himself has made no errors in the tasks.
 
 ## Firefox extension
+
 https://addons.mozilla.org/ru/firefox/addon/send-to-taskopy/
 
 Extension adds item to context menu. With it you can run task in Taskopy.
@@ -964,6 +968,7 @@ Example - play Youtube video in PotPlayer:
 			)
 
 ## Context menu
+
 You can add Taskopy to the *Send to* submenu of context menu.
 
 There is a simple powershell script *Taskopy.ps1* in *resources* directory. You need to create a shortcut to this script in user directory:
@@ -981,10 +986,12 @@ Example - pass the file name to the task _virustotal\_demo_ from [Task examples]
 Inside _virustotal\_demo_ you can see another way to pass a file name to a task - via **file_dialog**
 
 ## Help me
+
 - I've been in need of a tester for a long time :)
-- [Donate via PayPal](https://www.paypal.me/vikil)
+<!-- - [Donate via PayPal](https://www.paypal.me/vikil) -->
 
 ## Task examples
+
 - Disk free space
 - Current IP address
 - Add IP-address to MikroTik router
