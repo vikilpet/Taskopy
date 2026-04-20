@@ -5,15 +5,16 @@ from plugins.plugin_filesystem import *
 from plugins.plugin_process import *
 from plugins.plugin_system import *
 
-# 2024.01.03 abs path
-def emb_backup_and_purge(log_days:int=30, backup_days:int=30):
+# 2026.04.19 * new dir_purge
+def emb_backup_and_purge(log_interval:str='30 days'
+, backup_interval:str='30 days'):
 	' Make backup of crontab and extensions to the *backup* directory '
 	for fpath in dir_files(app_dir(), in_ext='py', subdirs=False):
 		tprint(file_backup(fpath, 'backup'))
-	# Delete logs older than 10 days:
-	dir_purge( (app_dir(), 'log'), days=log_days)
-	# Delete backups older than 20 days:
-	dir_purge( (app_dir(), 'backup'), days=backup_days)
+	# Delete old logs:
+	dir_purge( (app_dir(), 'log'), interval=log_interval, subdirs=True)
+	# Delete old backups:
+	dir_purge( (app_dir(), 'backup'), interval=backup_interval, subdirs=True)
 
 # 2024.01.03 abs path
 def emb_app_update(caller:str):

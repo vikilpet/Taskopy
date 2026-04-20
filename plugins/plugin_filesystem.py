@@ -425,13 +425,18 @@ def file_delete(fullpath)->int:
 
 def file_recycle(fullpath, silent:bool=True)->bool:
 	r'''
-	Move file to the recycle bin.  
+	Move file/directory to the recycle bin.  
 	*silent* - do not show standard windows
 	dialog to confirm deletion.  
 	Returns `True` on successful operation.  
 
-	NOTES: with `silent=True` large files that cannot be placed in the
+	NOTE: with `silent=True` large files that cannot be placed in the
 	recycle garbage can will be permanently deleted without notification.  
+	NOTE: this cannot move files with a long names.  
+
+		td = dir_test(with_long=False)
+		file_recycle(td, silent=False)
+		asrt( dir_exists(td), False)
 
 	'''
 	fullpath = path_get(fullpath)
@@ -448,6 +453,8 @@ def file_recycle(fullpath, silent:bool=True)->bool:
 		, None
 	))
 	return result[0] <= 3
+
+dir_recycle = file_recycle
 
 def dir_copy(fullpath, destination:str
 , symlinks:bool=False)->int:
@@ -811,13 +818,13 @@ def dir_rnd_dirs(fullpath, attempts:int=5
 				break
 	return None
 
-def dir_purge(fullpath, days:int=0, subdirs:bool=True
-, creation:bool=False, test:bool=False
-, print_del:bool=False, **rules)->int:
+def dir_purge(fullpath, interval:str, subdirs:bool
+, creation:bool=False, test:bool=False, print_del:bool=False
+, recycle:bool=False, **rules)->int:
 	r'''
-	Deletes files older than *x* days.  
-	Deletes empty subfolders.  
-	Returns number of deleted files and folders.  
+	Deletes files that are older than the *interval*.  
+	Deletes empty subdirectories.  
+	Returns the number of deleted files and directories.  
 	
 	*days=0* - delete everything  
 	*creation* - use date of creation, otherwise use last
@@ -826,11 +833,12 @@ def dir_purge(fullpath, days:int=0, subdirs:bool=True
 	will be deleted.  
 	*test* - only display the files and folders that should be deleted, without actually deleting them.  
 	*print_del* - print path when deleting.  
+	*recycle* - move to recycle bin.  
 	*rules* - rules for the `path_rule` function  
 
 		td = dir_test(sdirnum=2)
 		asrt( len( tuple( dir_files(td) ) ), 2 )
-		dir_purge(td, days=0, subdirs=True)
+		dir_purge(td, interval='0 sec', subdirs=True)
 		asrt(
 			len( tuple( dir_files(td) ) )
 			, 0
@@ -838,9 +846,10 @@ def dir_purge(fullpath, days:int=0, subdirs:bool=True
 		dir_delete(td)
 
 	'''
+	
 	def print_d(fn:str, reason:str):
 		if print_del:
-			qprint('dir_purge:', reason, os.path.relpath(fn, fullpath))
+			qprint('[dir_purge]:', reason, os.path.relpath(fn, fullpath))
 
 	def robust_remove_file(fn):
 		nonlocal counter
@@ -855,11 +864,19 @@ def dir_purge(fullpath, days:int=0, subdirs:bool=True
 			counter += 1
 		except:
 			pass
-		
+
+	def robust_recycle(fp):
+		nonlocal counter
+		try:
+			file_recycle(fp, silent=True)
+			counter += 1
+		except:
+			pass
+
 	def fn_print(fn):
 		nonlocal counter
 		counter += 1
-		qprint(os.path.relpath(fn, fullpath))
+		qprint('<dir_purge test> ' + os.path.relpath(fn, fullpath))
 
 	fullpath = path_get(fullpath)
 	counter = 0
@@ -870,16 +887,19 @@ def dir_purge(fullpath, days:int=0, subdirs:bool=True
 		dirs = dir_dirs(fullpath, subdirs=True)
 	else:
 		files = dir_files(fullpath, subdirs=False)
-	if days < 0: days = -days
 	drule = 'in_datec_bef' if creation else 'in_datem_bef'
-	rules[drule] = datetime.timedelta(days=days)
+	rules[drule] = tdelta(seconds=value_to_unit(interval, 'second'))
 	files = path_filter(files, **rules)
 	if test:
 		file_func = fn_print
 		dir_func = fn_print
 	else:
-		file_func = robust_remove_file
-		dir_func = robust_remove_dir
+		if recycle:
+			file_func = robust_recycle
+			dir_func = robust_recycle
+		else:
+			file_func = robust_remove_file
+			dir_func = robust_remove_dir
 	for fpath in files: file_func(fpath)
 	for fpath in dirs:
 		if not any(
@@ -887,8 +907,6 @@ def dir_purge(fullpath, days:int=0, subdirs:bool=True
 		):
 			dir_func(fpath)
 	return counter
-
-
 
 def file_name(fullpath)->str:
 	r'''
@@ -2030,6 +2048,7 @@ def path_rule(
 		in_rules.extend( in_rule if is_iter(in_rule) else (in_rule,) )
 	if ex_rule:
 		ex_rules.extend( ex_rule if is_iter(ex_rule) else (ex_rule,) )
+	now = datetime.datetime.now()
 	for val, time_att, is_inc, is_bef in (
 		(ex_datem_aft, 'st_mtime', False, False)
 		, (ex_datem_bef, 'st_mtime', False, True)
@@ -2053,7 +2072,7 @@ def path_rule(
 		elif isinstance(val, datetime.datetime):
 			pass
 		elif isinstance(val, datetime.timedelta):
-			val = datetime.datetime.now() - val
+			val = now - val
 		else:
 			raise Exception('wrong date rule')
 		tstamp = val.timestamp()
