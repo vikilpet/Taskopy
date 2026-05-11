@@ -66,7 +66,7 @@ except ModuleNotFoundError:
 	import plugins.cache as cache
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2026-04-20'
+APP_VERSION = 'v2026-05-11'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 if getattr(sys, 'frozen', False):
 	APP_PATH = os.path.dirname(sys.executable)
@@ -1012,8 +1012,11 @@ def msg_err(msg:str, title:str='', source:str='', timeout:str='30 min'
 	try:
 		if is_often('__msg_err ' + source + msg, interval=often_int):
 			if is_dev():
-				tprint('error msg suppressed: ' + msg, tname=source
-				, short=True)
+				tprint(
+					'error msg suppressed: ' + msg
+					, tname=source if source else None
+					, short=True, with_parent=True
+				)
 			return
 		exc_full:str=''
 		exc_short:str=''
@@ -1041,17 +1044,55 @@ def msg_warn(msg:str, title:str='', timeout:str='30 min'):
 	_msg_err(msg=msg, title=title, icon=tcon.TD_ICON_WARNING, timeout=timeout
 	, parent='msg_warn')
 
-def attach_thread_input_foreground(hwnd):
-	foreground = winapi.user32.GetForegroundWindow()
-	thread1 = winapi.user32.GetWindowThreadProcessId(foreground, None)
-	thread2 = winapi.user32.GetWindowThreadProcessId(hwnd, None)
-	
-	if thread1 != thread2:
-		winapi.user32.AttachThreadInput(thread1, thread2, True)
-		winapi.user32.SetForegroundWindow(hwnd)
-		winapi.user32.AttachThreadInput(thread1, thread2, False)
+def win_activate(hwnd:int, topmost:bool=False, focus:bool=False):
+	r'''
+	Restores and activates a window.  
+	NOTE: *hwnd* must be a number.  
+	'''
+	if not hwnd: return
+	cur_hwnd = int(hwnd)
+	if winapi.user32.IsIconic(cur_hwnd):
+		winapi.user32.ShowWindow(cur_hwnd, win32con.SW_RESTORE)
+	fg_hwnd = winapi.user32.GetForegroundWindow()
+	if fg_hwnd == cur_hwnd:
+		if topmost:
+			winapi.user32.SetWindowPos(cur_hwnd, win32con.HWND_TOPMOST, 0,0,0,0,
+			win32con.SWP_NOSIZE | win32con.SWP_NOMOVE | win32con.SWP_SHOWWINDOW)
+		return
+	fg_tid = ctypes.c_ulong()
+	cur_tid = ctypes.c_ulong()
+	winapi.user32.GetWindowThreadProcessId(fg_hwnd, ctypes.byref(fg_tid))
+	winapi.user32.GetWindowThreadProcessId(cur_hwnd, ctypes.byref(cur_tid))
+	if fg_tid.value == cur_tid.value:
+		winapi.user32.SetForegroundWindow(cur_hwnd)
 	else:
-		winapi.user32.SetForegroundWindow(hwnd)
+		winapi.user32.AttachThreadInput(fg_tid, cur_tid, True)
+		if focus:
+			winapi.user32.BringWindowToTop(cur_hwnd)
+			winapi.user32.SetActiveWindow(cur_hwnd)
+			winapi.user32.SetForegroundWindow(cur_hwnd)
+			winapi.user32.SetFocus(cur_hwnd)
+			winapi.user32.ShowWindow(cur_hwnd, win32con.SW_SHOW)
+		winapi.user32.AttachThreadInput(fg_tid, cur_tid, False)
+	flags = (win32con.SWP_NOSIZE | win32con.SWP_NOMOVE
+	| win32con.SWP_SHOWWINDOW | win32con.SWP_NOACTIVATE)
+	zorder = win32con.HWND_TOPMOST if topmost else win32con.HWND_TOP
+	winapi.user32.SetWindowPos(cur_hwnd, zorder, 0, 0, 0, 0, flags)
+	if topmost:
+		winapi.user32.SetWindowPos(cur_hwnd, win32con.HWND_TOPMOST
+		, 0, 0, 0, 0, flags)
+	if focus:
+		winapi.user32.keybd_event(0, 0, 0, 0)
+		winapi.user32.keybd_event(0, 0, 2, 0)
+
+def app_win_icon_set(hwnd:int):
+	r'''
+	Apply the program icon to the window.  
+	'''
+	win32gui.SendMessage(hwnd, win32con.WM_SETICON
+	, win32con.ICON_SMALL, app.icons[0])
+	win32gui.SendMessage(hwnd, win32con.WM_SETICON
+	, win32con.ICON_BIG, app.icons[1])
 
 def inputbox(message:str, title:str='', is_pwd:bool=False, default:str=''
 , multiline:bool=False, topmost:bool=True
@@ -1093,6 +1134,7 @@ def inputbox(message:str, title:str='', is_pwd:bool=False, default:str=''
 		if default: dlg.SetValue(str(default))
 		if topmost:
 			dlg.SetWindowStyleFlag(dlg.GetWindowStyle() | wx.STAY_ON_TOP)
+		app_win_icon_set(dlg.Handle)
 		status = dlg.ShowModal()
 		if status == wx.ID_OK: result[0] = dlg.GetValue()
 		dlg.Destroy()
@@ -1559,6 +1601,7 @@ def dialog(
 	, wait:bool=True
 	, icon_main:int|None=None
 	, icon_footer:int|None=None
+	, focus:bool|str='auto'
 )->int|str|tuple|None:
 	r'''
 	Shows dialog with multiple optional buttons.  
@@ -1594,6 +1637,7 @@ def dialog(
 	TDCBF_CANCEL_BUTTON = 8
 	TDF_CALLBACK_TIMER = 2048
 	TDF_USE_COMMAND_LINKS = 16
+	TDF_USE_HICON_MAIN = 2
 	TDF_EXPAND_FOOTER_AREA = 64
 	
 	@_callback_type
@@ -1617,16 +1661,15 @@ def dialog(
 		else:
 			if not on_top_flag:
 				try:
-					win32gui.SetWindowPos(
-						hwnd
-						, win32con.HWND_TOPMOST
-						, 0, 0, 0, 0
-						, win32con.SWP_NOSIZE | win32con.SWP_NOMOVE
-					)
 					on_top_flag = True
+					app_win_icon_set(hwnd)
+					win_activate(hwnd, topmost=True, focus=focus)
 				except:
-					raise Exception(f'dialog: wrong parameters ({exc_text()})')
+					msg_err(f'dialog: wrong parameters: ({exc_text()})')
 		return S_OK
+
+	if focus == 'auto':
+		focus = task_by_human()
 	if content: content = str(content)
 	if title == '':
 		title = func_name_human(task_name())
@@ -2173,9 +2216,9 @@ class DataEvent:
 		attrs = ', '.join(f'{k}={v!r}' for k, v in vars(self).items())
 		return f'{self.__class__.__name__}({attrs})'
 
-def _thread_pop(src:str, thread_id:int):
+def _thread_pop(src:str, tid:int):
 	' Delete current thread from `app.app_threads` '
-	thread = app.app_threads.pop(thread_id, None)
+	thread = app.app_threads.pop(tid, None)
 	if thread is None:
 		pass
 	else:
@@ -2203,7 +2246,7 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 	def wrapper():
 		nonlocal func, args, kwargs, thread
 		try:
-			app.app_threads[thread.ident] = {'func': ident
+			app.app_threads[thread.native_id] = {'func': ident
 			, 'stime': dtime.now(), 'thread': thread}
 		except NameError:
 			pass
@@ -2219,7 +2262,7 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 					if is_dev():
 						tprint(f'exception in err_action: {repr(err)}'
 						, with_parent=True)
-		_thread_pop('thread_start', thread_id=thread.ident)
+		_thread_pop('thread_start', tid=thread.native_id)
 
 	def err_handler(text:str):
 		if not is_dev(): return
@@ -2292,8 +2335,8 @@ def task_start(taskname:str|Callable, **kwargs):
 def app_threads_print():
 	thread: threading.Thread
 	table = [('TID', 'Dmn', 'Start time', 'Running time'
-	, 'Target', 'Identity')]
-	for ident, thr_dic in tuple(app.app_threads.items()):
+	, 'Name')]
+	for tid, thr_dic in tuple(app.app_threads.items()):
 		func_name = thr_dic.get('func')
 		start_time = thr_dic.get('stime')
 		run_time = time_diff_human(start_time, short=True) \
@@ -2301,11 +2344,10 @@ def app_threads_print():
 		thread = thr_dic.get('thread')
 		if thread is None:
 			table.append((
-				ident
+				tid
 				, '?'
 				, str(start_time).split('.')[0]
 				, run_time
-				, '?'
 				, func_name
 			))
 			continue
@@ -2313,11 +2355,10 @@ def app_threads_print():
 		target = getattr(thread, '_target', None)
 		if target: target = getattr(target, '__name__', None)
 		table.append((
-			ident
+			tid
 			, 'D' if is_daemon else '-'
 			, str(start_time).split('.')[0]
 			, run_time
-			, target
 			, func_name
 		))
 	tnum_thread = 0
@@ -2330,7 +2371,7 @@ def app_threads_print():
 	table_print(table, use_headers=True, sorting=[2]
 	, trim_func=path_short)
 	qprint('Number of threads:')
-	qprint(f'app		{tnum_app} (dead {tnum_dead})')
+	qprint(f'app		{tnum_app} (dead: {tnum_dead})')
 	qprint(f'threading	{tnum_thread} ({tnum_thread - tnum_app})')
 	qprint(f'system		{tnum_sys} ({tnum_sys - tnum_app})\n')
 
@@ -2345,7 +2386,7 @@ def app_win_show():
 	Bring the application console window to the foreground, if possible.
 	'''
 	if is_con(): return
-	app.show_window()
+	thread_start(app.show_window)
 
 @functools.cache
 def app_dir()->str:
@@ -2459,7 +2500,9 @@ def toast(msg:str|tuple|list, dur:str='default', img:str=''
 		if img in cache.toast_imgs: newToast.AddImage(cache.toast_imgs[img])
 	try:
 		toaster.show_toast(newToast)
-	except OSError:
+	except OSError as exc:
+		dev_print(f'toast exception: {exc}')
+		if is_iter(msg): msg = ' '.join(msg)
 		dialog(msg=msg, wait=False, title='<Toast message>')
 	newToast.text_fields = None
 	newToast.images = []
@@ -2546,14 +2589,19 @@ def median(source):
 
 
 
-def speak(text:str):
+def speak(text:str, wait:bool=False):
 	r'''
 	Pronounces text using the Windows built-in speech engine.  
 	Non-blocking.  
 	'''
 	text = str(text).strip()
 	try:
-		app.que_speech.put(text, block=False)
+		if wait:
+			event = threading.Event()
+			app.que_speech.put((text, event), block=False)
+			event.wait()
+		else:
+			app.que_speech.put((text, None), block=False)
 	except queue.Full:
 		tprint(f'queue is full, discard text=«{text}»'
 		, short=True, with_parent=True)
@@ -3255,6 +3303,17 @@ def dclass_str(instance, template:str='{} = {}'
 		))
 	if short > 0: lines = list(str_short(l, short) for l in lines)
 	return line_sep.join(lines)
+
+def task_by_human(human_caller:set={tcon.CALLER_MENU, tcon.CALLER_HOTKEY
+, tcon.CALLER_LEFT_CLICK})->bool:
+	r'''
+	Is the current task started by a user?
+	'''
+	tname = task_name()
+	if not tname: return False
+	task = app.tasks.task_dict.get(tname)
+	if not task: return False
+	return task.get('_caller') in human_caller
 
 def dict_str(dct:dict, template:str='{}: {}'
 , line_sep:str='\n', short:int=0)->str:

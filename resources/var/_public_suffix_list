@@ -7879,6 +7879,9 @@ poivron.org
 potager.org
 sweetpepper.org
 myasustor.com
+*.atlassian-3p.com
+*.atlassian-3p-us-gov-mod.com
+*.atlassian-isolated-3p.com
 cdn.prod.atlassian-dev.net
 myfritz.link
 myfritz.net
@@ -8083,7 +8086,6 @@ knx-server.net
 static-access.net
 craft.me
 realm.cz
-on.crisp.email
 *.cryptonomic.net
 cfolks.pl
 cyon.link
@@ -8122,6 +8124,8 @@ deno-staging.dev
 deno.net
 sandbox.deno.net
 deployagent.com
+piebox.site
+deployagent.space
 dedyn.io
 deta.app
 deta.dev
@@ -8576,6 +8580,7 @@ on.expo.app
 staging.expo.app
 on.staging.expo.app
 onfabrica.com
+fspages.org
 ru.net
 adygeya.ru
 bashkiria.ru
@@ -9267,6 +9272,7 @@ memset.net
 messerli.app
 atmeta.com
 apps.fbsbx.com
+*.metaaiusercontent.com
 *.cloud.metacentrum.cz
 custom.metacentrum.cz
 flt.cloud.muni.cz
@@ -9869,6 +9875,9 @@ biz.ua
 co.ua
 pp.ua
 as.sh.cn
+vicp.fun
+yicp.fun
+zicp.fun
 sheezy.games
 myshopblocks.com
 myshopify.com
@@ -10187,6 +10196,8 @@ za.org
 zap.cloud
 zeabur.app
 *.zerops.app
+prg1-zerops.zone
+*.zerops.zone
 bss.design
 basicserver.io
 virtualserver.io

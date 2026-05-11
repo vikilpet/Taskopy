@@ -6,8 +6,7 @@ ntdll = ctypes.WinDLL('ntdll', use_last_error=True)
 kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
 advapi32 = ctypes.WinDLL('advapi32', use_last_error=True)
 comctl32 = ctypes.WinDLL('comctl32', use_last_error=True)
-import ctypes
-from ctypes import wintypes
+shell32 = ctypes.WinDLL('shell32', use_last_error=True)
 
 
 class OVERLAPPED(ctypes.Structure):
@@ -43,6 +42,9 @@ LowLevelHookProc = ctypes.WINFUNCTYPE(
 	wintypes.WPARAM,
 	wintypes.LPARAM
 )
+
+HICON = wintypes.HICON
+UINT = wintypes.UINT
 
 def get_last_error()->str:
 	r'''

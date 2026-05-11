@@ -229,7 +229,7 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 				) == True:
 					if len(result): page = result[0]
 				else:
-					page = 'timeout'
+					page = '<timeout>'
 			else:
 				self.tasks.run_task(
 					task['task_func_name']

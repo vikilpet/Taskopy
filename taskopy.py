@@ -23,6 +23,7 @@ import argparse
 import msvcrt
 import queue
 import pythoncom
+import plugins.winapi as winapi
 from plugins.constants import *
 from plugins.tools import *
 from plugins.tools import _tlog, _thread_pop
@@ -79,7 +80,6 @@ TASK_OPTIONS = (
 	, ('idle', None)
 	, ('on_load', False)
 	, ('rule', None)
-	, ('thread', None)
 	, ('last_start', None)
 	, ('date', None)
 	, ('event_log', None)
@@ -105,6 +105,8 @@ TASK_OPTIONS = (
 	, ('_last_err', '')
 	, ('_params', {})
 	, ('on_any_key', False)
+	, ('_tid', False)
+	, ('_caller', '')
 )
 _WEEKDAY_HUMAN = {
 	'day': 'day'
@@ -143,8 +145,6 @@ _EVERY_PATTERNS = {
 	, re.compile(rf'^({"|".join(_WEEKDAY_HUMAN)})\s+(\d{{2}}:\d{{2}})$'): 'day'
 	, re.compile(r'^(m|min|minute|h|hr|hour)\s*(\:\d+)$'): 'time_day'
 }
-
-set_title = win32api.SetConsoleTitle
 crontab:types.ModuleType|None = None
 sett:Settings = Settings(ini_file='')
 lang:Language = None
@@ -188,58 +188,123 @@ WM_EVENTS = {WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP}
 CTRL_KEYS = {win32con.VK_LCONTROL, win32con.VK_RCONTROL}
 SHIFT_KEYS = {win32con.VK_LSHIFT, win32con.VK_RSHIFT}
 ALT_KEYS = {win32con.VK_LMENU, win32con.VK_RMENU}
+KEY_DOWN = {win32con.WM_KEYDOWN, win32con.WM_SYSKEYDOWN}
+
+def key_name(key:winapi.KBDLLHOOKSTRUCT)->str:
+	r'''
+	Returns nice name: 'shift', 'ctrl', 'alt', 'a', 'enter', ...
+	The difference between the right and left keys is ignored.  
+	*key* - `winapi.KBDLLHOOKSTRUCT` instance.  
+	'''
+	vk = key.vkCode
+	scan = key.scanCode
+	extended = bool(key.flags & 0x01)
+	if vk in (win32con.VK_RSHIFT, win32con.VK_RCONTROL, win32con.VK_RMENU):
+		extended = False
+	if 0x41 <= vk <= 0x5A:
+		return chr(vk).lower()
+	if 0x30 <= vk <= 0x39:
+		return chr(vk)
+	oem_map = {
+		tcon.VK_OEM_1:      ';',
+		tcon.VK_OEM_2:      '/',
+		tcon.VK_OEM_3:      '`',
+		tcon.VK_OEM_4:      '[',
+		tcon.VK_OEM_5:      '\\',
+		tcon.VK_OEM_6:      ']',
+		tcon.VK_OEM_7:      "'",
+		tcon.VK_OEM_PLUS:   '=',
+		tcon.VK_OEM_MINUS:  '-',
+		tcon.VK_OEM_PERIOD: '.',
+		tcon.VK_OEM_COMMA:  ',',
+		tcon.VK_OEM_102:    '<',
+	}
+	if vk in oem_map: return oem_map[vk]
+	lparam_raw = ((scan << 16) | (int(extended) << 24)) & 0xFFFFFFFF
+	if lparam_raw & 0x80000000:
+		lparam = lparam_raw - 0x100000000
+	else:
+		lparam = lparam_raw
+	buf = ctypes.create_unicode_buffer(64)
+	length = winapi.user32.GetKeyNameTextW(
+			ctypes.c_long(lparam),
+			buf,
+			len(buf)
+		)
+	if length > 0:
+		name = buf.value.strip()
+		if len(name) == 1:
+			name = name.lower()
+		else:
+			name = (
+				name.lower()
+				.replace('control', 'ctrl')
+				.replace('right ', '')
+				.replace('left ', '')
+			)
+		return name
+	return f'VK_{vk:02X}'
 
 def hook_consumer(data:tuple):
 
 	def run_any_key_task():
 		for task in tasks.on_any_key:
-			tasks.run_task(task, caller=CALLER_HOTKEY
-			, data=(key, wParam))
+			tasks.run_task(
+				task
+				, caller=CALLER_HOTKEY
+				, data=(
+					key_name(key)
+					, 'down' if wParam in KEY_DOWN else 'up'
+				)
+			)
 
-	wParam, lParam = data
-	if not wParam in WM_EVENTS: return
-	key = ctypes.cast(lParam, ctypes.POINTER(winapi.KBDLLHOOKSTRUCT)).contents
-	if key.flags & (win32con.LLKHF_INJECTED | win32con.LLKHF_LOWER_IL_INJECTED):
-		return
-	hook_kb = tasks.hook_kb
-	if key.vkCode in CTRL_KEYS:
-		hook_kb.ctrl_is_pressed = wParam in KEY_DOWN
-		run_any_key_task()
-		return
-	if key.vkCode in SHIFT_KEYS:
-		hook_kb.shift_is_pressed = wParam in KEY_DOWN
-		run_any_key_task()
-		return
-	if key.vkCode in ALT_KEYS:
-		hook_kb.alt_is_pressed = wParam in KEY_DOWN
-		run_any_key_task()
-		return
-	if not wParam in KEY_DOWN:
-		run_any_key_task()
-		return
-	candidates = tasks.hotkeys_nb.get(key.vkCode, ())
-	for modifiers, task in candidates:
-		if not modifiers:
-			if hook_kb.shift_is_pressed or hook_kb.ctrl_is_pressed \
-			or hook_kb.alt_is_pressed:
-				continue
+	try:
+		wParam, lParam = data
+		if not wParam in WM_EVENTS: return
+		key = ctypes.cast(lParam, ctypes.POINTER(winapi.KBDLLHOOKSTRUCT)).contents
+		if key.flags & (win32con.LLKHF_INJECTED | win32con.LLKHF_LOWER_IL_INJECTED):
+			return
+		hook_kb = tasks.hook_kb
+		if key.vkCode in CTRL_KEYS:
+			hook_kb.ctrl_is_pressed = wParam in KEY_DOWN
+			run_any_key_task()
+			return
+		if key.vkCode in SHIFT_KEYS:
+			hook_kb.shift_is_pressed = wParam in KEY_DOWN
+			run_any_key_task()
+			return
+		if key.vkCode in ALT_KEYS:
+			hook_kb.alt_is_pressed = wParam in KEY_DOWN
+			run_any_key_task()
+			return
+		if not wParam in KEY_DOWN:
+			run_any_key_task()
+			return
+		candidates = tasks.hotkeys_nb.get(key.vkCode, ())
+		for modifiers, task in candidates:
+			if not modifiers:
+				if hook_kb.shift_is_pressed or hook_kb.ctrl_is_pressed \
+				or hook_kb.alt_is_pressed:
+					continue
+				tasks.run_task(task, caller=CALLER_HOTKEY)
+				break
+			if VK_CONTROL in modifiers:
+				if not hook_kb.ctrl_is_pressed: continue
+			else:
+				if hook_kb.ctrl_is_pressed: continue
+			if VK_SHIFT in modifiers:
+				if not hook_kb.shift_is_pressed: continue
+			else:
+				if hook_kb.shift_is_pressed: continue
+			if VK_MENU in modifiers:
+				if not hook_kb.alt_is_pressed: continue
+			else:
+				if hook_kb.alt_is_pressed: continue
 			tasks.run_task(task, caller=CALLER_HOTKEY)
 			break
-		if VK_CONTROL in modifiers:
-			if not hook_kb.ctrl_is_pressed: continue
-		else:
-			if hook_kb.ctrl_is_pressed: continue
-		if VK_SHIFT in modifiers:
-			if not hook_kb.shift_is_pressed: continue
-		else:
-			if hook_kb.shift_is_pressed: continue
-		if VK_MENU in modifiers:
-			if not hook_kb.alt_is_pressed: continue
-		else:
-			if hook_kb.alt_is_pressed: continue
-		tasks.run_task(task, caller=CALLER_HOTKEY)
-		break
-	run_any_key_task()
+		run_any_key_task()
+	except:
+		dev_print('hook_consumer exception:' + str_indent(exc_text(0)))
 
 def msg_listener(tasks):
 	r'''
@@ -534,8 +599,12 @@ class Tasks:
 						return
 					if tasks_ver != tasks.version:
 						if is_dev():
-							ttprint(f'stop RDC {tasks_ver} != {tasks.version}')
-							tlog(f'stop RDC {tasks_ver} != {tasks.version}')
+							msg = (
+								task['task_func_name']
+								+ f' stop RDC {tasks_ver} != {tasks.version}'
+							)
+							ttprint(msg)
+							tlog(msg)
 						return
 					try:
 						results = win32file.ReadDirectoryChangesW(
@@ -750,56 +819,65 @@ class Tasks:
 
 		def run_task_inner(result:list=None):
 
-			def catcher(result:list=None):
-				nonlocal thread, task
-				try:
-					start_time = dtime.now()
-					app.app_threads[thread.ident] = {
-						'func': 'task: ' + task_func_name
-						, 'stime': start_time, 'thread': thread
-					}
-					task['running'] = True
-					task['_call_count'] += 1
-					task['thread'] = threading.current_thread().name
-					task_kwargs = {}
-					if 'caller' in task['_params']:
-						task_kwargs['caller'] = caller
-					if 'data' in task['_params']:
-						task_kwargs['data'] = data
-					task['last_start'] = start_time
-					r = task['task_func'](**task_kwargs)
-					if result != None: result.append(r)
-					task = tasks.task_dict.get(task_func_name)
-					if task:
-						task['running'] = False
-						task['thread'] = None
-						task['err_counter'] = 0
-				except:
+			def catcher(task:dict, result_storage:list|None=None):
+
+				def get_task():
+					' Get current task dictionary '
 					try:
-						task = tasks.task_dict.get(task_func_name)
-						if task:
-							task['running'] = False
-							task['thread'] = None
-					except NameError:
+						return tasks.task_dict.get(task_func_name)
+					except:
 						if is_dev():
-							ttprint(f'nx-task after reload: {task_func_name}')
-						return
-					err_counter = task['err_counter'] + 1
-					if not result is None: result.append('<task error>')
+							msg = f'exception after execution: {exc_text()}'
+							ttprint(msg)
+							msg_warn(msg)
+						return None
+				cur_task = task
+				start_time = dtime.now()
+				app.app_threads[thread.native_id] = {
+					'func': 'task: ' + task_func_name
+					, 'stime': start_time
+					, 'thread': thread
+					, 'task_func_name': task_func_name
+				}
+				cur_task['running'] = True
+				cur_task['_tid'] = thread.native_id
+				cur_task['_call_count'] += 1
+				cur_task['_caller'] = caller
+				task_kwargs = {}
+				if 'caller' in cur_task['_params']:
+					task_kwargs['caller'] = caller
+				if 'data' in cur_task['_params']:
+					task_kwargs['data'] = data
+				cur_task['last_start'] = start_time
+				try:
+					task_result = cur_task['task_func'](**task_kwargs)
+				except Exception:
 					exc_str = exc_text()
-					task['_last_err'] = exc_str
-					if err_counter <= task['err_threshold']:
-						task['err_counter'] = err_counter
-						if is_dev():
-							tprint(f'exception suppressed: {exc_str}'
-							, tname=task_func_name, short=True)
-					else:
-						task['err_counter'] = 0
-						msg_err( lang.warn_task_error.format(
-							task['task_name_full'])
-						)
+					new_task = get_task()
+					if new_task:
+						new_task['running'] = False
+						err_counter = new_task['err_counter'] + 1
+						if result_storage is not None:
+							result_storage.append('<task error>')
+						new_task['_last_err'] = exc_str
+						if err_counter <= new_task['err_threshold']:
+							new_task['err_counter'] = err_counter
+							if is_dev():
+								tprint(f'exception suppressed: {exc_str}'
+								, tname=task_func_name, short=True)
+						else:
+							new_task['err_counter'] = 0
+							msg_err(lang.warn_task_error.format(
+								new_task['task_name_full']) )
+				else:
+					if result_storage is not None:
+						result_storage.append(task_result)
+					new_task = get_task()
+					if new_task:
+						new_task['running'] = False
+						new_task['err_counter'] = 0
 				if wait_event: wait_event.set()
-				_thread_pop('task', thread_id=thread.ident)
+				_thread_pop('task', tid=thread.native_id)
 			if task['rule'] and (caller != tcon.CALLER_MENU):
 				for rule in task['rule']:
 					try:
@@ -811,9 +889,12 @@ class Tasks:
 			if task['log'] and caller != CALLER_CMDLINE:
 				cs = f' ({caller})' if caller else ''
 				con_log(f'task{cs}: {task["task_name_full"]}', tname='')
+			if task['result']:
+				args = (task, result)
+			else:
+				args = (task, result)
 			thread = threading.Thread(target=catcher, daemon=daemon
-			, name=task['task_name']
-			, args=(result,) if task['result'] else () )
+			, name=task['task_name'], args=args )
 			thread.start()
 			if task['result']: thread.join()
 		if app.is_cmd_task and (caller != CALLER_CMDLINE): return
@@ -826,7 +907,9 @@ class Tasks:
 			and ( not task['hyperactive'])
 			and caller != CALLER_MENU
 		): return
-		if task['single'] and task['running']: return
+		if task['single']:
+			if task['running']:
+				return
 		daemon = (not caller in (CALLER_EXIT, CALLER_CMDLINE)) 
 		if task['result'] and not (result is None):
 			thread_start(run_task_inner, is_daemon=daemon, args=(result,)
@@ -956,7 +1039,6 @@ class Tasks:
 		if self.http_server:
 			self.http_server.shutdown()
 			self.http_server.socket.close()
-		keyboard.unhook_all()
 		if self.global_hk:
 			self.global_hk.unregister()
 			self.global_hk.stop_listener()
@@ -983,7 +1065,7 @@ class Tasks:
 				else:
 					msg.append(f'CancelIoEx: {repr(err)}')
 			except Exception as err:
-					msg.append(f'CancelIoEx general: {repr(err)}')
+				msg.append(f'CancelIoEx general: {repr(err)}')
 			try:
 				hDir.Close()
 			except Exception as err:
@@ -1026,10 +1108,12 @@ tasks:Tasks = None
 def load_crontab(event=None, with_cache:bool=False)->bool:
 	global tasks
 	global crontab
+	app._reloaded.wait()
+	app._reloaded.clear()
 	start = dtime.now()
-	con_log(f'{lang.load_crontab} {os.getcwd()}', tname='app')
+	con_log(f'{lang.load_crontab} {APP_PATH}', tname='app')
 	try:
-		run_bef_reload = []
+		running_before_reload:list = []
 		if sys.modules.get('crontab') is None:
 			crontab = importlib.import_module('crontab')
 		else:
@@ -1041,16 +1125,18 @@ def load_crontab(event=None, with_cache:bool=False)->bool:
 				except PermissionError:
 					if is_dev(): qprint(f'permission error {attempt=}')
 					time.sleep(.01)
-				except:
+				except Exception:
 					sys.modules['crontab'] = prev_crontab
 					msg_err(lang.warn_crontab_reload, title=lang.menu_reload
 					, source='load_crontab')
 					return False
 			else:
 				raise Exception('No more attempts to reload crontab')
-			for task in tasks.task_dict.values():
-				if not task.get('thread'): continue
-				run_bef_reload.append(task)
+			for cur_task in tasks.task_dict.values():
+				if not cur_task['running']: continue
+				running_before_reload.append(cur_task)
+			dev_print('running tasks: '
+			+ ', '.join(t['task_name'] for t in running_before_reload))
 			tasks.close()
 			del tmp_crontab
 			del prev_crontab
@@ -1061,14 +1147,18 @@ def load_crontab(event=None, with_cache:bool=False)->bool:
 		tasks = Tasks()
 		app.tasks = tasks
 		tasks.start_listeners()
-		running_tasks = []
-		for rtask in run_bef_reload:
-			if not (task := tasks.task_dict.get(rtask['task_func_name']) ):
+		for prev_task in running_before_reload:
+			new_task = tasks.task_dict.get(prev_task['task_func_name'])
+			if not new_task: continue
+			app_thread = app.app_threads.get(prev_task['_tid'])
+			if app_thread:
+				if not app_thread['thread'].is_alive(): continue
+			else:
 				continue
-			running_tasks.append(rtask['task_func_name'])
-			task['thread'] = rtask['thread']
-			task['last_start'] = rtask['last_start']
-			task['running'] = rtask['running']
+			new_task['last_start'] = prev_task['last_start']
+			new_task['running'] = prev_task['running']
+			new_task['_tid'] = prev_task['_tid']
+			new_task['_caller'] = prev_task['_caller']
 		tasks.enabled = app.enabled
 		thread_start(tasks.run_at_crontab_load, err_msg=True
 		, ident='app: run_at_crontab_load')
@@ -1079,7 +1169,9 @@ def load_crontab(event=None, with_cache:bool=False)->bool:
 	except:
 		msg_err(lang.warn_crontab_reload, title=lang.menu_reload)
 		return False
-	
+	finally:
+		app._reloaded.set()
+
 def load_modules(with_cache:bool=False):
 	r'''
 	(Re)Loads all application plugins and crontab extensions if any.  
@@ -1288,15 +1380,11 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			if is_dev():
 				ttprint(f'end of session')
 				tlog(f'end of session')
-		running_tasks = ()
+		running_tasks:list[str] = []
 		if not app.is_cmd_task:
 			running_tasks = self.running_tasks(show_msg=False)
 		if running_tasks:
-			tasks_str = '\r\n'.join(
-				tuple(
-					t['task_name'] for t in running_tasks
-				)[:TASKS_MSG_MAX]
-			)
+			tasks_str = '\n'.join(running_tasks[:TASKS_MSG_MAX])
 			if len(running_tasks) > TASKS_MSG_MAX:
 				tasks_str += '\n...'
 			if not force:
@@ -1318,12 +1406,13 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			)
 			for task in tasks.task_list_exit:
 				tasks.run_task(task['task_func_name'], caller=CALLER_EXIT)
+		app._reloaded.wait()
 		con_log(lang.menu_exit, tname='app')
 		tasks.close()
 		app.que_log.stop()
 		app.que_hook.stop()
 		app.que_wxdialog.stop()
-		app.que_speech.put(None)
+		app.que_speech.put((None, None))
 		try:
 			app.log_file[1].close()
 		except Exception as exc:
@@ -1334,16 +1423,26 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		return True
 
 	def running_tasks(self, show_msg:bool= True
-	, event=None)->tuple:
+	, event=None)->list[str]:
 		r'''
 		Prints running tasks and shows dialog
 		(if show_msg == True).  
-		Returns a tuple of names of running tasks.  
+		Returns a list of names of running tasks.  
 		'''
 		TASKS_MSG_MAX = 10
-		running_tasks = tuple(
-			t for t in tasks.task_dict.values() if t['running']
-		)
+		os_threads:dict[int|None, str] = {}
+		for thr in threading.enumerate():
+			if thr._target is None: continue
+			os_threads[thr.native_id] = thr.name
+		running_tasks:list[tuple[int, dict]] = []
+		running_tasks_names:list[str] = []
+		for tid, info in app.app_threads.items():
+			thread_task_func_name = info.get('task_func_name')
+			if not task_name: continue
+			for task_func_name, task in tasks.task_dict.items():
+				if task_func_name == thread_task_func_name:
+					running_tasks.append((tid, task))
+					running_tasks_names.append(task_func_name)
 		if is_dev():
 			app_threads_print()
 			app_win_show()
@@ -1353,49 +1452,44 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 				, timeout=3, wait=False)
 			else:
 				ttprint('no running tasks')
-			return ()
-		os_threads:dict[str, int] = {}
-		for thr in threading.enumerate():
-			if thr._target is None: continue
-			os_threads[thr.name] = thr.native_id
-		table = [('Task function', 'Exist', 'TID'
-		, 'Start time', 'Running time')]
+			return []
+		table = [('Task function', 'Exist', 'TID', 'Start time'
+		, 'Running time', 'Caller')]
 		nx_tasks:list = []
-		for t in running_tasks:
+		for tid, running_task in running_tasks:
 			exist:str = 'Y'
-			if not t['thread'] in os_threads:
+			if not tid in os_threads:
 				exist = 'N'
-				nx_tasks.append(t)
+				nx_tasks.append(running_task)
 			last_start = None
 			duration = None
-			if t['last_start']:
-				last_start = t['last_start'].strftime('%Y.%m.%d %H:%M:%S')
-				duration = time_diff_human(t['last_start'])
-			module = t['task_func'].__module__
+			if running_task['last_start']:
+				last_start = running_task['last_start'].strftime('%Y.%m.%d %H:%M:%S')
+				duration = time_diff_human(running_task['last_start'])
+			module = running_task['task_func'].__module__
 			module = '' if module == 'crontab' else module + '.' 
 			table.append((
-				module + t['task_func_name']
+				module + running_task['task_func_name']
 				, exist
-				, os_threads.get(t['thread'], '?')
+				, tid
 				, last_start
 				, duration
+				, running_task['_caller']
 			))
 		if len(table) > 1:
 			qprint(lang.warn_runn_tasks_con + ':')
 			table_print(table, use_headers=True)
-		if (not show_msg) or is_dev(): return running_tasks
-		tasks_str = '\r\n'.join(
-			tuple(t['task_name'] for t in running_tasks)[:TASKS_MSG_MAX]
-		)
-		if len(running_tasks) > TASKS_MSG_MAX:
+		if (not show_msg) or is_dev(): return running_tasks_names
+		tasks_str = '\n'.join( running_tasks_names[:TASKS_MSG_MAX] )
+		if len(running_tasks_names) > TASKS_MSG_MAX:
 			tasks_str += '\r\n...'
 		buttons = (lang.dlg_nx_tasks,) if nx_tasks else None
 		choice = dialog(tasks_str, buttons=buttons, timeout='10 sec'
 		, wait=(True if nx_tasks else False))
-		if choice != 1000: return ()
+		if choice != 1000: return []
 		for task in nx_tasks:
 			tasks.task_dict.pop(task['task_func_name'], None)
-		return ()
+		return []
 
 	def on_edit_crontab(self, event=None):
 		proc_start(sett.editor, os.path.join(APP_PATH, 'crontab.py'))
@@ -1408,10 +1502,10 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		tasks.enabled = state
 		app.enabled = state
 		if state:
-			set_title(APP_NAME)
+			win32api.SetConsoleTitle(APP_NAME)
 			con_log(f'{APP_NAME} enabled', tname='app')
 		else:
-			set_title(f'{APP_NAME} (disabled)')
+			win32api.SetConsoleTitle(f'{APP_NAME} (disabled)')
 			con_log(f'{APP_NAME} disabled', tname='app')
 		self.set_icon(dis=not state)
 	
@@ -1429,7 +1523,7 @@ class App(wx.App):
 
 	def OnInit(self):
 		self.enabled = True
-		self.app_threads = {}
+		self.app_threads:dict[int, dict] = {}
 		self.frame=wx.Frame(None, style=wx.DEFAULT_FRAME_STYLE
 			| wx.STAY_ON_TOP)
 		self.taskbaricon = TaskBarIcon(self.frame)
@@ -1447,23 +1541,25 @@ class App(wx.App):
 		self.que_print:TQueue = None
 		self.que_wxdialog:TQueue = None
 		self.que_speech:queue.Queue = None
+		self.tasks:Tasks = None
+		self._reloaded:threading.Event = threading.Event()
+		self._reloaded.set()
 		self.log_memory:list[tuple[str, str]] = list()
 		self.log_file:tuple[str, object] = tuple()
+		self.icons:tuple[winapi.HICON, winapi.HICON] = tuple()
 		return True
 	
-	def win_save(self):
-		'Find and save handle of console window'
+	def _win_save(self):
+		' Find and save handle of console window'
 		show_warn:int = (not sett.dev) \
 		and (getattr(self.cmd_args, 'task', None) == None)
+		self.app_hwnd = winapi.kernel32.GetConsoleWindow()
+		app_win_icon_set(self.app_hwnd)
 		hwnd_list = win_find(APP_NAME)
-		if len(hwnd_list) == 1:
-			self.app_hwnd = hwnd_list[0]
-		elif len(hwnd_list) > 1:
+		if len(hwnd_list) > 1:
 			self.app_hwnd = hwnd_list[0]
 			if not show_warn: return
 			msg_warn(lang.warn_too_many_win.format(APP_NAME, len(hwnd_list) ) )
-		else:
-			if show_warn: msg_warn(f'None of {APP_NAME} windows was found')
 
 	def InitLocale(self):
 		' Override with nothing (or impliment local if actually needed)'
@@ -1474,8 +1570,7 @@ class App(wx.App):
 
 def show_app_window():
 	try:
-		win32gui.ShowWindow(app.app_hwnd, win32con.SW_RESTORE)
-		attach_thread_input_foreground(app.app_hwnd)
+		win_activate(app.app_hwnd)
 	except Exception as e:
 		dev_print(f'show window exception: {e}')
 
@@ -1544,7 +1639,8 @@ def _speech_worker():
 		dev_print('CoInitializeEx exception:' + str_indent(exc))
 	try:
 		while True:
-			text = app.que_speech.get()
+			event:threading.Event
+			text, event = app.que_speech.get()
 			if text == None:
 				break
 			try:
@@ -1553,6 +1649,7 @@ def _speech_worker():
 				dev_print(f'exception: {repr(e)}')
 			finally:
 				app.que_speech.task_done()
+				if event: event.set()
 	finally:
 		try:
 			pythoncom.CoUninitialize()
@@ -1569,7 +1666,7 @@ def main():
 	global tasks
 	global sett
 	global lang
-	set_title(APP_NAME)
+	win32api.SetConsoleTitle(APP_NAME)
 	cmd_parser = argparse.ArgumentParser()
 	cmd_parser.add_argument('-dev', action='store_true'
 	, help='Enable debug output')
@@ -1593,6 +1690,12 @@ def main():
 	__builtins__.sett = sett
 	lang = Language(sett.language)
 	__builtins__.lang = lang
+	if cmd_args.dev:
+		import faulthandler
+		faulthandler.enable(
+			file=open('log\\faulthandler.log', 'w', buffering=1)
+			, all_threads=True
+		)
 	if cmd_args.task: sett.kiosk = True
 	if sett.kiosk:
 		sett.dev = False
@@ -1612,7 +1715,8 @@ def main():
 		thread_start(_speech_worker, ident='app: _speech_worker')
 		app.is_cmd_task = not cmd_args.task is None
 		app.cmd_args = cmd_args
-		app.win_save()
+		app.icons = icon_file_load('resources\\icon.ico')
+		app._win_save()
 		if load_crontab():
 			if cmd_args.task:
 				event = threading.Event()
@@ -1625,8 +1729,8 @@ def main():
 			tasks.run_at_sys_startup()
 		thread_start(con_key_listener, ident='app: console key listener')
 		app.MainLoop()
-	except:
-		msg_err('General exception')
+	except Exception as exc:
+		msg_err(f'General exception: {repr(exc)}')
 		input('Press Enter to exit...')
 
 

@@ -364,7 +364,7 @@ class Process:
 	@functools.cached_property
 	def name(self)->str:
 		' Process exe name '
-		return self._safe('name')
+		return self._safe('name', default='')
 	
 	@functools.cached_property
 	def username(self)->str:

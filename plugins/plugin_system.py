@@ -183,50 +183,37 @@ def win_list(title_filter:str='', class_filter:str=''
 			titles = [ t for t in titles if title_filter in t ]
 	return titles
 
-def win_find(title:str, exact:bool=True)->list:
+def win_find(title:str='', exact:bool=True, class_name:str|None=None)->list:
 	r'''
-	Finds window handle by title.  
-	Returns list of found window handles.  
+	Finds window handle by title and/or class_name.
+	Returns list of found window handles.
 	'''
 
-	def check_title(hwnd, title:str):
+	def check_window(hwnd, _):
 		nonlocal result
 		wtitle = win32gui.GetWindowText(hwnd)
-		if title == '':
-			pass
-		if exact:
-			if wtitle == title: result.append(hwnd)
-		else:
-			if title.lower() in wtitle.lower(): result.append(hwnd)
+		if title:
+			if exact:
+				if wtitle != title:
+					return
+			else:
+				if title not in wtitle.lower():
+					return
+		if class_name is not None:
+			wclass = win32gui.GetClassName(hwnd)
+			if exact:
+				if wclass != class_name:
+					return
+			else:
+				if class_name not in wclass.lower():
+					return
+		result.append(hwnd)
 
+	if title and not exact: title = title.lower()
+	if class_name and not exact: class_name = class_name.lower()
 	result = []
-	win32gui.EnumWindows(check_title, title)
+	win32gui.EnumWindows(check_window, None)
 	return result
-
-def win_activate(window=None)->int:
-	''' Brings window to front, returns hwnd.'''
-	if not (hwnd := win_get(window)): return 0
-	try:
-		win32gui.SetForegroundWindow(hwnd)
-	except pywintypes.error:
-		cur_pos = mouse_pos_get()
-		mouse_pos_set((-500, -500))
-		try:
-			win32gui.SetForegroundWindow(hwnd)
-		except:
-			mouse_pos_set(cur_pos)
-			return 0
-		mouse_pos_set(cur_pos)
-	return hwnd
-
-def win_act_rest(window=None)->int:
-	r'''
-	Activates the window and restores it if it is minimized.
-	'''
-	if not (hwnd := win_get(window) ): return -1
-	win_activate(hwnd)
-	if win32gui.IsIconic(hwnd): win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-	return hwnd
 
 def win_is_min(window)->bool|None:
 	r'''
@@ -330,20 +317,21 @@ def idle_wait(interval:int|str='1 sec')->int:
 	return prev_millis
 
 
+
 def _monitor(state:int=tcon.MONITOR_ON):
-	_SendNotifyMessage(
-		win32con.HWND_BROADCAST
-		, win32con.WM_SYSCOMMAND
-		, win32con.SC_MONITORPOWER
-		, state
+	win32gui.SendMessage(
+		win32con.HWND_BROADCAST,
+		win32con.WM_SYSCOMMAND,
+		win32con.SC_MONITORPOWER,
+		2
 	)
 
 def monitor_off():
-	''' Turns off the monitor '''
+	''' Turns off the monitor(s) '''
 	_monitor(state=tcon.MONITOR_OFF)
 
 def monitor_on():
-	''' Turns on the monitor '''
+	''' Turns on the monitor(s) '''
 	_monitor(state=tcon.MONITOR_ON)
 	
 
@@ -380,7 +368,7 @@ def win_exists(window=None)->bool:
 		asrt( win_exists(win_get('Taskop*')), True )
 		asrt( win_exists(win_get('Taskopyy')), False )
 		asrt( bmark(win_exists, (0,)), 1500 )
-		asrt( bmark(win_exists, ('Taskopy',)), 7_000 )
+		asrt( bmark(win_exists, ('Taskopy',)), 25_000 )
 
 	'''
 	return win32gui.IsWindow(win_get(window)) == 1
@@ -433,6 +421,27 @@ def _test_reg_key():
 		reg_key + ' = ' + str(registry_get(reg_key))
 		+ '\n\nPress enter to exit'
 	)
+
+def icon_file_load(ico_path:str
+, icon_index:int=0)->tuple[winapi.HICON, winapi.HICON]:
+	r'''
+	Load small and large icons from a .ico file.
+	Returns (hicon_small, hicon_large) or (None, None) on failure.
+	'''
+	phicon_large = (winapi.HICON * 1)()
+	phicon_small = (winapi.HICON * 1)()
+	n = winapi.shell32.ExtractIconExW(ico_path, icon_index, phicon_large, phicon_small, 1)
+	if n > 0: return phicon_small[0], phicon_large[0]
+	return None, None
+
+def win_icon_set(window, hicon:int)->bool:
+	r'''
+	Set both small and large icon using your HICON handle.
+	'''
+	if not (hwnd := win_get(window)): return False
+	winapi.user32.SendMessageW(hwnd, win32con.WM_SETICON, win32con.ICON_SMALL, hicon)
+	winapi.user32.SendMessageW(hwnd, win32con.WM_SETICON, win32con.ICON_BIG, hicon)
+	return True
 
 _HWND = None
 
