@@ -66,7 +66,7 @@ except ModuleNotFoundError:
 	import plugins.cache as cache
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2026-05-11'
+APP_VERSION = 'v2026-05-20'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 if getattr(sys, 'frozen', False):
 	APP_PATH = os.path.dirname(sys.executable)
@@ -1669,7 +1669,7 @@ def dialog(
 		return S_OK
 
 	if focus == 'auto':
-		focus = task_by_human()
+		focus = task_is_manual()
 	if content: content = str(content)
 	if title == '':
 		title = func_name_human(task_name())
@@ -2046,7 +2046,7 @@ class DataHTTPReq(object):
 		except:
 			pass
 	
-	@cache.lazy_property
+	@functools.cached_property
 	def file(self)->str:
 		if self._file:
 			return self._file
@@ -2055,7 +2055,7 @@ class DataHTTPReq(object):
 				fd.write(self.body)
 			return self._fullpath
 	
-	@cache.lazy_property
+	@functools.cached_property
 	def body(self)->bytes:
 		if self._body: return self._body
 		if self._file:
@@ -2087,7 +2087,7 @@ class DataBrowserExtForm:
 	media_url:str
 	cookies:dict
 	frame_id:int
-	@cache.lazy_property
+	@functools.cached_property
 	def domain(self)->str:
 		r'''
 		Second level domain of the *hostname*.  
@@ -2189,26 +2189,26 @@ class DataEvent:
 		self.msg:str = msg
 		self.event_data:list = [d[0] for d in evt_data]
 	
-	@cache.lazy_property
+	@functools.cached_property
 	def time_created_local(self)->dtime:
 		r'''
 		From UTC to local time.  
 		'''
 		return self.time_created + tdelta(seconds=-time.timezone)
 	
-	@cache.lazy_property
+	@functools.cached_property
 	def _user(self)->tuple:
 		return win32security.LookupAccountSid(None, self.user_id)
 	
-	@cache.lazy_property
+	@functools.cached_property
 	def user_name_short(self)->str:
 		return self._user[0]
 
-	@cache.lazy_property
+	@functools.cached_property
 	def user_name_full(self)->str:
 		return f'{self._user[1]}\\{self._user[0]}'
 
-	@cache.lazy_property
+	@functools.cached_property
 	def user_domain(self)->str:
 		return self._user[1]
 
@@ -2404,6 +2404,7 @@ def app_tasks()->dict[str, dict]:
 	Returns dictionary with tasks. Keys are function names
 	, and values are a dictionary with all the properties of a task.  
 	'''
+	
 	return app.tasks.task_dict
 
 def app_tasks_print():
@@ -3304,7 +3305,7 @@ def dclass_str(instance, template:str='{} = {}'
 	if short > 0: lines = list(str_short(l, short) for l in lines)
 	return line_sep.join(lines)
 
-def task_by_human(human_caller:set={tcon.CALLER_MENU, tcon.CALLER_HOTKEY
+def task_is_manual(human_caller:set={tcon.CALLER_MENU, tcon.CALLER_HOTKEY
 , tcon.CALLER_LEFT_CLICK})->bool:
 	r'''
 	Is the current task started by a user?

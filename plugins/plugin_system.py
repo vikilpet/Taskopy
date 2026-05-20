@@ -10,6 +10,7 @@ import win32api
 import win32gui
 import win32con
 import win32com
+import win32process
 import winreg
 import pywintypes
 from datetime import datetime as dtime
@@ -346,7 +347,7 @@ def win_is_visible(window=None)->bool:
 		return False
 
 def win_close(window=None, wait:bool=True)->bool:
-	'''
+	r'''
 	Closes window and returns True on success.
 	'''
 	if not (hwnd := win_get(window)): return False
@@ -396,7 +397,17 @@ def win_texts(window, child_class_name:str='')->set[str]:
 	_enum_all(hwnd, _get_texts)
 	return texts
 
-
+def proc_by_win(window) -> int:
+	r'''
+	Returns the Process ID (PID) for a given window handle (HWND).  
+	*hwnd*: The window handle (HWND). Can be 0 or None for invalid windows.  
+	'''
+	if not (hwnd := win_get(window)): return 0
+	try:
+		return win32process.GetWindowThreadProcessId(hwnd)[1]
+	except Exception:
+		dev_print(exc_text())
+		return 0
 
 def win_list_top()->list:
 	r'''

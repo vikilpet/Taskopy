@@ -55,6 +55,8 @@ APP_SETTINGS = (
 )
 TASK_OPTIONS = (
 	('task_name', None)
+	, ('task_name_full', None)
+	, ('task_func_name', None)
 	, ('task', True)
 	, ('menu', True)
 	, ('hotkey', None)
@@ -350,119 +352,121 @@ class Tasks:
 		self.hook_kb:HookKB = None
 		self.version:str = dtime.now().strftime('%Y.%m.%d %H:%M:%S.%f')
 		self.on_any_key:list = []
-		for task_name in dir(crontab):
-			if task_name.startswith('_'): continue
-			task_obj = getattr(crontab, task_name)
-			if not isinstance(task_obj, types.FunctionType): continue
+		self._is_alive:bool = True
+		for task_func_name in dir(crontab):
+			if task_func_name.startswith('_'): continue
+			task_func = getattr(crontab, task_func_name)
+			if not isinstance(task_func, types.FunctionType): continue
 			if (
-				(not getattr(task_obj, TASK_ATTR, False))
-				and (task_obj.__module__ != 'crontab')
+				(not getattr(task_func, TASK_ATTR, False))
+				and (task_func.__module__ != 'crontab')
 			): continue
-			task_opts:dict = {}
-			params:dict = inspect.signature(task_obj).parameters
+			task:dict = dict()
+			params:dict = inspect.signature(task_func).parameters
 			for opt, opt_def in TASK_OPTIONS:
 				param = params.get(opt)
 				if param is None:
-					task_opts[opt] = opt_def
+					task[opt] = opt_def
 				else:
-					task_opts[opt] = param.default
-			task_opts['_params'] = tuple(p.lower() for p in params.keys())
-			if not task_opts['task']: continue
-			if not task_opts['active']: continue
-			self.task_dict[task_name] = task_opts
-			task_opts['task_func'] = task_obj
-			task_opts['task_func_name'] = task_name
-			if task_opts['task_name']:
-				task_opts['task_name_full'] = f'{task_name} ({task_opts["task_name"]})'
+					task[opt] = param.default
+			if not task['task']: continue
+			if not task['active']: continue
+			task['_params'] = tuple(p.lower() for p in params.keys())
+			self.task_dict[task_func_name] = task
+			task['task_func'] = task_func
+			task['task_func_name'] = task_func_name
+			if task['task_name']:
+				task['task_name_full'] = f'{task_func_name} ({task["task_name"]})'
 			else:
-				task_opts['task_name'] = func_name_human(task_name)
-				task_opts['task_name_full'] = task_opts['task_name']
+				task['task_name'] = func_name_human(task_func_name)
+				task['task_name_full'] = task['task_name']
 	
 	def start_listeners(self):
 		if app.is_cmd_task: return
-		start = dtime.now()
-		for func_name, task_opts in self.task_dict.items():
-			if task_opts['startup']:
-				self.task_list_startup.append(task_opts)
-			if task_opts['sys_startup']:
-				self.task_list_sys_startup.append(task_opts)
-			if task_opts['on_load']:
-				self.task_list_crontab_load.append(task_opts)
-			if task_opts['on_exit']:
-				self.task_list_exit.append(task_opts)
-			if task_opts['schedule']: self.add_schedule(task_opts)
-			if task_opts['on_file_change']:
-				self.add_dir_change_watch(task_opts, is_file=True
-				, path=task_opts['on_file_change'])
-			if task_opts['on_dir_change']:
-				self.add_dir_change_watch(task_opts, is_file=False
-				, path=task_opts['on_dir_change'])
-			if task_opts['event_log']: self.add_event_handler(task_opts)
-			if task_opts['left_click']:
-				self.task_list_left_click.append(task_opts)
+		for task in self.task_dict.values():
+			if task['startup']:
+				self.task_list_startup.append(task)
+			if task['sys_startup']:
+				self.task_list_sys_startup.append(task)
+			if task['on_load']:
+				self.task_list_crontab_load.append(task)
+			if task['on_exit']:
+				self.task_list_exit.append(task)
+			if task['schedule']: self.add_schedule(task)
+			if task['on_file_change']:
+				self.add_dir_change_watch(task, is_file=True
+				, path=task['on_file_change'])
+			if task['on_dir_change']:
+				self.add_dir_change_watch(task, is_file=False
+				, path=task['on_dir_change'])
+			if task['event_log']: self.add_event_handler(task)
+			if task['left_click']:
+				self.task_list_left_click.append(task)
 				app.taskbaricon.Bind(
 					wx.adv.EVT_TASKBAR_LEFT_DOWN
-					, lambda evt, t=task_opts['task_func_name']:
+					, lambda evt, t=task['task_func_name']:
 						self.run_task(task_func_name=t, caller=CALLER_LEFT_CLICK)
 				)
-			if task_opts['every']: self.add_every(task_opts)
-			if task_opts['date']: self.add_schedule_date(task_opts)
-			if task_opts['hotkey']: self.add_hotkey(task_opts)
-			if task_opts['hotkey_nb']: self.add_hotkey_nb(task_opts)
-			if task_opts['menu']:
+			if task['every']: self.add_every(task)
+			if task['date']: self.add_schedule_date(task)
+			if task['hotkey']: self.add_hotkey(task)
+			if task['hotkey_nb']: self.add_hotkey_nb(task)
+			if task['menu']:
 				submenu = None
-				if '__' in task_opts['task_func_name']:
-					submenu, sm_name = task_opts['task_func_name'].split('__', maxsplit=1)
-					submenu = submenu.replace('_', ' ')
+				submenu = task['submenu']
+				if submenu:
+					task['task_name_submenu'] = task['task_name']
+				elif '__' in task['task_func_name']:
+					submenu, sm_name = task['task_func_name'].split('__', maxsplit=1)
 					sm_name = sm_name.replace('_', ' ')
 					if not sm_name[0].isupper(): sm_name = sm_name.capitalize()
-					task_opts['task_name_submenu'] = sm_name
-				if s := task_opts.get('submenu'): submenu = s
+					task['task_name_submenu'] = sm_name
 				if submenu:
+					submenu = submenu.replace('_', ' ')
 					if not submenu[0].isupper(): submenu = submenu.capitalize()
 					for m in self.task_list_submenus:
 						if m[0] == submenu:
-							m[1].append(task_opts)
+							m[1].append(task)
 							break
 					else:
-						self.task_list_submenus.append((submenu, [task_opts]))
+						self.task_list_submenus.append((submenu, [task]))
 				else:
-					self.task_list_menu.append(task_opts)
-			if task_opts['http'] != False:
-				if task_opts['http'] == True:
+					self.task_list_menu.append(task)
+			if task['http'] != False:
+				if task['http'] == True:
 					http_re = (
-						''.join(('^', task_opts['task_func_name'], '$')),
+						''.join(('^', task['task_func_name'], '$')),
 					)
 				else:
-					http_re = task_opts['http']
-					if not is_iter(http_re): http_re = (task_opts['http'],)
-				task_opts['http_re'] = tuple(re.compile(p) for p in http_re)
-				if not task_opts['http_dir']:
-					task_opts['http_dir'] = temp_dir()
-				self.task_list_http.append(task_opts)
-				if (wl := task_opts['http_white_list']):
+					http_re = task['http']
+					if not is_iter(http_re): http_re = (task['http'],)
+				task['http_re'] = tuple(re.compile(p) for p in http_re)
+				if not task['http_dir']:
+					task['http_dir'] = temp_dir()
+				self.task_list_http.append(task)
+				if (wl := task['http_white_list']):
 					if isinstance(wl, str):
-						task_opts['http_white_list'] = []
+						task['http_white_list'] = []
 						for ip in wl.split(','):
-							task_opts['http_white_list'].append(ip.strip())
-			if task_opts['idle']: self.add_idle_task(task_opts)
-			if task_opts['rule'] != None:
-				if not is_iter(task_opts['rule']):
-					task_opts['rule'] = (task_opts['rule'], )
-				for rule in task_opts['rule']:
+							task['http_white_list'].append(ip.strip())
+			if task['idle']: self.add_idle_task(task)
+			if task['rule'] != None:
+				if not is_iter(task['rule']):
+					task['rule'] = (task['rule'], )
+				for rule in task['rule']:
 					if not isinstance(rule, Callable):
 						msg_warn(lang.warn_rule_type.format(
-							task_opts['task_name_full']
+							task['task_name_full']
 						))
-			if task_opts['on_any_key']:
-				self.on_any_key.append(task_opts['task_func_name'])
+			if task['on_any_key']:
+				self.on_any_key.append(task['task_func_name'])
 
 		thread_start(self.run_scheduler, err_msg=True
 		, ident='app: scheduler')
 		self.task_list_menu.sort( key=lambda k: k['task_name'].lower() )
 		self.task_list_submenus.sort( key=lambda k: k[0].lower() )
 		for subm in self.task_list_submenus:
-			subm[1].sort( key=lambda k: k['task_name'].lower() )
+			subm[1].sort( key=lambda k: k['task_name_submenu'].lower() )
 		left_click_tasks_count = len(self.task_list_left_click)
 		if left_click_tasks_count > 1:
 			msg_warn(
@@ -481,7 +485,7 @@ class Tasks:
 			thread_start(self.global_hk.listen
 			, err_msg=True, ident='app: global hotkey listener')
 		if self.task_list_http:
-			thread_start(http_server_start, args=(self,), err_msg=True
+			thread_start(http_server_start, err_msg=True
 			, ident='app: http server')
 		if self.hotkeys_nb:
 			thread_start(
@@ -869,6 +873,10 @@ class Tasks:
 							new_task['err_counter'] = 0
 							msg_err(lang.warn_task_error.format(
 								new_task['task_name_full']) )
+					else:
+						if is_dev():
+							msg_err('task not found after execution (e): '
+							+ task_func_name)
 				else:
 					if result_storage is not None:
 						result_storage.append(task_result)
@@ -876,6 +884,10 @@ class Tasks:
 					if new_task:
 						new_task['running'] = False
 						new_task['err_counter'] = 0
+					else:
+						if is_dev():
+							msg_err('task not found after execution (s): '
+							+ task_func_name)
 				if wait_event: wait_event.set()
 				_thread_pop('task', tid=thread.native_id)
 			if task['rule'] and (caller != tcon.CALLER_MENU):
@@ -1036,9 +1048,11 @@ class Tasks:
 		, close event handlers.  
 		'''
 		start = dtime.now()
+		self._is_alive = False
 		if self.http_server:
 			self.http_server.shutdown()
 			self.http_server.socket.close()
+			self.http_server = None
 		if self.global_hk:
 			self.global_hk.unregister()
 			self.global_hk.stop_listener()
@@ -1055,6 +1069,7 @@ class Tasks:
 				eh.close()
 			except Exception as err:
 				dev_print(f'event close error: {err}')
+		app.taskbaricon.Unbind(wx.adv.EVT_TASKBAR_LEFT_DOWN)
 		for hDir, dir_path in tuple(self.dir_change_stop.items()):
 			msg = [dir_path]
 			try:
@@ -1062,18 +1077,21 @@ class Tasks:
 			except OSError as err:
 				if err.winerror == 1168:
 					msg.append(f'{err.strerror} ({err.winerror})')
+				elif err.winerror == 22:
+					pass
 				else:
-					msg.append(f'CancelIoEx: {repr(err)}')
+					msg.append(f'CancelIoEx OSError: {repr(err)}')
 			except Exception as err:
 				msg.append(f'CancelIoEx general: {repr(err)}')
 			try:
 				hDir.Close()
 			except Exception as err:
-				msg.append(f'Close: {repr(err)}')
+				msg.append(f'hDir.Close exception: {repr(err)}')
 			if is_dev() and len(msg) > 1:
 				dev_print(str_indent(', '.join(msg)))
-				tlog('[app] close: ' + ', '.join(msg))
-		dev_print('close time: ' + time_diff_human(start, with_ms=True))
+				tlog('[app] dir_change exception: ' + ', '.join(msg))
+		if is_dev():
+			dev_print('done in ' + time_diff_human(start, with_ms=True))
 
 	def tasks_print(self):
 		r'''
@@ -1144,6 +1162,8 @@ def load_crontab(event=None, with_cache:bool=False)->bool:
 			del crontab
 			crontab = importlib.import_module('crontab')
 		load_modules(with_cache=with_cache)
+		if is_dev():
+			exec("from plugins.tools import *", globals())
 		tasks = Tasks()
 		app.tasks = tasks
 		tasks.start_listeners()
@@ -1180,7 +1200,8 @@ def load_modules(with_cache:bool=False):
 
 	global crontab
 	DO_NOT_RELOAD = {'winapi', 'cache'}
-	setattr(sett, 'own_modules', {'plugins.constants'})
+	start = dtime.now()
+	own_modules = {'plugins.constants'}
 	for obj_name, obj in crontab.__dict__.items():
 		if not (
 			hasattr(obj, '__module__')
@@ -1193,13 +1214,13 @@ def load_modules(with_cache:bool=False):
 				inspect.getfile(sys.modules[obj.__module__])
 			).startswith('.'):
 				continue
-			sett.own_modules.add(obj.__module__)
+			own_modules.add(obj.__module__)
 		except ValueError:
 			continue
 	if with_cache:
-		rel_mod = sett.own_modules
+		rel_mod = own_modules
 	else:
-		rel_mod = sett.own_modules - DO_NOT_RELOAD
+		rel_mod = own_modules - DO_NOT_RELOAD
 	for mdl_name in rel_mod:
 		if with_cache: dev_print(f'reload module: {mdl_name}')
 		prev_mdl = sys.modules.pop(mdl_name)
@@ -1232,15 +1253,20 @@ def load_modules(with_cache:bool=False):
 			):
 				continue
 			if not isinstance(obj, types.FunctionType):
+				if not hasattr(crontab, obj_name):
+					continue
 				setattr(crontab, obj_name, obj)
 				continue
-			for mdl_name_own in sett.own_modules:
-				if hasattr(sys.modules.get(mdl_name_own), obj_name):
-					setattr(sys.modules[mdl_name_own]
-						, obj_name, decor_except_status(obj))
+			for mdl_name_own in own_modules:
+				mdl_own = sys.modules.get(mdl_name_own)
+				if hasattr(mdl_own, obj_name):
+					setattr(mdl_own, obj_name, obj)
 			if hasattr(crontab, obj_name):
-				setattr(crontab, obj_name, decor_except_status(obj))
+				setattr(crontab, obj_name, obj)
 		sys.modules[mdl_name] = mdl
+	if is_dev():
+		tprint('done in ' + time_diff_human(start, with_ms=True)
+		, with_parent=True)
 
 
 class Task:
@@ -1406,8 +1432,8 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 			)
 			for task in tasks.task_list_exit:
 				tasks.run_task(task['task_func_name'], caller=CALLER_EXIT)
-		app._reloaded.wait()
 		con_log(lang.menu_exit, tname='app')
+		app._reloaded.wait()
 		tasks.close()
 		app.que_log.stop()
 		app.que_hook.stop()

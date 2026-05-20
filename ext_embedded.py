@@ -101,7 +101,7 @@ def embedded__app_update_exe_replace(caller:str='', data:str='', menu=False):
 	' Replace old exe with new '
 	pid, cmdline = data.split(';', maxsplit=1)
 	pid = int(pid)
-	for attempt in range(50):
+	for attempt in range(100):
 		if not proc_exists(pid): break
 		tprint('waiting for exit', attempt)
 	else:

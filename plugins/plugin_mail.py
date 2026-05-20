@@ -5,6 +5,7 @@ import glob
 import os
 import time
 import datetime
+import functools
 from typing import Callable, Iterable
 from email.message import EmailMessage, Message
 from email import message_from_bytes
@@ -48,7 +49,7 @@ class MailMsg:
 		self.check_only:bool = check_only
 		self.sub_rule:Callable = sub_rule if sub_rule else lambda m: ''
 	
-	@cache.lazy_property
+	@functools.cached_property
 	def as_str(self)->str:
 		'''
 		Returns the entire message (including headers)
@@ -56,18 +57,18 @@ class MailMsg:
 		'''
 		return self._message.as_string()
 
-	@cache.lazy_property
+	@functools.cached_property
 	def _message(self)->Message:
 		return message_from_bytes(self.raw_bytes)
 	
-	@cache.lazy_property
+	@functools.cached_property
 	def _subj_fname(self)->str:
 		'''
 		Subject as a filesystem safe string (not a full path)
 		'''
 		return file_name_fix(self.h_subject)
 
-	@cache.lazy_property
+	@functools.cached_property
 	def body(self)->str:
 		'''
 		Returns message body as text.
@@ -118,7 +119,7 @@ class MailMsg:
 			dev_print(hdr_str := f'header "{header}" error: {repr(e)}')
 		return status, hdr_str
 
-	@cache.lazy_property
+	@functools.cached_property
 	def h_date(self)->str:
 		'''
 		Returns decoded *Date* header.
@@ -134,7 +135,7 @@ class MailMsg:
 			)
 		)
 
-	@cache.lazy_property
+	@functools.cached_property
 	def h_subject(self)->str:
 		'''
 		Returns decoded *Subject* header.  
@@ -147,21 +148,21 @@ class MailMsg:
 		if not body: return 'empty'
 		return body[:_MAX_BODY_AS_SUBJ] + '...'
 
-	@cache.lazy_property
+	@functools.cached_property
 	def h_to(self)->str:
 		'''
 		Returns decoded *To* header.
 		'''
 		return self._get_header('To')[1]
 
-	@cache.lazy_property
+	@functools.cached_property
 	def h_from(self)->str:
 		'''
 		Returns decoded *From* header.
 		'''
 		return self._get_header('From')[1]
 
-	@cache.lazy_property
+	@functools.cached_property
 	def body_text(self)->str:
 		'''
 		Returns the email body text cleaned of HTML tags
@@ -169,7 +170,7 @@ class MailMsg:
 		'''
 		return html_clean(self.body, is_mail=True)
 	
-	@cache.lazy_property
+	@functools.cached_property
 	def fullpath(self)->str:
 		' Full path for the message file '
 		return path_get(

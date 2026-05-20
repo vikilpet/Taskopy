@@ -27,9 +27,9 @@ else:
 
 class HTTPHandlerTasks(BaseHTTPRequestHandler):
 
-	def __init__(self, request, client_address, server, tasks):
+	def __init__(self, request, client_address, server):
 		self.silent = True
-		self.tasks = tasks
+		self.tasks = app.tasks
 		self.req_data = DataHTTPReq()
 		super().__init__(request, client_address, server)
 
@@ -362,24 +362,23 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 		if not self.silent:
 			super().log_message(msg_format, *args)
 
-def http_server_start(tasks):
+def http_server_start():
 	r'''
-	Starts HTTP server that will run 'tasks'.  
-	*tasks* - instance of 'Tasks' class.  
+	Starts HTTP server.
 	'''
 	try:
 		httpd = ThreadingHTTPServer(
 			(sett.server_ip, sett.server_port)
-			, lambda *a, tasks=tasks: HTTPHandlerTasks(*a, tasks=tasks)
+			, lambda *a: HTTPHandlerTasks(*a)
 		)
 		tprint(
 			'The HTTP server is running at'
 			+ f' {sett.server_ip}:{sett.server_port}'
 		)
-		tasks.http_server = httpd
+		app.tasks.http_server = httpd
 		httpd.serve_forever()
 	except Exception as e:
-		print(f'HTTP server error:\n{repr(e)}')
+		print(f'HTTP server error:\n{repr(e)}\n')
 		warning(f'HTTP server error:\n{repr(e)}')
 def _file_hash(fullpath:str)->str:
 	hash_md5 = hashlib.md5()

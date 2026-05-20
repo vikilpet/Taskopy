@@ -901,7 +901,7 @@ startupinfo=None, timeout:int=-1)->int:
 	return win32process.GetExitCodeProcess(proc_handle)
 
 def win_by_pid(process)->tuple:
-	'''
+	r'''
 	Returns top window of a process as a tuple (hwnd:int, title:str).
 	'''
 	if (pid := proc_get(process)) == -1: return None, None
