@@ -66,7 +66,7 @@ except ModuleNotFoundError:
 	import plugins.cache as cache
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2026-05-20'
+APP_VERSION = 'v2026-06-06'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 if getattr(sys, 'frozen', False):
 	APP_PATH = os.path.dirname(sys.executable)
@@ -2386,7 +2386,7 @@ def app_win_show():
 	Bring the application console window to the foreground, if possible.
 	'''
 	if is_con(): return
-	thread_start(app.show_window)
+	thread_start(win_activate, kwargs={'hwnd':app.app_hwnd, 'focus': True})
 
 @functools.cache
 def app_dir()->str:
@@ -2404,8 +2404,8 @@ def app_tasks()->dict[str, dict]:
 	Returns dictionary with tasks. Keys are function names
 	, and values are a dictionary with all the properties of a task.  
 	'''
-	
-	return app.tasks.task_dict
+	if app.tasks:
+		return app.tasks.task_dict
 
 def app_tasks_print():
 	r'''

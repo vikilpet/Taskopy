@@ -363,7 +363,7 @@ class Process:
 
 	@functools.cached_property
 	def name(self)->str:
-		' Process exe name '
+		' Process exe file name (not a full path) '
 		return self._safe('name', default='')
 	
 	@functools.cached_property
@@ -506,7 +506,7 @@ def proc_close(process, timeout:int=10
 		try:
 			win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
 		except Exception as e:
-			dev_print(f'postmessage error: {repr(e)}')
+			pass
 	for _ in range(timeout):
 		time.sleep(1)
 		if not psutil.pid_exists(pid): return True

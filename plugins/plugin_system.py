@@ -5,7 +5,6 @@ A *window* argument in function can be a
 - *None* - it will find hwnd of a foreground window.
 '''
 import os
-import ctypes
 import win32api
 import win32gui
 import win32con
@@ -15,10 +14,13 @@ import winreg
 import pywintypes
 from datetime import datetime as dtime
 import ctypes
+from ctypes import c_float, c_void_p, POINTER
+from ctypes.wintypes import DWORD, BOOL
 import time
 import psutil
-from .tools import tprint, winapi, tcon, value_to_unit, dev_print \
+from .tools import tprint, tcon, value_to_unit, dev_print \
 , exc_text, app_pid
+import plugins.winapi as winapi
 LockWorkStation = winapi.user32.LockWorkStation
 _GetAncestor = winapi.user32.GetAncestor
 _SendNotifyMessage = winapi.user32.SendNotifyMessageA
@@ -453,29 +455,126 @@ def win_icon_set(window, hicon:int)->bool:
 	winapi.user32.SendMessageW(hwnd, win32con.WM_SETICON, win32con.ICON_SMALL, hicon)
 	winapi.user32.SendMessageW(hwnd, win32con.WM_SETICON, win32con.ICON_BIG, hicon)
 	return True
+_CLSID_MMDeviceEnumerator = winapi.GUID('{BCDE0395-E52F-467C-8E3D-C4579291692E}')
+_IID_IMMDeviceEnumerator  = winapi.GUID('{A95664D2-9614-4F35-A746-DE8DB63617E6}')
+_IID_IAudioEndpointVolume = winapi.GUID('{5CDF2C82-841E-4546-9722-0CF74078229A}')
+_eRender     = 0
+_eMultimedia = 1
+_IMMDeviceEnumerator_GetDefaultAudioEndpoint     = 4
+_IMMDevice_Activate                              = 3
+_IAudioEndpointVolume_SetMasterVolumeLevelScalar = 7
+_IAudioEndpointVolume_GetMasterVolumeLevelScalar = 9
+_IAudioEndpointVolume_SetMute                    = 14
+_IAudioEndpointVolume_GetMute                    = 15
 
-_HWND = None
+def _sound_endpoint() -> c_void_p:
+	"""Return an activated IAudioEndpointVolume pointer.
+	Caller must winapi.com_release() it when done."""
+	winapi.ole32.CoInitializeEx(None, winapi.COINIT_APARTMENTTHREADED)
+	enum_ptr = c_void_p()
+	winapi.ole32.CoCreateInstance(
+		ctypes.byref(_CLSID_MMDeviceEnumerator),
+		None, winapi.CLSCTX_ALL,
+		ctypes.byref(_IID_IMMDeviceEnumerator),
+		ctypes.byref(enum_ptr),
+	)
+	device_ptr = c_void_p()
+	try:
+		winapi.com_vcall(
+			enum_ptr, _IMMDeviceEnumerator_GetDefaultAudioEndpoint,
+			ctypes.HRESULT, [DWORD, DWORD, POINTER(c_void_p)],
+			_eRender, _eMultimedia, ctypes.byref(device_ptr),
+		)
+	finally:
+		winapi.com_release(enum_ptr)
+	vol_ptr = c_void_p()
+	try:
+		winapi.com_vcall(
+			device_ptr, _IMMDevice_Activate,
+			ctypes.HRESULT,
+			[POINTER(winapi.GUID), DWORD, c_void_p, POINTER(c_void_p)],
+			ctypes.byref(_IID_IAudioEndpointVolume),
+			winapi.CLSCTX_ALL, None, ctypes.byref(vol_ptr),
+		)
+	finally:
+		winapi.com_release(device_ptr)
+	return vol_ptr
 
-def _sound_cmd(cmd:int):
-	global _HWND
-	if not _HWND: _HWND = __builtins__['app'].app_hwnd
-	win32gui.SendMessage(_HWND, _WM_APPCOMMAND, None, cmd)
+def sound_vol_get() -> float:
+	'Return current master output volume in [0.0, 1.0].'
+	p = _sound_endpoint()
+	try:
+		out = c_float()
+		winapi.com_vcall(
+			p, _IAudioEndpointVolume_GetMasterVolumeLevelScalar,
+			ctypes.HRESULT, [POINTER(c_float)], ctypes.byref(out),
+		)
+		return out.value
+	finally:
+		winapi.com_release(p)
 
-def sound_vol_set(volume:int):
+def sound_vol_set(level: float) -> None:
+	'Set master output volume. `level` is in [0.0, 1.0].'
+	if not 0.0 <= level <= 1.0:
+		raise ValueError('level must be between 0.0 and 1.0')
+	p = _sound_endpoint()
+	try:
+		winapi.com_vcall(
+			p, _IAudioEndpointVolume_SetMasterVolumeLevelScalar,
+			ctypes.HRESULT, [c_float, POINTER(winapi.GUID)],
+			c_float(level), None,
+		)
+	finally:
+		winapi.com_release(p)
+
+def sound_vol_add(delta: float) -> float:
+	r'''
+	Change master volume by `delta` (e.g. +0.05 or -0.10).
+	Clamps to [0.0, 1.0] and returns the new volume.
 	'''
-	It needs to be redone someday. Probably.
-	'''
-	for _ in range(50): _sound_cmd(_APPCOMMAND_VOLUME_DOWN)
-	for _ in range(volume // 2): _sound_cmd(_APPCOMMAND_VOLUME_UP)
+	p = _sound_endpoint()
+	try:
+		cur = c_float()
+		winapi.com_vcall(
+			p, _IAudioEndpointVolume_GetMasterVolumeLevelScalar,
+			ctypes.HRESULT, [POINTER(c_float)], ctypes.byref(cur),
+		)
+		new = cur.value + delta
+		if   new < 0.0: new = 0.0
+		elif new > 1.0: new = 1.0
+		winapi.com_vcall(
+			p, _IAudioEndpointVolume_SetMasterVolumeLevelScalar,
+			ctypes.HRESULT, [c_float, POINTER(winapi.GUID)],
+			c_float(new), None,
+		)
+		return new
+	finally:
+		winapi.com_release(p)
 
-def sound_vol_up():
-	_sound_cmd(_APPCOMMAND_VOLUME_UP)
+def sound_mute_get() -> bool:
+	'Return current master mute state.'
+	p = _sound_endpoint()
+	try:
+		out = BOOL()
+		winapi.com_vcall(
+			p, _IAudioEndpointVolume_GetMute,
+			ctypes.HRESULT, [POINTER(BOOL)], ctypes.byref(out),
+		)
+		return bool(out.value)
+	finally:
+		winapi.com_release(p)
 
-def sound_vol_down():
-	_sound_cmd(_APPCOMMAND_VOLUME_DOWN)
-
-def sound_vol_mute():
-	_sound_cmd(_APPCOMMAND_VOLUME_MUTE)
+def sound_mute_set(mute: bool) -> None:
+	'Set master mute state.'
+	p = _sound_endpoint()
+	try:
+		winapi.com_vcall(
+			p, _IAudioEndpointVolume_SetMute,
+			ctypes.HRESULT, [BOOL, POINTER(winapi.GUID)],
+			BOOL(bool(mute)), None,
+		)
+	finally:
+		winapi.com_release(p)
 
 def mouse_pos_get()->tuple:
 	r'''

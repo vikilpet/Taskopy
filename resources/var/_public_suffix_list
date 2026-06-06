@@ -1081,6 +1081,7 @@ utazas.hu
 video.hu
 id
 ac.id
+ai.id
 biz.id
 co.id
 desa.id
@@ -7939,10 +7940,12 @@ vm.bytemark.co.uk
 cafjs.com
 canva-apps.cn
 my.canvasite.cn
+khsj.cn
 canva-apps.com
 canva-hosted-embed.com
 canvacode.com
 rice-labs.com
+canva.link
 canva.run
 my.canva.site
 drr.ac
@@ -10126,10 +10129,9 @@ wasmer.app
 webflow.io
 webflowtest.io
 *.webhare.dev
-bookonline.app
 hotelwithflight.com
-reserve-online.com
 reserve-online.net
+book.online
 cprapid.com
 pleskns.com
 wp2.host

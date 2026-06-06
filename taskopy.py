@@ -1308,7 +1308,6 @@ def create_menu_item(menu, task, func=None, parent_menu=None):
 
 class TaskBarIcon(wx.adv.TaskBarIcon):
 	def __init__(self, frame):
-		self.frame = frame
 		self.text_dic = {}
 		super(TaskBarIcon, self).__init__()
 		self.icon = wx.Icon(APP_ICON)
@@ -1407,21 +1406,21 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 				ttprint(f'end of session')
 				tlog(f'end of session')
 		running_tasks:list[str] = []
-		if not app.is_cmd_task:
+		if (not force) and (not app.is_cmd_task):
 			running_tasks = self.running_tasks(show_msg=False)
-		if running_tasks:
-			tasks_str = '\n'.join(running_tasks[:TASKS_MSG_MAX])
-			if len(running_tasks) > TASKS_MSG_MAX:
-				tasks_str += '\n...'
-			if not force:
-				if dialog(
-					lang.warn_runn_tasks_msg.format( len(running_tasks) )
-					+ '\n\n' + tasks_str
-					, title=lang.menu_exit
-					, buttons=(lang.button_close, lang.button_cancel)
-					, return_button=True
-				)[1] != lang.button_close:
-					return False
+			if running_tasks:
+				tasks_str = '\n'.join(running_tasks[:TASKS_MSG_MAX])
+				if len(running_tasks) > TASKS_MSG_MAX:
+					tasks_str += '\n...'
+				if not force:
+					if dialog(
+						lang.warn_runn_tasks_msg.format( len(running_tasks) )
+						+ '\n\n' + tasks_str
+						, title=lang.menu_exit
+						, buttons=(lang.button_close, lang.button_cancel)
+						, return_button=True
+					)[1] != lang.button_close:
+						return False
 		if not app.is_cmd_task and tasks.task_list_exit:
 			ttprint(
 				lang.warn_on_exit + ': '
@@ -1434,7 +1433,12 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 				tasks.run_task(task['task_func_name'], caller=CALLER_EXIT)
 		con_log(lang.menu_exit, tname='app')
 		app._reloaded.wait()
-		tasks.close()
+		try:
+			tasks.close()
+		except Exception as exc:
+			dev_print(f'tasks.close exception: {exc}')
+		finally:
+			app.tasks = None
 		app.que_log.stop()
 		app.que_hook.stop()
 		app.que_wxdialog.stop()
@@ -1444,9 +1448,20 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		except Exception as exc:
 			ttprint('error closing log file: ' + repr(exc))
 		app.que_print.stop(timeout=0.1)
+		self.RemoveIcon()
 		wx.CallAfter(self.Destroy)
-		self.frame.Close()
+		app.frame.Close(True)
 		return True
+	
+	def on_query_end_session(self, event:wx.CloseEvent):
+		dev_print('query end of session')
+		self.on_exit(is_end_session=True)
+		event.Skip(False)
+
+	def on_end_session(self, event:wx.CloseEvent):
+		dev_print('end of session')
+		if app.tasks: self.on_exit(is_end_session=True)
+		event.Skip(False)
 
 	def running_tasks(self, show_msg:bool= True
 	, event=None)->list[str]:
@@ -1556,8 +1571,10 @@ class App(wx.App):
 		self.show_window = self.taskbaricon.on_left_down
 		self.app_pid = win32process.GetCurrentProcessId()
 		self.app_hwnd:int = 0
+		self.frame.Bind(wx.EVT_QUERY_END_SESSION
+		, self.taskbaricon.on_query_end_session)
 		self.frame.Bind(wx.EVT_END_SESSION
-		, lambda: self.taskbaricon.on_exit(is_end_session=True) )
+		, self.taskbaricon.on_end_session)
 		self.cmd_args:argparse.Namespace = argparse.Namespace()
 		self.is_cmd_task:bool = False
 		self.load_crontab = load_crontab
