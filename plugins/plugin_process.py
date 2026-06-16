@@ -23,7 +23,7 @@ import pywintypes
 import ctypes
 from ctypes import wintypes
 from .tools import dev_print, tprint, patch_import \
-, thread_start, _SIZE_UNITS, winapi, cache, is_con
+, thread_start, _SIZE_UNITS, winapi, cache, is_con, is_dev
 from .plugin_filesystem import path_get
 from .plugin_system import win_list_top, win_get
 
@@ -302,36 +302,38 @@ def proc_exists(process, cmd_filter:str=None
 	command line of the process (case-insensitive).  
 	*user_filter* - only search within processes of
 	specified user. Format: pc\\username  
-	Not cheap:
-
-		asrt( bmark(proc_exists, ('explorer.exe',)), 800_000_000 )
+	Filtering using string filters is very expensive;
+	use PID whenever possible:
+		asrt( bmark(proc_exists, ('_',), b_iter=1), 2_200_000_000 )
+		asrt( bmark(proc_exists, (1,)), 18_000 )
 	
 	'''
 	if cmd_filter: cmd_filter = cmd_filter.lower()
 	if user_filter: user_filter = user_filter.lower()
-	if isinstance(process, str): process = process.lower()
-	for proc in psutil.process_iter():
+	if isinstance(process, int):
 		try:
-			if isinstance(process, str):
-				if proc.name().lower() == process:
-					if user_filter:
-						if proc.username().lower() != user_filter: continue
-					if cmd_filter:
-						if cmd_filter in ' '.join(proc.cmdline()).lower():
-							return proc.pid
-					else:
+			proc = psutil.Process(process)
+			if user_filter and proc.username().lower() != user_filter:
+				return False
+			if cmd_filter and cmd_filter not in ' '.join(proc.cmdline()).lower():
+				return False
+			return proc.pid
+		except (psutil.NoSuchProcess, psutil.AccessDenied):
+			return False
+	process = process.lower()
+	for proc in psutil.process_iter(attrs=['name']):
+		try:
+			if proc.info['name'] and proc.info['name'].lower() == process:
+				if user_filter and proc.username().lower() != user_filter:
+					continue
+				if cmd_filter:
+					if cmd_filter in ' '.join(proc.cmdline()).lower():
 						return proc.pid
-			else:
-				if proc.pid == process:
-					if user_filter:
-						if proc.username().lower() != user_filter: continue
-					if cmd_filter:
-						if cmd_filter in ' '.join(proc.cmdline()).lower():
-							return proc.pid
-					else:
-						return proc.pid
-		except psutil.AccessDenied:
-			dev_print(f'proc_exists access denied: {process}')
+				else:
+					return proc.pid
+		except (psutil.AccessDenied, psutil.NoSuchProcess):
+			if is_dev():
+				tprint(f'proc_exists access error: {process}')
 	return False
 
 

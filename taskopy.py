@@ -172,7 +172,14 @@ class HookKB:
 
 		def _low_level_keyboard_proc(nCode, wParam, lParam):
 			if nCode == win32con.HC_ACTION:
-				app.que_hook.put((wParam, lParam))
+				kb = ctypes.cast(lParam,
+					ctypes.POINTER(winapi.KBDLLHOOKSTRUCT)).contents
+				app.que_hook.put((
+					wParam
+					, kb.vkCode
+					, kb.scanCode
+					, kb.flags
+				))
 			return winapi.user32.CallNextHookEx(0, nCode
 			, wParam, lParam)
 
@@ -192,21 +199,19 @@ SHIFT_KEYS = {win32con.VK_LSHIFT, win32con.VK_RSHIFT}
 ALT_KEYS = {win32con.VK_LMENU, win32con.VK_RMENU}
 KEY_DOWN = {win32con.WM_KEYDOWN, win32con.WM_SYSKEYDOWN}
 
-def key_name(key:winapi.KBDLLHOOKSTRUCT)->str:
+def key_name(vkCode, scanCode, flags)->str:
 	r'''
 	Returns nice name: 'shift', 'ctrl', 'alt', 'a', 'enter', ...
 	The difference between the right and left keys is ignored.  
 	*key* - `winapi.KBDLLHOOKSTRUCT` instance.  
 	'''
-	vk = key.vkCode
-	scan = key.scanCode
-	extended = bool(key.flags & 0x01)
-	if vk in (win32con.VK_RSHIFT, win32con.VK_RCONTROL, win32con.VK_RMENU):
+	extended = bool(flags & 0x01)
+	if vkCode in (win32con.VK_RSHIFT, win32con.VK_RCONTROL, win32con.VK_RMENU):
 		extended = False
-	if 0x41 <= vk <= 0x5A:
-		return chr(vk).lower()
-	if 0x30 <= vk <= 0x39:
-		return chr(vk)
+	if 0x41 <= vkCode <= 0x5A:
+		return chr(vkCode).lower()
+	if 0x30 <= vkCode <= 0x39:
+		return chr(vkCode)
 	oem_map = {
 		tcon.VK_OEM_1:      ';',
 		tcon.VK_OEM_2:      '/',
@@ -221,8 +226,8 @@ def key_name(key:winapi.KBDLLHOOKSTRUCT)->str:
 		tcon.VK_OEM_COMMA:  ',',
 		tcon.VK_OEM_102:    '<',
 	}
-	if vk in oem_map: return oem_map[vk]
-	lparam_raw = ((scan << 16) | (int(extended) << 24)) & 0xFFFFFFFF
+	if vkCode in oem_map: return oem_map[vkCode]
+	lparam_raw = ((scanCode << 16) | (int(extended) << 24)) & 0xFFFFFFFF
 	if lparam_raw & 0x80000000:
 		lparam = lparam_raw - 0x100000000
 	else:
@@ -245,7 +250,7 @@ def key_name(key:winapi.KBDLLHOOKSTRUCT)->str:
 				.replace('left ', '')
 			)
 		return name
-	return f'VK_{vk:02X}'
+	return f'VK_{vkCode:02X}'
 
 def hook_consumer(data:tuple):
 
@@ -255,34 +260,33 @@ def hook_consumer(data:tuple):
 				task
 				, caller=CALLER_HOTKEY
 				, data=(
-					key_name(key)
+					key_name(vkCode, scanCode, flags)
 					, 'down' if wParam in KEY_DOWN else 'up'
 				)
 			)
 
 	try:
-		wParam, lParam = data
+		wParam, vkCode, scanCode, flags = data
 		if not wParam in WM_EVENTS: return
-		key = ctypes.cast(lParam, ctypes.POINTER(winapi.KBDLLHOOKSTRUCT)).contents
-		if key.flags & (win32con.LLKHF_INJECTED | win32con.LLKHF_LOWER_IL_INJECTED):
+		if flags & (win32con.LLKHF_INJECTED | win32con.LLKHF_LOWER_IL_INJECTED):
 			return
 		hook_kb = tasks.hook_kb
-		if key.vkCode in CTRL_KEYS:
+		if vkCode in CTRL_KEYS:
 			hook_kb.ctrl_is_pressed = wParam in KEY_DOWN
 			run_any_key_task()
 			return
-		if key.vkCode in SHIFT_KEYS:
+		if vkCode in SHIFT_KEYS:
 			hook_kb.shift_is_pressed = wParam in KEY_DOWN
 			run_any_key_task()
 			return
-		if key.vkCode in ALT_KEYS:
+		if vkCode in ALT_KEYS:
 			hook_kb.alt_is_pressed = wParam in KEY_DOWN
 			run_any_key_task()
 			return
 		if not wParam in KEY_DOWN:
 			run_any_key_task()
 			return
-		candidates = tasks.hotkeys_nb.get(key.vkCode, ())
+		candidates = tasks.hotkeys_nb.get(vkCode, ())
 		for modifiers, task in candidates:
 			if not modifiers:
 				if hook_kb.shift_is_pressed or hook_kb.ctrl_is_pressed \
@@ -891,13 +895,17 @@ class Tasks:
 				if wait_event: wait_event.set()
 				_thread_pop('task', tid=thread.native_id)
 			if task['rule'] and (caller != tcon.CALLER_MENU):
+				task['running'] = True
 				for rule in task['rule']:
 					try:
 						if not rule():
+							task['running'] = False
 							return
 					except:
+						task['running'] = False
 						msg_err(lang.warn_rule_exc.format(task["task_name"]))
 						return
+				task['running'] = False
 			if task['log'] and caller != CALLER_CMDLINE:
 				cs = f' ({caller})' if caller else ''
 				con_log(f'task{cs}: {task["task_name_full"]}', tname='')
@@ -1221,8 +1229,10 @@ def load_modules(with_cache:bool=False):
 		rel_mod = own_modules
 	else:
 		rel_mod = own_modules - DO_NOT_RELOAD
+	table = [('Module', 'Time')]
 	for mdl_name in rel_mod:
 		if with_cache: dev_print(f'reload module: {mdl_name}')
+		mdl_time = time.perf_counter_ns()
 		prev_mdl = sys.modules.pop(mdl_name)
 		try:
 			tmp_mdl = importlib.import_module(mdl_name)
@@ -1264,6 +1274,13 @@ def load_modules(with_cache:bool=False):
 			if hasattr(crontab, obj_name):
 				setattr(crontab, obj_name, obj)
 		sys.modules[mdl_name] = mdl
+		table.append((
+			mdl_name
+			, (time.perf_counter_ns() - mdl_time)
+		))
+	if is_dev():
+		tprint(f'{len(table)-1} modules:')
+		table_print(table, use_headers=True, sorting=(0,))
 	if is_dev():
 		tprint('done in ' + time_diff_human(start, with_ms=True)
 		, with_parent=True)
@@ -1479,7 +1496,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 		running_tasks_names:list[str] = []
 		for tid, info in app.app_threads.items():
 			thread_task_func_name = info.get('task_func_name')
-			if not task_name: continue
+			if not thread_task_func_name: continue
 			for task_func_name, task in tasks.task_dict.items():
 				if task_func_name == thread_task_func_name:
 					running_tasks.append((tid, task))
@@ -1752,7 +1769,8 @@ def main():
 		__builtins__.app = app
 		app.que_print = TQueue(consumer=print, max_size=8192)
 		app.que_log = TQueue(consumer=_tlog, max_size=8192)
-		app.que_hook = TQueue(consumer=hook_consumer, max_size=8192)
+		app.que_hook = TQueue(consumer=hook_consumer, max_size=8192
+		, priority=win32con.THREAD_PRIORITY_ABOVE_NORMAL)
 		app.que_wxdialog = TQueue(consumer=_dialog_consumer)
 		app.que_speech = Queue(maxsize=16)
 		thread_start(_speech_worker, ident='app: _speech_worker')

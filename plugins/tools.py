@@ -66,7 +66,7 @@ except ModuleNotFoundError:
 	import plugins.cache as cache
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2026-06-06'
+APP_VERSION = 'v2026-06-16'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 if getattr(sys, 'frozen', False):
 	APP_PATH = os.path.dirname(sys.executable)
@@ -182,11 +182,11 @@ class TQueue(Queue):
 
 	'''
 	def __init__(self, consumer:Callable=lambda v: qprint(v)
-	, max_size:int=4096)->None:
+	, max_size:int=4096, priority:int=win32con.THREAD_PRIORITY_NORMAL)->None:
 		super().__init__(maxsize=max_size)
 		self._stop_sentinel:object = object()
 		self.consumer:Callable=consumer
-		thread_start(func=self.consumer_thread
+		thread_start(func=self.consumer_thread, priority=priority
 		, ident='TQueue: ' + consumer.__name__)
 	
 	def consumer_thread(self):
@@ -2304,14 +2304,17 @@ def thread_priority_get(native_id:int|None=None)->None|int:
 
 def thread_priority_set(native_id:int, priority:int):
 	r'''
-	Sets own thread priority.  
+	Sets the thread's priority.  
 	*native_id* - a `threading.Thread().native_id`  
 	*priority* - a constant like `win32con.THREAD_PRIORITY_NORMAL`  
 	'''
-	handle = win32api.OpenThread(win32con.THREAD_SET_INFORMATION, False
-	, native_id)
-	win32process.SetThreadPriority(handle, priority)
-	win32api.CloseHandle(handle)
+	handle = win32api.OpenThread(
+		win32con.THREAD_SET_INFORMATION, False, native_id
+	)
+	try:
+		win32process.SetThreadPriority(handle, priority)
+	finally:
+		win32api.CloseHandle(handle)
 
 def task_start(taskname:str|Callable, **kwargs):
 	r'''
