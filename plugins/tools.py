@@ -22,6 +22,7 @@ import win32clipboard
 import win32security
 import pywintypes
 from multiprocessing.dummy import Pool as ThreadPool
+import _multiprocessing
 from operator import itemgetter
 import re
 import winsound
@@ -66,7 +67,7 @@ except ModuleNotFoundError:
 	import plugins.cache as cache
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2026-06-16'
+APP_VERSION = 'v2026-07-12'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 if getattr(sys, 'frozen', False):
 	APP_PATH = os.path.dirname(sys.executable)
@@ -3313,6 +3314,7 @@ def task_is_manual(human_caller:set={tcon.CALLER_MENU, tcon.CALLER_HOTKEY
 	r'''
 	Is the current task started by a user?
 	'''
+	if is_con(): return True
 	tname = task_name()
 	if not tname: return False
 	task = app.tasks.task_dict.get(tname)
@@ -3348,6 +3350,8 @@ def _init():
 	setattr(app, 'app_pid', win32process.GetCurrentProcessId())
 	setattr(app, 'cmd_args', argparse.Namespace(dev=True))
 	setattr(app, 'tasks', {})
+	from .plugin_system import icon_file_load
+	setattr(app, 'icons', icon_file_load('resources\\icon.ico'))
 	__builtins__['app'] = app
 	
 if __name__ != '__main__':

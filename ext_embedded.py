@@ -104,6 +104,7 @@ def embedded__app_update_exe_replace(caller:str='', data:str='', menu=False):
 	for attempt in range(100):
 		if not proc_exists(pid): break
 		tprint('waiting for exit', attempt)
+		time_sleep('200 ms')
 	else:
 		tprint("Something's wrong, the app still hasn't closed")
 		time_sleep('5 sec')

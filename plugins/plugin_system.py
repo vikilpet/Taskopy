@@ -16,8 +16,10 @@ from datetime import datetime as dtime
 import ctypes
 from ctypes import c_float, c_void_p, POINTER
 from ctypes.wintypes import DWORD, BOOL
+from ctypes import wintypes
 import time
 import psutil
+from enum import IntEnum, IntFlag
 from .tools import tprint, tcon, value_to_unit, dev_print \
 , exc_text, app_pid
 import plugins.winapi as winapi
@@ -235,6 +237,30 @@ def win_minimize(window=None)->int:
 	hwnd = win_get(window)
 	if hwnd: win32gui.ShowWindow(hwnd, win32con.SW_MINIMIZE)
 	return hwnd
+
+def win_is_fullscreen(window=None):
+	r'''
+	Check if a window is in full-screen mode by comparing its
+	rect to the monitor rect.
+	'''
+	if not (hwnd := win_get(window) ): return False
+	if not win32gui.IsWindowVisible(hwnd): return False
+	if win32gui.IsIconic(hwnd): return False
+	left, top, right, bottom = win32gui.GetWindowRect(hwnd)
+	window_width = right - left
+	window_height = bottom - top
+	monitor_info = win32api.GetMonitorInfo(
+		win32api.MonitorFromWindow(hwnd, win32con.MONITOR_DEFAULTTONEAREST)
+	)
+	monitor_rect = monitor_info["Monitor"]  # (left, top, right, bottom)
+	monitor_width = monitor_rect[2] - monitor_rect[0]
+	monitor_height = monitor_rect[3] - monitor_rect[1]
+	return (
+		window_width >= monitor_width
+		and window_height >= monitor_height
+		and left <= monitor_rect[0]
+		and top <= monitor_rect[1]
+	)
 	
 def win_maximize(window=None)->int:
 	r'''
@@ -466,6 +492,51 @@ _IAudioEndpointVolume_SetMasterVolumeLevelScalar = 7
 _IAudioEndpointVolume_GetMasterVolumeLevelScalar = 9
 _IAudioEndpointVolume_SetMute                    = 14
 _IAudioEndpointVolume_GetMute                    = 15
+_IMMDevice_OpenPropertyStore  = 4
+_IPropertyStore_GetValue       = 5
+_IMMDeviceEnumerator_EnumAudioEndpoints = 3
+_IMMDeviceCollection_GetCount             = 3
+_IMMDeviceCollection_Item                  = 4
+_IMMDevice_GetId    = 5
+_IMMDevice_GetState = 6
+_CLSID_CPolicyConfigClient = winapi.GUID("{870af99c-171d-4f9e-af0d-e63df40c2bc9}")
+_IID_IPolicyConfig = winapi.GUID("{f8679f50-850a-41cf-9c72-430f290290c8}")
+_IPolicyConfig_SetDefaultEndpoint = 13
+_eConsole         = 0
+_eMultimedia      = 1
+_eCommunications  = 2
+
+
+class SoundDevType(IntEnum):
+	'''EDataFlow — direction of audio data flow.'''
+	RENDER  = 0   # output / playback / speakers
+	CAPTURE = 1   # input  / recording / microphone
+
+
+class SoundDevState(IntFlag):
+	'''DEVICE_STATE_* flags describing endpoint availability.'''
+	ACTIVE     = 0x00000001
+	DISABLED   = 0x00000002
+	NOTPRESENT = 0x00000004
+	UNPLUGGED  = 0x00000008
+	ALL        = 0x0000000F
+_STGM_READ = 0x00000000
+_VT_LPWSTR = 31
+class _PROPERTYKEY(ctypes.Structure):
+	_fields_ = [("fmtid", winapi.GUID), ("pid", DWORD)]
+
+_PKEY_Device_FriendlyName = _PROPERTYKEY(
+	winapi.GUID("{a45c254e-df1c-4efd-8020-67d146a850e0}"), 14
+)
+class _PROPVARIANT(ctypes.Structure):
+	_fields_ = [
+		("vt",        ctypes.c_ushort),
+		("wReserved1", ctypes.c_ushort),
+		("wReserved2", ctypes.c_ushort),
+		("wReserved3", ctypes.c_ushort),
+		("ptr",       ctypes.c_void_p),   # union — for VT_LPWSTR this is a PWSTR
+		("_pad",      ctypes.c_void_p),   # extra space (DECIMAL / array members)
+	]
 
 def _sound_endpoint() -> c_void_p:
 	"""Return an activated IAudioEndpointVolume pointer.
@@ -575,6 +646,171 @@ def sound_mute_set(mute: bool) -> None:
 		)
 	finally:
 		winapi.com_release(p)
+
+def sound_device_name() -> str|None:
+	r'''
+	Return the friendly name of the default render device.  
+
+		asrt( bmark(sound_device_name), 8_800_000 )
+	
+	'''
+	winapi.ole32.CoInitializeEx(None, winapi.COINIT_APARTMENTTHREADED)
+	enum_ptr = ctypes.c_void_p()
+	winapi.ole32.CoCreateInstance(
+		ctypes.byref(_CLSID_MMDeviceEnumerator),
+		None, winapi.CLSCTX_ALL,
+		ctypes.byref(_IID_IMMDeviceEnumerator),
+		ctypes.byref(enum_ptr),
+	)
+	device_ptr = ctypes.c_void_p()
+	try:
+		winapi.com_vcall(
+			enum_ptr, _IMMDeviceEnumerator_GetDefaultAudioEndpoint,
+			ctypes.HRESULT, [DWORD, DWORD, POINTER(ctypes.c_void_p)],
+			_eRender, _eMultimedia, ctypes.byref(device_ptr),
+		)
+	finally:
+		winapi.com_release(enum_ptr)
+	try:
+		props_ptr = ctypes.c_void_p()
+		winapi.com_vcall(
+			device_ptr, _IMMDevice_OpenPropertyStore,
+			ctypes.HRESULT, [DWORD, POINTER(ctypes.c_void_p)],
+			_STGM_READ, ctypes.byref(props_ptr),
+		)
+	finally:
+		winapi.com_release(device_ptr)
+	try:
+		pv = _PROPVARIANT()
+		winapi.com_vcall(
+			props_ptr, _IPropertyStore_GetValue,
+			ctypes.HRESULT,
+			[POINTER(_PROPERTYKEY), POINTER(_PROPVARIANT)],
+			ctypes.byref(_PKEY_Device_FriendlyName),
+			ctypes.byref(pv),
+		)
+		if pv.vt == _VT_LPWSTR and pv.ptr:
+			return ctypes.wstring_at(pv.ptr)
+		return None
+	finally:
+		winapi.com_release(props_ptr)
+
+def sound_device_list(
+	data_flow: SoundDevType = SoundDevType.RENDER,
+	state_mask: SoundDevState = SoundDevState.ACTIVE,
+) -> list[tuple[str, str]]:
+	'''
+	Return ``(friendly_name, device_id)`` tuples for each matching endpoint.
+
+	*data_flow* - `RENDER` for playback devices
+	, `CAPTURE` for recording devices.  
+	*state_mask* - bitwise-OR of device states to
+	include (default: ACTIVE only).  
+
+		asrt( bmark(sound_device_list), 9_800_000 )
+	
+	'''
+	winapi.ole32.CoInitializeEx(None, winapi.COINIT_APARTMENTTHREADED)
+	enum_ptr = ctypes.c_void_p()
+	winapi.ole32.CoCreateInstance(
+		ctypes.byref(_CLSID_MMDeviceEnumerator),
+		None, winapi.CLSCTX_ALL,
+		ctypes.byref(_IID_IMMDeviceEnumerator),
+		ctypes.byref(enum_ptr),
+	)
+	coll_ptr = ctypes.c_void_p()
+	try:
+		winapi.com_vcall(
+			enum_ptr, _IMMDeviceEnumerator_EnumAudioEndpoints,
+			ctypes.HRESULT,
+			[DWORD, DWORD, POINTER(ctypes.c_void_p)],
+			int(data_flow), int(state_mask), ctypes.byref(coll_ptr),
+		)
+	finally:
+		winapi.com_release(enum_ptr)
+	try:
+		count = DWORD(0)
+		winapi.com_vcall(
+			coll_ptr, _IMMDeviceCollection_GetCount,
+			ctypes.HRESULT, [POINTER(DWORD)],
+			ctypes.byref(count),
+		)
+		results: list[tuple[str, str]] = []
+		for i in range(count.value):
+			device_ptr = ctypes.c_void_p()
+			winapi.com_vcall(
+				coll_ptr, _IMMDeviceCollection_Item,
+				ctypes.HRESULT,
+				[DWORD, POINTER(ctypes.c_void_p)],
+				i, ctypes.byref(device_ptr),
+			)
+			try:
+				id_ptr = ctypes.c_wchar_p()
+				winapi.com_vcall(
+					device_ptr, _IMMDevice_GetId,
+					ctypes.HRESULT, [POINTER(ctypes.c_wchar_p)],
+					ctypes.byref(id_ptr),
+				)
+				device_id = id_ptr.value or ""
+				props_ptr = ctypes.c_void_p()
+				winapi.com_vcall(
+					device_ptr, _IMMDevice_OpenPropertyStore,
+					ctypes.HRESULT, [DWORD, POINTER(ctypes.c_void_p)],
+					_STGM_READ, ctypes.byref(props_ptr),
+				)
+				try:
+					pv = _PROPVARIANT()
+					winapi.com_vcall(
+						props_ptr, _IPropertyStore_GetValue,
+						ctypes.HRESULT,
+						[POINTER(_PROPERTYKEY), POINTER(_PROPVARIANT)],
+						ctypes.byref(_PKEY_Device_FriendlyName),
+						ctypes.byref(pv),
+					)
+					if pv.vt == _VT_LPWSTR and pv.ptr:
+						name = ctypes.wstring_at(pv.ptr)
+					else:
+						name = ""
+				finally:
+					winapi.com_release(props_ptr)
+			finally:
+				winapi.com_release(device_ptr)
+			results.append((name, device_id))
+		return results
+	finally:
+		winapi.com_release(coll_ptr)
+
+def sound_device_set(device_id:str)->bool:
+	r'''
+	Set the default audio device for all roles.
+
+	Parameters
+	----------
+	device_id : str
+		Opaque device ID string as returned by :func:`sound_device_list`
+		(the second element of each tuple).
+
+	Returns `True` if the call succeeded.  
+	'''
+	winapi.ole32.CoInitializeEx(None, winapi.COINIT_APARTMENTTHREADED)
+	policy_ptr = ctypes.c_void_p()
+	winapi.ole32.CoCreateInstance(
+		ctypes.byref(_CLSID_CPolicyConfigClient),
+		None, winapi.CLSCTX_ALL,
+		ctypes.byref(_IID_IPolicyConfig),
+		ctypes.byref(policy_ptr),
+	)
+	try:
+		for role in (_eConsole, _eMultimedia, _eCommunications):
+			winapi.com_vcall(
+				policy_ptr, _IPolicyConfig_SetDefaultEndpoint,
+				ctypes.HRESULT,
+				[ctypes.c_wchar_p, DWORD],
+				device_id, role,
+			)
+		return True
+	finally:
+		winapi.com_release(policy_ptr)
 
 def mouse_pos_get()->tuple:
 	r'''

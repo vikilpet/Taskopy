@@ -291,4 +291,18 @@ def adb_is_locked(dev_id:str)->tuple[bool, bool|str]:
 		return False, data
 	return True, 'mDreamingLockscreen=true' in data
 
+def adb_free_space(storage:str='/data', **kwargs)->int:
+	r'''
+	Gets free space on the internal storage in bytes.  
+	List all partitions:  
+	
+		adb shell df -h
+	
+	'''
+	status, data = adb_run("shell stat -f -c '%a %S' " + storage, **kwargs)
+	if not status: return -1
+	available_blocks, block_size = (int(v) for v in data.split())
+	return available_blocks * block_size
+
+
 if __name__ != '__main__': patch_import()

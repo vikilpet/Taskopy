@@ -8053,6 +8053,9 @@ cnpy.gdn
 *.otap.co
 co.ca
 co.com
+sch.ac
+dev.cv
+store.cv
 codeberg.page
 csb.app
 preview.csb.app
@@ -8165,7 +8168,20 @@ ccwu.cc
 cc.cd
 us.ci
 de5.net
+dnshome.at
+resolve.bar
+ddns.berlin
+dnshome.cloud
+ddnssec.de
 dnshome.de
+dyndnssec.de
+heimdns.de
+srvdns.de
+dnshome.eu
+dnshome.it
+dyn.now
+heimdns.online
+ddns.wtf
 online.th
 shop.th
 co.scot
@@ -8983,8 +8999,6 @@ in-vpn.net
 in-dsl.org
 in-vpn.org
 oninferno.net
-biz.at
-info.at
 info.cx
 ac.leg.br
 al.leg.br
@@ -9261,7 +9275,6 @@ modelscape.com
 mwcloudnonprod.com
 polyspace.com
 mayfirst.info
-mayfirst.org
 mcdir.me
 mcdir.ru
 vps.mcdir.ru
@@ -9331,6 +9344,7 @@ mittwald.info
 mittwaldserver.info
 typo3server.info
 project.space
+mkm.fan
 mocha.app
 mochausercontent.com
 mocha-sandbox.dev
@@ -9628,6 +9642,9 @@ byen.site
 nyc.mn
 *.cn.st
 pubtls.org
+puter.app
+puter.site
+puter.work
 pythonanywhere.com
 eu.pythonanywhere.com
 qa2.com
@@ -10178,6 +10195,7 @@ raffleentry.org.uk
 weeklylottery.org.uk
 wpenginepowered.com
 js.wpenginepowered.com
+grok.me
 *.xenonconnect.de
 half.host
 xnbay.com

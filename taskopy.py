@@ -1229,7 +1229,6 @@ def load_modules(with_cache:bool=False):
 		rel_mod = own_modules
 	else:
 		rel_mod = own_modules - DO_NOT_RELOAD
-	table = [('Module', 'Time')]
 	for mdl_name in rel_mod:
 		if with_cache: dev_print(f'reload module: {mdl_name}')
 		mdl_time = time.perf_counter_ns()
@@ -1274,13 +1273,6 @@ def load_modules(with_cache:bool=False):
 			if hasattr(crontab, obj_name):
 				setattr(crontab, obj_name, obj)
 		sys.modules[mdl_name] = mdl
-		table.append((
-			mdl_name
-			, (time.perf_counter_ns() - mdl_time)
-		))
-	if is_dev():
-		tprint(f'{len(table)-1} modules:')
-		table_print(table, use_headers=True, sorting=(0,))
 	if is_dev():
 		tprint('done in ' + time_diff_human(start, with_ms=True)
 		, with_parent=True)

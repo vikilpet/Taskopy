@@ -1,6 +1,7 @@
 import subprocess
 import os
 import ctypes
+from ctypes import wintypes
 import psutil
 import time
 from typing import Iterable
@@ -17,17 +18,16 @@ import win32file
 import win32security
 import win32ts
 import win32serviceutil
+import pythoncom
 import contextlib
 import winerror
 import pywintypes
-import ctypes
-from ctypes import wintypes
 from .tools import dev_print, tprint, patch_import \
 , thread_start, _SIZE_UNITS, winapi, cache, is_con, is_dev
 from .plugin_filesystem import path_get
 from .plugin_system import win_list_top, win_get
 
-# https://psutil.readthedocs.io/en/latest/
+IS_64BIT = ctypes.sizeof(ctypes.c_void_p) == 8
 
 def file_open(fullpath, parameters:str=None, operation:str='open'
 , cwd:str='', showcmd:int=win32con.SW_SHOWNORMAL):
@@ -52,28 +52,167 @@ def file_open(fullpath, parameters:str=None, operation:str='open'
 		, showcmd
 	)
 
-def proc_get(process, cmd_filter:str='')->int:
+def _pids_by_name(name_lower):
+	r"""
+	Yield every PID whose image name matches *name_lower*
+	(case-insensitive, already pre-lowered by caller).
+	"""
+	snapshot = winapi.kernel32.CreateToolhelp32Snapshot(winapi.TH32CS_SNAPPROCESS, 0)
+	if not snapshot or snapshot == winapi.INVALID_HANDLE_VALUE:
+		return
+	try:
+		entry = winapi.PROCESSENTRY32W()
+		entry.dwSize = ctypes.sizeof(winapi.PROCESSENTRY32W)
+		if winapi.kernel32.Process32FirstW(snapshot, ctypes.byref(entry)):
+			while True:
+				if entry.szExeFile.lower() == name_lower:
+					yield entry.th32ProcessID
+				if not winapi.kernel32.Process32NextW(snapshot, ctypes.byref(entry)):
+					break
+	finally:
+		winapi.kernel32.CloseHandle(snapshot)
+
+
+def _read_cmdline(handle):
+	r"""
+	Read the command line of the process behind *handle*
+	by walking its PEB via ReadProcessMemory.
+	Returns the string, or None on any failure.
+	"""
+	bytes_read = ctypes.c_size_t()
+
+	if IS_64BIT:
+		wow64 = ctypes.c_uint64()
+		if winapi.ntdll.NtQueryInformationProcess(
+			handle, winapi.PROCESSWOW64_CLASS, ctypes.byref(wow64),
+			ctypes.sizeof(wow64), None
+		) == 0 and wow64.value:
+			ptr_size  = 4
+			peb_addr  = wow64.value
+			pp_offset = winapi.PEB_PROCESS_PARAMETERS_OFFSET_32
+			cl_offset = winapi.PEB_COMMANDLINE_OFFSET_32
+		else:
+			pbi = winapi.PROCESS_BASIC_INFORMATION64()
+			if winapi.ntdll.NtQueryInformationProcess(
+				handle, winapi.PROCESSBASICINFO_CLASS, ctypes.byref(pbi),
+				ctypes.sizeof(pbi), None
+			) != 0 or not pbi.PebBaseAddress:
+				return None
+			ptr_size  = 8
+			peb_addr  = pbi.PebBaseAddress
+			pp_offset = winapi.PEB_PROCESS_PARAMETERS_OFFSET_64
+			cl_offset = winapi.PEB_COMMANDLINE_OFFSET_64
+	else:
+		pbi = winapi.PROCESS_BASIC_INFORMATION32()
+		if winapi.ntdll.NtQueryInformationProcess(
+			handle, winapi.PROCESSBASICINFO_CLASS, ctypes.byref(pbi),
+			ctypes.sizeof(pbi), None
+		) != 0 or not pbi.PebBaseAddress:
+			return None
+		ptr_size  = 4
+		peb_addr  = pbi.PebBaseAddress
+		pp_offset = winapi.PEB_PROCESS_PARAMETERS_OFFSET_32
+		cl_offset = winapi.PEB_COMMANDLINE_OFFSET_32
+	if ptr_size == 4:
+		param_ptr = ctypes.c_uint32()
+	else:
+		param_ptr = ctypes.c_uint64()
+	if not winapi.kernel32.ReadProcessMemory(
+		handle, ctypes.c_void_p(peb_addr + pp_offset),
+		ctypes.byref(param_ptr), ptr_size, ctypes.byref(bytes_read),
+	):
+		return None
+	params = param_ptr.value
+	if not params:
+		return None
+	if ptr_size == 4:
+		unicode_str = winapi.UNICODE_STRING32()
+	else:
+		unicode_str = winapi.UNICODE_STRING64()
+	if not winapi.kernel32.ReadProcessMemory(
+		handle, ctypes.c_void_p(params + cl_offset),
+		ctypes.byref(unicode_str), ctypes.sizeof(unicode_str),
+		ctypes.byref(bytes_read),
+	):
+		return None
+	if not unicode_str.Length or not unicode_str.Buffer:
+		return None
+	buf = ctypes.create_unicode_buffer(unicode_str.Length // 2 + 1)
+	if not winapi.kernel32.ReadProcessMemory(
+		handle, ctypes.c_void_p(unicode_str.Buffer),
+		buf, unicode_str.Length, ctypes.byref(bytes_read),
+	):
+		return None
+	return buf.value
+
+
+def read_user(handle):
+	r"""
+	Return 'DOMAIN\\User' for the process behind *handle*,
+	or None if the token cannot be opened.
+	"""
+	try:
+		token = win32security.OpenProcessToken(handle, winapi.TOKEN_QUERY)
+		sid, _ = win32security.GetTokenInformation(token, win32security.TokenUser)
+		domain, user, _ = win32security.LookupAccountSid(None, sid)
+		return f'{domain}\\{user}'
+	except Exception:
+		return None
+
+def proc_get(process, cmd_filter: str = '', user_filter: str = '') -> int | None:
 	r'''
-	Returns PID of process or *-1* if not found.  
-	*cmd_filter* - find the process with this substring in the command line.  
-	
+	Returns PID if the process with the specified name exists.  
+	*process* - image name or PID.  
+	*cmd_filter* - optional string to search in the
+	command line of the process (case-insensitive).  
+	*user_filter* - only search within processes of
+	specified user.  
+	Filtering using string filters is expensive;
+	use PID whenever possible:
+		asrt( bmark(proc_get, ('_',), b_iter=3), 60_000_000 )
+		asrt( bmark(proc_get, (1,)), 700 )
+		asrt( bmark(proc_get, ('\\taskopy.py',), b_iter=3), 70_000_000 )
+		pid, user = os.getpid(), os.getlogin()
+		asrt( bmark(proc_get, ('', user), b_iter=3), 70_000_000 )
+		asrt( proc_get(pid, '\\taskopy.py'), pid)
+		asrt( proc_get(pid, '\\python.exe', user), pid)
+
 	'''
 	if isinstance(process, int): return process
-	if cmd_filter: cmd_filter = cmd_filter.lower()
-	name = process.lower()
-	if not name.endswith('.exe'): name = name + '.exe'
-	for proc in psutil.process_iter():
-		try:
-			proc_name = proc.name().lower()
-		except psutil.AccessDenied as e:
-			dev_print('proc_get error: ' + repr(e))
+	name_lower = process.lower()
+	if cmd_filter:
+		cmd_filter = cmd_filter.lower()
+	if user_filter:
+		user_filter = user_filter.lower()
+	need_cmd  = bool(cmd_filter)
+	need_user = bool(user_filter)
+	for pid in _pids_by_name(name_lower):
+		if not need_cmd and not need_user:
+			return pid
+
+		access = winapi.PROCESS_QUERY_LIMITED_INFORMATION
+		if need_cmd:
+			access |= winapi.PROCESS_VM_READ
+
+		handle = winapi.kernel32.OpenProcess(access, False, pid)
+		if not handle:
 			continue
-		if proc_name == name:
-			if not cmd_filter:
-				return proc.pid
-			if cmd_filter in ' '.join(proc.cmdline()).lower():
-				return proc.pid
-	return -1
+		try:
+			if need_cmd:
+				cmdline = _read_cmdline(handle)
+				if not cmdline or cmd_filter not in cmdline.lower():
+					continue
+
+			if need_user:
+				usr = read_user(handle)
+				if not usr or usr.lower() != user_filter:
+					continue
+
+			return pid
+		finally:
+			winapi.kernel32.CloseHandle(handle)
+
+	return None
 
 def _create_pipe():
 	sa = pywintypes.SECURITY_ATTRIBUTES()
@@ -293,48 +432,52 @@ def proc_start(
 	else:
 		return r.pid
 
-def proc_exists(process, cmd_filter:str=None
-, user_filter:str=None)->int:
+
+
+def proc_owner(process)->str:
 	r'''
-	Returns PID if the process with the specified name exists.  
-	*process* - image name or PID.  
-	*cmd_filter* - optional string to search in the
-	command line of the process (case-insensitive).  
-	*user_filter* - only search within processes of
-	specified user. Format: pc\\username  
-	Filtering using string filters is very expensive;
-	use PID whenever possible:
-		asrt( bmark(proc_exists, ('_',), b_iter=1), 2_200_000_000 )
-		asrt( bmark(proc_exists, (1,)), 18_000 )
-	
+	Gets the owner of a PID.
+
+		user = os.getlogin()
+		pid = proc_get('explorer.exe')
+		asrt( proc_owner(pid), user)
+		asrt( bmark(proc_owner, (pid,)), 200_000 )
+
 	'''
-	if cmd_filter: cmd_filter = cmd_filter.lower()
-	if user_filter: user_filter = user_filter.lower()
-	if isinstance(process, int):
+	if (pid := proc_get(process)) == None: return ''
+	try:
+		handle = win32api.OpenProcess(win32con.PROCESS_QUERY_LIMITED_INFORMATION
+		, False, pid)
 		try:
-			proc = psutil.Process(process)
-			if user_filter and proc.username().lower() != user_filter:
-				return False
-			if cmd_filter and cmd_filter not in ' '.join(proc.cmdline()).lower():
-				return False
-			return proc.pid
-		except (psutil.NoSuchProcess, psutil.AccessDenied):
-			return False
-	process = process.lower()
-	for proc in psutil.process_iter(attrs=['name']):
-		try:
-			if proc.info['name'] and proc.info['name'].lower() == process:
-				if user_filter and proc.username().lower() != user_filter:
-					continue
-				if cmd_filter:
-					if cmd_filter in ' '.join(proc.cmdline()).lower():
-						return proc.pid
-				else:
-					return proc.pid
-		except (psutil.AccessDenied, psutil.NoSuchProcess):
-			if is_dev():
-				tprint(f'proc_exists access error: {process}')
-	return False
+			token = win32security.OpenProcessToken(handle, win32con.TOKEN_QUERY)
+			try:
+				sid, _ = win32security.GetTokenInformation(token, win32security.TokenUser)
+				user, _, _ = win32security.LookupAccountSid(None, sid)
+				return user
+			finally:
+				token.Close()
+		finally:
+			win32api.CloseHandle(handle)
+	except Exception:
+		return ''
+
+
+def proc_exists(pid:int)->bool:
+	r'''
+	Returns True if the PID exists.  
+
+		pid = proc_get('explorer.exe')
+		asrt(proc_exists(pid), True)
+		asrt( bmark(proc_exists, (pid,)), 7_100 )
+
+	'''
+	try:
+		h_process = win32api.OpenProcess(win32con.PROCESS_QUERY_INFORMATION
+		, False, pid)
+		win32api.CloseHandle(h_process)
+		return True
+	except win32api.error:
+		return False
 
 
 @dataclass
@@ -421,11 +564,11 @@ def proc_cpu(process, interval:float=1.0)->float:
 	of time in seconds.  
 	If a process not found then returns -1:
 
-		asrt(proc_cpu('not existing process'), -1)
+		asrt(proc_cpu('non existing process'), -1)
 		asrt(proc_cpu(0), 1, '>')
 		
 	'''
-	if (pid := proc_get(process)) == -1: return -1
+	if (pid := proc_get(process)) == None: return -1
 	proc = psutil.Process(pid)
 	return proc.cpu_percent(interval)
 
@@ -434,7 +577,7 @@ def proc_uptime(process)->float:
 	Returns process running time in seconds or -1.0
 	if no process is found.
 	'''
-	if (pid := proc_get(process)) == -1: return -1.0
+	if (pid := proc_get(process)) == None: return -1.0
 	return time.time() - psutil.Process(pid).create_time()
 
 def proc_kill(process, cmd_filter:str=''):
@@ -477,11 +620,11 @@ def free_ram(unit:str='percent')->float:
 		return round(psutil.virtual_memory()[4] / e, 1)
 
 def proc_thread_num(process)->int:
-	if (pid := proc_get(process)) == -1: return -1
+	if (pid := proc_get(process)) == None: return -1
 	return len(psutil.Process(pid=pid).threads())
 
 def proc_handle_num(process)->int:
-	if (pid := proc_get(process)) == -1: return -1
+	if (pid := proc_get(process)) == None: return -1
 	return psutil.Process(pid=pid).num_handles()
 
 def proc_close(process, timeout:int=10
@@ -496,7 +639,7 @@ def proc_close(process, timeout:int=10
 		windows.append(hwnd)
 		return True
 	
-	if (pid := proc_get(process, cmd_filter)) == -1: return -1
+	if (pid := proc_get(process, cmd_filter)) == None: return -1
 	windows = []
 	try:
 		for thread in psutil.Process(pid).threads():
@@ -525,7 +668,7 @@ def proc_fpath(process)->str:
 		asrt( bmark(proc_fpath, (17532,)), 5_000 )
 		
 	'''
-	if (pid := proc_get(process)) == -1: return ''
+	if (pid := proc_get(process)) == None: return ''
 	hProc = winapi.kernel32.OpenProcess(win32con.PROCESS_QUERY_LIMITED_INFORMATION
 	, False, pid)
 	if not hProc: return ''
@@ -906,7 +1049,7 @@ def win_by_pid(process)->tuple:
 	r'''
 	Returns top window of a process as a tuple (hwnd:int, title:str).
 	'''
-	if (pid := proc_get(process)) == -1: return None, None
+	if (pid := proc_get(process)) == None: return None, None
 	win_lst = win_list_top()
 	for hwnd, title in win_lst:
 		if win32process.GetWindowThreadProcessId(hwnd)[1] == pid:
@@ -932,16 +1075,12 @@ def proc_cmdline(process, full:bool=False)->str:
 	Returns a command line.  
 	*full* - include process path.  
 	'''
-	if (pid := proc_get(process)) == -1: return ''
+	if (pid := proc_get(process)) == None: return ''
 	cmdline = psutil.Process(pid).cmdline()
 	if full:
 		return ' '.join( cmdline )
 	else:
 		return ' '.join(cmdline[1:]) if len(cmdline) > 1 else ''
-
-
-
-
 
 
 

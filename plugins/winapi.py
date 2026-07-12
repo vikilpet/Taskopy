@@ -95,6 +95,90 @@ LowLevelHookProc = ctypes.WINFUNCTYPE(
 	wintypes.WPARAM,
 	wintypes.LPARAM
 )
+TH32CS_SNAPPROCESS                = 0x00000002
+PROCESS_QUERY_LIMITED_INFORMATION = 0x00001000
+PROCESS_VM_READ                   = 0x00000010
+TOKEN_QUERY                       = 0x00000008
+PROCESSBASICINFO_CLASS = 0
+PROCESSWOW64_CLASS     = 26
+PEB_PROCESS_PARAMETERS_OFFSET_32 = 0x10
+PEB_PROCESS_PARAMETERS_OFFSET_64 = 0x20
+PEB_COMMANDLINE_OFFSET_32         = 0x40
+PEB_COMMANDLINE_OFFSET_64         = 0x70
+INVALID_HANDLE_VALUE = (1 << (ctypes.sizeof(ctypes.c_void_p) * 8)) - 1
+
+
+class PROCESSENTRY32W(ctypes.Structure):
+	_fields_ = [
+		('dwSize',              wintypes.DWORD),
+		('cntUsage',            wintypes.DWORD),
+		('th32ProcessID',       wintypes.DWORD),
+		('th32DefaultHeapID',   ctypes.POINTER(wintypes.ULONG)),
+		('th32ModuleID',        wintypes.DWORD),
+		('cntThreads',          wintypes.DWORD),
+		('th32ParentProcessID', wintypes.DWORD),
+		('pcPriClassBase',      wintypes.LONG),
+		('dwFlags',             wintypes.DWORD),
+		('szExeFile',           wintypes.WCHAR * 260),
+	]
+
+
+class UNICODE_STRING32(ctypes.Structure):
+	_fields_ = [
+		('Length',        wintypes.USHORT),
+		('MaximumLength', wintypes.USHORT),
+		('Buffer',        ctypes.c_uint32),
+	]
+
+
+class UNICODE_STRING64(ctypes.Structure):
+	_fields_ = [
+		('Length',        wintypes.USHORT),
+		('MaximumLength', wintypes.USHORT),
+		('Buffer',        ctypes.c_uint64),
+	]
+
+
+class PROCESS_BASIC_INFORMATION32(ctypes.Structure):
+	_fields_ = [
+		('ExitStatus',     ctypes.c_uint32),
+		('PebBaseAddress', ctypes.c_uint32),
+		('AffinityMask',   ctypes.c_uint32),
+		('BasePriority',   ctypes.c_uint32),
+		('UniqueProcId',   ctypes.c_uint32),
+		('InheritedPid',   ctypes.c_uint32),
+	]
+
+
+class PROCESS_BASIC_INFORMATION64(ctypes.Structure):
+	_fields_ = [
+		('ExitStatus',     ctypes.c_uint64),
+		('PebBaseAddress', ctypes.c_uint64),
+		('AffinityMask',   ctypes.c_uint64),
+		('BasePriority',   ctypes.c_uint64),
+		('UniqueProcId',   ctypes.c_uint64),
+		('InheritedPid',   ctypes.c_uint64),
+	]
+kernel32.CreateToolhelp32Snapshot.restype  = wintypes.HANDLE
+kernel32.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
+kernel32.Process32FirstW.restype  = wintypes.BOOL
+kernel32.Process32FirstW.argtypes = [wintypes.HANDLE, ctypes.POINTER(PROCESSENTRY32W)]
+kernel32.Process32NextW.restype  = wintypes.BOOL
+kernel32.Process32NextW.argtypes = [wintypes.HANDLE, ctypes.POINTER(PROCESSENTRY32W)]
+kernel32.OpenProcess.restype  = wintypes.HANDLE
+kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+kernel32.ReadProcessMemory.restype  = wintypes.BOOL
+kernel32.ReadProcessMemory.argtypes = [
+	wintypes.HANDLE, ctypes.c_void_p, ctypes.c_void_p,
+	ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t),
+]
+kernel32.CloseHandle.restype  = wintypes.BOOL
+kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+ntdll.NtQueryInformationProcess.restype  = wintypes.LONG
+ntdll.NtQueryInformationProcess.argtypes = [
+	wintypes.HANDLE, wintypes.ULONG, ctypes.c_void_p,
+	wintypes.ULONG, ctypes.POINTER(wintypes.ULONG),
+]
 
 def get_last_error()->str:
 	r'''
