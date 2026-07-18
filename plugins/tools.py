@@ -67,7 +67,7 @@ except ModuleNotFoundError:
 	import plugins.cache as cache
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2026-07-12'
+APP_VERSION = 'v2026-07-18'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 if getattr(sys, 'frozen', False):
 	APP_PATH = os.path.dirname(sys.executable)
@@ -183,12 +183,13 @@ class TQueue(Queue):
 
 	'''
 	def __init__(self, consumer:Callable=lambda v: qprint(v)
-	, max_size:int=4096, priority:int=win32con.THREAD_PRIORITY_NORMAL)->None:
+	, max_size:int=4096, priority:int=win32con.THREAD_PRIORITY_NORMAL
+	, is_daemon:bool=True)->None:
 		super().__init__(maxsize=max_size)
 		self._stop_sentinel:object = object()
 		self.consumer:Callable=consumer
 		thread_start(func=self.consumer_thread, priority=priority
-		, ident='TQueue: ' + consumer.__name__)
+		, ident='TQueue: ' + consumer.__name__, is_daemon=is_daemon)
 	
 	def consumer_thread(self):
 		while True:

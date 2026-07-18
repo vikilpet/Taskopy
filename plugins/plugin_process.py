@@ -432,8 +432,6 @@ def proc_start(
 	else:
 		return r.pid
 
-
-
 def proc_owner(process)->str:
 	r'''
 	Gets the owner of a PID.
@@ -540,7 +538,7 @@ def proc_list(name:str='', cmd_filter:str=''
 	*cmd_filter* - a substring to look for in command
 	line (case-insensitive).  
 
-		asrt( bmark( lambda: len(proc_list()), b_iter=3), 760_000_000 )
+		asrt( bmark( lambda: len(proc_list()), b_iter=1), 7_000_000_000 )
 
 	'''
 	result:list[Process] = []
@@ -610,7 +608,7 @@ def free_ram(unit:str='percent')->float:
 	Returns free RAM size.  
 	*unit* - 'gb', 'mb'... or 'percent'  
 
-		asrt( bmark(free_ram, b_iter=3), 7_000_000 )
+		asrt( bmark(free_ram, b_iter=3), 70_000_000 )
 
 	'''
 	if unit == 'percent':

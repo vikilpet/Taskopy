@@ -50,11 +50,11 @@ requests.packages.urllib3.disable_warnings(
 
 def http_req(url:str, encoding:str='utf-8'
 , cookies:dict=None, headers:dict=None
-, http_method:str='', post_json:str=None
+, http_method:str='', post_json:dict|None=None
 , post_file:str=None, post_hash:bool=False
 , post_form_data:dict=None, post_file_capt:str=''
 , timeout:float=3.0, attempts:int=3, auth:tuple=()
-, as_json:bool=False, chunk_size:int=8192, **kwargs)->str|Exception:
+, as_json:bool=False, chunk_size:int=8192, **kwargs)->str|dict|Exception:
 	r'''
 	Gets content of the specified URL.  
 	*post_file_capt* - if the file should be uploaded in

@@ -164,6 +164,7 @@ class HookKB:
 		self.shift_is_pressed:bool = False
 		self.ctrl_is_pressed:bool = False
 		self.alt_is_pressed:bool = False
+		self.last_input_time:dtime = dtime.min
 	
 	def install_hook(self):
 		r'''
@@ -271,6 +272,7 @@ def hook_consumer(data:tuple):
 		if flags & (win32con.LLKHF_INJECTED | win32con.LLKHF_LOWER_IL_INJECTED):
 			return
 		hook_kb = tasks.hook_kb
+		hook_kb.last_input_time = dtime.now()
 		if vkCode in CTRL_KEYS:
 			hook_kb.ctrl_is_pressed = wParam in KEY_DOWN
 			run_any_key_task()

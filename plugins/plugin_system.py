@@ -311,7 +311,7 @@ def win_on_top(window=None, on_top:bool=True)->int:
 
 
 def _idle_millis()->int:
-	'''
+	r'''
 	Returns idle time in milliseconds.
 	'''
 	C_ULONG_MAX = 4294967295
@@ -320,14 +320,25 @@ def _idle_millis()->int:
 	while cur_time > C_ULONG_MAX: cur_time -= C_ULONG_MAX
 	return cur_time - last_input
 
-def idle_duration(unit:str='sec')->int:
+def _idle_millis_kb()->int:
+	r'''
+	Returns idle time in milliseconds from built-in hook.
+	'''
+	delta = dtime.now() - app.tasks.hook_kb.last_input_time
+	return int(delta.total_seconds() * 1000)
+
+def idle_duration(unit:str='sec', by_keyboard:bool=False)->int:
 	r'''
 	Returns idle time in specified units ('msec', 'sec', 'min', 'hour').  
+	*by_keyboard* - use last input time from the internal keyboard hook.  
+	Rationale: A system-level inactivity timer may be triggered by
+	various events, such as signals from a wireless mouse.  
 
-		asrt( bmark(idle_duration), 2_500 )
+		asrt( bmark(idle_duration), 4_000 )
 
 	'''
-	return int( value_to_unit((_idle_millis(), 'ms'), unit=unit) )
+	millis = _idle_millis_kb() if by_keyboard else _idle_millis()
+	return int( value_to_unit((millis, 'ms'), unit=unit) )
 
 def idle_wait(interval:int|str='1 sec')->int:
 	r'''
