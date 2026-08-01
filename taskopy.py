@@ -184,7 +184,7 @@ class HookKB:
 			return winapi.user32.CallNextHookEx(0, nCode
 			, wParam, lParam)
 
-		self.hook_proc_ref = winapi.LowLevelHookProc(_low_level_keyboard_proc)
+		self.hook_proc_ref = winapi.HOOKPROC(_low_level_keyboard_proc)
 		module_handle = winapi.kernel32.GetModuleHandleW(None)
 		self.hook_id = winapi.user32.SetWindowsHookExW(
 			win32con.WH_KEYBOARD_LL
@@ -192,7 +192,8 @@ class HookKB:
 			, module_handle
 			, 0
 		)
-		if not self.hook_id: raise Exception(winapi.get_last_error())
+		if not self.hook_id:
+			raise Exception('Hook error: ' + winapi.get_last_error())
 
 WM_EVENTS = {WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP}
 CTRL_KEYS = {win32con.VK_LCONTROL, win32con.VK_RCONTROL}

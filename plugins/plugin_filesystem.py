@@ -1871,7 +1871,7 @@ def file_conf_read(fullpath:str, encoding:str='utf-8'
 	
 DriveIO = namedtuple(
 	'DriveIO'
-	, psutil._common.sdiskio._fields
+	, psutil._ntuples.sdiskio._fields
 	+ ('read_bytes_delta', 'write_bytes_delta', 'total_bytes_delta')
 )
 

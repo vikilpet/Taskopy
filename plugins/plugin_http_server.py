@@ -5,7 +5,6 @@ import hashlib
 import json
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-import cgi
 import urllib
 import email
 from typing import Pattern
@@ -275,38 +274,47 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 		Returns (status, None) or (status, error:str)  
 		'''
 
-		def extract_filename_and_field(part_headers_bytes):
-			msg = email.message_from_bytes(b'Content-Type: text/plain\r\n'
-				+ part_headers_bytes)
-			disposition, params = msg.get_params()
-			params_dict = dict(params)
-			filename = params_dict.get('filename') or msg.get_filename()  # fallback to decoded filename*
-			field_name = params_dict.get('name')
-			return filename, field_name
-		
 		CHUNK_SIZE = 1_048_576
 		BODY_SIZE_MAX = 1_048_576
 		self.req_data._fullpath = os.path.join(self.http_dir
 		, 'tskphttp' + random_str(5))
 		try:
-			form_obj: cgi.FieldStorage = None
 			if (ct := self.headers['Content-Type']) != None and (
 				'form-data' in ct
 				or 'x-www-form-urlencoded' in ct
 			):
-				form_obj = cgi.FieldStorage(
-					fp=self.rfile
-					, headers=self.headers
-					, environ={
-						'REQUEST_METHOD': 'POST'
-						, 'CONTENT_TYPE': self.headers['Content-Type']
-					}
-				)
+				cont_len = int(self.headers['Content-Length'])
+				body = self.rfile.read(cont_len)
+				form_fields, files = _parse_form_body(body, ct)
+
+				for key, value in form_fields.items():
+					if key == 'file': continue
+					if key == 'editable':
+						self.req_data.form[key] = (value == 'true')
+					elif value == 'undefined':
+						self.req_data.form[key] = None
+					else:
+						self.req_data.form[key] = value
+				self.req_data._ext_fill()
+
+				if 'file' in files:
+					file_info = files['file']
+					if not file_info['data'] and not file_info['filename']:
+						return False, 'error: form file is None'
+					filename = file_info['filename']
+					if not filename:
+						filename = time.strftime('%m%d%H%M%S') + random_str(5)
+					self.req_data._fullpath = os.path.join(self.http_dir, filename)
+					self.req_data._file = self.req_data._fullpath
+					with open(self.req_data._fullpath, 'wb') as fd:
+						fd.write(file_info['data'])
+				self.req_data._md5 = self.headers.get('Content-MD5', '')
+				return True, None
 			else:
 				cont_len = int( self.headers['Content-Length'] )
 				cont_disp = self.headers.get('Content-Disposition')
 				if cont_disp:
-					cont_disp_opt = cgi.parse_header(cont_disp)[1]
+					cont_disp_opt = _parse_header(cont_disp)[1]
 					fname = ''
 					if 'filename*' in cont_disp_opt:
 						fname = urllib.parse.unquote(
@@ -331,27 +339,6 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 						fd.write(chunk)
 						cur_size += CHUNK_SIZE
 				return True, None
-			for key in form_obj.keys():
-				if key == 'file': continue
-				if key == 'editable':
-					self.req_data.form[key] = (form_obj.getfirst(key) == 'true')
-				elif form_obj.getfirst(key) == 'undefined':
-					self.req_data.form[key] = None
-				else:
-					self.req_data.form[key] = form_obj.getfirst(key)
-			self.req_data._ext_fill()
-			if form_obj.getvalue('file', None):
-				if form_obj['file'].file is None:
-					return False, 'error: form file is None'
-				filename = form_obj['file'].filename
-				if not filename:
-					filename = time.strftime('%m%d%H%M%S') + random_str(5)
-				self.req_data._fullpath = os.path.join(self.http_dir, filename)
-				self.req_data._file = self.req_data._fullpath
-				with open(self.req_data._fullpath, 'wb') as fd:
-					fd.write(form_obj['file'].file.read())
-			self.req_data._md5 = self.headers.get('Content-MD5', '')
-			return True, None
 		except:
 			return False, f'upload error: {exc_text()}'
 
@@ -386,7 +373,69 @@ def _file_hash(fullpath:str)->str:
 		for chunk in iter(lambda: fi.read(1_048_576), b''):
 			hash_md5.update(chunk)
 	return hash_md5.hexdigest()
- 
+
+def _parse_header(header_value: str) -> tuple:
+	"""Replace cgi.parse_header. Returns (main_value, params_dict)."""
+	if not header_value:
+		return '', {}
+	parts = header_value.split(';')
+	main_value = parts[0].strip()
+	params = {}
+	for part in parts[1:]:
+		part = part.strip()
+		if '=' not in part:
+			continue
+		key, value = part.split('=', 1)
+		key = key.strip().lower()
+		value = value.strip()
+		if len(value) >= 2 and value[0] == value[-1] == '"':
+			value = value[1:-1]
+			value = value.replace('\\\\', '\\').replace('\\"', '"')
+		params[key] = value
+	return main_value, params
+
+def _parse_form_body(body: bytes, content_type: str) -> tuple:
+	"""
+	Parse multipart/form-data or application/x-www-form-urlencoded body.
+	Returns (form_fields: dict, files: dict).
+	files dict: {field_name: {'filename': str, 'data': bytes}}
+	"""
+	form_fields = {}
+	files = {}
+
+	if 'form-data' in content_type:
+		msg = email.message_from_bytes(
+			b'Content-Type: ' + content_type.encode('utf-8') + b'\r\n\r\n' + body
+		)
+		for part in msg.walk():
+			if part.is_multipart():
+				continue
+			cd = part.get('Content-Disposition', '')
+			if not cd:
+				continue
+			params = dict(part.get_params(header='content-disposition') or [])
+			name = params.get('name')
+			if name is None:
+				continue
+			filename = params.get('filename')
+			if filename is None:
+				filename = part.get_filename()
+			payload = part.get_payload(decode=True)
+			if filename is not None:
+				files[name] = {'filename': filename, 'data': payload or b''}
+			else:
+				form_fields[name] = (
+					payload.decode('utf-8', errors='replace') if payload else ''
+				)
+	elif 'x-www-form-urlencoded' in content_type:
+		parsed = urllib.parse.parse_qs(
+			body.decode('utf-8', errors='replace')
+		)
+		for key, values in parsed.items():
+			form_fields[key] = values[0] if values else ''
+
+	return form_fields, files
+
 if __name__ == '__main__':
 	print('Test http task handler')
 	serv_ip = '127.0.0.1'

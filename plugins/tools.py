@@ -21,6 +21,7 @@ import win32com.client
 import win32clipboard
 import win32security
 import pywintypes
+from ctypes import wintypes
 from multiprocessing.dummy import Pool as ThreadPool
 import _multiprocessing
 from operator import itemgetter
@@ -56,7 +57,12 @@ import io
 import unicodedata
 import multiprocessing
 from xml.etree import ElementTree as _ElementTree
-import windows_toasts as wtoasts
+try:
+	import windows_toasts as wtoasts
+	_TOASTS_AVAILABLE = True
+except Exception:
+	wtoasts = None
+	_TOASTS_AVAILABLE = False
 try:
 	import constants as tcon
 	import winapi
@@ -67,7 +73,7 @@ except ModuleNotFoundError:
 	import plugins.cache as cache
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2026-07-18'
+APP_VERSION = 'v2026-08-01'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 if getattr(sys, 'frozen', False):
 	APP_PATH = os.path.dirname(sys.executable)
@@ -1046,43 +1052,49 @@ def msg_warn(msg:str, title:str='', timeout:str='30 min'):
 	_msg_err(msg=msg, title=title, icon=tcon.TD_ICON_WARNING, timeout=timeout
 	, parent='msg_warn')
 
-def win_activate(hwnd:int, topmost:bool=False, focus:bool=False):
+def win_activate(hwnd:int, topmost:bool=False, focus:bool=True):
 	r'''
-	Restores and activates a window.  
-	NOTE: *hwnd* must be a number.  
+	Restores and activates a window.
+	NOTE: *hwnd* must be a number.
 	'''
 	if not hwnd: return
+
+	flags = (win32con.SWP_NOSIZE | win32con.SWP_NOMOVE
+			| win32con.SWP_SHOWWINDOW | win32con.SWP_NOACTIVATE)
 	cur_hwnd = int(hwnd)
 	if winapi.user32.IsIconic(cur_hwnd):
 		winapi.user32.ShowWindow(cur_hwnd, win32con.SW_RESTORE)
 	fg_hwnd = winapi.user32.GetForegroundWindow()
 	if fg_hwnd == cur_hwnd:
 		if topmost:
-			winapi.user32.SetWindowPos(cur_hwnd, win32con.HWND_TOPMOST, 0,0,0,0,
-			win32con.SWP_NOSIZE | win32con.SWP_NOMOVE | win32con.SWP_SHOWWINDOW)
+			win32gui.SetWindowPos(cur_hwnd, win32con.HWND_TOPMOST,
+								0, 0, 0, 0, flags)
 		return
-	fg_tid = ctypes.c_ulong()
-	cur_tid = ctypes.c_ulong()
+	fg_tid = winapi.wintypes.DWORD()
+	cur_tid = wintypes.DWORD()
 	winapi.user32.GetWindowThreadProcessId(fg_hwnd, ctypes.byref(fg_tid))
 	winapi.user32.GetWindowThreadProcessId(cur_hwnd, ctypes.byref(cur_tid))
 	if fg_tid.value == cur_tid.value:
 		winapi.user32.SetForegroundWindow(cur_hwnd)
 	else:
 		winapi.user32.AttachThreadInput(fg_tid, cur_tid, True)
-		if focus:
-			winapi.user32.BringWindowToTop(cur_hwnd)
-			winapi.user32.SetActiveWindow(cur_hwnd)
-			winapi.user32.SetForegroundWindow(cur_hwnd)
-			winapi.user32.SetFocus(cur_hwnd)
-			winapi.user32.ShowWindow(cur_hwnd, win32con.SW_SHOW)
-		winapi.user32.AttachThreadInput(fg_tid, cur_tid, False)
-	flags = (win32con.SWP_NOSIZE | win32con.SWP_NOMOVE
-	| win32con.SWP_SHOWWINDOW | win32con.SWP_NOACTIVATE)
-	zorder = win32con.HWND_TOPMOST if topmost else win32con.HWND_TOP
-	winapi.user32.SetWindowPos(cur_hwnd, zorder, 0, 0, 0, 0, flags)
+		try:
+			if focus:
+				winapi.user32.BringWindowToTop(cur_hwnd)
+				winapi.user32.SetActiveWindow(cur_hwnd)
+				winapi.user32.SetForegroundWindow(cur_hwnd)
+				winapi.user32.SetFocus(cur_hwnd)
+				winapi.user32.ShowWindow(cur_hwnd, win32con.SW_SHOW)
+		finally:
+			winapi.user32.AttachThreadInput(fg_tid, cur_tid, False)
 	if topmost:
-		winapi.user32.SetWindowPos(cur_hwnd, win32con.HWND_TOPMOST
-		, 0, 0, 0, 0, flags)
+		win32gui.SetWindowPos(cur_hwnd, win32con.HWND_TOPMOST,
+							0, 0, 0, 0, flags)
+	else:
+		win32gui.SetWindowPos(cur_hwnd, win32con.HWND_TOPMOST,
+							0, 0, 0, 0, flags)
+		win32gui.SetWindowPos(cur_hwnd, win32con.HWND_NOTOPMOST,
+							0, 0, 0, 0, flags)
 	if focus:
 		winapi.user32.keybd_event(0, 0, 0, 0)
 		winapi.user32.keybd_event(0, 0, 2, 0)
@@ -1145,10 +1157,6 @@ def inputbox(message:str, title:str='', is_pwd:bool=False, default:str=''
 	app.que_wxdialog.put_nowait(show_dialog)
 	done_event.wait()
 	return result[0]
-
-
-
-
 
 def file_dialog(title:str=None, multiple:bool=False
 , default_dir:str='', default_file:str=''
@@ -2268,8 +2276,7 @@ def thread_start(func, args:tuple=(), kwargs:dict={}
 
 	def err_handler(text:str):
 		if not is_dev(): return
-		tprint(f'exception in thread «{ident}»: {str_indent(text)}'
-		, tname='thread_start')
+		con_log(f'exception in thread «{ident}»:{str_indent(text)}')
 
 	if not ident:
 		parents = _get_parents()[-3:]
@@ -2488,6 +2495,9 @@ def toast(msg:str|tuple|list, dur:str='default', img:str=''
 	if not appid in cache.toast_toasters:
 		cache.toast_toasters[appid] = wtoasts.WindowsToaster(appid)
 	toaster = cache.toast_toasters[appid]
+	if not _TOASTS_AVAILABLE:
+		dialog(msg=' '.join(msg), wait=False, title='<Toast message>')
+		return
 	newToast = wtoasts.Toast()
 	newToast.duration = wtoasts.ToastDuration(dur)
 	newToast.text_fields = msg

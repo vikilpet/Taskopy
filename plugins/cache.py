@@ -1,6 +1,11 @@
 import datetime
 from collections import OrderedDict
-import windows_toasts as wtoasts
+try:
+	import windows_toasts as wtoasts
+	_TOASTS_AVAILABLE = True
+except Exception:
+	wtoasts = None
+	_TOASTS_AVAILABLE = False
 import functools
 
 
@@ -36,7 +41,8 @@ class LRUCache(dict):
 
 
 often:dict[str, datetime.datetime] = dict()
-toast_toasters:dict[str, wtoasts.WindowsToaster] = dict()
+if _TOASTS_AVAILABLE:
+	toast_toasters:dict[str, wtoasts.WindowsToaster] = dict()
 toast_imgs = LRUCache(max_items=16)
 public_suffix_list:set = set()
 

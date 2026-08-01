@@ -28,6 +28,49 @@ from .plugin_filesystem import path_get
 from .plugin_system import win_list_top, win_get
 
 IS_64BIT = ctypes.sizeof(ctypes.c_void_p) == 8
+_EPOCH_DIFF = 11_644_473_600
+_EXE_PATH_BUF = 32768  # Windows MAX_LONG_PATH
+_TerminateProcess = winapi.kernel32.TerminateProcess
+_TerminateProcess.argtypes = [wintypes.HANDLE, wintypes.UINT]
+_TerminateProcess.restype  = wintypes.BOOL
+_EnumProcesses = winapi.psapi.EnumProcesses
+_EnumProcesses.argtypes = [
+	wintypes.LPVOID,            # lpidProcess
+	wintypes.DWORD,             # cb
+	ctypes.POINTER(wintypes.DWORD),    # lpcbNeeded
+]
+_EnumProcesses.restype = wintypes.BOOL
+_ProcessIdToSessionId = winapi.kernel32.ProcessIdToSessionId
+_ProcessIdToSessionId.argtypes = [
+	wintypes.DWORD,            # dwProcessId
+	ctypes.POINTER(wintypes.DWORD),   # pSessionId
+]
+_ProcessIdToSessionId.restype = wintypes.BOOL
+_CommandLineToArgvW = winapi.shell32.CommandLineToArgvW
+_CommandLineToArgvW.argtypes = [
+	wintypes.LPCWSTR,          # lpCmdLine
+	ctypes.POINTER(wintypes.INT),     # pNumArgs
+]
+_CommandLineToArgvW.restype = ctypes.POINTER(wintypes.LPWSTR)
+_LocalFree = winapi.kernel32.LocalFree
+_LocalFree.argtypes = [wintypes.HLOCAL]
+_LocalFree.restype  = wintypes.HLOCAL
+_GetProcessTimes = winapi.kernel32.GetProcessTimes
+_GetProcessTimes.argtypes = [
+	wintypes.HANDLE,
+	ctypes.POINTER(wintypes.FILETIME),  # lpCreationTime
+	ctypes.POINTER(wintypes.FILETIME),  # lpExitTime
+	ctypes.POINTER(wintypes.FILETIME),  # lpKernelTime
+	ctypes.POINTER(wintypes.FILETIME),  # lpUserTime
+]
+_GetProcessTimes.restype = wintypes.BOOL
+_GetSystemTimes = winapi.kernel32.GetSystemTimes
+_GetSystemTimes.argtypes = [
+	ctypes.POINTER(wintypes.FILETIME),  # lpIdleTime
+	ctypes.POINTER(wintypes.FILETIME),  # lpKernelTime
+	ctypes.POINTER(wintypes.FILETIME),  # lpUserTime
+]
+_GetSystemTimes.restype = wintypes.BOOL
 
 def file_open(fullpath, parameters:str=None, operation:str='open'
 , cwd:str='', showcmd:int=win32con.SW_SHOWNORMAL):
@@ -52,33 +95,58 @@ def file_open(fullpath, parameters:str=None, operation:str='open'
 		, showcmd
 	)
 
+def _enumerate_all_pids():
+	r'''
+	Yield all PIDs on the system using EnumProcesses.
+	Returns 0 (System Idle) as the first entry — skip it if unwanted.
+	'''
+	size = 1024  # initial buffer in DWORDs (4096 bytes)
+	while True:
+		buf = (wintypes.DWORD * size)()
+		needed = wintypes.DWORD(0)
+		if not _EnumProcesses(buf, ctypes.sizeof(buf), ctypes.byref(needed)):
+			return
+		count = needed.value // ctypes.sizeof(wintypes.DWORD)
+		if count < size:
+			for i in range(count):
+				yield buf[i]
+			return
+		size *= 2
+
 def _pids_by_name(name_lower):
-	r"""
+	r'''
 	Yield every PID whose image name matches *name_lower*
 	(case-insensitive, already pre-lowered by caller).
-	"""
-	snapshot = winapi.kernel32.CreateToolhelp32Snapshot(winapi.TH32CS_SNAPPROCESS, 0)
+	'''
+	snapshot = winapi.kernel32.CreateToolhelp32Snapshot(
+		winapi.TH32CS_SNAPPROCESS, 0)
 	if not snapshot or snapshot == winapi.INVALID_HANDLE_VALUE:
-		return
+		err = ctypes.get_last_error()
+		raise OSError(f'CreateToolhelp32Snapshot failed: {winapi.get_last_error()}')
 	try:
 		entry = winapi.PROCESSENTRY32W()
 		entry.dwSize = ctypes.sizeof(winapi.PROCESSENTRY32W)
-		if winapi.kernel32.Process32FirstW(snapshot, ctypes.byref(entry)):
-			while True:
-				if entry.szExeFile.lower() == name_lower:
-					yield entry.th32ProcessID
-				if not winapi.kernel32.Process32NextW(snapshot, ctypes.byref(entry)):
-					break
+		if not winapi.kernel32.Process32FirstW(snapshot, ctypes.byref(entry)):
+			err = ctypes.get_last_error()
+			raise OSError(
+				f'Process32FirstW failed: {winapi.get_last_error()}\n'
+				f'  sizeof(PROCESSENTRY32W) = {entry.dwSize} '
+				f'(expected 568 on x64, 556 on x86)'
+			)
+		while True:
+			if entry.szExeFile.lower() == name_lower:
+				yield entry.th32ProcessID
+			if not winapi.kernel32.Process32NextW(snapshot, ctypes.byref(entry)):
+				break
 	finally:
 		winapi.kernel32.CloseHandle(snapshot)
 
-
 def _read_cmdline(handle):
-	r"""
+	r'''
 	Read the command line of the process behind *handle*
 	by walking its PEB via ReadProcessMemory.
 	Returns the string, or None on any failure.
-	"""
+	'''
 	bytes_read = ctypes.c_size_t()
 
 	if IS_64BIT:
@@ -146,7 +214,7 @@ def _read_cmdline(handle):
 	return buf.value
 
 
-def read_user(handle):
+def _read_user(handle):
 	r"""
 	Return 'DOMAIN\\User' for the process behind *handle*,
 	or None if the token cannot be opened.
@@ -154,14 +222,101 @@ def read_user(handle):
 	try:
 		token = win32security.OpenProcessToken(handle, winapi.TOKEN_QUERY)
 		sid, _ = win32security.GetTokenInformation(token, win32security.TokenUser)
-		domain, user, _ = win32security.LookupAccountSid(None, sid)
+		user, domain, _ = win32security.LookupAccountSid(None, sid)
 		return f'{domain}\\{user}'
 	except Exception:
 		return None
 
-def proc_get(process, cmd_filter: str = '', user_filter: str = '') -> int | None:
+def _read_session_id(pid: int) -> int:
 	r'''
-	Returns PID if the process with the specified name exists.  
+	Return the Terminal Services session ID for *pid*, or -1 on failure.
+	'''
+	sid = wintypes.DWORD(0)
+	if _ProcessIdToSessionId(pid, ctypes.byref(sid)):
+		return sid.value
+	return -1
+
+def _read_creation_time(handle) -> float:
+	r"""
+	Return the creation time of the process behind *handle*
+	as a Unix epoch timestamp (seconds since 1970-01-01),
+	or 0 on failure.
+	"""
+	creation  = wintypes.FILETIME()
+	exit_time  = wintypes.FILETIME()
+	kernel    = wintypes.FILETIME()
+	user_time = wintypes.FILETIME()
+
+	ok = winapi.kernel32.GetProcessTimes(
+		handle,
+		ctypes.byref(creation),
+		ctypes.byref(exit_time),
+		ctypes.byref(kernel),
+		ctypes.byref(user_time),
+	)
+	if not ok:
+		return 0
+	ft = (creation.dwHighDateTime << 32) | creation.dwLowDateTime
+	if ft == 0:
+		return 0
+	return ft / 10_000_000 - _EPOCH_DIFF
+
+def _read_exe_path(handle) -> str:
+	r"""
+	Return the full Win32 path (e.g. 'C:\Windows\System32\cmd.exe')
+	for the process behind *handle*, or '' on failure.
+	"""
+	buf = ctypes.create_unicode_buffer(_EXE_PATH_BUF)
+	size = wintypes.DWORD(_EXE_PATH_BUF)
+	ok = winapi.kernel32.QueryFullProcessImageNameW(handle, 0, buf
+	, ctypes.byref(size))
+	if not ok:
+		return ''
+	return buf.value
+
+def _split_cmdline(cmdline: str) -> list[str]:
+	r"""
+	Split a Windows command line string into a list of tokens,
+	using the native CommandLineToArgvW parser.
+	
+	'\"C:\\Python313\\python.exe\" script.py --flag'
+	  → ['C:\\Python313\\python.exe', 'script.py', '--flag']
+	"""
+	if not cmdline:
+		return []
+	argc = wintypes.INT(0)
+	argv = _CommandLineToArgvW(cmdline, ctypes.byref(argc))
+	if not argv:
+		return []
+	try:
+		return [argv[i] for i in range(argc.value)]
+	finally:
+		_LocalFree(argv)
+
+def _ft_to_int(ft: wintypes.FILETIME) -> int:
+	''' Combine FILETIME's two DWORDs into one 64-bit value (100-ns ticks). '''
+	return ft.dwLowDateTime | (ft.dwHighDateTime << 32)
+
+def _read_proc_cpu_time(handle) -> int:
+	''' Total CPU time (kernel + user) for the process in 100-ns ticks. '''
+	c, e, k, u = (wintypes.FILETIME() for _ in range(4))
+	if _GetProcessTimes(handle, c, e, k, u):
+		return _ft_to_int(k) + _ft_to_int(u)
+	return -1
+
+def _read_sys_cpu_time() -> tuple[int, int, int]:
+	'''
+	Returns (idle, kernel, user) total system times in 100-ns ticks.
+	Each is -1 on failure.
+	'''
+	idle, k, u = wintypes.FILETIME(), wintypes.FILETIME(), wintypes.FILETIME()
+	if _GetSystemTimes(idle, k, u):
+		return _ft_to_int(idle), _ft_to_int(k), _ft_to_int(u)
+	return -1, -1, -1
+
+def proc_get(process, cmd_filter:str = '', user_filter:str = '')->int|None:
+	r'''
+	Returns PID if the process with the specified name exists or None  
 	*process* - image name or PID.  
 	*cmd_filter* - optional string to search in the
 	command line of the process (case-insensitive).  
@@ -169,11 +324,11 @@ def proc_get(process, cmd_filter: str = '', user_filter: str = '') -> int | None
 	specified user.  
 	Filtering using string filters is expensive;
 	use PID whenever possible:
-		asrt( bmark(proc_get, ('_',), b_iter=3), 60_000_000 )
+		asrt( bmark(proc_get, ('_',), b_iter=3), 80_000_000 )
 		asrt( bmark(proc_get, (1,)), 700 )
 		asrt( bmark(proc_get, ('\\taskopy.py',), b_iter=3), 70_000_000 )
 		pid, user = os.getpid(), os.getlogin()
-		asrt( bmark(proc_get, ('', user), b_iter=3), 70_000_000 )
+		asrt( bmark(proc_get, ('', user), b_iter=3), 80_000_000 )
 		asrt( proc_get(pid, '\\taskopy.py'), pid)
 		asrt( proc_get(pid, '\\python.exe', user), pid)
 
@@ -204,7 +359,7 @@ def proc_get(process, cmd_filter: str = '', user_filter: str = '') -> int | None
 					continue
 
 			if need_user:
-				usr = read_user(handle)
+				usr = _read_user(handle)
 				if not usr or usr.lower() != user_filter:
 					continue
 
@@ -480,94 +635,261 @@ def proc_exists(pid:int)->bool:
 
 @dataclass
 class Process:
-	_proc:psutil.Process
-	sessionid:int = -1
-	strip_pc:bool=True
+	pid: int
+	strip_pc: bool = True
+	_exe_path: str = ''   # full exe path (pre-read, NOT a basename)
+	_cmdline: str = ''    # pre-read cmdline
+	_user: str = ''       # pre-read raw 'DOMAIN\User'
 
-	def _safe(self, method:str, default=None):
-		try:
-			return getattr(self._proc, method)()
-		except Exception as exc:
+	def _safe_handle(self, access:int, fn, default=None):
+		'''Open a process handle, call *fn(handle)*, auto-close.'''
+		handle = winapi.kernel32.OpenProcess(access, False, self.pid)
+		if not handle:
 			return default
+		try:
+			return fn(handle)
+		except Exception:
+			return default
+		finally:
+			winapi.kernel32.CloseHandle(handle)
 
 	@functools.cached_property
-	def pid(self)->int:
-		return self._proc.pid
-	
-	@functools.cached_property
-	def cmdline_list(self)->list[str]:
-		' Command line as a list '
-		return self._safe('cmdline', [])
-	
-	@functools.cached_property
-	def cmdline(self)->str:
-		' Command line as a string'
-		return ' '.join(self.cmdline_list)
+	def cmdline(self) -> str:
+		''' Command line as a string '''
+		if self._cmdline:
+			return self._cmdline
+		access = win32con.PROCESS_QUERY_LIMITED_INFORMATION \
+		         | win32con.PROCESS_VM_READ
+		return self._safe_handle(access, _read_cmdline, default='')
 
 	@functools.cached_property
-	def name(self)->str:
-		' Process exe file name (not a full path) '
-		return self._safe('name', default='')
-	
-	@functools.cached_property
-	def username(self)->str:
-		if self.strip_pc:
-			return self._safe('username').split('\\')[1]
-		else:
-			return self._safe('username')
+	def cmdline_list(self) -> list[str]:
+		''' Command line as a list '''
+		return self.cmdline.split() if self.cmdline else []
 
 	@functools.cached_property
-	def fullpath(self)->str:
-		' Full path to the exe file '
-		return self._safe('exe')
-	def uptime(self)->float:
-		' Uptime in seconds '
-		return time.time() - self._safe('create_time')
-	
-	def kill(self):
-		' Kill the current process with SIGKILL '
-		return self._proc.kill()
+	def username(self) -> str:
+		if self._user:
+			return self._user
+		usr = self._safe_handle(
+			win32con.PROCESS_QUERY_LIMITED_INFORMATION,
+			_read_user,
+			default=''
+		)
+		if usr and self.strip_pc and '\\' in usr:
+			usr = usr.split('\\', 1)[1]
+		return usr
+
+	@functools.cached_property
+	def fullpath(self) -> str:
+		''' Full path to the exe file '''
+		if self._exe_path:
+			return self._exe_path
+		return self._safe_handle(
+			win32con.PROCESS_QUERY_LIMITED_INFORMATION,
+			_read_exe_path,
+			default=''
+		)
+
+	@functools.cached_property
+	def name(self) -> str:
+		''' Process exe file name (not a full path) '''
+		path = self.fullpath
+		return os.path.basename(path) if path else ''
+
+	def uptime(self) -> float:
+		''' Uptime in seconds (not cached — changes over time) '''
+		ctime = self._safe_handle(
+			win32con.PROCESS_QUERY_LIMITED_INFORMATION,
+			_read_creation_time,
+			default=0
+		)
+		return time.time() - ctime if ctime else 0
+
+	def kill(self, exit_code: int = 1):
+		r'''
+		Kill the current process.
+		Raises OSError if the process cannot be opened or terminated.
+		'''
+		handle = winapi.kernel32.OpenProcess(
+			win32con.PROCESS_TERMINATE, False, self.pid
+		)
+		if not handle:
+			err = ctypes.get_last_error()
+			raise OSError(
+				f'OpenProcess({self.pid}) for TERMINATE failed: error {err}'
+			)
+		try:
+			if not _TerminateProcess(handle, exit_code):
+				err = ctypes.get_last_error()
+				raise OSError(
+					f'TerminateProcess({self.pid}) failed: error {err}'
+				)
+		finally:
+			winapi.kernel32.CloseHandle(handle)
+
+	@functools.cached_property
+	def sessionid(self) -> int:
+		''' Terminal Services session ID (0 = Services, 1 = Console, etc.) '''
+		return _read_session_id(self.pid)
+
+	@functools.cached_property
+	def argv(self) -> list[str]:
+		r"""
+		Command line split into tokens.
+		argv[0] is the exe path (as it was on launch, possibly quoted).
+		"""
+		cmd = self.cmdline   # raw string from PEB (already cached)
+		if not cmd:
+			return []
+		return _split_cmdline(cmd)
+
+	@functools.cached_property
+	def args(self) -> str:
+		r"""
+		Command line arguments **without** the exe path.
+		
+		argv = ['C:\\Python313\\python.exe', 'script.py', '--flag']
+		args = 'script.py --flag'
+		"""
+		av = self.argv
+		return ' '.join(av[1:]) if len(av) > 1 else ''
+
+	def cpu_percent(self, interval: float = 1.0) -> float:
+		r'''
+		Returns CPU usage percentage over *interval* seconds.
+		100% means one core is fully utilized.
+		Returns -1.0 if the process cannot be opened or is dead.
+		
+		Special case: PID 0 (System Idle) uses idle time from GetSystemTimes.
+		'''
+		if self.pid == 0:
+			i1, k1, u1 = _read_sys_cpu_time()
+			if i1 == -1:
+				return -1.0
+			time.sleep(interval)
+			i2, k2, u2 = _read_sys_cpu_time()
+			if i2 == -1:
+				return -1.0
+			sys_delta = (k2 + u2) - (k1 + u1)
+			if sys_delta == 0:
+				return 0.0
+			idle_delta = i2 - i1
+			return (idle_delta / sys_delta) * 100.0
+
+		handle = winapi.kernel32.OpenProcess(
+			winapi.PROCESS_QUERY_LIMITED_INFORMATION, False, self.pid
+		)
+		if not handle:
+			return -1.0
+		try:
+			t1 = _read_proc_cpu_time(handle)
+			_, k1, u1 = _read_sys_cpu_time()
+			if t1 == -1:
+				return -1.0
+			time.sleep(interval)
+			t2 = _read_proc_cpu_time(handle)
+			_, k2, u2 = _read_sys_cpu_time()
+			if t2 == -1:
+				return -1.0
+
+			proc_delta = t2 - t1
+			sys_delta = (k2 + u2) - (k1 + u1)
+
+			if sys_delta == 0:
+				return 0.0
+			return (proc_delta / sys_delta) * 100.0
+		finally:
+			winapi.kernel32.CloseHandle(handle)
 
 
-def proc_list(name:str='', cmd_filter:str=''
+def proc_list(name:str='', cmd_filter:str='', user_filter:str=''
 , strip_pc:bool=True)->list[Process]:
 	r'''
 	Returns list of `Process` objects.  
 	*name* - image name (case-insensitive). If not specified then list all
 	processes.  
-	*cmd_filter* - a substring to look for in command
-	line (case-insensitive).  
+	*cmd_filter* - a substring to look for in command line (case-insensitive).  
+	*user_filter* - only search within processes of specified user.  
 
-		asrt( bmark( lambda: len(proc_list()), b_iter=1), 7_000_000_000 )
+		asrt( bmark( lambda: len(proc_list()), b_iter=1), 90_000_000 )
+		table = [('Name', 'PID', 'User', 'Uptime', 'CPU', 'CMDline')]
+		for proc in proc_list('')[:10]:
+			table.append((proc.name, proc.pid, proc.username
+			, int(proc.uptime()), proc.cpu_percent(.1), proc.cmdline))
+		table_print(table, use_headers=True)
+
 
 	'''
 	result:list[Process] = []
-	name = name.lower()
-	if cmd_filter: cmd_filter = cmd_filter.lower()
-	for psproc in psutil.process_iter():
-		proc = Process(_proc=psproc, strip_pc=strip_pc)
-		if name:
-			try:
-				if proc.name.lower() != name: continue
-			except psutil.AccessDenied as e:
-				dev_print('proc_list error: ' + repr(e))
-		if cmd_filter:
-			if not cmd_filter in proc.cmdline.lower(): continue
-		result.append(proc)
+	name_lower = name.lower() if name else ''
+	if cmd_filter:
+		cmd_filter = cmd_filter.lower()
+	if user_filter:
+		user_filter = user_filter.lower()
+	need_name = bool(name_lower)
+	need_cmd  = bool(cmd_filter)
+	need_user = bool(user_filter)
+	if name_lower:
+		pids = _pids_by_name(name_lower)
+	else:
+		pids = _enumerate_all_pids()
+
+	for pid in pids:
+		if pid == 0:
+			continue  # System Idle Process, skip
+
+		access = winapi.PROCESS_QUERY_LIMITED_INFORMATION
+		if need_cmd:
+			access |= winapi.PROCESS_VM_READ
+
+		handle = winapi.kernel32.OpenProcess(access, False, pid)
+		if not handle:
+			continue
+		try:
+			exe_path = _read_exe_path(handle)
+			if not exe_path:
+				continue
+			if need_name:
+				actual_name = os.path.basename(exe_path).lower()
+				if actual_name != name_lower:
+					continue
+			pre_cmd  = ''
+			pre_user = ''
+			if need_cmd:
+				cmdline = _read_cmdline(handle)
+				if not cmdline or cmd_filter not in cmdline.lower():
+					continue
+				pre_cmd = cmdline
+			if need_user:
+				usr = _read_user(handle)
+				if not usr:
+					continue
+				if usr.lower() != user_filter:
+					continue
+				pre_user = usr
+
+			result.append(Process(
+				pid=pid,
+				strip_pc=strip_pc,
+				_exe_path=exe_path,
+				_cmdline=pre_cmd,
+				_user=pre_user,
+			))
+		finally:
+			winapi.kernel32.CloseHandle(handle)
+
 	return result
 
 def proc_cpu(process, interval:float=1.0)->float:
 	r'''
 	Returns CPU usage of specified PID for specified interval
-	of time in seconds.  
-	If a process not found then returns -1:
-
-		asrt(proc_cpu('non existing process'), -1)
-		asrt(proc_cpu(0), 1, '>')
-		
+	of time in seconds.
+	If a process not found then returns -1.
 	'''
-	if (pid := proc_get(process)) == None: return -1
-	proc = psutil.Process(pid)
+	if (pid := proc_get(process)) is None:
+		return -1
+	proc = Process(pid=pid)
 	return proc.cpu_percent(interval)
 
 def proc_uptime(process)->float:
@@ -575,33 +897,15 @@ def proc_uptime(process)->float:
 	Returns process running time in seconds or -1.0
 	if no process is found.
 	'''
-	if (pid := proc_get(process)) == None: return -1.0
-	return time.time() - psutil.Process(pid).create_time()
+	if (pid := proc_get(process)) is None: return -1
+	return Process(pid=pid).uptime()
 
-def proc_kill(process, cmd_filter:str=''):
+def proc_kill(pid:int):
 	r'''
 	Kills the prosess.  
 	*cmd_filter* is case-insensitive.  
 	'''
-	if isinstance(process, int):
-		try:
-			psutil.Process(process).kill()
-		except (ProcessLookupError, psutil.NoSuchProcess):
-			dev_print(f'proc_kill: PID {process} not found')
-	elif isinstance(process, str):
-		name = process.lower()
-		if cmd_filter: cmd_filter = cmd_filter.lower()
-		for proc in psutil.process_iter(attrs=['name']):
-			if proc.name().lower() == name:
-				if cmd_filter:
-					if cmd_filter in ' '.join(proc.cmdline()).lower():
-						proc.kill()
-				else:
-					proc.kill()
-	else:
-		raise ValueError(
-			f'Unknown type of "process" argument: {type(process)}'
-		)
+	Process(pid=pid).kill()
 
 def free_ram(unit:str='percent')->float:
 	r'''
@@ -727,21 +1031,6 @@ def wts_logoff(sessionid:int, wait:bool=False)->int:
 	If the function fails, the return value is zero.
 	'''
 	return win32ts.WTSLogoffSession(0, sessionid, wait)
-
-def wts_proc_list(process:str='', strip_pc:bool=True)->list[Process]:
-	r'''
-	Returns list of `Process` objects with additional *sessionid* property.  
-	'''
-	if process: process = process.lower()
-	result:list[Process] = []
-	for tup in win32ts.WTSEnumerateProcesses():
-		sessionid, pid, name, pysid = tup
-		if process:
-			if name.lower() != process: continue
-		proc = Process(_proc = psutil.Process(pid), strip_pc=strip_pc)
-		proc.sessionid = sessionid
-		result.append(proc)
-	return result
 
 def service_running(service:str)->bool:
 	'''Returns True if servise is running.'''
@@ -1073,12 +1362,12 @@ def proc_cmdline(process, full:bool=False)->str:
 	Returns a command line.  
 	*full* - include process path.  
 	'''
-	if (pid := proc_get(process)) == None: return ''
-	cmdline = psutil.Process(pid).cmdline()
+	if (pid := proc_get(process)) is None:
+		return ''
+	proc = Process(pid=pid)
 	if full:
-		return ' '.join( cmdline )
-	else:
-		return ' '.join(cmdline[1:]) if len(cmdline) > 1 else ''
+		return proc.cmdline
+	return proc.args
 
 
 

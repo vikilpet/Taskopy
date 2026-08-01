@@ -8,9 +8,13 @@ advapi32 = ctypes.WinDLL('advapi32', use_last_error=True)
 comctl32 = ctypes.WinDLL('comctl32', use_last_error=True)
 shell32 = ctypes.WinDLL('shell32', use_last_error=True)
 ole32 = ctypes.WinDLL('ole32', use_last_error=True)
+psapi = ctypes.WinDLL('psapi', use_last_error=True)
 
 HICON = wintypes.HICON
 UINT = wintypes.UINT
+ULONG_PTR = ctypes.c_size_t
+LONG_PTR  = ctypes.c_ssize_t
+LRESULT   = LONG_PTR
 
 
 class GUID(ctypes.Structure):
@@ -62,15 +66,22 @@ def com_release(ptr):
 		com_vcall(ptr, 2, ctypes.c_uint, [])
 
 
-class OVERLAPPED(ctypes.Structure):
+class _OVERLAPPED_UNION(ctypes.Structure):
 	_fields_ = [
-		('Internal', wintypes.LPVOID),
-		('InternalHigh', wintypes.LPVOID),
 		('Offset', wintypes.DWORD),
 		('OffsetHigh', wintypes.DWORD),
-		('Pointer', wintypes.LPVOID),
+	]
+
+
+class OVERLAPPED(ctypes.Structure):
+	_anonymous_ = ('_u',)    # makes Offset/OffsetHigh/Pointer accessible directly
+	_fields_ = [
+		('Internal', ULONG_PTR),
+		('InternalHigh', ULONG_PTR),
+		('_u', _OVERLAPPED_UNION),         # union: 8 bytes on x64
 		('hEvent', wintypes.HANDLE)
 	]
+
 
 def _errcheck_bool(value, func, args):
 	if not value:
@@ -81,20 +92,16 @@ CancelIoEx = kernel32.CancelIoEx
 CancelIoEx.restype = wintypes.BOOL
 CancelIoEx.errcheck = _errcheck_bool
 CancelIoEx.argtypes = ( wintypes.HANDLE, ctypes.POINTER(OVERLAPPED) )
+
+
 class KBDLLHOOKSTRUCT(ctypes.Structure):
 	_fields_ = [
 		('vkCode', wintypes.DWORD),
 		('scanCode', wintypes.DWORD),
 		('flags', wintypes.DWORD),
 		('time', wintypes.DWORD),
-		('dwExtraInfo', ctypes.POINTER(wintypes.ULONG))
+		('dwExtraInfo', ULONG_PTR),
 	]
-LowLevelHookProc = ctypes.WINFUNCTYPE(
-	wintypes.LPARAM,
-	ctypes.c_int,
-	wintypes.WPARAM,
-	wintypes.LPARAM
-)
 TH32CS_SNAPPROCESS                = 0x00000002
 PROCESS_QUERY_LIMITED_INFORMATION = 0x00001000
 PROCESS_VM_READ                   = 0x00000010
@@ -113,7 +120,7 @@ class PROCESSENTRY32W(ctypes.Structure):
 		('dwSize',              wintypes.DWORD),
 		('cntUsage',            wintypes.DWORD),
 		('th32ProcessID',       wintypes.DWORD),
-		('th32DefaultHeapID',   ctypes.POINTER(wintypes.ULONG)),
+		('th32DefaultHeapID',   ULONG_PTR),
 		('th32ModuleID',        wintypes.DWORD),
 		('cntThreads',          wintypes.DWORD),
 		('th32ParentProcessID', wintypes.DWORD),
@@ -176,9 +183,61 @@ kernel32.CloseHandle.restype  = wintypes.BOOL
 kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
 ntdll.NtQueryInformationProcess.restype  = wintypes.LONG
 ntdll.NtQueryInformationProcess.argtypes = [
-	wintypes.HANDLE, wintypes.ULONG, ctypes.c_void_p,
+	wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p,
 	wintypes.ULONG, ctypes.POINTER(wintypes.ULONG),
 ]
+kernel32.GetModuleHandleW.restype = wintypes.HMODULE
+kernel32.GetModuleHandleW.argtypes = [wintypes.LPCWSTR]
+HOOKPROC = ctypes.WINFUNCTYPE(
+	LRESULT,   # return type — 64-bit on x64!
+	ctypes.c_int,       # nCode
+	wintypes.WPARAM,    # wParam — 64-bit on x64!
+	wintypes.LPARAM     # lParam — 64-bit on x64!
+)
+
+user32.SetWindowsHookExW.argtypes = [
+	ctypes.c_int,       # idHook
+	HOOKPROC,           # lpfn — the callback type
+	wintypes.HMODULE,   # hMod — pointer-sized!
+	wintypes.DWORD      # dwThreadId
+]
+user32.SetWindowsHookExW.restype = wintypes.HHOOK  # pointer-sized!
+user32.CallNextHookEx.restype = LRESULT
+user32.CallNextHookEx.argtypes = [
+	wintypes.HHOOK,
+	ctypes.c_int,
+	wintypes.WPARAM,
+	wintypes.LPARAM
+]
+user32.UnhookWindowsHookEx.restype  = wintypes.BOOL
+user32.UnhookWindowsHookEx.argtypes = [wintypes.HHOOK]
+user32.IsIconic.restype          = wintypes.BOOL
+user32.IsIconic.argtypes         = [wintypes.HWND]
+user32.ShowWindow.restype        = wintypes.BOOL
+user32.ShowWindow.argtypes       = [wintypes.HWND, wintypes.INT]
+user32.GetForegroundWindow.restype = wintypes.HWND
+user32.GetForegroundWindow.argtypes = []
+user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, wintypes.LPDWORD]
+user32.SetWindowPos.restype     = wintypes.BOOL
+user32.SetWindowPos.argtypes    = [wintypes.HWND, wintypes.HWND,
+								wintypes.INT, wintypes.INT,
+								wintypes.INT, wintypes.INT,
+								wintypes.UINT]
+
+user32.SetForegroundWindow.restype = wintypes.BOOL
+user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+user32.AttachThreadInput.restype = wintypes.BOOL
+user32.AttachThreadInput.argtypes = [wintypes.DWORD, wintypes.DWORD, wintypes.BOOL]
+user32.BringWindowToTop.restype   = wintypes.BOOL
+user32.BringWindowToTop.argtypes  = [wintypes.HWND]
+user32.SetActiveWindow.restype    = wintypes.HWND
+user32.SetActiveWindow.argtypes   = [wintypes.HWND]
+user32.SetFocus.restype           = wintypes.HWND
+user32.SetFocus.argtypes          = [wintypes.HWND]
+user32.keybd_event.restype        = None
+user32.keybd_event.argtypes       = [wintypes.BYTE, wintypes.BYTE,
+                                    wintypes.DWORD, ULONG_PTR]
 
 def get_last_error()->str:
 	r'''
