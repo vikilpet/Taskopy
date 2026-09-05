@@ -173,12 +173,26 @@ def examp_cert_check(caller:str, codepage:str=''
 	Find the difference in the PC certificate list and the similar
 	list from *Windows Update*.
 
+	If you find a new PC-only certificate:
+	
+	- A PC-only certificate is not automatically malicious — it
+	  may be a legitimate CA no longer distributed via WU, or
+	  installed by software (antivirus, VPN, payment tools).
+	- Check if the certificate is in the Microsoft Trusted Root
+	  Program: https://learn.microsoft.com/en-us/security/trusted-root/participants-list
+	- If not in the program, check Event Viewer (Applications and
+	  Services Logs → Microsoft → Windows → CertificateServicesClient-CertEnroll
+	  → Operational) for the installing process.
+	- A certificate you cannot trace to any installed software is
+	  the real red flag.
+
 	Links:
 	
 	- https://justinparrtech.com/JustinParr-Tech/windows-certutil-list-certificate-stores/
 	- https://www.computerworld.com/article/3008113/dell-installs-self-signed-root-certificate-on-laptops-endangers-users-privacy.html
 	- https://support.microsoft.com/en-us/topic/an-automatic-updater-of-untrusted-certificates-is-available-for-windows-vista-windows-server-2008-windows-7-and-windows-server-2008-r2-117bc163-d9e0-63ad-5a79-e61f38be8b77
 	
+	2026.08
 	'''
 
 	def parser(dump:str)->dict:
@@ -189,13 +203,18 @@ def examp_cert_check(caller:str, codepage:str=''
 			hsh = re_find(sect, r'(?:\):\s)([0-9a-z ]{32,})')
 			if not hsh: continue
 			name = re_find(sect, r'(?:\s(?:CN=|OU=|O=))(.+?)[,\r\n]', re_flags=0)
-			if caller == tcon.CALLER_MENU:
+			if is_manual:
 				if not name: tprint(f'no name: {hsh}')
-			dct[hsh[0].strip()] = name[0].strip() if name else '?'
+			issued = re_find(sect, r'NotBefore:\s*(.+?)[\r\n]', re_flags=0)
+			dct[hsh[0].strip()] = (
+				name[0].strip() if name else '?'
+				, issued[0].strip() if issued else '?'
+			)
 		return dct
 
 	VARNAME = 'cert_check_diff'
 	if not codepage: codepage = sys_codepage()
+	is_manual = task_is_manual()
 	dump_file = temp_file(suffix='.sst')
 	ret, out, _ = proc_wait(f'certutil -generateSSTFromWU "{dump_file}"')
 	if ret:
@@ -217,26 +236,29 @@ def examp_cert_check(caller:str, codepage:str=''
 			toast(f'certutil store «{store}» error: {out}')
 			return
 		hashes_pc.update(parser(out))
-	table = [('Src', 'Name', 'Hash')]
-	for hsh, name in hashes_pc.items():
+	for hsh, (name, issued) in hashes_pc.items():
 		if not hsh in hashes_wu:
-			hashes_pc_only[hsh] = name
+			hashes_pc_only[hsh] = (name, issued)
 			diff.add(hsh)
-			table.append(('PC', name, hsh))
-	if caller == tcon.CALLER_MENU and diff:
-		tprint(f'{len(hashes_pc)=}, {len(hashes_wu)=}')
-		table_print(table, sorting=(0, 1), use_headers=True)
-	# Comparing it to the previous difference between PC and WU:
-	if not set(
+	# Previous difference between PC and WU:
+	prev_diff:set = set(
 		var_get(VARNAME, as_literal=True, default=())
-	).symmetric_difference(diff):
-		if caller == tcon.CALLER_MENU:
-			dialog('No new PC-only certificates', timeout='2 sec')
+	)
+	# New PC-only certificates compared to the previous check:
+	new:set = diff - prev_diff
+	if new or is_manual:
+		tprint(f'{len(hashes_pc)=}, {len(hashes_wu)=}, {len(new)=}')
+		table = [('Src', 'Name', 'Hash', 'New', 'Issued')]
+		for hsh, (name, issued) in hashes_pc_only.items():
+			table.append(('PC', name, hsh
+			, '+' if hsh in new else ''
+			, issued))
+		table_print(table, sorting=(0, 1), use_headers=True)
+		if is_manual: app_win_show()
+	if not new:
+		if is_manual:
+			dialog('No new PC-only certificates', timeout='3 sec')
 		return
-	if len(hashes_pc_only) == 0:
-		return
-	# Show application window and dialog only if there is a difference:
-	app_win_show()
 	if dialog('Save the new difference?', ('No', 'Yes')) == 1001:
 		var_set(VARNAME, diff)
 

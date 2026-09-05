@@ -391,7 +391,8 @@ def file_move(fullpath, destination)->str:
 def file_delete(fullpath)->int:
 	r'''
 	Deletes the file permanently.  
-	Returns *0* on success or if the file does not exist.  
+	See also `file_recycle`.  
+	Returns *0* when successful or if the file does not exist.  
 
 		bmark(
 			lambda fls: tuple(file_delete(f) for f in fls)
@@ -563,15 +564,13 @@ def file_size(fullpath, unit:str='b')->int:
 	e = _SIZE_UNITS.get(unit.lower(), 1)
 	return win32file.GetFileAttributesEx(fullpath)[4] // e
 
-def file_size_str(fullpath)->str:
+def file_size_str(fullpath:int|float|str|tuple)->str:
 	r'''
 	Size of file *for humans*.  
-	Example:
+	Examples:
 
-		file_size_str(r'c:\\my_file.bin')
-		>'5 MB'
-		file_size_str(336013)
-		>'328.1 KB'
+		asrt( file_size_str(r'c:\Windows\Updreg.EXE'), '88.0 KB')
+		asrt( file_size_str(336013), '328.1 KB' )
 
 	'''
 	if isinstance(fullpath, (int, float)):
@@ -826,7 +825,7 @@ def dir_purge(fullpath, interval:str, subdirs:bool
 	Deletes empty subdirectories.  
 	Returns the number of deleted files and directories.  
 	
-	*days=0* - delete everything  
+	*interval='0 sec'* - delete everything  
 	*creation* - use date of creation, otherwise use last
 	modification date.  
 	*subdirs* - delete in subfolders too. Empty subfolders 
@@ -2749,6 +2748,21 @@ def dir_junc(src_path, dst_path):
 	dst_path = path_get(dst_path)
 	CreateJunction(src_path, dst_path)
 
+def dir_last(fullpath, subdirs:bool=True
+, sort_function:Callable=file_date_m, **rules):
+	r'''
+	Returns the full path of the "last" file in `fullpath`,
+	where "last" is defined by `sort_function`.
+
+		td = dir_test(with_long=False)
+		tf = file_write((td, 'last'), 'l')
+		asrt( dir_last(td), tf )
+		asrt( bmark(dir_last, a=(td,)), 600_000)
+		dir_delete(td)
+
+	'''
+	candidates = dir_files(fullpath, subdirs=subdirs, **rules)
+	return max(candidates, key=sort_function)
 
 
 

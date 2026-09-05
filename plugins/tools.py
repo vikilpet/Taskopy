@@ -73,7 +73,7 @@ except ModuleNotFoundError:
 	import plugins.cache as cache
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2026-08-01'
+APP_VERSION = 'v2026-09-05'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 if getattr(sys, 'frozen', False):
 	APP_PATH = os.path.dirname(sys.executable)
@@ -314,7 +314,7 @@ def task_name(is_human:bool=False, with_parent:bool=False)->str:
 	tname:str = ''
 	parent:str = ''
 	try:
-		tasks = set(app.tasks.task_dict.keys())
+		tasks = set(t for t,p in app.tasks.task_dict.items() if p['running'])
 	except NameError:
 		return ''
 	except AttributeError:
@@ -512,11 +512,12 @@ def time_now(**delta)->dtime:
 	return ( datetime.datetime.now() + datetime.timedelta(**delta) )
 
 def time_from_str(date_string:str, template:str=tcon.DATE_STR_FILE
-, use_locale:str='C')->dtime:
+, use_locale:str='C', from_iso:bool=False)->dtime:
 	r'''
 	Returns datetime object from string and
 	specified locale.  
 	'''
+	if from_iso: return dtime.fromisoformat(date_string)
 	with locale_set(use_locale):
 		return datetime.datetime.strptime(date_string, template)
 
@@ -1307,10 +1308,10 @@ class Job:
 			self.result = self.func(*self.args, **self.kwargs)
 			if isinstance(self.result, Exception):
 				self.error = True
-				self.result = f'exception: {repr(self.result)}' \
+				self.result = f'func exception: {repr(self.result)}' \
 				+ f'\nat line {self.result.__traceback__.tb_lineno}'
-		except:
-			self.result = f'exception: {exc_text()}'
+		except Exception as exc:
+			self.result = f'job exception: {str(exc)}'
 			self.error = True
 		self.finished = True
 		self.time = datetime.timedelta(
@@ -1532,7 +1533,8 @@ def safe(func:Callable)->Callable:
 		except Exception as e:
 			trace_li = traceback.format_exc().splitlines()
 			trace_str = '\n'.join(trace_li[-3:])
-			if is_con(): tprint(f'<safe>: \n{trace_str}')
+			if is_con():
+				tprint(f'<safe {func.__name__}>:', str_indent(trace_str))
 			return False, e
 	return wrapper
 _TaskDialogIndirect = winapi.comctl32.TaskDialogIndirect
@@ -2711,44 +2713,67 @@ def asrt(value, expect, comp:str='==', show_diff:bool=False):
 	) 
 	raise Exception(msg)
 
-def exc_text(line_num:int=1, with_file:bool=True)->str:
-	r'''
-	Gets the shorted text of an exception.  
-	*line_num* - the number of lines of the exception
-	text from the end. *0* - get all.  
-	
-	Rationale: because of the heavy use of the win32 api
-	, these win32 exceptions should be handled differently.  
 
-	Example:
+
+def exc_text(line_num: int = 1, with_file: bool = True,
+			exc_obj: BaseException = None) -> str:
+	r'''
+	Returns a short one-line description of the current (or given) exception.
+
+	*line_num*  - number of traceback lines to return from the end.
+				``0`` returns the whole traceback as multi-line text.
+	*with_file* - include the source file name.
+	*exc_obj*   - use this exception instead of ``sys.exc_info()``;
+				handy when paired with a `safe` decorator that
+				has already captured the exception.
+
+	Examples:
 
 		try:
 			raise ZeroDivisionError('Just a test')
 		except:
-			dialog(exc_text())
+			qprint(exc_text())
 
+		def f(): pass
+		try:
+			f(x=1)
+		except Exception as e:
+			qprint(exc_text(exc_obj=e))
+
+		try:
+			win32api.CloseHandle(1)   # 1 is almost never a valid handle
+		except:
+			qprint(exc_text())
+	
 	'''
-	if line_num > 1:
-		lines = traceback.format_exc().splitlines()
+	if line_num != 1:
+		tb_text = traceback.format_exc() if exc_obj is None \
+			else ''.join(traceback.format_exception(
+				type(exc_obj)
+				, exc_obj
+				, exc_obj.__traceback__)
+			)
+		lines = tb_text.splitlines()
+		if line_num == 0:
+			return '\n'.join(lines)
 		return '\n'.join(lines[-line_num:])
-	exc_type, exc_value, exc_tb = sys.exc_info()
-	last_frame = traceback.extract_tb(exc_tb)[-1]
-	del exc_tb
-	fullpath = last_frame.filename
-	lineno = last_frame.lineno
-	function = last_frame.name
-	exc_name = exc_type.__name__
-	fname:str = ''
-	if with_file: fname = os.path.basename(fullpath)
-	if isinstance(exc_value, pywintypes.error):
-		msg = f'{function}: {exc_value.strerror.rstrip(".")}' \
-		+ f' ({exc_value.winerror})'
-		if with_file: msg += f' at line {lineno} in file {fname}'
-		return msg
-	if with_file:
-		return f'{exc_name} at line {lineno} in file {fname}'
+	if exc_obj is None:
+		exc_type, exc_value, exc_tb = sys.exc_info()
 	else:
-		return f'{exc_name} at line {lineno}'
+		exc_type, exc_value, exc_tb = type(exc_obj), exc_obj, exc_obj.__traceback__
+	if exc_type is None: return '<no exception>'
+	last_frame = traceback.extract_tb(exc_tb)[-1]
+	lineno = last_frame.lineno
+	fname = os.path.basename(last_frame.filename) if with_file else ''
+	func = last_frame.name
+	if isinstance(exc_value, pywintypes.error):
+		head = f'{func}: "{exc_value.strerror.rstrip(".")} ({exc_value.winerror})"'
+	else:
+		msg = str(exc_value).rstrip('.')
+		head = f'{exc_type.__name__}: "{msg}"' if msg else exc_type.__name__
+	where = f' at line {lineno}'
+	if with_file: where += f' in file {fname}'
+	return head + where
 
 
 
@@ -3072,8 +3097,8 @@ def str_remove_white(text:str, algo:str='basic', sep:str=' ')->str:
 	*algo* - 'basic', 'space', 'unicode' where  
 		
 		- *basic* - remove standard whitespace characters
-		- *space* - same as *basic* but preserve new lines.
-		- *unicoce* - remove all whitespace characters.
+		- *space* - same as *basic* but preserve new lines
+		- *unicoce* - remove all whitespace characters
 
 
 		asrt( str_remove_white(' ba  sic '), 'ba sic')
@@ -3323,7 +3348,7 @@ def dclass_str(instance, template:str='{} = {}'
 def task_is_manual(human_caller:set={tcon.CALLER_MENU, tcon.CALLER_HOTKEY
 , tcon.CALLER_LEFT_CLICK})->bool:
 	r'''
-	Is the current task started by a user?
+	Is the current task started by a user?  
 	'''
 	if is_con(): return True
 	tname = task_name()
@@ -3331,6 +3356,18 @@ def task_is_manual(human_caller:set={tcon.CALLER_MENU, tcon.CALLER_HOTKEY
 	task = app.tasks.task_dict.get(tname)
 	if not task: return False
 	return task.get('_caller') in human_caller
+
+def task_duration(tname:str='')->str:
+	r'''
+	How long does the current task work? -> '4m:3s'  
+	'''
+	if is_con(): return '<not in console>'
+	if not tname: tname = task_name()
+	if not tname: return '<task not found>'
+	task = app.tasks.task_dict.get(tname)
+	if not task: return '<task not found in app>'
+	if not task['running']: return '<task is not running>'
+	return time_diff_human(task.get('last_start'))
 
 def dict_str(dct:dict, template:str='{}: {}'
 , line_sep:str='\n', short:int=0)->str:

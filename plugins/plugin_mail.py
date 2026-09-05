@@ -19,6 +19,7 @@ from .tools import Job, job_batch, tdebug \
 from .plugin_filesystem import file_name_fix, file_size_str \
 , var_get, var_set, path_get
 from .plugin_network import html_clean
+from .plugin_system import sys_codepage
 _CC_LIMIT = 35
 _MAX_FILE_LEN = 200
 _FILE_EXT = 'eml'
@@ -27,12 +28,13 @@ _LAST_NUM_VAR = 'last_mail_msg_num_in_'
 _MAX_BODY_AS_SUBJ = 20
 _EXC_LINE_LIMIT = 5
 
+
 class MailMsg:
-	'''
+	r'''
 	Represents email message as an object.
 	'''
 
-	def __init__(self, login:str, server:str
+	def __init__(self, login:str='', server:str=''
 	, check_only:bool=False, raw_bytes:bytes=b''
 	, error:str='', exception:Exception|None=None
 	, sub_rule:Callable|None=None):
@@ -43,12 +45,14 @@ class MailMsg:
 		self.server:str = server
 		self.dst_dir:str = ''
 		self.file_index:int = 0
-		if raw_bytes:
-			self.size:int = len(raw_bytes)
-			self.size_str:str = file_size_str(self.size)
+		self.size:int = len(raw_bytes)
 		self.check_only:bool = check_only
 		self.sub_rule:Callable = sub_rule if sub_rule else lambda m: ''
-	
+
+	@functools.cached_property
+	def size_str(self)->str:
+		return file_size_str(self.size)
+
 	@functools.cached_property
 	def as_str(self)->str:
 		'''
@@ -69,35 +73,50 @@ class MailMsg:
 		return file_name_fix(self.h_subject)
 
 	@functools.cached_property
-	def body(self)->str:
+	def body(self) -> str:
 		'''
 		Returns message body as text.
-		This can be an HTML string (see also **body_text**)
+		Prefers text/plain; falls back to text/html.
 		'''
-		body = ''
-		charsets = set(('utf-8', 'cp1251'))
-		if cs := self._message.get_charset(): charsets.update(cs)
+		text_parts: list[str] = []
+		html_parts: list[str] = []
+		charsets = ['utf-8', sys_codepage()]
+		if cs := self._message.get_charset(): charsets.append(cs)
+
+		def _decode(payload: bytes) -> str:
+			for charset in charsets:
+				try:
+					return payload.decode(encoding=charset)
+				except (UnicodeDecodeError, LookupError):
+					continue
+			return payload.decode(errors='replace')
+
 		try:
 			if self._message.is_multipart():
 				for part in self._message.walk():
-					if part.get_content_type() != 'text/plain': continue
-					payload = part.get_payload(decode=True)
-					for charset in charsets:
-						try:
-							body += payload.decode(encoding=charset)
-						except:
-							continue
-			else:
-				body = self._message.get_payload(decode=True)
-				for charset in charsets:
-					try:
-						body = body.decode(encoding=charset)
-					except:
+					if part.is_multipart():
 						continue
+					payload = part.get_payload(decode=True)
+					if not payload:
+						continue
+					ctype = part.get_content_type()
+					if ctype == 'text/plain':
+						text_parts.append(_decode(payload))
+					elif ctype == 'text/html':
+						html_parts.append(_decode(payload))
+			else:
+				payload = self._message.get_payload(decode=True)
+				if payload:
+					ctype = self._message.get_content_type()
+					if ctype == 'text/plain':
+						text_parts.append(_decode(payload))
+					elif ctype == 'text/html':
+						html_parts.append(_decode(payload))
 		except Exception as e:
-			dev_print(body := f'body error: {repr(e)}')
-		body = body.strip()
-		return body
+			return f'body error: {e!r}'
+
+		body = ''.join(text_parts) or ''.join(html_parts)
+		return body.strip()
 
 	def _get_header(self, header:str)->tuple[bool, str]:
 		'''
@@ -164,11 +183,11 @@ class MailMsg:
 
 	@functools.cached_property
 	def body_text(self)->str:
+		r'''
+		Returns e-mail body text cleared of HTML tags
+		and excessive empty space.
 		'''
-		Returns the email body text cleaned of HTML tags
-		and empty space, including line breaks.
-		'''
-		return html_clean(self.body, is_mail=True)
+		return html_clean(self.body, strip_white=True)
 	
 	@functools.cached_property
 	def fullpath(self)->str:
@@ -183,8 +202,8 @@ class MailMsg:
 		)
 	
 	def __getattr__(self, name: str):
-		if not name.startswith('h_'):
-			raise Exception(f'MailMsg unknown attribute: {name}')
+		if name.startswith('_') or not name.startswith('h_'):
+			raise AttributeError(f'MailMsg has no attribute {name!r}')
 		name = name[2:]
 		dev_print(f'get: unknown header: "{name}"')
 		hdr_str = self._get_header(name)[1]
@@ -194,6 +213,7 @@ class MailMsg:
 
 	def __str__(self):
 		return 'MailMsg: ' + self.h_subject[:20]
+
 
 class _MailLog:
 
@@ -305,7 +325,7 @@ def mail_send_batch(recipients:str=''
 		)[1] )
 	return errors
 
-def mail_check(server:str, login:str, password:str
+def mail_check(server:str, login:str, password:str, port:int=993
 , folders:list=['inbox'], msg_status:str='UNSEEN'
 , headers:tuple=('subject', 'from', 'to', 'date')
 , silent:bool=True, timeout:int=180)->tuple[ list[MailMsg], list[str] ]:
@@ -320,7 +340,13 @@ def mail_check(server:str, login:str, password:str
 	log = _MailLog(prefix='check', login=login, server=server
 	, silent=silent, err_lst=errors).log
 	try:
-		imap = imaplib.IMAP4_SSL(server, timeout=timeout)
+		ctx = ssl.create_default_context()
+		if port == 993:
+			imap = imaplib.IMAP4_SSL(server, port=port, ssl_context=ctx
+			, timeout=timeout)
+		else:
+			imap = imaplib.IMAP4(server, port=port, timeout=timeout)
+			imap.starttls(ssl_context=ctx)
 		try:
 			imap.login(login, password)
 		except:
@@ -406,7 +432,7 @@ def _mail_get_folders(imap:imaplib.IMAP4_SSL)->list:
 def mail_download(
 	server:str, login:str, password:str
 	, dst_dir:str, folders:list=['inbox']
-	, trash_folder:str='Trash', silent:bool=True
+	, port:int=993, trash_folder:str='Trash', silent:bool=True
 	, attempts:int=3, sub_rule:Callable=None
 	, timeout:int=3600
 )->tuple[list[MailMsg], list[str] ]:
@@ -440,7 +466,13 @@ def mail_download(
 	
 	try:
 		log('connect to server')
-		imap = imaplib.IMAP4_SSL(server, timeout=timeout)
+		ctx = ssl.create_default_context()
+		if port == 993:
+			imap = imaplib.IMAP4_SSL(server, port=port, ssl_context=ctx
+			, timeout=timeout)
+		else:
+			imap = imaplib.IMAP4(server, port=port, timeout=timeout)
+			imap.starttls(ssl_context=ctx)
 		try:
 			imap.login(login, password)
 		except:
@@ -604,21 +636,22 @@ def mail_download_batch(mailboxes:list, dst_dir:str, timeout:int=3600
 			target = mail_download
 			if box.get('check_only'):
 				target = mail_check
+				box.pop('check_only', None)
 			else:
 				if not box.get('dst_dir'):
 					box['dst_dir'] = dst_dir
-			jobs.append( Job(
-				target
-				, **{k:box[k] for k in box if k!='check_only'}
-			) )
+			jobs.append( Job( target, **box ) )
 		errors = []
 		msgs = []
-		table = [('Login', 'Time')]
+		table = [('Login', 'Time', 'Error')]
 		job: Job
 		for job in job_batch(jobs, timeout=(timeout + 1)):
 			if job.error:
-				table.append( ('{}@{}'.format(job.kwargs['login']
-				, job.kwargs['server']), 'error') )
+				table.append( (
+					'{}@{}'.format(job.kwargs['login'], job.kwargs['server'])
+					, 'error'
+					, job.result
+				) )
 				errors.append(
 					'{}@{} error: {}'.format(
 						job.kwargs['login']
@@ -629,8 +662,11 @@ def mail_download_batch(mailboxes:list, dst_dir:str, timeout:int=3600
 				continue
 			msgs.extend(job.result[0])
 			errors.extend(job.result[1])
-			table.append( ('{}@{}'.format(job.kwargs['login']
-			, job.kwargs['server']), job.time) )
+			table.append( (
+				'{}@{}'.format(job.kwargs['login'], job.kwargs['server'])
+				, job.time
+				, None
+			) )
 		if not silent: table_print(table, use_headers=True)
 		status, data = write_log()
 		if not status: errors.append(f'logging error: {data}')
@@ -645,5 +681,15 @@ def mail_download_batch(mailboxes:list, dst_dir:str, timeout:int=3600
 		dev_print(f'general exception:{exc_text(_EXC_LINE_LIMIT)}')
 		errors.append(exc_text())
 	return msgs, errors
-	
+
+def mail_from_file(fullpath, **kwargs)->MailMsg:
+	r'''
+	Creates a MailMsg instance from a file on disk
+	(e.g. a previously saved *.eml* file).
+	'''
+	with open(path_get(fullpath), 'rb') as f:
+		return MailMsg(raw_bytes=f.read(), **kwargs)
+
+
+
 if __name__ != '__main__': patch_import()

@@ -406,7 +406,7 @@ def proc_wait(
 	*cmd* - command line with the program and its arguments  
 	*cwd* - current working directory  
 	*create_console* - to catch output of some programs  
-	*env* - add this to the environment (not replace all)  
+	*env* - add this variables to the environment (not replace all)  
 	'''
 	stdout_read, stdout_write = _create_pipe()
 	stderr_read, stderr_write = _create_pipe()

@@ -15,6 +15,7 @@ import html
 import psutil
 import tempfile
 import win32file
+import unicodedata
 from io import BytesIO
 from hashlib import md5
 from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
@@ -37,13 +38,14 @@ from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 from .plugin_process import proc_wait
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 LAN_DOMAINS = ('lan', 'local', 'home')
 _RE_PING_LOSS = re.compile(r'\((\d+)%')
 _RE_PING_FAIL = re.compile(r' \d+\.\d+\.\d+\.\d+: .+?=\d+\D+[<=]\d+\D+=\d+')
 _RE_PING_TIME = re.compile(r' = (\d+).+? = (\d+).+? = (\d+)')
 _RE_HOST_IP = re.compile(r'\D(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})[\:/]')
+_ZW_TABLE = str.maketrans('', '', '\u200b\u200c\u200d\u2060\ufeff')
 warnings.filterwarnings('ignore', category=MarkupResemblesLocatorWarning)
 requests.packages.urllib3.disable_warnings(
 	requests.packages.urllib3.exceptions.InsecureRequestWarning)
@@ -158,7 +160,7 @@ def _rem_white(text:str)->str:
 	return ' '.join(text.split())
 
 def file_download(url:str, destination:str=None
-, attempts:int=3, timeout:float=3.0
+, attempts:int=3, timeout:float|tuple[float|None,float|None]=3.0
 , del_bad_file:bool=False, headers:dict={}
 , size_limit:int=None
 , stop_event:threading.Event=None
@@ -264,34 +266,30 @@ def file_download(url:str, destination:str=None
 		raise last_exc
 	return dst_file
 
-def html_clean(html_str:str, sep:str=' ', is_mail:bool=False
-, del_spec:bool=True)->str:
+def html_clean(html_str:str, sep:str=' ', strip_white:bool=True)->str:
 	r'''
 	Removes HTML tags from a string. Also removes content
-	of non-text tags: *style, script, img*  
-	*sep* - separator between tags.  
+	of non-text tags: *style, script, img*
+	*sep* - separator between tags.
+	*strip_white* - normalize whitespace (NFKC) but preserve new lines.
 
 		asrt( html_clean('\r\n<a>t</a>\t'), 't')
 		asrt( html_clean('\r\n<a>t</a><a>t2</a>\t', sep='\n'), 't\nt2')
-		asrt( html_clean('\u200b\r \n<a>t</a>\t', is_mail=True), 't')
+		asrt( html_clean('\u200b\r \n<a>t</a>\t', strip_white=True), 't')
 		asrt( html_clean('<style>{}</style><a>t</a>\t'), 't')
-		asrt( html_clean('<img>jpg</img><a>t</a>\t', del_spec=False), 'jpg t')
-		asrt( bmark(html_clean, a=('',)), 200_000 )
+		asrt( bmark(html_clean, a=('<style>{}</style><a>t</a>\t',)), 300_000 )
 
 	'''
-	SPEC_CHARS = ' \r\n\t\u200b\xa0\u200c'
-	DEL_TAGS = ('script', 'style', 'img')
 	soup = BeautifulSoup(html_str, 'lxml')
-	if del_spec:
-		for tag in DEL_TAGS: [s.decompose() for s in soup(tag)]
 	text = soup.get_text(separator=sep)
 	soup.decompose()
 	del soup
-	if is_mail:
-		text = text.strip(SPEC_CHARS)
-	else:
-		text = text.strip()
-	if is_mail: text = ' '.join(text.split())
+	text = unicodedata.normalize('NFKC', text).translate(_ZW_TABLE).strip()
+	if strip_white:
+		text = '\n'.join(
+			' '.join(line.split()) for line in text.splitlines()
+			if line.strip()
+		)
 	return text
 
 def html_element(url:str, element

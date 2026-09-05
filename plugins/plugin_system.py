@@ -5,11 +5,13 @@ A *window* argument in function can be a
 - *None* - it will find hwnd of a foreground window.
 '''
 import os
+import functools
 import win32api
 import win32gui
 import win32con
 import win32com
 import win32process
+import win32pdh
 import winreg
 import pywintypes
 from datetime import datetime as dtime
@@ -883,12 +885,13 @@ def screen_height()->int:
 	' Returns screen height in pixels '
 	return win32api.GetSystemMetrics(win32con.SM_CYSCREEN)
 
+@functools.cache
 def sys_codepage():
 	r'''
 	Returns current Windows code page for non-unicode programs.
 
 		asrt( sys_codepage(), 'cp1251' )
-		asrt( bmark(sys_codepage), 2100 )
+		asrt( bmark(sys_codepage), 1500 )
 
 	'''
 	return 'cp' + str(_GetACP())
@@ -907,15 +910,17 @@ def is_sys_locked()->bool:
 	'''
 	return win32gui.GetForegroundWindow() == 0
 
+@functools.cache
 def sys_is_server()->bool:
 	r'''
 	Is this computer a Windows Server?
 
-		asrt( bmark(sys_is_server), 3_700 )
+		asrt( bmark(sys_is_server), 3_000 )
 	
 	'''
 	return win32api.GetVersionEx(1)[8] != 1
 
+@functools.cache
 def sys_start_time()->dtime:
 	r'''
 	Returns system startup time (local time).
@@ -1028,3 +1033,315 @@ def sys_kboard_lang_set(layout_id_or_lang:int|str)->bool:
 	result = win32api.SendMessage(hwnd, win32con.WM_INPUTLANGCHANGEREQUEST
 	, 0, layout_id)
 	return result == 0
+
+
+class CpuUsageMonitor:
+	r'''
+	Monitor total CPU usage matching Task Manager (Windows 8+).  
+	Should match *Task Manager*  
+	Usage example:
+
+		with CpuUsageMonitor() as monitor:
+			for _ in range(5):
+				print(f"CPU: {monitor.read():.1f}%")
+
+	'''
+
+	def __init__(self, sleep_interval:float=1.0):
+		self.sleep_interval = sleep_interval
+		self._hq = win32pdh.OpenQuery()
+		self._hc_busy = win32pdh.AddCounter(
+			self._hq,
+			r"\Processor Information(_Total)\% Processor Time",
+		)
+		self._hc_queue = win32pdh.AddCounter(
+			self._hq,
+			r"\System\Processor Queue Length",
+		)
+		win32pdh.CollectQueryData(self._hq)
+
+	def read(self):
+		"""Return current CPU busy percentage (0.0 - 100.0)."""
+		time.sleep(self.sleep_interval)
+		win32pdh.CollectQueryData(self._hq)
+		_type, value = win32pdh.GetFormattedCounterValue(
+			self._hc_busy, win32pdh.PDH_FMT_DOUBLE
+		)
+		return max(0.0, min(100.0, value))
+
+	def is_saturated(
+		self,
+		busy_threshold=85.0,
+		queue_per_core=2.0,
+		logical_cores=None,
+	):
+		"""
+		Return True if the CPU appears to be a bottleneck.
+
+		Saturation is confirmed when BOTH:
+		* % Processor Time >= busy_threshold, AND
+		* Processor Queue Length >= queue_per_core * logical_cores
+
+		Per Microsoft guidance:
+		- busy_threshold85%: "system might work slowly"
+		- queue_per_core 2:   warning level (>2 per processor with high CPU => investigate)
+		- queue_per_core 10:  definite bottleneck (server workload)
+
+		Args:
+			busy_threshold:   Sustained % Processor Time that counts as
+							"high" (0-100). Default 85.
+			queue_per_core:    Queue-length-per-core threshold. Default 2
+							(Microsoft warning). Use 10 for "definitely
+							bottlenecked" on servers.
+			logical_cores: Logical processor count. Auto-detected via
+							os.cpu_count() if None.
+
+		Returns:
+			dict with:
+				saturated (bool)   - True if CPU is a bottleneck
+				busy_pct (float)  - % Processor Time
+				queue_len   (float)  - Processor Queue Length
+				queue_limit (float)  - queue threshold that was applied
+		"""
+		if logical_cores is None:
+			logical_cores = os.cpu_count() or 1
+		queue_limit = queue_per_core * logical_cores
+
+		time.sleep(self.sleep_interval)
+		win32pdh.CollectQueryData(self._hq)
+
+		fmt = win32pdh.PDH_FMT_DOUBLE
+		_, busy = win32pdh.GetFormattedCounterValue(self._hc_busy, fmt)
+		_, queue = win32pdh.GetFormattedCounterValue(self._hc_queue, fmt)
+
+		busy = max(0.0, min(100.0, busy))
+		saturated = (busy >= busy_threshold) and (queue >= queue_limit)
+
+		return {
+			"saturated": saturated,
+			"busy_pct": busy,
+			"queue_len": queue,
+			"queue_limit": queue_limit,
+		}
+
+	def close(self):
+		for hc in (getattr(self, "_hc_busy", None),
+				getattr(self, "_hc_queue", None)):
+			if hc is not None:
+				try:
+					win32pdh.RemoveCounter(hc)
+				except Exception:
+					pass
+		self._hc_busy = self._hc_queue = None
+		if getattr(self, "_hq", None) is not None:
+			try:
+				win32pdh.CloseQuery(self._hq)
+			except Exception:
+				pass
+		self._hq = None
+
+	def __enter__(self):
+		return self
+
+	def __exit__(self, *exc_info):
+		self.close()
+
+	def __del__(self):
+		self.close()
+
+
+def sys_cpu_usage(sleep_interval=1.0)->float:
+	r'''
+	Return total CPU usage (%) matching Task Manager.  
+	Suitable for occasional use (not tight loops).  
+	*sleep_interval* - Seconds between the two samples needed
+	to compute the rate. 1.0 matches Task
+	Manager's update interval.  
+	'''
+	hq = win32pdh.OpenQuery()
+	try:
+		hc = win32pdh.AddCounter(
+			hq, r"\Processor Information(_Total)\% Processor Utility"
+		)
+		try:
+			win32pdh.CollectQueryData(hq)        # seed baseline
+			time.sleep(sleep_interval)
+			win32pdh.CollectQueryData(hq)        # take the sample
+			_type, value = win32pdh.GetFormattedCounterValue(
+				hc, win32pdh.PDH_FMT_DOUBLE
+			)
+			return round(value, 1)
+		finally:
+			win32pdh.RemoveCounter(hc)
+	finally:
+		win32pdh.CloseQuery(hq)
+
+class RamUsageMonitor:
+	r'''
+	Monitor free RAM and detect memory saturation.  
+	'''
+
+	def __init__(self, sleep_interval=1.0):
+		self.sleep_interval = sleep_interval
+		self._hq = win32pdh.OpenQuery()
+		self._hc_avail = win32pdh.AddCounter(
+			self._hq, r"\Memory\Available MBytes"
+		)
+		self._hc_commit = win32pdh.AddCounter(
+			self._hq, r"\Memory\% Committed Bytes In Use"
+		)
+		self._hc_pages = win32pdh.AddCounter(
+			self._hq, r"\Memory\Pages/sec"
+		)
+		win32pdh.CollectQueryData(self._hq)
+		self._total_mb = self._get_total_physical_mb()
+
+	@staticmethod
+	def _get_total_physical_mb():
+		"""Get total physical RAM in MB via GlobalMemoryStatusEx."""
+		class MEMORYSTATUSEX(ctypes.Structure):
+			_fields_ = [
+				("dwLength", ctypes.c_uint32),
+				("dwMemoryLoad", ctypes.c_uint32),
+				("ullTotalPhys", ctypes.c_uint64),
+				("ullAvailPhys", ctypes.c_uint64),
+				("ullTotalPageFile", ctypes.c_uint64),
+				("ullAvailPageFile", ctypes.c_uint64),
+				("ullTotalVirtual", ctypes.c_uint64),
+				("ullAvailVirtual", ctypes.c_uint64),
+				("ullAvailExtendedVirtual", ctypes.c_uint64),
+			]
+
+		stat = MEMORYSTATUSEX()
+		stat.dwLength = ctypes.sizeof(stat)
+		ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
+		return stat.ullTotalPhys // (1024 * 1024)
+
+	def read(self):
+		"""
+		Return current memory status.
+
+		Returns:
+			dict with:
+				available_mb (float)  - free + standby, immediately usable
+				total_mb     (int)    - total installed physical RAM
+				used_mb      (float)  - total - available
+				used_pct     (float)  - used as % of total
+				commit_pct   (float)  - committed bytes / commit limit * 100
+				pages_per_sec(float)  - page fault rate (hard paging)
+		"""
+		time.sleep(self.sleep_interval)
+		win32pdh.CollectQueryData(self._hq)
+
+		fmt = win32pdh.PDH_FMT_DOUBLE
+		_, avail = win32pdh.GetFormattedCounterValue(self._hc_avail, fmt)
+		_, pages = win32pdh.GetFormattedCounterValue(self._hc_pages, fmt)
+		_, commit = win32pdh.GetFormattedCounterValue(self._hc_commit, fmt)
+
+		avail = max(0.0, avail)
+		used = max(0.0, self._total_mb - avail)
+		used_pct = (used / self._total_mb * 100.0) if self._total_mb else 0.0
+
+		return {
+			"available_mb": avail,
+			"total_mb": self._total_mb,
+			"used_mb": used,
+			"used_pct": used_pct,
+			"commit_pct": commit,
+			"pages_per_sec": pages,
+		}
+
+	def is_saturated(
+		self,
+		available_mb_threshold=256,
+		pages_per_sec_threshold=50,
+		commit_pct_threshold=90.0,
+	):
+		"""
+		Return True if the system is experiencing memory pressure.
+
+		Saturation is confirmed when BOTH:
+		* Available MBytes <= available_mb_threshold (very low free RAM), AND
+		* Pages/sec >= pages_per_sec_threshold (system is hard-paging)
+
+		Additionally, if commit charge is near the limit
+		(commit_pct >= commit_pct_threshold), the system is at risk of
+		running out of virtual memory entirely.
+
+		Args:
+			available_mb_threshold: Available MB below which RAM is
+									considered critically low. Default 256.
+			pages_per_sec_threshold: Paging rate that indicates the
+									system is thrashing. Default 50
+									(Microsoft: sustained >5/sec warrants
+									attention; >50 = serious).
+			commit_pct_threshold:   % Committed Bytes In Use that signals
+									virtual memory exhaustion risk.
+
+		Returns:
+			dict with:
+				saturated   (bool)   - True if memory is a bottleneck
+				available_mb(float)  - current available RAM
+				pages_per_sec(float) - current paging rate
+				commit_pct  (float)  - current commit charge %
+				reason      (str)    - human-readable explanation
+		"""
+		time.sleep(self.sleep_interval)
+		win32pdh.CollectQueryData(self._hq)
+
+		fmt = win32pdh.PDH_FMT_DOUBLE
+		_, avail = win32pdh.GetFormattedCounterValue(self._hc_avail, fmt)
+		_, pages = win32pdh.GetFormattedCounterValue(self._hc_pages, fmt)
+		_, commit = win32pdh.GetFormattedCounterValue(self._hc_commit, fmt)
+
+		avail = max(0.0, avail)
+
+		low_ram = avail <= available_mb_threshold
+		thrashing = pages >= pages_per_sec_threshold
+		commit_risk = commit >= commit_pct_threshold
+		saturated = low_ram and thrashing
+
+		if saturated:
+			reason = "Low available RAM + high paging — memory bottleneck"
+		elif commit_risk:
+			reason = "Commit charge near limit — risk of OOM"
+		elif low_ram:
+			reason = "Low available RAM but low paging — compression coping"
+		elif thrashing:
+			reason = "High paging but RAM not critically low — check app behavior"
+		else:
+			reason = "Memory healthy"
+
+		return {
+			"saturated": saturated,
+			"available_mb": avail,
+			"pages_per_sec": pages,
+			"commit_pct": commit,
+			"reason": reason,
+		}
+
+	def close(self):
+		for hc in (getattr(self, "_hc_avail", None),
+				getattr(self, "_hc_pages", None),
+				getattr(self, "_hc_commit", None)):
+			if hc is not None:
+				try:
+					win32pdh.RemoveCounter(hc)
+				except Exception:
+					pass
+		self._hc_avail = self._hc_pages = self._hc_commit = None
+		if getattr(self, "_hq", None) is not None:
+			try:
+				win32pdh.CloseQuery(self._hq)
+			except Exception:
+				pass
+		self._hq = None
+
+	def __enter__(self):
+		return self
+
+	def __exit__(self, *exc_info):
+		self.close()
+
+	def __del__(self):
+		self.close()
