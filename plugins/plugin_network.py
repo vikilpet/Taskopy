@@ -38,14 +38,30 @@ from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 from .plugin_process import proc_wait
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 LAN_DOMAINS = ('lan', 'local', 'home')
 _RE_PING_LOSS = re.compile(r'\((\d+)%')
 _RE_PING_FAIL = re.compile(r' \d+\.\d+\.\d+\.\d+: .+?=\d+\D+[<=]\d+\D+=\d+')
 _RE_PING_TIME = re.compile(r' = (\d+).+? = (\d+).+? = (\d+)')
 _RE_HOST_IP = re.compile(r'\D(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})[\:/]')
-_ZW_TABLE = str.maketrans('', '', '\u200b\u200c\u200d\u2060\ufeff')
+_ZW_TABLE = str.maketrans('', '',
+	'\u200b'   # ZERO WIDTH SPACE          — invisible, not whitespace
+	'\u200c'   # ZERO WIDTH NON-JOINER     — invisible, not whitespace
+	'\u200d'   # ZERO WIDTH JOINER        — invisible (used for emoji sequences)
+	'\u2060'   # WORD JOINER              — invisible, not whitespace
+	'\ufeff'   # ZERO WIDTH NO-BREAK SPACE — BOM/ZWNBSP, invisible
+	'\u00A0'   # NO-BREAK SPACE            — &nbsp;, looks like space but isn't (also NFKC folds it, kept for safety)
+	'\u2800'   # BRAILLE PATTERN BLANK    — looks like space, not whitespace
+	'\u0085'   # NEXT LINE (NEL)           — control char, acts as line break, isspace()=True
+	'\u180e'   # MONGOLIAN VOWEL SEPARATOR — invisible, was classified as space until Unicode 6.3
+	'\u2028'   # LINE SEPARATOR           — invisible line break, isspace()=True but survives mid-text
+	'\u2029'   # PARAGRAPH SEPARATOR      — invisible paragraph break, isspace()=True but survives mid-text
+	'\u115f'   # HANGUL CHOSEONG FILLER   — renders blank, not whitespace
+	'\u1160'   # HANGUL JUNGSEONG FILLER  — renders blank, not whitespace
+	'\u3164'   # HANGUL FILLER            — renders blank, not whitespace
+	'\uffa0'   # HALFWIDTH HANGUL FILLER  — renders blank, not whitespace
+)
 warnings.filterwarnings('ignore', category=MarkupResemblesLocatorWarning)
 requests.packages.urllib3.disable_warnings(
 	requests.packages.urllib3.exceptions.InsecureRequestWarning)
@@ -635,8 +651,8 @@ def net_html_unescape(html_str:str)->str:
 
 
 
-def is_online(
-	sites:tuple|str=('http://clients3.google.com', 'http://captive.apple.com')
+def net_is_online(
+	sites:tuple|str=('http://clients3.google.com/generate_204', 'http://captive.apple.com/hotspot-detect.html')
 	, timeout:float=2.0
 )->int:
 	r'''
@@ -652,16 +668,60 @@ def is_online(
 	if isinstance(sites, str):
 		sites = (sites, )
 	elif not isinstance(sites, (tuple, list)):
-		raise Exception(f'Incorrect data type of *sites*: {type(sites)}')
-	r = 0
+		raise TypeError(f'Incorrect data type of *sites*: {type(sites)}')
+	result = 0
 	for site in sites:
 		try:
-			requests.head(site, timeout=timeout
-				, headers={**_USER_AGENT})
-			r += 1
-		except:
+			resp = requests.head(
+				site
+				, timeout=timeout
+				, headers={**_USER_AGENT}
+				, allow_redirects=False
+			)
+			result += 1
+		except Exception:
 			pass
-	return r
+	return result
+
+def net_is_online_socks5(
+	proxy:str
+	, sites:tuple|str=('http://clients3.google.com/generate_204', 'http://captive.apple.com/hotspot-detect.html')
+	, timeout:float=2.0
+)->int:
+	r'''
+	A simple check if there is an internet connection via a *SOCKS5*
+	proxy with *HEAD* requests to the specified sites.
+	The function will not raise any exception.
+	Env vars (*HTTP_PROXY* etc.) are ignored — only *proxy* is used.  
+	*proxy* - socks5 proxy URL, e.g. `'socks5h://127.0.0.1:9050'`.
+	`socks5h://` resolves DNS through the proxy;
+	`socks5://` resolves locally.  
+	*timeout* - timeout in seconds.  
+
+	'''
+	if isinstance(sites, str):
+		sites = (sites, )
+	elif not isinstance(sites, (tuple, list)):
+		raise TypeError(f'Incorrect data type of *sites*: {type(sites)}')
+
+	_proxies = {'http': proxy, 'https': proxy}
+
+	result = 0
+	with requests.Session() as s:
+		s.trust_env = False
+		for site in sites:
+			try:
+				resp = s.head(
+					site
+					, timeout=timeout
+					, headers={**_USER_AGENT}
+					, proxies=_proxies
+					, allow_redirects=False
+				)
+				result += 1
+			except Exception:
+				pass
+	return result
 def _file_hash(fullpath:str)->str:
 	hash_md5 = md5()
 	with open(fullpath, 'rb') as fi:

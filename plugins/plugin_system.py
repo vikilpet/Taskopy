@@ -709,11 +709,11 @@ def sound_device_name() -> str|None:
 		winapi.com_release(props_ptr)
 
 def sound_device_list(
-	data_flow: SoundDevType = SoundDevType.RENDER,
-	state_mask: SoundDevState = SoundDevState.ACTIVE,
+	data_flow:SoundDevType = SoundDevType.RENDER,
+	state_mask:SoundDevState = SoundDevState.ACTIVE,
 ) -> list[tuple[str, str]]:
 	'''
-	Return ``(friendly_name, device_id)`` tuples for each matching endpoint.
+	Return `(friendly_name, device_id)` tuples for each matching endpoint.
 
 	*data_flow* - `RENDER` for playback devices
 	, `CAPTURE` for recording devices.  

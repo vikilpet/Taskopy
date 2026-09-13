@@ -109,6 +109,7 @@ TASK_OPTIONS = (
 	, ('on_any_key', False)
 	, ('_tid', False)
 	, ('_caller', '')
+	, ('menu_hint', '')
 )
 _WEEKDAY_HUMAN = {
 	'day': 'day'
@@ -1298,8 +1299,8 @@ def create_menu_item(menu, task, func=None, parent_menu=None):
 	'''
 	if isinstance(task, dict):
 		tname = task['task_name']
-		if task['hotkey']:
-			tname = f"{tname}\t{task['hotkey'].title()}"
+		info = task['menu_hint'] or task['hotkey']
+		if info: tname = f'{tname}\t{info}'
 		func = lambda evt, t=task['task_func_name']: tasks.run_task(
 			task_func_name=t
 			, caller=CALLER_MENU

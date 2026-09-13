@@ -85,7 +85,7 @@ def embedded__app_update_exe_start(caller:str=''):
 		tprint('no new exe')
 		return
 	new_exe = new_files.pop()
-	# Removing previous releases:
+	# Removal of previous releases:
 	for fpath in new_files: file_recycle(fpath)
 	tprint('update to', new_exe)
 	pid = app_pid()
@@ -96,6 +96,7 @@ def embedded__app_update_exe_start(caller:str=''):
 	)
 	app_exit(force=True)
 
+# 2026.09 give more time to exit
 @task_add
 def embedded__app_update_exe_replace(caller:str='', data:str='', menu=False):
 	' Replace old exe with new '
@@ -104,16 +105,17 @@ def embedded__app_update_exe_replace(caller:str='', data:str='', menu=False):
 	for attempt in range(100):
 		if not proc_exists(pid): break
 		tprint('waiting for exit', attempt)
-		time_sleep('200 ms')
+		time_sleep('500 ms')
 	else:
 		tprint("Something's wrong, the app still hasn't closed")
 		time_sleep('5 sec')
-		app_exit()
+		app_exit(force=True)
 	app_exe = path_get((app_dir(), 'taskopy.exe'))
+	file_lock_wait(app_exe)
 	file_recycle(app_exe)
 	file_rename(sys.executable, app_exe)
 	file_open(app_exe, cmdline)
-	app_exit()
+	app_exit(force=True)
 
 # 2024.01.03 abs path
 @task_add
