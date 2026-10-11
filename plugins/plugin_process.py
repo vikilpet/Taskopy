@@ -903,7 +903,6 @@ def proc_uptime(process)->float:
 def proc_kill(pid:int):
 	r'''
 	Kills the prosess.  
-	*cmd_filter* is case-insensitive.  
 	'''
 	Process(pid=pid).kill()
 

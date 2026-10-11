@@ -30,6 +30,9 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 		self.silent = True
 		self.tasks = app.tasks
 		self.req_data = DataHTTPReq()
+		self.url_path:str = ''
+		self.url_query:str = ''
+		self.url_fragment:str = ''
 		super().__init__(request, client_address, server)
 
 	def s_print(self, text:str, data:str=''):
@@ -194,8 +197,11 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 					break
 			if task: break
 		else:
-			self.s_print('task path not found: "{}"'.format( task_path[:30]) )
-			self.send_content('task not found')
+			if self.url_path == '/favicon.ico':
+				self._serve_favicon()
+			else:
+				self.s_print('task path not found: "{}"'.format( task_path[:30]) )
+				self.send_content('task not found')
 			return
 		if not self.white_list_check(task=task):
 			self.send_content('403')
@@ -240,31 +246,31 @@ class HTTPHandlerTasks(BaseHTTPRequestHandler):
 			self.s_print(f'HTTP task exception:\n{exc_text(6)}')
 			page = 'error'
 		self.send_content(page)
+	
+	def _serve_favicon(self):
+		global _FAVICON
+		if self.white_list_check():
+			if not _FAVICON:
+				i = file_b64_dec(tcon._APP_FAVICON)
+				_FAVICON = (i, str(len(i)))
+			self.send_response(200)
+			self.send_header('Content-Type', 'image/x-icon')
+			self.send_header('Content-Length', _FAVICON[1])
+			self.end_headers()
+			try:
+				self.wfile.write(_FAVICON[0])
+			except ConnectionAbortedError:
+				dev_print(f'favicon connection aborted')
+			except Exception as e:
+				dev_print(f'favicon req exception: {e}')
+		else:
+			dev_print(f'unknown favicon request: {self.path} from {self.client_address}')
+			try:
+				self.wfile.write(b'<link rel="icon" href="data:,">')
+			except Exception as e:
+				dev_print(f'favicon req (unknown) exception: {e}')
 
 	def do_GET(self):
-		global _FAVICON
-		if 'favicon.' in self.path:
-			if self.white_list_check():
-				if not _FAVICON:
-					i = file_b64_dec(tcon._APP_FAVICON)
-					_FAVICON = (i, str(len(i)))
-				self.send_response(200)
-				self.send_header('Content-Type', 'image/x-icon')
-				self.send_header('Content-Length', _FAVICON[1])
-				self.end_headers()
-				try:
-					self.wfile.write(_FAVICON[0])
-				except ConnectionAbortedError:
-					dev_print(f'favicon connection aborted')
-				except Exception as e:
-					dev_print(f'favicon req exception: {e}')
-			else:
-				dev_print(f'unknown favicon request: {self.path} from {self.client_address}')
-				try:
-					self.wfile.write(b'<link rel="icon" href="data:,">')
-				except Exception as e:
-					dev_print(f'favicon req (unknown) exception: {e}')
-			return
 		self.process_req('GET')
 		
 	def data_processing(self)->tuple:

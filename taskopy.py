@@ -1748,8 +1748,12 @@ def main():
 	__builtins__.lang = lang
 	if cmd_args.dev:
 		import faulthandler
+		fh_file = 'log\\faulthandler.log'
+		if file_exists(fh_file) and file_size(fh_file) > 0:
+			file_name_add(fh_file
+			, suffix='_' + time_str(template=DATE_STR_FILE))
 		faulthandler.enable(
-			file=open('log\\faulthandler.log', 'w', buffering=1)
+			file=open(fh_file, 'w', buffering=1)
 			, all_threads=True
 		)
 	if cmd_args.task: sett.kiosk = True

@@ -10,6 +10,7 @@ import threading
 import configparser
 import psutil
 import sqlite3
+from io import StringIO
 import json
 import subprocess
 import win32process
@@ -73,7 +74,7 @@ except ModuleNotFoundError:
 	import plugins.cache as cache
 
 APP_NAME = 'Taskopy'
-APP_VERSION = 'v2026-09-13'
+APP_VERSION = 'v2026-10-11'
 APP_FULLNAME = APP_NAME + ' ' + APP_VERSION
 if getattr(sys, 'frozen', False):
 	APP_PATH = os.path.dirname(sys.executable)
@@ -1375,7 +1376,8 @@ def qprint(*values):
 	except:
 		print('<qprint fail>', msg)
 
-def tprint(*msgs, tname:str|None=None, short:bool=False, with_parent:bool=False):
+def tprint(*msgs, tname:str|None=None, short:bool=False
+, with_parent:bool=True):
 	r'''
 	Prints the message(s) with the task name and time.  
 	*tname* - name of the caller (task name). If it
@@ -1816,6 +1818,7 @@ def table_print(
 	, trim_col:int=-1
 	, trim_func=None
 	, trim_placeholder:str='...'
+	, qprint=qprint
 ):
 	r'''
 	Print list of lists/tuples as a table.
@@ -1989,6 +1992,20 @@ def table_print(
 		qprint(template.format(*row))
 	qprint()
 
+def table_str(*args, **kwargs) -> str:
+	r'''
+	Return `table_print` output as a string.
+	All other args are forwarded as-is.
+	'''
+	buf = StringIO()
+	def _qprint(*a, **k):
+		if a:
+			buf.write(' '.join(str(x) for x in a))
+		buf.write('\n')
+	kwargs['qprint'] = _qprint
+	table_print(*args, **kwargs)
+	return buf.getvalue()
+	
 def patch_import():
 	'''
 	Import patch for current module if any.  
@@ -3101,7 +3118,7 @@ def str_remove_white(text:str, algo:str='basic', sep:str=' ')->str:
 		- *unicoce* - remove all whitespace characters
 
 
-		asrt( str_remove_white(' ba  sic '), 'ba sic')
+		asrt( str_remove_white(' ba  \nsic '), 'ba sic')
 		asrt( str_remove_white(' spa\n\tce ', 'space'), 'spa\nce')
 		asrt( str_remove_white(' win\r\nspace ', 'space'), 'win\r\nspace')
 		asrt( str_remove_white(' no spa\n\tce ', sep=''), 'nospace')
@@ -3357,7 +3374,7 @@ def task_is_manual(human_caller:set={tcon.CALLER_MENU, tcon.CALLER_HOTKEY
 	if not task: return False
 	return task.get('_caller') in human_caller
 
-def task_duration(tname:str='')->str:
+def task_duration(tname:str='', with_ms:bool=False)->str:
 	r'''
 	How long does the current task work? -> '4m:3s'  
 	'''
@@ -3367,7 +3384,7 @@ def task_duration(tname:str='')->str:
 	task = app.tasks.task_dict.get(tname)
 	if not task: return '<task not found in app>'
 	if not task['running']: return '<task is not running>'
-	return time_diff_human(task.get('last_start'))
+	return time_diff_human(task.get('last_start'), with_ms=with_ms)
 
 def dict_str(dct:dict, template:str='{}: {}'
 , line_sep:str='\n', short:int=0)->str:

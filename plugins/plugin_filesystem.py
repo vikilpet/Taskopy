@@ -915,6 +915,7 @@ def file_name(fullpath)->str:
 		# Note: for a directory with a slash at the end
 		asrt( file_name('C:\\Windows\\System32\\'), '' )
 		asrt( file_name('C:\\Windows\\System32'), 'System32' )
+		asrt( bmark(file_name, ('C:\\Windows\\System32\\calc.exe',)), 5_000 )
 
 	'''
 	return os.path.basename( path_get(fullpath) )
@@ -2749,10 +2750,11 @@ def dir_junc(src_path, dst_path):
 	CreateJunction(src_path, dst_path)
 
 def dir_last(fullpath, subdirs:bool=True
-, sort_function:Callable=file_date_m, **rules):
+, sort_function:Callable=file_date_m, **rules)->str:
 	r'''
 	Returns the full path of the "last" file in `fullpath`,
-	where "last" is defined by `sort_function`.
+	where "last" is defined by `sort_function`.  
+	Sort by name: `sort_function=file_nam e`
 
 		td = dir_test(with_long=False)
 		tf = file_write((td, 'last'), 'l')

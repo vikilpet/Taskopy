@@ -16,6 +16,7 @@ import psutil
 import tempfile
 import win32file
 import unicodedata
+import struct
 from io import BytesIO
 from hashlib import md5
 from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
@@ -38,7 +39,7 @@ from .plugin_filesystem import var_lst_get, path_get, file_name, file_dir
 from .plugin_process import proc_wait
 
 
-_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36'}
+_USER_AGENT = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36'}
 _SPEED_UNITS = {'gb': 1_073_741_824, 'mb': 1_048_576, 'kb': 1024, 'b': 1}
 LAN_DOMAINS = ('lan', 'local', 'home')
 _RE_PING_LOSS = re.compile(r'\((\d+)%')
@@ -46,21 +47,46 @@ _RE_PING_FAIL = re.compile(r' \d+\.\d+\.\d+\.\d+: .+?=\d+\D+[<=]\d+\D+=\d+')
 _RE_PING_TIME = re.compile(r' = (\d+).+? = (\d+).+? = (\d+)')
 _RE_HOST_IP = re.compile(r'\D(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})[\:/]')
 _ZW_TABLE = str.maketrans('', '',
-	'\u200b'   # ZERO WIDTH SPACE          — invisible, not whitespace
-	'\u200c'   # ZERO WIDTH NON-JOINER     — invisible, not whitespace
-	'\u200d'   # ZERO WIDTH JOINER        — invisible (used for emoji sequences)
-	'\u2060'   # WORD JOINER              — invisible, not whitespace
-	'\ufeff'   # ZERO WIDTH NO-BREAK SPACE — BOM/ZWNBSP, invisible
-	'\u00A0'   # NO-BREAK SPACE            — &nbsp;, looks like space but isn't (also NFKC folds it, kept for safety)
-	'\u2800'   # BRAILLE PATTERN BLANK    — looks like space, not whitespace
-	'\u0085'   # NEXT LINE (NEL)           — control char, acts as line break, isspace()=True
-	'\u180e'   # MONGOLIAN VOWEL SEPARATOR — invisible, was classified as space until Unicode 6.3
-	'\u2028'   # LINE SEPARATOR           — invisible line break, isspace()=True but survives mid-text
-	'\u2029'   # PARAGRAPH SEPARATOR      — invisible paragraph break, isspace()=True but survives mid-text
-	'\u115f'   # HANGUL CHOSEONG FILLER   — renders blank, not whitespace
-	'\u1160'   # HANGUL JUNGSEONG FILLER  — renders blank, not whitespace
-	'\u3164'   # HANGUL FILLER            — renders blank, not whitespace
-	'\uffa0'   # HALFWIDTH HANGUL FILLER  — renders blank, not whitespace
+	'\u200b'   # ZERO WIDTH SPACE
+	'\u200c'   # ZERO WIDTH NON-JOINER
+	'\u200d'   # ZERO WIDTH JOINER
+	'\u2060'   # WORD JOINER
+	'\ufeff'   # ZERO WIDTH NO-BREAK SPACE (BOM/ZWNBSP)
+	'\u034f'   # COMBINING GRAPHEME JOINER — spam filler
+	'\u200e'   # LEFT-TO-RIGHT MARK
+	'\u200f'   # RIGHT-TO-LEFT MARK
+	'\u202a'   # LEFT-TO-RIGHT EMBEDDING
+	'\u202b'   # RIGHT-TO-LEFT EMBEDDING
+	'\u202c'   # POP DIRECTIONAL FORMATTING
+	'\u202d'   # LEFT-TO-RIGHT OVERRIDE
+	'\u202e'   # RIGHT-TO-LEFT OVERRIDE — famous malware trick
+	'\u2066'   # LEFT-TO-RIGHT ISOLATE
+	'\u2067'   # RIGHT-TO-LEFT ISOLATE
+	'\u2068'   # FIRST STRONG ISOLATE
+	'\u2069'   # POP DIRECTIONAL ISOLATE
+	'\u2061'   # FUNCTION APPLICATION
+	'\u2062'   # INVISIBLE TIMES
+	'\u2063'   # INVISIBLE SEPARATOR
+	'\u2064'   # INVISIBLE PLUS
+	'\u206a'   # INHIBIT SYMMETRIC SWAPPING
+	'\u206b'   # ACTIVATE SYMMETRIC SWAPPING
+	'\u206c'   # INHIBIT ARABIC FORM SHAPING
+	'\u206d'   # ACTIVATE ARABIC FORM SHAPING
+	'\u206e'   # NATIONAL DIGIT SHAPES
+	'\u206f'   # NOMINAL DIGIT SHAPES
+	'\ufff9'   # INTERLINEAR ANNOTATION ANCHOR
+	'\ufffa'   # INTERLINEAR ANNOTATION SEPARATOR
+	'\ufffb'   # INTERLINEAR ANNOTATION TERMINATOR
+	'\u00A0'   # NO-BREAK SPACE
+	'\u2800'   # BRAILLE PATTERN BLANK
+	'\u0085'   # NEXT LINE (NEL)
+	'\u180e'   # MONGOLIAN VOWEL SEPARATOR
+	'\u2028'   # LINE SEPARATOR
+	'\u2029'   # PARAGRAPH SEPARATOR
+	'\u115f'   # HANGUL CHOSEONG FILLER
+	'\u1160'   # HANGUL JUNGSEONG FILLER
+	'\u3164'   # HANGUL FILLER
+	'\uffa0'   # HALFWIDTH HANGUL FILLER
 )
 warnings.filterwarnings('ignore', category=MarkupResemblesLocatorWarning)
 requests.packages.urllib3.disable_warnings(
@@ -175,11 +201,10 @@ def _rem_white(text:str)->str:
 	if not text: return text
 	return ' '.join(text.split())
 
-def file_download(url:str, destination:str=None
-, attempts:int=3, timeout:float|tuple[float|None,float|None]=3.0
+def file_download(url:str, destination:str=None, attempts:int=3
+, timeout:float|tuple[float|None,float|None]=3.0
 , del_bad_file:bool=False, headers:dict={}
-, size_limit:int=None
-, stop_event:threading.Event=None
+, size_limit:int=None, stop_event:threading.Event=None
 , overwrite:bool=False
 , chunk_size:int=1_048_576
 , **kwargs)->str:
@@ -223,7 +248,7 @@ def file_download(url:str, destination:str=None
 			os.makedirs(os.path.dirname(destination))
 		except FileExistsError:
 			pass
-	find_name = False
+	find_name:bool = False
 	dst_file = destination
 	if dst_file:
 		find_name = os.path.isdir(dst_file)
@@ -252,6 +277,7 @@ def file_download(url:str, destination:str=None
 					fname = req.url.split('/')[-1]
 				if fname:
 					dst_file = os.path.join(dst_file, fname.strip('"'))
+					find_name = False
 				else:
 					with tempfile.TemporaryFile() as f:
 						dst_file = f.name
@@ -929,8 +955,6 @@ def ping_tcp(host:str, port:int, count:int=1, pause:int=100
 	loss = (count - len(timings)) * 100 // count
 	return True, ( loss, int(median(timings)))
 
-
-
 def ping_icmp(host:str, count:int=3
 , timeout:int=500, encoding:str='cp866')->tuple[bool, tuple|str]:
 	r'''
@@ -955,6 +979,222 @@ def ping_icmp(host:str, count:int=3
 	av_time:int = 0
 	av_time = int( _RE_PING_TIME.findall(out)[1][2] )
 	return True, (loss, av_time)
+def _socks5_handshake(tcp_sock, username=None, password=None):
+	'''SOCKS5 method negotiation + optional auth.'''
+	if username:
+		tcp_sock.sendall(b'\x05\x02\x00\x02')
+	else:
+		tcp_sock.sendall(b'\x05\x01\x00')
+	response = tcp_sock.recv(2)
+	if len(response) < 2:
+		raise ConnectionError('SOCKS5 greeting failed')
+	method = response[1]
+	if method == 0x00:
+		return
+	elif method == 0x02 and username:
+		auth = (b'\x01'
+			+ bytes([len(username)]) + username.encode()
+			+ bytes([len(password)]) + password.encode())
+		tcp_sock.sendall(auth)
+		response = tcp_sock.recv(2)
+		if response[1] != 0:
+			raise ConnectionError('SOCKS5 auth failed')
+	else:
+		raise ConnectionError(f'SOCKS5 method {method} not supported')
+
+def _socks5_udp_associate(tcp_sock):
+	'''Send UDP ASSOCIATE, return (relay_addr, relay_port).'''
+	tcp_sock.sendall(b'\x05\x03\x00\x01\x00\x00\x00\x00\x00\x00')
+	response = b''
+	while len(response) < 10:
+		chunk = tcp_sock.recv(256)
+		if not chunk:
+			raise ConnectionError('SOCKS5 closed during UDP ASSOCIATE')
+		response += chunk
+	reply_code = response[1]
+	if reply_code != 0:
+		errors = {1: 'general failure', 2: 'not allowed',
+			3: 'network unreachable', 4: 'host unreachable',
+			5: 'connection refused', 6: 'TTL expired',
+			7: 'command not supported',
+			8: 'address type not supported'}
+		raise ConnectionError(
+			f'UDP ASSOCIATE rejected: {errors.get(reply_code, "unknown")}')
+	atyp = response[3]
+	offset = 4
+	if atyp == 1:
+		addr = socket.inet_ntoa(response[offset:offset+4])
+		offset += 4
+	elif atyp == 3:
+		dlen = response[offset]
+		addr = response[offset+1:offset+1+dlen].decode()
+		offset += 1 + dlen
+	elif atyp == 4:
+		addr = socket.inet_ntop(socket.AF_INET6, response[offset:offset+16])
+		offset += 16
+	else:
+		raise ConnectionError(f'Unknown ATYP {atyp}')
+	port = struct.unpack('>H', response[offset:offset+2])[0]
+	return addr, port
+
+def _socks5_udp_wrap(dst_host, dst_port, payload):
+	'''Wrap payload in SOCKS5 UDP header.'''
+	try:
+		ip = socket.inet_aton(dst_host)
+		return b'\x00\x00\x00\x01' + ip + struct.pack('>H', dst_port) + payload
+	except OSError:
+		return (b'\x00\x00\x00\x03' + bytes([len(dst_host)])
+			+ dst_host.encode() + struct.pack('>H', dst_port) + payload)
+
+def _parse_socks5_udp_header(data):
+	'''Parse SOCKS5 UDP relay header. Returns (src_addr, src_port, payload).'''
+	if len(data) < 6:
+		return None, None, data
+	atyp = data[3]
+	offset = 4
+	if atyp == 1:
+		if len(data) < offset + 4 + 2:
+			return None, None, data
+		addr = socket.inet_ntoa(data[offset:offset+4])
+		offset += 4
+	elif atyp == 3:
+		if len(data) < offset + 1:
+			return None, None, data
+		dlen = data[offset]
+		addr = data[offset+1:offset+1+dlen].decode()
+		offset += 1 + dlen
+	elif atyp == 4:
+		if len(data) < offset + 16 + 2:
+			return None, None, data
+		addr = socket.inet_ntop(socket.AF_INET6, data[offset:offset+16])
+		offset += 16
+	else:
+		return None, None, data
+	port = struct.unpack('>H', data[offset:offset+2])[0]
+	offset += 2
+	return addr, port, data[offset:]
+
+STUN_MAGIC_COOKIE = 0x2112A442
+
+def _stun_binding_request(txid: bytes) -> bytes:
+	'''Build a 20-byte STUN Binding Request.'''
+	return struct.pack('>HHI', 0x0001, 0, STUN_MAGIC_COOKIE) + txid
+
+def _stun_validate_response(data: bytes, expected_txid: bytes) -> bool:
+	'''Check if response is a valid STUN Binding Success Response with matching TXID.'''
+	if len(data) < 20:
+		return False
+	msg_type, msg_len, cookie = struct.unpack('>HHI', data[:8])
+	txid = data[8:20]
+	if msg_type != 0x0101:
+		return False
+	if cookie != STUN_MAGIC_COOKIE:
+		return False
+	return txid == expected_txid
+
+def ping_stun_socks5(
+	socks_host:str
+	, socks_port:int
+	, dst_host:str='stun.l.google.com'
+	, dst_port:int=19302
+	, socks_user:str|None=None
+	, socks_pass:str|None=None
+	, count:int=4
+	, pause:int=100
+	, timeout:int=2000
+)->tuple:
+	r'''
+	Measure loss and response time with a STUN Binding Request
+	sent through SOCKS5 UDP ASSOCIATE.
+
+	Returns (True, (loss percentage, time in ms) )
+	or (False, 'error text').
+	*pause* - pause in milliseconds between attempts
+	*timeout* - waiting time for a response in milliseconds.
+	NOTE: the first packet time is discarded, you better
+	set *count* to 2 or more.  
+
+	Public STUN servers:
+
+		stun.l.google.com:19302       Google
+		stun1.l.google.com:19302      Google
+		stun2.l.google.com:19302      Google
+		stun3.l.google.com:19302      Google
+		stun4.l.google.com:19302      Google
+		stun.cloudflare.com:3478      Cloudflare
+		stun.miwifi.com:3478          Xiaomi
+		stun.syncthing.net:3478       Syncthing
+		stun.nextcloud.com:3478       Nextcloud
+		stun.sipgate.net:3478         Sipgate
+		stun.ekiga.net:3478           Ekiga
+		stun.internetcalls.com:3478   Internetcalls
+		stun.voipbuster.com:3478      Voipbuster
+		stun.antisip.com:3478         Antisip
+		stun.bluesip.net:3478         Bluesip
+		stun.dus.net:3478             Dus.net
+		stun.gmx.net:3478             GMX
+		stun.schlund.de:3478          Schlund
+		stun.1und1.de:3478            1&1
+		stun.halonet.net:3478         Halonet
+
+	Examples:
+
+		asrt( ping_stun_socks5('10.0.1.3', 20170)[0], True )
+		asrt( ping_stun_socks5('10.0.1.3', 20170)[1][1] > 10, True )
+		asrt( ping_stun_socks5('10.0.1.3', 20170, 'stun.cloudflare.com', 3478)[0], True )
+
+	'''
+	timings = []
+	last_err = 'OK'
+	udp_sock = None
+	tcp_sock = None
+	try:
+		tcp_sock = socket.socket( socket.AF_INET, socket.SOCK_STREAM )
+		tcp_sock.settimeout(timeout/1000)
+		tcp_sock.connect((socks_host, socks_port))
+		_socks5_handshake(tcp_sock, socks_user, socks_pass)
+		relay_addr, relay_port = _socks5_udp_associate(tcp_sock)
+		if relay_addr in ('0.0.0.0', '::'):
+			relay_addr = socks_host
+		relay = (relay_addr, relay_port)
+
+		udp_sock = socket.socket( socket.AF_INET, socket.SOCK_DGRAM )
+		udp_sock.settimeout(timeout/1000)
+
+		for _ in range(count):
+			try:
+				txid = os.urandom(12)
+				stun_req = _stun_binding_request(txid)
+				packet = _socks5_udp_wrap(dst_host, dst_port, stun_req)
+
+				tstart = time.perf_counter_ns()
+				udp_sock.sendto(packet, relay)
+				data, _ = udp_sock.recvfrom(2048)
+
+				_, _, payload = _parse_socks5_udp_header(data)
+				if not _stun_validate_response(payload, txid):
+					raise ValueError('invalid STUN response')
+
+				timings.append(
+					(time.perf_counter_ns() - tstart) // 1_000_000
+				)
+			except Exception as err:
+				last_err = str(err)
+			time.sleep(pause / 1000)
+
+	except Exception as err:
+		last_err = str(err)
+	finally:
+		for sock in (udp_sock, tcp_sock):
+			if sock:
+				try: sock.close()
+				except: pass
+
+	tdebug(timings)
+	if not timings: return False, last_err
+	steady = timings[1:] if len(timings) > 1 else timings
+	loss = (count - len(timings)) * 100 // count
+	return True, ( loss, int(median(steady)) )
 
 def ftp_upload(fullpath:str|list|tuple, server:str
 , user:str, pwd:str, dst_dir:str='/', port:int=21
@@ -1188,7 +1428,7 @@ def net_speedtest(url:str)->float:
 		qprint(f'{total_bytes_dload=}, {speed_measurements=}')
 	return median(speed_measurements)
 
-def task_add_if(pc_name:str|set[str]=''
+def task_add_if(pc_name:str|set[str]|tuple[str]=''
 , rule:Callable|list[Callable]|None=None):
 	r'''
 	Conditionally adds an attribute indicating that the function is a *task*.  
